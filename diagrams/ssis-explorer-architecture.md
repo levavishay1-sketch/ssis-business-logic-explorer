@@ -42,3 +42,6 @@
 
 ## גרסה בעברית וצבעונית
 `ssis-explorer-architecture-he.html` (SVG מוטבע, RTL) ו-`ssis-explorer-architecture-he.png`. ירוק = כלי דטרמיניסטי, סגול = סוכן, כתום = משתמש, צהוב = חוקים, אדום מקווקו = לולאת תיקון ובדיקה חוזרת.
+
+## תרשים הסוכנים והכלים
+`ssis-agents-and-tools-he.html` / `.png`: כל סוכן עם כלי Claude Code וכלי הפרויקט שלו, סדר הפעולות, קטלוג `tools/*.mjs`. ה-`ssis-fixer` מסומן כמוצע (עוד לא קיים כקובץ).
