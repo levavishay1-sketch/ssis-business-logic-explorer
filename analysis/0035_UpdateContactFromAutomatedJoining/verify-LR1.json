@@ -1,0 +1,24 @@
+{
+  "verifier": "ssis-verifier",
+  "package": "0035_UpdateContactFromAutomatedJoining",
+  "scope": "logic-claims re-check after fixes",
+  "checkedAt": "2026-11-07T12:08:22Z",
+  "checked": 1,
+  "results": [
+    {
+      "id": "L|Package\\Update Contact From Joining|open",
+      "hash": "599dfdb370e6",
+      "verdict": "WRONG",
+      "detail": "Units 1, 2 and 4 are correct. Unit 1: donotsendmm and gen_quarterstatement are unqualified in the WHERE (DTSX:858-859). Unit 2: the cross-package SQL comments are quoted exactly and attributed correctly: 0005:32056 'temp.gen_joiningstatus = 7 -- status send to the bank' (temp is derived from gen_automatedjoining aj, 0005:32051-32055), and 0037:3232/4762 'gen_joiningstatus = 8 --> Finish' on gen_automatedjoining. Other comments in the supplied files ('in (5,6,7,8,13) /*cancelled or finished*/' in 0028:915 and '= 13 --finished' in 0029:36384) refer to gen_pensionjoining, so they do not contradict unit 2. 0035:857 is unqualified. Unit 4: no label or option evidence for donotsendmm or gen_quarterstatement exists in any supplied DTSX. Unit 3 is wrong: it states the reselection condition backwards. The package itself writes contact.donotsendmm=false (main.cs, DTSX:1206) and contact.gen_quarterstatement=true (DTSX:1211). Under unit 1's own hypothesis that these WHERE columns belong to Contact, a successful update makes 'donotsendmm != 0' and 'gen_quarterstatement != 1' false. The request is then not selected again, whatever the agreement-update dates are. So reselection is not 'as long as donotsendmm or gen_quarterstatement did not change'.",
+      "evidence": "0035 DTSX:843-859 (SqlCommand), DTSX:1197-1214 (Update Contact: gen_notauthorizeforuse, donotsendmm=false, gen_quarterstatement=true, service.Update; no write to gen_emailagreementupdate / gen_marketingagreementupdate); 0005_Customer Account.dtsx:32051-32056; 0037_MeetTheCustomerGemel.dtsx:3232, 4762; 0028_Fund Enrolment.dtsx:911-915; 0029_POA.dtsx:36381-36384",
+      "wrongUnits": [
+        {
+          "unit": 3,
+          "problem": "The text says the same requests may be selected again 'as long as donotsendmm or gen_quarterstatement did not change'. This package itself changes them (donotsendmm=false, gen_quarterstatement=true). After a successful update, filters A and B no longer match, so the missing date updates do not cause reselection in that case.",
+          "correct": "This assumes donotsendmm and gen_quarterstatement in the WHERE are Contact columns (השערה, unit 1). The agreement-update dates are not written here, so an old request is selected again in two cases. (a) The contact update failed: errors are swallowed and the values stay unchanged. (b) Later, contact.donotsendmm becomes non-0 again, or gen_quarterstatement becomes non-1 again (for example a later opt-out), while gen_emailagreementupdate / gen_marketingagreementupdate are still NULL or earlier than the request's CreatedOn. In case (b) the package writes the old consent again (donotsendmm=false / gen_quarterstatement=true) and overwrites gen_notauthorizeforuse. If the columns belong to gen_automatedjoining instead, the package does not change them, and the original wording would apply.",
+          "evidence": "DTSX:858-859, DTSX:1206, DTSX:1211, DTSX:1214"
+        }
+      ]
+    }
+  ]
+}

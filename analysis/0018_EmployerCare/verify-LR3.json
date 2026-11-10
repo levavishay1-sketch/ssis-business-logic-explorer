@@ -1,0 +1,87 @@
+{
+  "verifier": "ssis-verifier",
+  "package": "0018_EmployerCare",
+  "scope": "logic-claims re-check round 3",
+  "checkedAt": "2026-11-07",
+  "checked": 8,
+  "results": [
+    {
+      "id": "L|summary",
+      "hash": "dae9f1d29351",
+      "verdict": "WRONG",
+      "detail": "Unit 1, step 1, is correct against get Gen_employercare SQL DTSX:1425-1432 and Get All Transaction DTSX:1364-1368. Problem (a), unit 1, step 2: 'מסנכרנת ... את איש התפעול מתוך חשבון המעסיק (account.gen_operationperson) כשהוא שונה' is not exact. The SQL (DTSX:6772-6779) selects only when gen_employeroperationpersonname != a.gen_operationperson OR (gen_employeroperationpersonname is null AND a.gen_operationperson is not null). When the account value is NULL and the care record has a value, the two differ but the row is NOT selected. The package's own low finding ('ערך ריק בחשבון אינו מתפשט / ללא ניקוי') says this, so the summary contradicts it. Also, gen_employeroperationpersonname is unqualified in that query (ec / a), and the component's own open question marks its ownership as השערה; the summary presents it as the care record's value. Correct wording: 'כשבחשבון המעסיק מוגדר איש תפעול והוא שונה מהערך בעמודה gen_employeroperationpersonname שנשלפה (עמודה לא מסויגת; לפי ההשערה של הטיפול), או שהערך הזה ריק; ריק בחשבון אינו מנקה'. Smaller point in step 1: the summary does not mention the second attribute written with the state, gen_modifiedbybank = DateTime.Now (Update employer care main.cs:133). Problem (b), unit 2, count: 'מתוך 5 כותבי הסקריפט, 2 עסקיים ו-3 מסגרת' is not exact. There are 8 script-based SDK writers: 5 data-flow script components (Update employer care, Update CustomerCare, ETL Warning x2, ETL Record Finish) plus 3 Script Tasks that write gen_etlprocess/annotation (Create ETL Process record DTSX:2669; Error ETL Process record x2 in the OnError handlers, DTSX:247/256 and 5689/5698). Say '5 רכיבי סקריפט כותבים בזרימות הנתונים' or add the 3 framework Script Tasks. The rest of unit 2 is verified: single connection manager [CRM] (DTSX:6), EnableConfig=True, ConfigurationType=1 C:\\Generix\\SSISConfigFile.dtsConfig, all SQL is SELECT, no Execute SQL task, business writes are ExecuteMultiple Update of gen_employercare.",
+      "evidence": "source/DailyProcess/0018_EmployerCare.dtsx sha256 D6F9EBA6…: DTSX:6772-6779; DTSX:1425-1432, 1364-1368; Update employer care main.cs:130-133; SDK calls DTSX:247, 256, 821, 1946, 2669, 3209, 5689, 5698, 6226, 7290; DTSX:1, 6, 11",
+      "wrongUnits": [
+        {
+          "unit": 1,
+          "problem": "Operation-person sync 'כשהוא שונה' ignores the NULL semantics (account NULL -> no update even though values differ) and assumes ownership of an unqualified column; contradicts the package's own low-severity finding",
+          "correct": "Update only when a.gen_operationperson is not null and differs from the selected gen_employeroperationpersonname (unqualified), or that value is null; a NULL on the account never clears the care record",
+          "evidence": "DTSX:6772-6779"
+        },
+        {
+          "unit": 2,
+          "problem": "'5 כותבי הסקריפט' undercounts script-based SDK writers",
+          "correct": "5 script components (2 business + 3 framework) plus 3 framework Script Tasks (Create ETL Process record, Error ETL Process record x2)",
+          "evidence": "DTSX:2663-2669, 241-256, 5683-5698"
+        }
+      ]
+    },
+    {
+      "id": "L|exec",
+      "hash": "75bc24fe40c5",
+      "verdict": "CONFIRMED",
+      "detail": "The constraints at DTSX:7925-7928 are all default Success with no expressions: Get Organization Variables -> Create ETL Process record -> Close Gen_employercare -> Update operation person -> End ETL Process record. Nothing is disabled. The two OnError handlers (framework) are not listed, which is acceptable. The step-3 title is labelled with its sources (code comment / component name).",
+      "evidence": "DTSX:7925-7928",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|finding#1",
+      "hash": "952419915b61",
+      "verdict": "CONFIRMED",
+      "detail": "Get All Transaction is a full-cache lookup on gen_fundmainid = gen_fundnumber over gen_ftcurrentyear JOIN Gen_fundtransactiontype WHERE gen_transgrouptype = 1 AND gen_transactiontypeid NOT LIKE '%99%' GROUP BY gen_fundnumber. There is no date or employer column. The source joins every Gen_fundmain of the care record's customer account. gen_employername is not used. 'Current year' is labelled as a hypothesis. On ownership: gen_fundnumber is gen_ftcurrentyear's (qualified as gen_ftcurrentyear.gen_fundnumber in 0009/0015). gen_transactiontypeid is unqualified. The ambiguity rule plus 0008 'Get trans type name' (Gen_TransactionTypeID selected from gen_fundtransactiontype JOIN gen_banks) places it on Gen_fundtransactiontype. Either way, the label 'קוד סוג התנועה' is neutral about the table.",
+      "evidence": "DTSX:1364-1384, 1425-1432; 0008_LeumiFile-PY.dtsx:62942-62948; 0009/0015 gen_ftcurrentyear.gen_fundnumber",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|finding#2",
+      "hash": "ab9fad6d87d4",
+      "verdict": "CONFIRMED",
+      "detail": "Update employer care main.cs:164-169: ErrorBuffer.AddRow and Description are commented out. No other code adds rows to the Error output, so Union All receives none. An unhandled exception fails the component, and the Close Gen_employercare OnError handler (DTSX:34-41) runs Error ETL Process record. That handler updates gen_etlprocess (statuscode 277880001, runtime) and creates an annotation with System::ErrorDescription (ReadOnlyVariables, DTSX:236-256). The external CRM.Proxy is marked unknown. The text is conditional.",
+      "evidence": "Update employer care main.cs:148-173 (DTSX:1940-1970); DTSX:34-60, 236-256",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|finding#5",
+      "hash": "18ced5df98a9",
+      "verdict": "CONFIRMED",
+      "detail": "Close Gen_employercare -> Update operation person is a Success constraint (DTSX:7927). The operation-person SQL (DTSX:6772-6779) has no state filter, so care records moved to state 3 earlier in the run are eligible. Note: 'על כל רשומות טיפול המעסיק' means 'regardless of state'. The update still applies only to rows that pass the employer/operation-person condition.",
+      "evidence": "DTSX:7927, 6772-6779",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Close Gen_employercare|title",
+      "hash": "c655e28d60b6",
+      "verdict": "CONFIRMED",
+      "detail": "title_he and short_he match the source SQL (state 2, reason NULL or not in 6,7,8,9,11, all funds of the customer account) and the lookup condition. flow[3]: Aggregate GROUP BY Gen_employercareid (AggregationType=0, DTSX:580). flow[4]: main.cs:132-133: OptionSetValue(3) with comment //Finished, and gen_modifiedbybank = DateTime.Now, with the meaning labelled השערה.",
+      "evidence": "DTSX:1425-1432, 1364-1384, 554-580; main.cs:125-142",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Close Gen_employercare|detail",
+      "hash": "942ebb35cab9",
+      "verdict": "CONFIRMED",
+      "detail": "[1]-[2] as re-derived (CacheType=0, NoMatchBehavior=1, ParameterMap = gen_fundmainid). [3] The No Match output has no path. There is no date condition. [4] Update via ExecuteMultipleExtension(RequestType.Update) in batches of 100 plus the remainder, entity.Id = Gen_employercareid, gen_currentstate=3 literal, gen_modifiedbybank=DateTime.Now. [5] Consistent with finding#2.",
+      "evidence": "DTSX:1362-1384, 1408; main.cs:125-189",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Close Gen_employercare|decisions",
+      "hash": "4c62ae170735",
+      "verdict": "CONFIRMED",
+      "detail": "[1] WHERE quoted verbatim (DTSX:1431-1432). [2] Lookup reference query matches DTSX:1364-1368. The unmatched fund row is dropped (no path), and the record moves to 3 if any of its fund rows matches (Aggregate). [3] main.cs:127-128 skips rows with a NULL id.",
+      "evidence": "DTSX:1364-1368, 1425-1432; main.cs:127-128",
+      "wrongUnits": []
+    }
+  ],
+  "missingWrites": []
+}

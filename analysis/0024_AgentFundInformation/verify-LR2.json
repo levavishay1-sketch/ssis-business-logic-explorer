@@ -1,0 +1,43 @@
+{
+  "verifier": "ssis-verifier",
+  "package": "0024_AgentFundInformation",
+  "scope": "logic-claims re-check round 2",
+  "checkedAt": "2026-11-07",
+  "source": "source/DailyProcess/0024_AgentFundInformation.dtsx sha256 659C8F355B506D3D1772DC5A1165E80E3574B31C18BBCD1F2E43A836ADF6E2C4 (re-hashed, matches)",
+  "checked": 4,
+  "results": [
+    {
+      "id": "L|summary",
+      "hash": "16fb5edf4ce0",
+      "verdict": "WRONG",
+      "detail": "Verified: the table name label; the meaning labelled השערה; no other supplied DTSX references Gen_allowedinformationforfund (all 19 hits are in 0024); insert of new 5-key combinations skipping contacts with gen_customeragename = N'נפטר'; then Delete Rows (dead contacts + rows not matched by the population query) and Execute SQL Task 'delete ... where gen_agencyname is null and gen_agentname is null' (DTSX:4481). ScopeNote verified: [CRM] {EC67FF20} = Psql/ALTSHULER_MSCRM; the 4 writers in 3 executables all use it (Execute SQL Task SQLTask:Connection={EC67FF20}); EnableConfig=True + DTSX:17; Create system columns and Set system variables are VB. Wrong unit: summary_he ends 'כל הכתיבות נעשות ב-SQL ישיר על מסד הנתונים של ה-CRM'. The package also writes through the CRM SDK: Create ETL Process record crmServiceProxy.Create(gen_etlprocess) (DTSX:297) and End ETL Process record crmServiceProxy.Update (DTSX:3019). Unlike 0022, this claim does not mention these framework writers anywhere. Fix: 'כל הכתיבות העסקיות ...' (and optionally note the ETL SDK writers). Minor note, not counted as wrong: 'צירופים חדשים של קופה, לקוח, סוכן וסוכנות' omits the account key (the existence Lookup uses 5 keys incl. Gen_accountname).",
+      "evidence": "DTSX:297, 3019, 4481, 2137-2149, 1906-1922, 4-6, 17",
+      "wrongUnits": ["[1] 'כל הכתיבות נעשות ב-SQL ישיר' - SDK writes exist (gen_etlprocess Create DTSX:297, Update DTSX:3019); must be scoped to business writes"]
+    },
+    {
+      "id": "L|Package\\Create Fund View Table|title",
+      "hash": "ec2756f434c5",
+      "verdict": "WRONG",
+      "detail": "Verified: the existinfile meaning is labelled השערה; 'ששוערכו מאז תחילת השנה שלפני שלוש שנים' = year(gen_revaluationdate) >= year(getdate())-3; current POA (gen_currentstate = 1); only new combinations (Lookup NoMatch 1, Match unconnected); dead contacts skipped; direct SQL insert. Wrong unit: flow_he[1] says 'והסוכן או הסוכנות המורשים לכל קופה' as fact. 'מורשים' (authorized) is a meaning not shown by the files. In branch 2 the agent/agency written are those of the parent contract ac2 (gen_agentsid = ac2.gen_agentname, Gen_agencieId = ac2.gen_agencyname). They are not named in the POA; the POA only has to name the fund's agent or agency. In branch 1 they are gen_agents/gen_agencie rows matched by gen_agents.gen_contactname = poa.gen_agentname and gen_agencie.gen_agencyname = poa.gen_agencyname. Fix: 'והסוכן או הסוכנות שנגזרים מייפוי הכוח או מחוזה האב'.",
+      "evidence": "DTSX:2034-2084 (SqlCommand from 1970), 2137-2149, 2190-2214",
+      "wrongUnits": ["[3] flow_he[1] 'הסוכן או הסוכנות המורשים לכל קופה' - unproven meaning; branch-2 agent/agency come from ac2, not from the POA"]
+    },
+    {
+      "id": "L|Package\\Create Fund View Table|detail",
+      "hash": "230c111e5473",
+      "verdict": "INCOMPLETE",
+      "detail": "Units 1-3 and 5 verified against SQL DTSX:1970-2084: two active UNION ALL branches (two others commented out); left joins to gen_agents/gen_agencie; ac1 via gen_brokernumber and ac2 via ac1.gen_agencycontractnumber (the 'parent' label is in the SQL comment '--Agent with parent contracr ...'); branch-2 conditions; ROW_NUMBER over (FUND_NUMBER, CONTACT_NAME, ACCOUNT_NAME, AGENT_NAME, AGENCY_NAME) ordered by POW_START_DATE desc only. The Gen_existinfile ambiguity argument is explicit and holds; no supplied file shows Gen_existinfile on the other FROM tables. Lookup is Full cache, 5 keys, Match unconnected. Dead filter on Contact where gen_customeragename = N'נפטר'. Unit 4 verified: AccessMode 0 OpenRowset [dbo].[Gen_allowedinformationforfundBase]; StatusCode=1 main.vb:27, StateCode=0 main.vb:30; OwningUser/CreatedBy/ModifiedBy = SystemUserId and OwningBusinessUnit = BusinessUnitId, both from Get System user id (SystemUser by DomainName = @[User::UserName]) via Set system variables. Missing values written to CRM by this INSERT, not stated anywhere in the claim: Gen_powerofattorneymainname <- POW_MAIN (gen_powerofattorney.gen_powerofattorneymain); gen_agentreceivescommissionnly <- IS_COMMISSION_AGENT = isnull(gen_powerofattorney.gen_agentreceivescommissionnly, 0) (NULL defaulted to 0); CreatedOn/ModifiedOn = DateTime.UtcNow (main.vb:25,33); Gen_allowedinformationforfundId = Guid.NewGuid (main.vb:36). Note: the dedupe partitions by gen_fundmain.gen_fundnumber, not by fund GUID. If two fund records share a fund number with the same contact/account/agent/agency, only one gets a row. Whether gen_fundnumber is unique is not shown.",
+      "evidence": "DTSX:1970-2084, 2137-2149, 1906-1922, 608-616, main.vb:18-36 (Create system columns, DTSX:684), Get System user id DTSX:5388-5402",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Delete Rows|detail",
+      "hash": "a27fed564a47",
+      "verdict": "WRONG",
+      "detail": "Units 1-4 verified. Source: select ... from Gen_allowedinformationforfund with no WHERE (DTSX:2608). Multicast: Output 2 -> Get customers dead (Match -> delete), Output 3 -> Check if valid allow (No Match -> delete), Output 1 dangling. The validity query's active SQL is identical to the insert query; a whitespace-normalised diff differs only by one blank line. The 6 keys are agency, agent, fund (FUND_GUID), contact, POW_MAIN, account (DTSX:2463). Both deletes are 'delete Gen_allowedinformationforfundBase where Gen_allowedinformationforfundid = ?' on [CRM]. The double-delete note is labelled השערה. Unit 5 is wrong as stated: 'נמחקת ... כשייפוי הכוח כבר אינו במצב נוכחי (1)'. The actual rule is that a row is deleted when no row of the population query matches its 6 keys. If another current POA of the same account still yields the same agent/agency/contact/account/fund and the same POW_MAIN value (gen_powerofattorneymain is a GUID reference whose uniqueness per POA is not shown), the row is kept. The list in unit 5 is also presented as the set of triggers but omits others in the SQL: ac1.Gen_isContractDataSharing no longer 1, or the POA agent/agency no longer equal to the fund's (branch-2 rows); a change in the agent/agency resolution (gen_agents.gen_contactname / gen_agencie.gen_agencyname) or in the fund's contact/account; losing RowNum = 1. Fix: state the rule ('כשאין לה עוד התאמה בשישה המפתחות לשאילתת האוכלוסייה') and give the listed cases as examples.",
+      "evidence": "DTSX:2603-2620, 2722-2750, 2227-2340, 2457-2463, 2529-2532, 2566-2569",
+      "wrongUnits": ["[5] 'כשייפוי הכוח כבר אינו במצב נוכחי (1)' - not sufficient for deletion; true trigger is absence of a 6-key match; enumeration omits branch-2 / resolution / RowNum triggers"]
+    }
+  ],
+  "missingWrites": []
+}

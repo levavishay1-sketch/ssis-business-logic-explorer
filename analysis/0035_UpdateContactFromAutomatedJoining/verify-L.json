@@ -1,0 +1,136 @@
+{
+  "verifier": "ssis-verifier",
+  "package": "0035_UpdateContactFromAutomatedJoining",
+  "scope": "logic-claims all",
+  "checkedAt": "2026-11-07T11:35:42.138Z",
+  "checked": 15,
+  "results": [
+    {
+      "id": "L|summary",
+      "hash": "4b7ecbfc942b",
+      "verdict": "CONFIRMED",
+      "detail": "Re-derived: Get Automated Joinings joins gen_automatedjoining to Contact on gen_applicantidentitynumber = Contact.gen_identitynumber; Update Contact sets donotsendmm=false when gen_newcompanyemailagreement==1, gen_quarterstatement=true when gen_newmarketinginquiriesagreement==1, and always sets gen_notauthorizeforuse (OptionSetValue or null) from the derived column. Scope note: single SDK write (service.Update), [PSQL] = PSQL/ALTSHULER_MSCRM read only (DTSX:4), no package configurations, log providers or event handlers in the file, ServerName/OrganizationName from gen_etlvariable (Set Variables ReadWriteVariables DTSX:803).",
+      "evidence": "DTSX:843-862; Update Contact main.cs:118-157 @DTSX:941; DTSX:4; DTSX:29, 803",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|exec",
+      "hash": "c0e08aadd4a4",
+      "verdict": "CONFIRMED",
+      "detail": "Only two executables; one precedence constraint Get Organization Variables -> Update Contact From Joining, no DTS:Value (Success), no expression; nothing disabled.",
+      "evidence": "DTSX:19, 833, 1971",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|ignored",
+      "hash": "681f05b9a180",
+      "verdict": "CONFIRMED",
+      "detail": "Get Organization Variables only reads gen_etlvariable (gen_key/gen_value by package scope) and sets User::OrganizationName/ServerName (connection parameters); no CRM write, no business filter.",
+      "evidence": "DTSX:29-36, 803",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|finding#1",
+      "hash": "10c5f46eb521",
+      "verdict": "CONFIRMED",
+      "detail": "WHERE is 'gen_joiningstatus in(7,8) and (A) or (B)'; SQL AND binds tighter than OR, so it is (status in (7,8) AND A) OR B; B rows are selected regardless of gen_joiningstatus and flow to Update Contact.",
+      "evidence": "DTSX:857-859",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|finding#2",
+      "hash": "caee443aee30",
+      "verdict": "CONFIRMED",
+      "detail": "UpdateEmailAgreement/UpdateMarketingAgreement are computed in SQL and are inputs of Update Contact but never referenced in main.cs; the script tests only gennewcompanyemailagreement==1 / gennewmarketinginquiriesagreement==1, so a row selected through B with gen_newcompanyemailagreement=1 also gets donotsendmm=false without A's date/donotsendmm conditions.",
+      "evidence": "DTSX:843-850; Update Contact main.cs:139-147",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|finding#3",
+      "hash": "ce8e26b945bc",
+      "verdict": "CONFIRMED",
+      "detail": "main.cs:130-137 always sets contact[\"gen_notauthorizeforuse\"] (OptionSetValue or null) for every row with ContactId; the derived value is the joining's gen_notauthorizetousedatasource (or NULL in the special case), so a NULL value clears the contact field.",
+      "evidence": "Set field by other DTSX:909; main.cs:130-137",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|finding#4",
+      "hash": "c6d64d337d7d",
+      "verdict": "CONFIRMED",
+      "detail": "catch -> Row.DirectRowToErrors(); the data flow has only two paths (Source -> Set field by other -> Update Contact); Errors output has no path; no ETL warning component and no log provider in the package.",
+      "evidence": "main.cs:151-155; DTSX:1963-1964",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|finding#5",
+      "hash": "46286aec4c77",
+      "verdict": "CONFIRMED",
+      "detail": "Plain inner join on identity number with no tie-break; SELECT DISTINCT only collapses fully identical rows, so several joinings with different flag values for one contact produce several Update calls in undefined order (no ORDER BY).",
+      "evidence": "DTSX:843, 855-856",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Update Contact From Joining|title",
+      "hash": "285ec7fed56a",
+      "verdict": "CONFIRMED",
+      "detail": "Summary-level description matches the flow (selection of new consents, match by identity number, derived 'not authorized' value, SDK update).",
+      "evidence": "DTSX:843-862, 909, 941",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Update Contact From Joining|short",
+      "hash": "a3a809eb4ac2",
+      "verdict": "CONFIRMED",
+      "detail": "Steps and branches match main.cs:139-147 and the always-written gen_notauthorizeforuse; meanings of donotsendmm/gen_quarterstatement correctly labelled hypothesis.",
+      "evidence": "main.cs:130-147",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Update Contact From Joining|detailed",
+      "hash": "04d09c64c324",
+      "verdict": "CONFIRMED",
+      "detail": "Every unit re-derived: join and DISTINCT, precedence of the WHERE, both condition groups exactly (donotsendmm != 0, gen_quarterstatement != 1, datediff>0 or NULL), derived-column expression and its two branches, ContactId null skip, null/OptionSet write, the two independent ifs, single service.Update, unconnected Errors output.",
+      "evidence": "DTSX:843-862; DTSX:909 expression; main.cs:121-155; DTSX:1963-1964",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Update Contact From Joining|detail",
+      "hash": "695040df9859",
+      "verdict": "CONFIRMED",
+      "detail": "Population, matching, three decision points, unused SQL flags, CRM write and outcome all match.",
+      "evidence": "DTSX:843-862; DTSX:909; main.cs:118-157",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Update Contact From Joining|decisions",
+      "hash": "096ecac4b661",
+      "verdict": "CONFIRMED",
+      "detail": "All four conditions copied exactly from SQL, derived column and main.cs:139/144.",
+      "evidence": "DTSX:857-859; DTSX:909; main.cs:139, 144",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Update Contact From Joining|crm",
+      "hash": "2e0292375428",
+      "verdict": "CONFIRMED",
+      "detail": "Single SDK Update of contact; attributes and conditions correct; rows without ContactId skipped.",
+      "evidence": "main.cs:121-149",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Update Contact From Joining|open",
+      "hash": "75d2738d7681",
+      "verdict": "WRONG",
+      "detail": "Units 1, 3 and 4 are correctly labelled and not settled by the files. Unit 2 is partly answerable: the meaning of gen_automatedjoining.gen_joiningstatus 7 and 8 is given by SQL comments in other supplied packages; only gen_quarterstatement remains unproven.",
+      "evidence": "0005_Customer Account.dtsx:32051-32056 ('temp.gen_joiningstatus = 7 -- status send to the bank', from gen_automatedjoining aj); 0037_MeetTheCustomerGemel.dtsx:3232, 4762 ('gen_joiningstatus = 8 --> Finish' on gen_automatedjoining)",
+      "wrongUnits": [
+        {
+          "unit": 2,
+          "problem": "States that the meaning of gen_joiningstatus 7 and 8 is not proven.",
+          "correct": "In the supplied files gen_automatedjoining.gen_joiningstatus 7 = 'status send to the bank' and 8 = 'Finish' (SQL comments). The meaning of gen_quarterstatement is still unproven.",
+          "evidence": "0005_Customer Account.dtsx:32056; 0037_MeetTheCustomerGemel.dtsx:3232, 4762"
+        }
+      ]
+    }
+  ]
+}

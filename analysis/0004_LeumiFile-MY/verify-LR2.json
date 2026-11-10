@@ -1,0 +1,221 @@
+{
+  "verifier": "ssis-verifier",
+  "package": "0004_LeumiFile-MY",
+  "scope": "logic-claims re-check round 2",
+  "checkedAt": "2026-11-07",
+  "source": "source/DailyProcess/0004_LeumiFile-MY.dtsx sha256 E22BEC283D4ED4A103C1F51FD283DBC70CF958E2E932AB903F7BEE1CAC24B10C",
+  "checked": 35,
+  "results": [
+    {
+      "id": "L|summary", "hash": "7ed8889f3a57", "verdict": "CONFIRMED",
+      "detail": "Re-derived: Get User Id 1 selects systemuser where lower(domainname) LIKE '%crmadmin'; Set Varibales sets both User::SystemUserId and User::UserId to the same id (main.cs 108-113), so ContactBase UPDATE ModifiedBy (Param_10), AccountBase UPDATE ModifiedBy (Param_5), kibbutz 'update Account' ModifiedBy (AdminId) and gen_contactlogsbase CreatedBy/ModifiedBy all carry the system user. Fund INSERT carries CreatedBy/ModifiedBy/OwnerId/OwnerIdType/OwningBusinessUnit/TransactionCurrencyId (Add System Columns main.cs 117-126); fund UPDATE and the agent-date UPDATE have no ModifiedBy. Loan-eligibility UPDATE follows both Update gen_fundmain and Create gen_FundMain. SDK split correct (ExecuteMultiple for account/contact/gen_employers; service.Create per gen_kibutz). The DTSX has no package configurations, and every direct DML on CRM tables uses connection CRM (psql/ALTSHULER_MSCRM).",
+      "evidence": "DTSX:100430, 100465 (Set Varibales main.cs 108-113), 34278, 22695, 56523, 26695, 61788, 92873, 92818, 93451, 93489; configurations=[] in evidence", "wrongUnits": []
+    },
+    {
+      "id": "L|finding#7", "hash": "1bb43bfaf2fa", "verdict": "CONFIRMED",
+      "detail": "Fields From File Or DB: try main.cs 31-191, catch(Exception e){} empty at 193-195. Line 62 reads Row.genexcludedupdatedepositmfpercentage without an _IsNull guard. The rules after it (deposit bonus date 62-77, disconnect 79-89, mycreateddate 93-101, indicators/benefit mail 103-187) are skipped if it throws. The output is synchronous, so the row still reaches Update gen_fundmain. The throw case is correctly conditional.",
+      "evidence": "Fields From File Or DB main.cs:31-195 @DTSX:64907", "wrongUnits": []
+    },
+    {
+      "id": "L|finding#22", "hash": "bcdb26f37d78", "verdict": "CONFIRMED",
+      "detail": "Add 0 to short id num (Create Kibutz) main.cs 53-67 does p.GetValue, then IsNullOrEmpty -> \"\", then PadLeft(size,'0'). Set AccountName And AccountNumber checks !_IsNull && !IsNullOrWhiteSpace at main.cs 122 and 134, which a 000000000 value passes. Lookups pad to 9 with Right('000000000'+x,9). Both runtime branches are stated conditionally.",
+      "evidence": "DTSX:47595 main.cs 49-67; DTSX:53629 main.cs 117-142; DTSX:53490, 53440", "wrongUnits": []
+    },
+    {
+      "id": "L|Package (control flow)|detailed", "hash": "c0f21b43a772", "verdict": "INCOMPLETE",
+      "detail": "Re-judged under reports/logic-verify-standard.md. The earlier reason (a failed step stopping the loop) is runtime-failure plumbing and is NOT counted. Units 1-17 match the DTSX: the gen_etlvariable query; the CalendarRule SQL into User::NonWorkingDays; GetFiles(\"*\"+FileName+\"*\"); the isFileExist default false, set true only when files.Length>0; the ExpressionAndConstraint; the yyyy.MM.dd archive directory; the ascending LastWriteTime sort despite the 'desc' comment; ForEachADOEnumerator; the Success-only inner chain; and the disabled Foreach Loop Container 1 / Move file To Archive. Missing business step: the narrative skips 'Get Sytem User Id', which runs between Get Organization Variables and Get closer dates. That step fetches the crmadmin system user, its BusinessUnitId, OwnerIdType and the 'שקל חדש' TransactionCurrencyId into variables. Those values are then written to CRM: owner, creator, modifier, business unit and currency on new funds, and ModifiedBy in the contact, account and kibbutz SQL updates. Organization Variables is listed as framework, but this step feeds CRM attribute values.",
+      "evidence": "DTSX:101966-101967 (precedence Get Organization Variables -> Get Sytem User Id -> Get closer dates); DTSX:100252 data flow; Set Varibales main.cs 108-113",
+      "wrongUnits": [ { "unit": "1-3", "problem": "Pre-loop step 'Get Sytem User Id' omitted", "correct": "Add a step: the system user (systemuser with domainname ending 'crmadmin'), its business unit, owner type and transaction currency are loaded; they are later written as owner, creator and modifier of new funds and as ModifiedBy in the SQL updates", "evidence": "DTSX:100252, 100430, 101966-101967" } ]
+    },
+    {
+      "id": "L|Package\\Foreach Loop Container\\Write MY File To Staging|detailed", "hash": "0ab6dccdd970", "verdict": "CONFIRMED",
+      "detail": "Truncate precedes the load (Success constraint DTSX:98838). The source is RaggedRight with CodePage 1255, the connection string is @[User::FullFileName], and there is no header row. Fast-load goes to [dbo].[MY_FileData] on PSRS_GENERIX_STAGING. Unit 4 now uses the output name only. Re-checked that the '@' output ('Last row', or 'Last Row' in Create Kibutz) is unconnected in all 7 later data flows: CAE, Create Employers, Contacts, Accounts, Kibutz, Aggregate and Minhali daily.",
+      "evidence": "DTSX:9-13, 96032-96045, 98838; path lists of each data flow (no path from Last row / Last Row)", "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Foreach Loop Container\\Write MY File To Staging|detail", "hash": "efa927374195", "verdict": "CONFIRMED",
+      "detail": "Matches the DTSX. All rows are staged, '@' rows included. They are routed to the unconnected 'Last row' output downstream. There is no CRM write in this data flow.",
+      "evidence": "DTSX:96032-96045", "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Foreach Loop Container\\Create Account For Employers|title", "hash": "6a66faead275", "verdict": "CONFIRMED",
+      "detail": "Re-derived every flow line. The 3 lookups have NoMatchBehavior=0 and IgnoreFailure, and no writer uses their outputs. Add 0 pads and removes '.' on accountnumber, Employer_Number_38 and Bank_Account_Number_27. The split condition is correct and its default 'פרטי' output is unconnected. Also correct: the name, address and building expressions; accountnumber==0 -> Employer_Number_38; an empty name -> Employer_Name_39; {0,1,18} -> 'לקוח לא ידוע'; the HashSet dedupe; Format Dates; the lookup on active accounts with accountsWithFunds from gen_fundmain gen_existinfile=1 with no statecode filter; Create, no update, or field-wise Update.",
+      "evidence": "DTSX:3261, 4093, 4129, 4164-4218, 5747, 7372-7570, 7582, 7856, 7889, 9507", "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Foreach Loop Container\\Create Account For Employers|detailed", "hash": "99ad30bab1bf", "verdict": "WRONG",
+      "detail": "Units 1-35 match the DTSX: the conditions, padding, merge, unknown customer, dedupe, Format Dates, the lookup, Create (batch 1000, gen_essentialaccount/gen_isoperate/gen_inputsource=1/address1_addresstypecode=1/address1_name), Update (batch 100, CheckIfToUpdate on 7 fields, dob else=null, unguarded assignments with a conditional NULL-read outcome, CastingError -> ETL Warning). Unit 27 correctly says 'קופות שמסומנות כקיימות בקובץ'. Unit 36 (end state) says 'חשבונות שיש להם קופות בקובץ נשארים ללא שינוי'. The code does not check funds in the current file. It checks gen_fundmain rows in CRM with gen_existinfile = 1 (any statecode), as they stand when this step runs, before Minhali daily of this file. An account whose only fund appears in the current file for the first time IS updated. That makes unit 36 a wrong condition.",
+      "evidence": "DTSX:4164-4185 (left join gen_fundmain where gen_existinfile = 1 -> accountsWithFunds); DTSX:7856 Remove accounts with funds; precedence DTSX:98832/98843 (CAE runs before Minhali daily)",
+      "wrongUnits": [ { "unit": 36, "problem": "'accounts that have funds in the file' misstates the condition", "correct": "Accounts that have at least one gen_fundmain in CRM with gen_existinfile = 1 (any statecode) when this step runs are not updated", "evidence": "DTSX:4164-4185" } ]
+    },
+    {
+      "id": "L|Package\\Foreach Loop Container\\Create Account For Employers|decisions", "hash": "ea4f71c3ac58", "verdict": "CONFIRMED",
+      "detail": "All 8 decisions are exact: the Last row SUBSTRING; the employer-funds condition with its default 'פרטי' unconnected; the merge expressions; DT_I8 {0,1,18}; HashSet main.cs 113; the active-account lookup with NoMatchBehavior=1; accountsWithFunds==1; Extensions.CheckIfToUpdate semantics (String.Equals, ==, |Δ|<12h, null≠value).",
+      "evidence": "DTSX:4093, 4129, 4164, 4326, 7582, 7856, 7889; Update Account main.cs 135-221; Extensions.cs 10-67", "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Foreach Loop Container\\Create Employers|title", "hash": "c362af4b2290", "verdict": "CONFIRMED",
+      "detail": "Re-derived: Add 0 pads Customer_Id_Number_6, gen_bankaccountnumber, gen_employernumber and Employer_Number_38. The product lookup filters gen_banknumber=10 with NoMatchBehavior=1, and No Match goes to an unconnected Derived Column. The 3 IgnoreFailure lookups join on Service_Provider_Bank_Branch_24, Employer_Agreement_Segment_176 and Sector_Code_17. The Gen_CorporateNumber expression is correct. Both dedupes key on employer number + product. The active account lookup on Gen_CorporateNumber has an unconnected No Match. The employer lookup uses StateCode=0, bank '10', number + fundtypename. Create and Update go through the SDK.",
+      "evidence": "DTSX:36092, 36964, 37035-37144, 40570-40859, 41100, 41830", "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Foreach Loop Container\\Create Employers|detailed", "hash": "e60bc7ab856d", "verdict": "WRONG",
+      "detail": "Most units match: the conditions, lookups, corporate number, dedupe keys, the address expression with its NULL semantics, the conditional corporatename, the nine CheckIfToUpdate fields, gen_existinfile when NULL/false, and the conditional NULL-read wording in unit 35. Problems: (a) Unit 36 says that whenever the activity status differs, Convert.ToBoolean of the file value fails. gen_isactiveemplyer is wstr(1), so any non-null file value always throws in Convert.ToBoolean(string), with no hypothesis needed. A NULL file value against a non-NULL CRM value is also 'different'. If reading a missing value returns null, Convert.ToBoolean((string)null) returns false, so the employer is updated with gen_isactiveemplyer=false and does not fail. Only if the read throws does it go to CastingError. The unconditional 'נכשלת' is therefore not exact. (b) Unit 39 says 'ברשומות קיימות מתעדכנים רק תשעת השדות הנבדקים'. Unit 35 itself says gen_existinfile (when NULL/false) and gen_modifiedbybank are also written, so unit 39 contradicts it. (c) Unit 30 (create) omits gen_modifiedbybank = DateTime.Now, which is written on create (main.cs 200).",
+      "evidence": "Update Employer main.cs 133-139, 200-203 @DTSX:45271; Read MY Data From Staging gen_isactiveemplyer wstr(1) (Is_Active_Employer_112) DTSX:40945; Create Employer main.cs 200 @DTSX:37308",
+      "wrongUnits": [
+        { "unit": 36, "problem": "Failure stated unconditionally and tied to an unnecessary hypothesis", "correct": "A non-null 1-character file value always makes Convert.ToBoolean throw, so CastingError and the employer is not updated. If the file value is NULL and CRM has a value: if reading a missing value throws, the result is the same; if it returns null, gen_isactiveemplyer is set to false", "evidence": "main.cs 200-203; DTSX:40945" },
+        { "unit": 39, "problem": "'only the nine checked fields' contradicts unit 35", "correct": "The nine checked fields, plus gen_existinfile=true when NULL/false and gen_modifiedbybank=Now whenever an update is sent", "evidence": "main.cs 133-139" },
+        { "unit": 30, "problem": "Create attribute list omits gen_modifiedbybank", "correct": "Also gen_modifiedbybank = DateTime.Now", "evidence": "Create Employer main.cs 200" }
+      ]
+    },
+    {
+      "id": "L|Package\\Foreach Loop Container\\Create Employers|detail", "hash": "009d20a10654", "verdict": "INCOMPLETE",
+      "detail": "Units 2, 4 and 5 match. Unit 4 now includes gen_activecustomernumber; batch 1000 and gen_modifiedbybank are correct. Unit 1 ('מקור ואוכלוסייה') and unit 3 ('החלטות') leave out two row-selection steps that drop rows before any write. (1) The Last row exclusion: SUBSTRING(Revaluation_Date_1,1,1)=='@', output unconnected. (2) The duplicate removal on employer number + product, where only the first row is kept. Both are business row filters under the standard.",
+      "evidence": "DTSX:37000-37018; remove duplicates corporate number main.cs 113-121 @DTSX:41830; remove duplicate employer main.cs 117-123 @DTSX:41100",
+      "wrongUnits": [ { "unit": "1/3", "problem": "Population and decisions omit row filters", "correct": "Add: rows whose Revaluation_Date_1 starts with '@' are dropped (Last row unconnected); duplicates of employer number + product are dropped, keeping the first", "evidence": "DTSX:37000-37018, 41100, 41830" } ]
+    },
+    {
+      "id": "L|Package\\Foreach Loop Container\\Create Employers|decisions", "hash": "44fba3096a7a", "verdict": "CONFIRMED",
+      "detail": "All 11 decisions are exact transcriptions of the split, lookup, derived and script logic (main.cs 113/117, 136, 181; Helpers.cs bool '1'/'true').",
+      "evidence": "DTSX:36964, 37000, 37035, 37100, 40767, 40846, 42575; Create Employer main.cs 181; Update Employer main.cs 136; Helpers.cs 8-71", "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Foreach Loop Container\\Create Contacts For Minhali|title", "hash": "58da5b1fc2f0", "verdict": "WRONG",
+      "detail": "short_he and flow lines 1-5 and 7-9 match. That includes the conditional log path: isUpdateCustomerPreference can be true only after a fill-in, and the comparison reads the NULL DB value without a guard. Flow line 6 says 'טלפון בן 10 ספרות שמתחיל ב-\"05\"'. The code checks only that the value is 10 characters long after removing '-' and that it starts with \"05\" (MobilePhone.Length == 10 && Substring(0,2)==\"05\"). There is no digit check, so any 10-character value starting with 05 is taken as mobile. The condition as written is not exact.",
+      "evidence": "Set MobilePhone End EmailAddress1 main.cs 58-81 @DTSX:29829",
+      "wrongUnits": [ { "unit": "flow_he[6]", "problem": "'10 digits' is not the code condition", "correct": "A phone whose length after removing '-' is 10 characters and which starts with \"05\" (no digit check)", "evidence": "main.cs 61-62, 74-75" } ]
+    },
+    {
+      "id": "L|Package\\Foreach Loop Container\\Create Contacts For Minhali|short", "hash": "898a04357077", "verdict": "CONFIRMED",
+      "detail": "The level-1 private rows, unknown customer, mobile detection, invalid email -> NULL, active-contact lookup, SDK create, SQL update, the fill-in rule (gen_recordsorce=1 and CRM empty), and the conditional preference/log path all match. The end state is the happy path.",
+      "evidence": "DTSX:23592, 28690, 29829, 23676, 25111, 34278, 34651, 34790, 24067, 26695", "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Foreach Loop Container\\Create Contacts For Minhali|detailed", "hash": "552d868e72f1", "verdict": "WRONG",
+      "detail": "Most units match. Checked: the classification order and conditions, the level-3 caveat, Add 0 as a no-op, the HashSet dedupe, unknown values, Format date, Custom Fields, create attributes (batch 10, sourcelastupdate 3, gen_postalcode=Mailbox_78), the exact isUpdateCustomerPreference condition with the conditional NULL read, the preference/transmission reset and the 'equal preference still logs' case, the UPDATE parameter positions 0-43, and the address name driven by gendercodeDB through Param_41. Problems: (a) Unit 30 says 'טלפון בן 10 ספרות'; the code checks 10 characters after removing '-' plus the '05' prefix, with no digit check. (b) Unit 35 lists what is set when mobile or email is filled from the file: the update date, source 3 and transmission status 2/3. It leaves out that Update Correct Value also sets that channel's transmission date, file name, feedback and transmission error to NULL. The UPDATE then writes these (Param_18-25), so written values are missing.",
+      "evidence": "Set MobilePhone End EmailAddress1 main.cs 61-62, 74-75 @DTSX:29829; Update Correct Value DTSX:34651 (gen_*transmissiondate/filename/feedback/transmissionerror = NULL on fill); UPDATE ContactBase DTSX:34278 params 18-25",
+      "wrongUnits": [
+        { "unit": 30, "problem": "'10 digits' is not the code condition", "correct": "10 characters after removing '-' and starting with \"05\"", "evidence": "main.cs 61-62, 74-75" },
+        { "unit": 35, "problem": "Omits values written on fill-in", "correct": "On fill-in, also gen_mobilephone/gen_emailaddress1 transmission date, file name, feedback and transmission error are set to NULL and written by the UPDATE", "evidence": "DTSX:34651; DTSX:34278 Param_18-25" }
+      ]
+    },
+    {
+      "id": "L|Package\\Foreach Loop Container\\Create Contacts For Minhali|decisions", "hash": "ae9ec4362e86", "verdict": "CONFIRMED",
+      "detail": "All 15 decisions are exact. Decision 9 quotes the actual code condition (Length==10 && Substring \"05\"). Decision 12 includes the NULL resets. Decision 13 has the exact condition with the IsNull guards and the conditional NULL-read wording. Decision 15 maps Param_41/42.",
+      "evidence": "DTSX:23592, 23643, 24034, 24067, 28690, 28923, 29829, 31319, 34278, 34651, 34790", "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Foreach Loop Container\\Create Accounts For Minhali|title", "hash": "d7a78c5c4dfe", "verdict": "CONFIRMED",
+      "detail": "The level-3 condition, Add 0 on accountnumber, the VB ArrayList dedupe, Set columns, unknown customer 000000000 / 'לקוח לא ידוע', the lookup with no statecode filter, SDK create, and the direct UPDATE of AccountBase and CustomerAddressBase all match.",
+      "evidence": "DTSX:14990, 15077, 15211, 19386, 20274, 21005, 16121, 22695", "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Foreach Loop Container\\Create Accounts For Minhali|detailed", "hash": "fab900148b69", "verdict": "WRONG",
+      "detail": "Units 1-27 match. Unit 28 (end state) says 'כל לקוח מסוג חברה, כספי פיצולים או מרכזית פיצויים בקובץ קיים ב-CRM כחשבון'. Only rows of that class with Row_Level_147 == \"3\" are handled. Unit 13 of this claim and Contacts detailed unit 11 both say rows of this class at other levels are handled nowhere. Unit 28 contradicts them. Also incomplete: unit 24 (create) omits gen_modifiedbybank = DateTime.Now (Create Account main.cs 187). Unit 26 (UPDATE AccountBase) omits gen_modifiedbybank = getDate(), ModifiedOn = GETDATE() and ModifiedBy = system user (Param_5).",
+      "evidence": "Check customer type DTSX:14990 (&& Row_Level_147 == \"3\"); Create Account main.cs 187 @DTSX:16121; Update Account SQL DTSX:22695",
+      "wrongUnits": [
+        { "unit": 28, "problem": "End state ignores the level-3 restriction and contradicts unit 13", "correct": "Every row of this class with Row_Level_147 == \"3\" exists in CRM as an account; rows of this class at other levels are not handled", "evidence": "DTSX:14990" },
+        { "unit": "24/26", "problem": "Written attributes omitted", "correct": "Create also writes gen_modifiedbybank; the SQL update also writes gen_modifiedbybank, ModifiedOn and ModifiedBy (system user)", "evidence": "main.cs 187; DTSX:22695" }
+      ]
+    },
+    {
+      "id": "L|Package\\Foreach Loop Container\\Create Accounts For Minhali|decisions", "hash": "cb3bcc3731c8", "verdict": "CONFIRMED",
+      "detail": "All 7 decisions are exact. 'Other Customer' uses only 1/5. The level-3 clause, the VB dedupe, the unknown values, and the lookup without statecode all match.",
+      "evidence": "DTSX:14990, 15042, 15077, 15211, 19386, 21005", "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Foreach Loop Container\\Create Kibutz|title", "hash": "3ea3ec464598", "verdict": "CONFIRMED",
+      "detail": "The labels are attributed as code comments. The populations, the LastName9+FirstName10 name with no space, Sort with EliminateDuplicates on AccountNumber, both 9-digit padded lookups with no statecode filter, RowNumber = ++counter % 5 into 5 branches, service.Create, and the SQL update all match.",
+      "evidence": "DTSX:47595, 48430, 48463, 53438-53533, 53629 main.cs 115-142, 54711, 55434, 48520, 56520", "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Foreach Loop Container\\Create Kibutz|short", "hash": "e7a6dac6470e", "verdict": "CONFIRMED",
+      "detail": "The comment-attributed populations and the conditional end state match. On create failure the row goes to the unconnected Error output, so there is no account link and no warning. An existing gen_kibutz means no link. No account means skipped.",
+      "evidence": "Create Kibutz main.cs 64-83 @DTSX:48520; DTSX:53438-53533", "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Foreach Loop Container\\Create Kibutz|detailed", "hash": "a90dc8dbc0fc", "verdict": "WRONG",
+      "detail": "Units 1-25 and 27-33 match the DTSX. Unit 26 says 'הקיבוצים מחולקים לחמישה ענפים זהים כדי לעבד אותם במקביל'. The files only show the round-robin split (++counter % 5 -> Conditional Split 1 -> 5 identical branches). No comment, constant or other package states the purpose, and whether SSIS actually runs the branches in parallel is runtime behaviour not shown. The intent 'כדי לעבד במקביל' is an unproven meaning stated as fact.",
+      "evidence": "Set Row Number main.cs 59-65 @DTSX:54711; Conditional Split 1 DTSX:48463",
+      "wrongUnits": [ { "unit": 26, "problem": "Unproven purpose stated as fact", "correct": "Rows are split round-robin into five identical branches (purpose not stated in the files; parallelism = השערה)", "evidence": "DTSX:54711, 48463" } ]
+    },
+    {
+      "id": "L|Package\\Foreach Loop Container\\Create Kibutz|detail", "hash": "be747e671641", "verdict": "INCOMPLETE",
+      "detail": "Units 2, 4 and 5 match, and the conditional padding note in unit 1 is correct. Unit 1 ('מקור ואוכלוסייה') and unit 3 ('החלטות') leave out two row filters. (1) The 'Last Row' exclusion: SUBSTRING(CheckLastRow,1,1)=='@', output unconnected. (2) The Sort duplicate elimination on AccountNumber, so each kibbutz number is handled once. Both decide which rows can reach the gen_kibutz create.",
+      "evidence": "Conditional Split DTSX:48430; Sort DTSX:55434 (EliminateDuplicates, key AccountNumber)",
+      "wrongUnits": [ { "unit": "1/3", "problem": "Population and decisions omit row filters", "correct": "Add: '@' rows are dropped (Last Row unconnected); duplicate AccountNumber values are eliminated by the Sort", "evidence": "DTSX:48430, 55434" } ]
+    },
+    {
+      "id": "L|Package\\Foreach Loop Container\\Create Kibutz|decisions", "hash": "f53c8659b618", "verdict": "CONFIRMED",
+      "detail": "All 7 decisions are exact transcriptions. Decision 7's meaning 'חלוקת עומס' only describes the split of rows across branches; it states no further purpose.",
+      "evidence": "DTSX:48430, 48463, 53438, 53488, 53629, 54711, 55434", "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Foreach Loop Container\\Aggregate Account Balance|title", "hash": "501a67b68d58", "verdict": "CONFIRMED",
+      "detail": "Format money fields divides by 100 (non-numeric or 0 gives 0). gen_accountbalance is the sum of the 3 portions. Last row and No product (gen_fundtypenumber = Course_Number_22 is NULL or '0000') are unconnected. The product lookup uses ProductNumber in bank '10' with No Match unconnected. The Aggregate uses AggregationType 0,0,0,4. The insert goes to dbo.AggregateFunds on SQL.GENERIX_STAGING.",
+      "evidence": "DTSX:541-600, 604, 661-664, 716, 2015, 2059-2083, 2499", "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Foreach Loop Container\\Aggregate Account Balance|detailed", "hash": "7e6bd3919706", "verdict": "WRONG",
+      "detail": "The mechanics in units 1 and 3-16 match. Unit 2 says 'הסכומים בקובץ מחולקים ב-100 כדי להמיר אותם לשקלים'. No file states the unit of the file amounts. The same FormatNumeric routine divides the percentage fields (Deposit_*_Percentage_205/208/209/246, weighted MF) by 100 too, and those are not agorot. The purpose 'convert to shekels' is an unproven meaning (השערה at most).",
+      "evidence": "Format money fields main.cs 48-57 @DTSX:716 (inputs include Deposit_MF_Percentage_* and gen_weightedmanagementfeepercentageSTR_FLOAT)",
+      "wrongUnits": [ { "unit": 2, "problem": "Unproven meaning (agorot -> shekels)", "correct": "Values are divided by 100 (two implied decimals); the unit is not stated in the files", "evidence": "DTSX:716 main.cs 48-57" } ]
+    },
+    {
+      "id": "L|Package\\Foreach Loop Container\\Aggregate Account Balance|detail", "hash": "82132b93d590", "verdict": "CONFIRMED",
+      "detail": "The population filters (Last row, No product, product No Match), the staging-only write (psql/GENERIX_STAGING) and the use by the MF template lookup in Minhali daily all match.",
+      "evidence": "DTSX:604, 661-664, 2059, 69950-69962, 70298-70358", "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Foreach Loop Container\\Aggregate Account Balance|decisions", "hash": "907ddb7676e4", "verdict": "WRONG",
+      "detail": "Decisions 1, 2 and 4 are exact, and the condition of decision 3 is exact. Decision 3's meaning_he 'סכומים בקובץ באגורות' and outcome 'המרה לשקלים' state an unproven unit. The same routine divides percentage fields by 100, and no file states agorot.",
+      "evidence": "Format money fields main.cs 48-57 @DTSX:716",
+      "wrongUnits": [ { "unit": 3, "problem": "Unproven meaning (agorot/shekels)", "correct": "Division by 100 (two implied decimals); unit not stated in the files", "evidence": "DTSX:716" } ]
+    },
+    {
+      "id": "L|Package\\Foreach Loop Container\\Minhali daily|title", "hash": "2e5ba8ce5ebf", "verdict": "WRONG",
+      "detail": "Most flow lines match: product, branch (statecode 0), estate code, padding of 4 fields, unknown customer 'לא ידוע'+'לקוח', classification, Employee/Indipendent, the employer chain via Main_Fund_Number (= Fund_Type_Number_21 by externalMetadataColumnId), the agent RowNum by statecode, Convesrt, the MF template, Set MF, blocking 991/992, the fund lookup, and create/update/kibbutz. Problems: (a) Flow line 13 says 'עדכון תאריך מינוי סוכן לשאר קופות אותו לקוח'. The SQL filters on gen_customeraccountname. Package 0005_Customer Account sets that attribute as an EntityReference to gen_customeraccount, a customer-account record, not the customer. 'Same customer' is therefore an unproven meaning; the correct phrase is 'same gen_customeraccountname'. (b) Flow line 10 says the deposit MF is 'המינימום מבין הרמות התקפות (ישות/מעסיק/חשבון לקוח/סוג קופה)'. The fund-type level has no validity (date) check at all, only >= 0. An empty fund-type rate becomes 0 and so becomes the minimum. 'Valid levels' misstates that condition.",
+      "evidence": "Update 'gen_agentappointmentdate' DTSX:92818; 0005_Customer Account.dtsx:3274 (fundmain[\"gen_customeraccountname\"] = new EntityReference(\"gen_customeraccount\", ...)); Set Deposit Mf Percentage main.cs 64-70 @DTSX:77379",
+      "wrongUnits": [
+        { "unit": "flow_he[11]", "problem": "'אותו לקוח' is an unproven meaning", "correct": "Other active funds with the same gen_customeraccountname (a gen_customeraccount reference)", "evidence": "DTSX:92818; 0005:3274" },
+        { "unit": "flow_he[8]", "problem": "'valid levels' includes the undated fund-type level", "correct": "Minimum of entity/employer/customer-account rates valid today and the fund-type rate (only >= 0, no date check)", "evidence": "main.cs 28-70" }
+      ]
+    },
+    {
+      "id": "L|Package\\Foreach Loop Container\\Minhali daily|short", "hash": "42c51e3a8ef2", "verdict": "WRONG",
+      "detail": "Units 1-8 match, including the create-only/update-only column split and the 0149/0743 kibbutz drop. Unit 9 says that in existing funds 'היתרות, הסכומים, תאריך השערוך ... נשארים כפי שהיו'. The UPDATE does write one money amount: gen_allowancevalue = Param_33, from file field gen_allowancevalue_STR_CY divided by 100 and cast to DT_CY. 'The amounts stay unchanged' is therefore not exact. Name the unchanged totals explicitly (Gen_AccountBalance, portion totals, yearly deposits/transfers, Gen_FundCurrentYearTotal) and note that gen_allowancevalue is updated.",
+      "evidence": "Update gen_fundmain DTSX:92873 (gen_allowancevalue = ? , Param_33); Format money fileds DTSX:69682",
+      "wrongUnits": [ { "unit": 9, "problem": "'הסכומים' unchanged, but gen_allowancevalue is updated", "correct": "Balances and accumulated totals stay unchanged; gen_allowancevalue is updated", "evidence": "DTSX:92873" } ]
+    },
+    {
+      "id": "L|Package\\Foreach Loop Container\\Minhali daily|detailed", "hash": "af2329a50040", "verdict": "WRONG",
+      "detail": "Checked against the DTSX: Set String Fields, the lookups, unknown customer, Format dates/money (TryParse -> '0'), the weighted-MF DT_I4 wording, financial track, classification, the contact lookup (gen_leumi=1, statecode=0), customer category only on create, Get corporate number 1, get Employer replacing gen_employername, agent RowNum, Convesrt, the MF template SQL wording, the gemel split, Set Deposit Mf (fund-type has no date check and keeps the previous dates), 9.99->0, blocking, the fund lookup, Set Date Fields try/catch, the agent change, Fields From File Or DB (rated template, bonus dates incl. the exclusion guard, subproduct-first eligibility, indicators, 7 business days, BENEFITMAIL), Set gen_depositmfpercentage, INSERT/UPDATE column sets, Add System Columns, Is Kibutz/Get Kibutz, and the loan flag. Problems: (a) Unit 71 says the agent appointment date is updated 'בשאר הקופות של אותו לקוח'. The WHERE is gen_customeraccountname, a reference to gen_customeraccount (per 0005), so 'same customer' is unproven. (b) Units 81 and 96 say 'היתרות והסכומים אינם מתעדכנים' / 'הסכומים ... נשארים'. The UPDATE writes gen_allowancevalue, a money amount divided by 100.",
+      "evidence": "DTSX:92818; 0005_Customer Account.dtsx:3274; DTSX:92873 (gen_allowancevalue Param_33)",
+      "wrongUnits": [
+        { "unit": 71, "problem": "'אותו לקוח' is an unproven meaning", "correct": "Other funds with the same gen_customeraccountname (gen_customeraccount reference)", "evidence": "DTSX:92818; 0005:3274" },
+        { "unit": "81/96", "problem": "Generic 'amounts not updated' is false for gen_allowancevalue", "correct": "Balances and accumulated totals are not updated; gen_allowancevalue is updated", "evidence": "DTSX:92873" }
+      ]
+    },
+    {
+      "id": "L|Package\\Foreach Loop Container\\Minhali daily|detail", "hash": "687fd32dd0a7", "verdict": "INCOMPLETE",
+      "detail": "Units 1, 2, 3 and 5 match, and Main_Fund_Number = Fund_Type_Number_21 is verified via externalMetadataColumnId. Unit 4's create-only and update-only lists and system columns match DTSX:61788 vs 92873. Unit 4's list of what the UPDATE writes leaves out written attributes. gen_allowancevalue (a money amount) is updated, but it appears neither in the updated list nor among the not-updated balances. The link enumeration '(חשבון, איש קשר, מעסיק, סוכן, סניף, ומוצר בסוף תקופה בלבד)' omits three lookups the UPDATE also writes: gen_bankname (Param_26), gen_estatetype (Param_32) and gen_mftemplate (Param_19).",
+      "evidence": "Update gen_fundmain DTSX:92873 (gen_allowancevalue Param_33, gen_bankname Param_26, gen_estatetype Param_32, gen_mftemplate Param_19)",
+      "wrongUnits": [ { "unit": 4, "problem": "Update list omits written attributes", "correct": "Add gen_allowancevalue and the links gen_bankname, gen_estatetype, gen_mftemplate to the UPDATE description", "evidence": "DTSX:92873" } ]
+    },
+    {
+      "id": "L|Package\\Foreach Loop Container\\Minhali daily|decisions", "hash": "58d9b8a1fdf7", "verdict": "INCOMPLETE",
+      "detail": "Decisions 1-12, 14, 15 and 17-37 are exact against the DTSX and code. Two written values are missing. (1) Decision 16 (Convesrt) lists only the code->picklist mappings. Set fund field data first sets gen_subestatetype = 0, and Convesrt overwrites it only for the 8 listed codes. For NULL or unlisted Sector_Estate_Type_23, gen_sectorstatus is therefore written as 0. gen_fundestateid stays NULL for unlisted Sector_Code_17. gen_fundauthenticationindication stays NULL unless the file value is '0' or '1'. (2) Decision 13 (Set fund field data) leaves out that the same Derived Column rewrites ChangedByAge_PensionPayment_239 and ChangedByAge_Compensation_240 to 1 when (DT_I4) > 0, otherwise 0. Those rewritten values are written to gen_rewardsbyagemodel and gen_compensationbyagemodel (UPDATE Param_65/64, INSERT Param_94/93).",
+      "evidence": "Set fund field data DTSX:78471 (gen_subestatetype = 0; ChangedByAge_* readWrite expressions); Convesrt main.vb 17-45 @DTSX:60782; DTSX:92873, 61788",
+      "wrongUnits": [
+        { "unit": 16, "problem": "Default values of written attributes omitted", "correct": "Unlisted/NULL estate type -> gen_sectorstatus 0; unlisted sector -> gen_fundestateid NULL; authentication indication NULL unless '0'/'1'", "evidence": "DTSX:78471, 60782" },
+        { "unit": 13, "problem": "ChangedByAge rewrite omitted", "correct": "ChangedByAge_239/240 := (!ISNULL && (DT_I4)>0) ? 1 : 0, written to gen_rewardsbyagemodel / gen_compensationbyagemodel", "evidence": "DTSX:78471; DTSX:92873 Param_64/65" }
+      ]
+    },
+    {
+      "id": "L|Package\\Foreach Loop Container\\Minhali daily|open", "hash": "01a5638f485c", "verdict": "CONFIRMED",
+      "detail": "Opens 1-3 are genuinely open. Open 4 matches the files. The output-name labels and both Create Kibutz code comments are cited exactly. A grep of source/DailyProcess found no label for 0228 (0009 uses it only in an unnamed 'Case 1' output), none for the other Sector_Estate_Type_23 values, and none for Mf_Benefit_Level_167.",
+      "evidence": "DTSX:59874, 62561, 36964, 4093, 53629 main.cs 119/131; 0009_LeumiFile-BY.dtsx:50723", "wrongUnits": []
+    }
+  ],
+  "missingWrites": []
+}

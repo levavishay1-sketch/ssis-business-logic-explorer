@@ -1,0 +1,1457 @@
+{
+ "package": "0028_Fund Enrolment",
+ "dataFlows": [
+  "Package\\Create Fundenrolment",
+  "Package\\Create FundEnrolment For Pension",
+  "Package\\Close FundEnrolments For Pension",
+  "Package\\Update Reject Management With Fund Enrolment",
+  "Package\\Update FundEnrolment"
+ ],
+ "analyst": "ssis-field-lineage",
+ "scriptOutputs": [
+  {
+   "component": "Package\\Create Fundenrolment\\Set gen_notes",
+   "output": "Output 0",
+   "column": "gen_notes",
+   "from": [
+    {
+     "column": "Regect_1",
+     "role": "value"
+    },
+    {
+     "column": "Regect_2",
+     "role": "value"
+    },
+    {
+     "column": "Regect_3",
+     "role": "value"
+    },
+    {
+     "column": "Regect_4",
+     "role": "value"
+    },
+    {
+     "column": "note",
+     "role": "value"
+    }
+   ],
+   "expression": "note = \"\"; if (!Regect1_IsNull) note = \"1: \" + Regect1 + \"; \"; if (!Regect2_IsNull) note += \"2: \" + Regect2 + \"; \"; same for 3 and 4; if (!note_IsNull) note += Row.note; Row.gennotes = note. Inputs Regect_1_new..4_new and gen_receivingdate are not used. Output column is wstr(4000) while the inputs can total ~4,220 chars (4×(300+5) + 3000) — an over-long value would fail the buffer assignment (no try/catch).",
+   "condition": null,
+   "evidence": "Set gen_notes main.cs:117-129"
+  },
+  {
+   "component": "Package\\Create Fundenrolment\\Create gen_fundEnrolment",
+   "output": "Result",
+   "column": "RejectTeamId",
+   "from": [],
+   "expression": "Guid.Parse(Variables.RejectTeamId) — package variable User::RejectTeamId, set at run time by framework data flow \"Get Organization Variables\" → script \"Set Organization Variables\" (DTSX 12958, main.cs:24-31,38) from [CRM] gen_etlvariable.gen_Value where gen_key = 'RejectTeamId' and gen_scope = 'global' or the package scope parameter (SQL DTSX 12922); the script throws if the key is missing. Design-time value \"From DB\" (DTSX 33). Not a row value; config files not supplied could in theory override it",
+   "condition": "only rows whose service.Create succeeded reach the Result output",
+   "evidence": "Create gen_fundEnrolment main.cs:136-137, 280"
+  },
+  {
+   "component": "Package\\Create Fundenrolment\\Create gen_fundEnrolment",
+   "output": "Result",
+   "column": "FundEnrollmentId",
+   "from": [],
+   "expression": "Row.FundEnrollmentId = service.Create(fundEnrolment) — GUID of the gen_fundenrolment record just created by this component (no input column value)",
+   "condition": "only on successful Create (DirectRowToResult); failures go to CastingError (unconnected)",
+   "evidence": "Create gen_fundEnrolment main.cs:279-280"
+  },
+  {
+   "component": "Package\\Create FundEnrolment For Pension\\Set gen_note",
+   "output": "Output 0",
+   "column": "gen_note",
+   "from": [
+    {
+     "column": "gen_rejectionreason1Name",
+     "role": "value"
+    },
+    {
+     "column": "gen_rejectionreason2Name",
+     "role": "value"
+    },
+    {
+     "column": "gen_rejectionreason3Name",
+     "role": "value"
+    },
+    {
+     "column": "gen_rejectionreason4Name",
+     "role": "value"
+    },
+    {
+     "column": "gen_rejectreasonsnotes",
+     "role": "value"
+    }
+   ],
+   "expression": "note = \"\"; if (!IsNullOrWhiteSpace(reason1Name)) note = \"1: \" + reason1Name + \"; \"; same for 2,3,4 (\"2: \", \"3: \", \"4: \"); if (!IsNullOrWhiteSpace(gen_rejectreasonsnotes)) note += gen_rejectreasonsnotes; Row.gennote = note. HYPOTHESIS (not tested): the code reads all five inputs via String.IsNullOrWhiteSpace(Row.<col>) WITHOUT checking <col>_IsNull and has no try/catch; in SSIS reading a NULL buffer column through the generated accessor throws, so a NULL reason name / note would fail the whole pension data flow rather than be skipped. Output column is wstr(1000) while inputs can total ~3,220 chars (4×(300+5)+2000) — an over-long value would fail the buffer assignment (no try/catch).",
+   "condition": null,
+   "evidence": "Set gen_note main.cs:117-130"
+  },
+  {
+   "component": "Package\\Create FundEnrolment For Pension\\Create Fund Enrolment",
+   "output": "Result",
+   "column": "FundEnrolmentId",
+   "from": [],
+   "expression": "Row.FundEnrolmentId = service.Create(fundEnrolment) — GUID of the gen_fundenrolment just created",
+   "condition": "only on successful Create (DirectRowToResult); exceptions go to CustingError (unconnected)",
+   "evidence": "Create Fund Enrolment main.cs:327-328"
+  },
+  {
+   "component": "Package\\Create FundEnrolment For Pension\\Create Fund Enrolment",
+   "output": "Result",
+   "column": "OwnerId",
+   "from": [
+    {
+     "column": "gen_updatedbyreferent",
+     "role": "value"
+    },
+    {
+     "column": "gen_passedandreject",
+     "role": "condition"
+    }
+   ],
+   "expression": "if (!genpassedandreject_IsNull && genpassedandreject == true) OwnerId = Row.genupdatedbyreferent (pj.gen_updatedbyreferent, a systemuser id); else OwnerId = Guid.Parse(Variables.RejectTeamId) — package variable User::RejectTeamId, set at run time by framework data flow \"Get Organization Variables\" → script \"Set Organization Variables\" (DTSX 12958, main.cs:24-31,38) from [CRM] gen_etlvariable.gen_Value where gen_key = 'RejectTeamId' and gen_scope = 'global' or the package scope parameter (SQL DTSX 12922); the script throws if the key is missing. Design-time value \"From DB\" (DTSX 33). Not a row value; config files not supplied could in theory override it",
+   "condition": "gen_passedandreject == true → referent; otherwise reject team",
+   "evidence": "Create Fund Enrolment main.cs:136-146"
+  },
+  {
+   "component": "Package\\Create FundEnrolment For Pension\\Create Fund Enrolment",
+   "output": "Result",
+   "column": "OwnerIdType",
+   "from": [
+    {
+     "column": "gen_passedandreject",
+     "role": "condition"
+    }
+   ],
+   "expression": "literal 8 (systemuser) when gen_passedandreject == true; literal 9 (team) otherwise",
+   "condition": "gen_passedandreject == true → 8; else 9",
+   "evidence": "Create Fund Enrolment main.cs:139, 146"
+  }
+ ],
+ "crmWrites": [
+  {
+   "component": "Package\\Create Fundenrolment\\Create gen_fundEnrolment",
+   "identicalCopies": [],
+   "entity": "gen_fundenrolment",
+   "verb": "CREATE",
+   "mechanism": "SDK (IOrganizationService.Create via CRM.Proxy CrmProxy.GetCrmService)",
+   "status": "Supported",
+   "recordKey": "new record; returned id → Row.FundEnrollmentId",
+   "recordKeyColumns": [],
+   "declaredRowFilters": [],
+   "condition": "Data flow \"Create Fundenrolment\" runs after Truncate Table TblFundEnrolments (Success, DTSX 15647). Rows: gen_automatedjoining with gen_joiningstatus = 2 and (gen_lastsyncdate IS NULL or < ModifiedOn) (SQL DTSX 3357; LEFT JOIN gen_transferrequest can multiply a joining that has several transfer requests → several creates in one run); Lookup \"Is Fundenrolment Exits\" (full cache, DTSX 3612) — only No-Match rows (no gen_fundenrolment with gen_automatedjoining = gen_automatedjoiningId) continue; Conditional Split \"Check If Rejects Null\" \"No CreateRow\" requires JoiningStatus != 2 and therefore never fires (source filters status 2) — all rows go to \"Create Row\". Each row is created inside try/catch; failures → CastingError (unconnected, lost).",
+   "attributes": [
+    {
+     "attribute": "gen_automatedjoining",
+     "from": [
+      {
+       "column": "gen_automatedjoiningId",
+       "role": "value"
+      }
+     ],
+     "expression": "new EntityReference(\"gen_automatedjoining\", Row.genautomatedjoiningId) when not NULL. Source: aj.gen_automatedjoiningId (gen_automatedjoining primary key) in source \"Get All joining reject From bank\" (OLE DB Source, [CRM] altshuler_mscrm, SqlCommand DTSX 3357).",
+     "fixedValue": null,
+     "condition": "!Row.genautomatedjoiningId_IsNull",
+     "evidence": "Create gen_fundEnrolment main.cs:140-141"
+    },
+    {
+     "attribute": "gen_supervisor",
+     "from": [
+      {
+       "column": "supervisorName",
+       "role": "value"
+      }
+     ],
+     "expression": "new EntityReference(\"systemuser\", Row.supervisorName) when not NULL. Source: aj.gen_validationuser AS supervisorName (GUID despite the alias) in source \"Get All joining reject From bank\" (OLE DB Source, [CRM] altshuler_mscrm, SqlCommand DTSX 3357).",
+     "fixedValue": null,
+     "condition": "!Row.supervisorName_IsNull",
+     "evidence": "Create gen_fundEnrolment main.cs:142-143"
+    },
+    {
+     "attribute": "gen_agencyaccountname",
+     "from": [
+      {
+       "column": "gen_agencyaccountname",
+       "role": "value"
+      }
+     ],
+     "expression": "new EntityReference(\"account\", Row.genagencyaccountname) when not NULL. Source: aj.gen_agencyname AS gen_agencyaccountname (GUID) in source \"Get All joining reject From bank\" (OLE DB Source, [CRM] altshuler_mscrm, SqlCommand DTSX 3357).",
+     "fixedValue": null,
+     "condition": "!Row.genagencyaccountname_IsNull",
+     "evidence": "Create gen_fundEnrolment main.cs:145-146"
+    },
+    {
+     "attribute": "gen_agnetcontactname",
+     "from": [
+      {
+       "column": "gen_agentcontactname",
+       "role": "value"
+      }
+     ],
+     "expression": "new EntityReference(\"contact\", Row.genagentcontactname) when not NULL (attribute name spelled \"gen_agnetcontactname\" in code). Source: aj.gen_agentname AS gen_agentcontactname (GUID) in source \"Get All joining reject From bank\" (OLE DB Source, [CRM] altshuler_mscrm, SqlCommand DTSX 3357).",
+     "fixedValue": null,
+     "condition": "!Row.genagentcontactname_IsNull",
+     "evidence": "Create gen_fundEnrolment main.cs:148-149"
+    },
+    {
+     "attribute": "gen_fundtypename",
+     "from": [
+      {
+       "column": "gen_fundtypename",
+       "role": "value"
+      }
+     ],
+     "expression": "new EntityReference(\"product\", Row.genfundtypename) when not NULL. Source: productByCourse.ProductId AS gen_fundtypename = ProductId of the FIRST gen_coursepartition (row_number() over (partition by gen_automatedjoining order by gen_coursepartition.createdon), num = 1) of the automated joining, joined to product — in source \"Get All joining reject From bank\" (OLE DB Source, [CRM] altshuler_mscrm, SqlCommand DTSX 3357).",
+     "fixedValue": null,
+     "condition": "!Row.genfundtypename_IsNull",
+     "evidence": "Create gen_fundEnrolment main.cs:151-152"
+    },
+    {
+     "attribute": "gen_enrolmentfundfinancenumber",
+     "from": [
+      {
+       "column": "gen_sourcefundtype",
+       "role": "value"
+      }
+     ],
+     "expression": "new EntityReference(\"competitor\", Row.gensourcefundtype) when not NULL. Source: tr.gen_sourcefundtype from LEFT JOIN gen_transferrequest tr ON tr.gen_automatedjoining = aj.gen_automatedjoiningId in source \"Get All joining reject From bank\" (OLE DB Source, [CRM] altshuler_mscrm, SqlCommand DTSX 3357).",
+     "fixedValue": null,
+     "condition": "!Row.gensourcefundtype_IsNull",
+     "evidence": "Create gen_fundEnrolment main.cs:154-155"
+    },
+    {
+     "attribute": "gen_brokernumber",
+     "from": [
+      {
+       "column": "gen_agentcontract",
+       "role": "value"
+      }
+     ],
+     "expression": "new EntityReference(\"gen_agentcontract\", Row.genagentcontract) when not NULL. Source: aj.gen_agentcontract in source \"Get All joining reject From bank\" (OLE DB Source, [CRM] altshuler_mscrm, SqlCommand DTSX 3357).",
+     "fixedValue": null,
+     "condition": "!Row.genagentcontract_IsNull",
+     "evidence": "Create gen_fundEnrolment main.cs:157-158"
+    },
+    {
+     "attribute": "gen_consultant",
+     "from": [
+      {
+       "column": "consultant",
+       "role": "value"
+      }
+     ],
+     "expression": "direct string copy of Row.consultant when not NULL. Source: aj.gen_bankadvisorname AS consultant (name of the bank advisor lookup) in source \"Get All joining reject From bank\" (OLE DB Source, [CRM] altshuler_mscrm, SqlCommand DTSX 3357).",
+     "fixedValue": null,
+     "condition": "!Row.consultant_IsNull",
+     "evidence": "Create gen_fundEnrolment main.cs:161-162"
+    },
+    {
+     "attribute": "gen_sourcefundnumber",
+     "from": [
+      {
+       "column": "sourcefundnumber",
+       "role": "value"
+      }
+     ],
+     "expression": "direct string copy of Row.sourcefundnumber when not NULL. Source: tr.gen_sourcefundnumber AS sourcefundnumber from LEFT JOIN gen_transferrequest in source \"Get All joining reject From bank\" (OLE DB Source, [CRM] altshuler_mscrm, SqlCommand DTSX 3357).",
+     "fixedValue": null,
+     "condition": "!Row.sourcefundnumber_IsNull",
+     "evidence": "Create gen_fundEnrolment main.cs:164-165"
+    },
+    {
+     "attribute": "gen_identitynumber",
+     "from": [
+      {
+       "column": "identitynumber",
+       "role": "value"
+      }
+     ],
+     "expression": "direct string copy of Row.identitynumber when not NULL. Source: aj.gen_applicantidentitynumber AS identitynumber (wstr 10) in source \"Get All joining reject From bank\" (OLE DB Source, [CRM] altshuler_mscrm, SqlCommand DTSX 3357).",
+     "fixedValue": null,
+     "condition": "!Row.identitynumber_IsNull",
+     "evidence": "Create gen_fundEnrolment main.cs:167-168"
+    },
+    {
+     "attribute": "gen_fundnumberdefine",
+     "from": [
+      {
+       "column": "gen_allocatedinadvance",
+       "role": "value"
+      }
+     ],
+     "expression": "direct string copy of Row.genallocatedinadvance when not NULL. Source: aj.gen_allocatedinadvance in source \"Get All joining reject From bank\" (OLE DB Source, [CRM] altshuler_mscrm, SqlCommand DTSX 3357).",
+     "fixedValue": null,
+     "condition": "!Row.genallocatedinadvance_IsNull",
+     "evidence": "Create gen_fundEnrolment main.cs:170-171"
+    },
+    {
+     "attribute": "gen_joiningrejectreason1",
+     "from": [
+      {
+       "column": "Regect_1",
+       "role": "value"
+      }
+     ],
+     "expression": "direct string copy of Row.Regect1 when not NULL. Source: aj.gen_rejectreasonlookup1Name AS Regect_1 (display name of reject-reason lookup 1) in source \"Get All joining reject From bank\" (OLE DB Source, [CRM] altshuler_mscrm, SqlCommand DTSX 3357).",
+     "fixedValue": null,
+     "condition": "!Row.Regect1_IsNull",
+     "evidence": "Create gen_fundEnrolment main.cs:173-174"
+    },
+    {
+     "attribute": "gen_joiningrejectreason2",
+     "from": [
+      {
+       "column": "Regect_2",
+       "role": "value"
+      }
+     ],
+     "expression": "direct string copy of Row.Regect2 when not NULL. Source: aj.gen_rejectreasonlookup2Name AS Regect_2 (display name of reject-reason lookup 2) in source \"Get All joining reject From bank\" (OLE DB Source, [CRM] altshuler_mscrm, SqlCommand DTSX 3357).",
+     "fixedValue": null,
+     "condition": "!Row.Regect2_IsNull",
+     "evidence": "Create gen_fundEnrolment main.cs:176-177"
+    },
+    {
+     "attribute": "gen_joiningrejectreason3",
+     "from": [
+      {
+       "column": "Regect_3",
+       "role": "value"
+      }
+     ],
+     "expression": "direct string copy of Row.Regect3 when not NULL. Source: aj.gen_rejectreasonlookup3Name AS Regect_3 (display name of reject-reason lookup 3) in source \"Get All joining reject From bank\" (OLE DB Source, [CRM] altshuler_mscrm, SqlCommand DTSX 3357).",
+     "fixedValue": null,
+     "condition": "!Row.Regect3_IsNull",
+     "evidence": "Create gen_fundEnrolment main.cs:179-180"
+    },
+    {
+     "attribute": "gen_joiningrejectreason4",
+     "from": [
+      {
+       "column": "Regect_4",
+       "role": "value"
+      }
+     ],
+     "expression": "direct string copy of Row.Regect4 when not NULL. Source: aj.gen_rejectreasonlookup4Name AS Regect_4 (display name of reject-reason lookup 4) in source \"Get All joining reject From bank\" (OLE DB Source, [CRM] altshuler_mscrm, SqlCommand DTSX 3357).",
+     "fixedValue": null,
+     "condition": "!Row.Regect4_IsNull",
+     "evidence": "Create gen_fundEnrolment main.cs:182-183"
+    },
+    {
+     "attribute": "gen_email",
+     "from": [
+      {
+       "column": "gen_emailaddress",
+       "role": "value"
+      }
+     ],
+     "expression": "direct string copy of Row.genemailaddress when not NULL. Source: aj.gen_emailaddress in source \"Get All joining reject From bank\" (OLE DB Source, [CRM] altshuler_mscrm, SqlCommand DTSX 3357).",
+     "fixedValue": null,
+     "condition": "!Row.genemailaddress_IsNull",
+     "evidence": "Create gen_fundEnrolment main.cs:185-186"
+    },
+    {
+     "attribute": "gen_index",
+     "from": [
+      {
+       "column": "gen_addresszipcode",
+       "role": "value"
+      }
+     ],
+     "expression": "direct string copy of Row.genaddresszipcode (zip code) when not NULL. Source: aj.gen_addresszipcode in source \"Get All joining reject From bank\" (OLE DB Source, [CRM] altshuler_mscrm, SqlCommand DTSX 3357).",
+     "fixedValue": null,
+     "condition": "!Row.genaddresszipcode_IsNull",
+     "evidence": "Create gen_fundEnrolment main.cs:188-189"
+    },
+    {
+     "attribute": "gen_house_number",
+     "from": [
+      {
+       "column": "gen_addressbuildingnumber",
+       "role": "value"
+      }
+     ],
+     "expression": "direct string copy of Row.genaddressbuildingnumber when not NULL. Source: aj.gen_addressbuildingnumber in source \"Get All joining reject From bank\" (OLE DB Source, [CRM] altshuler_mscrm, SqlCommand DTSX 3357).",
+     "fixedValue": null,
+     "condition": "!Row.genaddressbuildingnumber_IsNull",
+     "evidence": "Create gen_fundEnrolment main.cs:191-192"
+    },
+    {
+     "attribute": "gen_flat_number",
+     "from": [
+      {
+       "column": "gen_addressapartmentnumber",
+       "role": "value"
+      }
+     ],
+     "expression": "direct string copy of Row.genaddressapartmentnumber when not NULL. Source: aj.gen_addressapartmentnumber in source \"Get All joining reject From bank\" (OLE DB Source, [CRM] altshuler_mscrm, SqlCommand DTSX 3357).",
+     "fixedValue": null,
+     "condition": "!Row.genaddressapartmentnumber_IsNull",
+     "evidence": "Create gen_fundEnrolment main.cs:194-195"
+    },
+    {
+     "attribute": "gen_city",
+     "from": [
+      {
+       "column": "gen_citiesid",
+       "role": "value"
+      }
+     ],
+     "expression": "new EntityReference(\"gen_cities\", Row.gencitiesid) when not NULL. Source: aj.gen_citiesid in source \"Get All joining reject From bank\" (OLE DB Source, [CRM] altshuler_mscrm, SqlCommand DTSX 3357).",
+     "fixedValue": null,
+     "condition": "!Row.gencitiesid_IsNull",
+     "evidence": "Create gen_fundEnrolment main.cs:197-198"
+    },
+    {
+     "attribute": "gen_street",
+     "from": [
+      {
+       "column": "gen_addressstreet",
+       "role": "value"
+      }
+     ],
+     "expression": "direct string copy of Row.genaddressstreet when not NULL. Source: aj.gen_addressstreet in source \"Get All joining reject From bank\" (OLE DB Source, [CRM] altshuler_mscrm, SqlCommand DTSX 3357).",
+     "fixedValue": null,
+     "condition": "!Row.genaddressstreet_IsNull",
+     "evidence": "Create gen_fundEnrolment main.cs:200-201"
+    },
+    {
+     "attribute": "gen_post_box",
+     "from": [
+      {
+       "column": "gen_mailbox",
+       "role": "value"
+      }
+     ],
+     "expression": "direct string copy of Row.genmailbox when not NULL. Source: aj.gen_mailbox in source \"Get All joining reject From bank\" (OLE DB Source, [CRM] altshuler_mscrm, SqlCommand DTSX 3357).",
+     "fixedValue": null,
+     "condition": "!Row.genmailbox_IsNull",
+     "evidence": "Create gen_fundEnrolment main.cs:203-204"
+    },
+    {
+     "attribute": "gen_rejectreason1_new",
+     "from": [
+      {
+       "column": "Regect_1_new",
+       "role": "value"
+      }
+     ],
+     "expression": "new EntityReference(\"gen_rejectreasonautomatedjoining\", Row.Regect1new) when not NULL (Task 5163). Source: aj.gen_rejectreasonlookup1 AS Regect_1_new (GUID) in source \"Get All joining reject From bank\" (OLE DB Source, [CRM] altshuler_mscrm, SqlCommand DTSX 3357).",
+     "fixedValue": null,
+     "condition": "!Row.Regect1new_IsNull",
+     "evidence": "Create gen_fundEnrolment main.cs:207-208"
+    },
+    {
+     "attribute": "gen_rejectreason2_new",
+     "from": [
+      {
+       "column": "Regect_2_new",
+       "role": "value"
+      }
+     ],
+     "expression": "new EntityReference(\"gen_rejectreasonautomatedjoining\", Row.Regect2new) when not NULL (Task 5163). Source: aj.gen_rejectreasonlookup2 AS Regect_2_new (GUID) in source \"Get All joining reject From bank\" (OLE DB Source, [CRM] altshuler_mscrm, SqlCommand DTSX 3357).",
+     "fixedValue": null,
+     "condition": "!Row.Regect2new_IsNull",
+     "evidence": "Create gen_fundEnrolment main.cs:210-211"
+    },
+    {
+     "attribute": "gen_rejectreason3_new",
+     "from": [
+      {
+       "column": "Regect_3_new",
+       "role": "value"
+      }
+     ],
+     "expression": "new EntityReference(\"gen_rejectreasonautomatedjoining\", Row.Regect3new) when not NULL (Task 5163). Source: aj.gen_rejectreasonlookup3 AS Regect_3_new (GUID) in source \"Get All joining reject From bank\" (OLE DB Source, [CRM] altshuler_mscrm, SqlCommand DTSX 3357).",
+     "fixedValue": null,
+     "condition": "!Row.Regect3new_IsNull",
+     "evidence": "Create gen_fundEnrolment main.cs:213-214"
+    },
+    {
+     "attribute": "gen_rejectreason4_new",
+     "from": [
+      {
+       "column": "Regect_4_new",
+       "role": "value"
+      }
+     ],
+     "expression": "new EntityReference(\"gen_rejectreasonautomatedjoining\", Row.Regect4new) when not NULL (Task 5163). Source: aj.gen_rejectreasonlookup4 AS Regect_4_new (GUID) in source \"Get All joining reject From bank\" (OLE DB Source, [CRM] altshuler_mscrm, SqlCommand DTSX 3357).",
+     "fixedValue": null,
+     "condition": "!Row.Regect4new_IsNull",
+     "evidence": "Create gen_fundEnrolment main.cs:216-217"
+    },
+    {
+     "attribute": "gen_contactname",
+     "from": [
+      {
+       "column": "fullname",
+       "role": "value"
+      }
+     ],
+     "expression": "direct string copy of Row.fullname when not NULL. Source: Right(aj.gen_applicantfirstname + ' ' + aj.gen_applicantlastname, 100) AS fullname — first name, one space, last name, cut to the RIGHTMOST 100 characters; with SQL Server default CONCAT_NULL_YIELDS_NULL ON a NULL first or last name makes fullname NULL and the attribute is not set (session setting not proven).",
+     "fixedValue": null,
+     "condition": "!Row.fullname_IsNull",
+     "evidence": "Create gen_fundEnrolment main.cs:220-223"
+    },
+    {
+     "attribute": "gen_enrolmentid",
+     "from": [
+      {
+       "column": "fullname",
+       "role": "value"
+      }
+     ],
+     "expression": "same value as gen_contactname: direct copy of Row.fullname when not NULL (record name). Source: Right(aj.gen_applicantfirstname + ' ' + aj.gen_applicantlastname, 100) AS fullname in source \"Get All joining reject From bank\" (OLE DB Source, [CRM] altshuler_mscrm, SqlCommand DTSX 3357).",
+     "fixedValue": null,
+     "condition": "!Row.fullname_IsNull",
+     "evidence": "Create gen_fundEnrolment main.cs:220-223"
+    },
+    {
+     "attribute": "gen_agencyname",
+     "from": [
+      {
+       "column": "gen_agencyname",
+       "role": "value"
+      }
+     ],
+     "expression": "direct string copy of Row.genagencyname when not NULL. Source: aj.gen_agencynamename AS gen_agencyname (display name of the agency lookup) in source \"Get All joining reject From bank\" (OLE DB Source, [CRM] altshuler_mscrm, SqlCommand DTSX 3357).",
+     "fixedValue": null,
+     "condition": "!Row.genagencyname_IsNull",
+     "evidence": "Create gen_fundEnrolment main.cs:225-226"
+    },
+    {
+     "attribute": "gen_agentname",
+     "from": [
+      {
+       "column": "gen_agentname",
+       "role": "value"
+      }
+     ],
+     "expression": "direct string copy of Row.genagentname when not NULL. Source: aj.gen_agentnamename AS gen_agentname (display name of the agent lookup) in source \"Get All joining reject From bank\" (OLE DB Source, [CRM] altshuler_mscrm, SqlCommand DTSX 3357).",
+     "fixedValue": null,
+     "condition": "!Row.genagentname_IsNull",
+     "evidence": "Create gen_fundEnrolment main.cs:228-229"
+    },
+    {
+     "attribute": "gen_notes",
+     "from": [
+      {
+       "column": "gen_notes",
+       "role": "value"
+      }
+     ],
+     "expression": "direct copy of Row.gennotes when not NULL. gen_notes is built by script \"Set gen_notes\" (see scriptOutputs): \"1: <Regect_1>; 2: <Regect_2>; 3: <Regect_3>; 4: <Regect_4>; \" (each part only when not NULL) followed by note = cast(left(aj.gen_rejectwidedescription, 3000) as nvarchar(3000)). Set gen_notes always assigns a string (possibly \"\"), so the attribute is always sent (empty string when no reasons and no note).",
+     "fixedValue": null,
+     "condition": "!Row.gennotes_IsNull",
+     "evidence": "Create gen_fundEnrolment main.cs:232-233"
+    },
+    {
+     "attribute": "gen_employername",
+     "from": [
+      {
+       "column": "gen_employername",
+       "role": "value"
+      }
+     ],
+     "expression": "direct string copy of Row.genemployername when not NULL. Source: aj.gen_employernameName AS gen_employername (display name of the employer lookup) in source \"Get All joining reject From bank\" (OLE DB Source, [CRM] altshuler_mscrm, SqlCommand DTSX 3357).",
+     "fixedValue": null,
+     "condition": "!Row.genemployername_IsNull",
+     "evidence": "Create gen_fundEnrolment main.cs:236-237"
+    },
+    {
+     "attribute": "gen_actiontype",
+     "from": [
+      {
+       "column": "JoiningType",
+       "role": "value"
+      }
+     ],
+     "expression": "new OptionSetValue(Row.JoiningType) — option value copied 1:1 (no mapping) when not NULL. Source: the UNQUALIFIED column gen_joiningtype AS JoiningType in source \"Get All joining reject From bank\" (OLE DB Source, [CRM] altshuler_mscrm, SqlCommand DTSX 3357) — SQL Server binds it to whichever joined table (aj, tr, ac, productByCourse) has that column; that it is gen_automatedjoining.gen_joiningtype is an inference (not proven; the same applies to gen_joiningstatus AS JoiningStatus).",
+     "fixedValue": null,
+     "condition": "!Row.JoiningType_IsNull",
+     "evidence": "Create gen_fundEnrolment main.cs:241-242"
+    },
+    {
+     "attribute": "gen_enrolmentstatus",
+     "from": [
+      {
+       "column": "gen_closedate",
+       "role": "condition"
+      }
+     ],
+     "expression": "new OptionSetValue(ENROLMENT_STATUS_IN_PROCESS) = 1 (const, main.cs:33) — set only when gen_closedate (CONVERT(nVARCHAR(10),DATEADD(hh,3,aj.gen_closingdate),103)) is not NULL; otherwise not sent.",
+     "fixedValue": 1,
+     "condition": "!Row.genclosedate_IsNull",
+     "evidence": "Create gen_fundEnrolment main.cs:244-245"
+    },
+    {
+     "attribute": "gen_source",
+     "from": [],
+     "expression": "new OptionSetValue(ENROLMENT_SOURCE_SYSTEM) = 100000000 (const, main.cs:34) — always.",
+     "fixedValue": 100000000,
+     "condition": null,
+     "evidence": "Create gen_fundEnrolment main.cs:247"
+    },
+    {
+     "attribute": "gen_closedate",
+     "from": [
+      {
+       "column": "gen_closedate",
+       "role": "value"
+      }
+     ],
+     "expression": "DateTime.ParseExact(Row.genclosedate, \"dd/MM/yyyy\", null) when not NULL. Source: CONVERT(nVARCHAR(10), DATEADD(hh,3,aj.gen_closingdate), 103) AS gen_closedate — CRM closing date shifted +3 hours, formatted dd/mm/yyyy (style 103), time part dropped, then parsed back to a date at 00:00 (DateTimeKind.Unspecified).",
+     "fixedValue": null,
+     "condition": "!Row.genclosedate_IsNull",
+     "evidence": "Create gen_fundEnrolment main.cs:251-252"
+    },
+    {
+     "attribute": "gen_application_receipt_date",
+     "from": [
+      {
+       "column": "gen_receivingdate",
+       "role": "value"
+      }
+     ],
+     "expression": "DateTime.ParseExact(Row.genreceivingdate, \"dd/MM/yyyy\", null) when not NULL. Source: CONVERT(nVARCHAR(10), DATEADD(hh,3,aj.gen_receivingdate), 103) AS gen_receivingdate — +3 hours, style 103 (dd/mm/yyyy), time dropped, parsed back to a date at 00:00.",
+     "fixedValue": null,
+     "condition": "!Row.genreceivingdate_IsNull",
+     "evidence": "Create gen_fundEnrolment main.cs:254-255"
+    },
+    {
+     "attribute": "gen_expectedtransferamount",
+     "from": [
+      {
+       "column": "gen_expectedtransferamount",
+       "role": "value"
+      }
+     ],
+     "expression": "new Money(Row.genexpectedtransferamount) (currency) when not NULL. Source: tr.gen_expectedtransferamount from LEFT JOIN gen_transferrequest in source \"Get All joining reject From bank\" (OLE DB Source, [CRM] altshuler_mscrm, SqlCommand DTSX 3357).",
+     "fixedValue": null,
+     "condition": "!Row.genexpectedtransferamount_IsNull",
+     "evidence": "Create gen_fundEnrolment main.cs:259-260"
+    },
+    {
+     "attribute": "gen_isgemel",
+     "from": [
+      {
+       "column": "gen_documenttype",
+       "role": "condition"
+      }
+     ],
+     "expression": "= true when gen_documenttype == GEMEL (1) || == STUDY_FUND (2) (consts main.cs:35,37); otherwise not sent. Source: aj.gen_documenttype in source \"Get All joining reject From bank\" (OLE DB Source, [CRM] altshuler_mscrm, SqlCommand DTSX 3357).",
+     "fixedValue": true,
+     "condition": "!Row.gendocumenttype_IsNull && (Row.gendocumenttype == 1 || Row.gendocumenttype == 2)",
+     "evidence": "Create gen_fundEnrolment main.cs:263-268"
+    },
+    {
+     "attribute": "gen_investmentgemel",
+     "from": [
+      {
+       "column": "gen_documenttype",
+       "role": "condition"
+      }
+     ],
+     "expression": "= true when gen_documenttype == GEMEL_INVEST (4) (const main.cs:36); otherwise not sent.",
+     "fixedValue": true,
+     "condition": "!Row.gendocumenttype_IsNull && Row.gendocumenttype == 4",
+     "evidence": "Create gen_fundEnrolment main.cs:269-272"
+    },
+    {
+     "attribute": "gen_ischildsaving",
+     "from": [
+      {
+       "column": "gen_documenttype",
+       "role": "condition"
+      }
+     ],
+     "expression": "= true when gen_documenttype == CHILDSAVING (5) (const main.cs:38); otherwise not sent.",
+     "fixedValue": true,
+     "condition": "!Row.gendocumenttype_IsNull && Row.gendocumenttype == 5",
+     "evidence": "Create gen_fundEnrolment main.cs:273-276"
+    }
+   ],
+   "evidence": "Create gen_fundEnrolment main.cs:130-292 (DTSX 1505); source SQL DTSX 3357"
+  },
+  {
+   "component": "Package\\Create Fundenrolment\\Update Owner",
+   "identicalCopies": [],
+   "entity": "gen_fundenrolment",
+   "verb": "UPDATE",
+   "mechanism": "SQL (UPDATE Gen_fundenrolmentBase via OLE DB Command on [CRM] psql/altshuler_mscrm)",
+   "status": "Unsupported",
+   "recordKey": "WHERE Gen_fundenrolmentId = ? (Param_1, 2nd \"?\") ← FundEnrollmentId = id returned by service.Create in \"Create gen_fundEnrolment\"",
+   "recordKeyColumns": [
+    "FundEnrollmentId"
+   ],
+   "declaredRowFilters": [],
+   "condition": "Every row that Create gen_fundEnrolment created successfully (Result output → Multicast Output 1).",
+   "attributes": [
+    {
+     "attribute": "ownerid",
+     "from": [
+      {
+       "column": "RejectTeamId",
+       "role": "value"
+      }
+     ],
+     "expression": "SET OwnerId = ? — Param_0 (1st \"?\") bound to RejectTeamId = Guid.Parse(Variables.RejectTeamId) — package variable User::RejectTeamId, set at run time by framework data flow \"Get Organization Variables\" → script \"Set Organization Variables\" (DTSX 12958, main.cs:24-31,38) from [CRM] gen_etlvariable.gen_Value where gen_key = 'RejectTeamId' and gen_scope = 'global' or the package scope parameter (SQL DTSX 12922); the script throws if the key is missing. Design-time value \"From DB\" (DTSX 33). Not a row value; config files not supplied could in theory override it",
+     "fixedValue": null,
+     "condition": null,
+     "evidence": "Update Owner SqlCommand DTSX 4696-4699; params [0] RejectTeamId→Param_0"
+    },
+    {
+     "attribute": "owneridtype",
+     "from": [],
+     "expression": "SET OwnerIdType = 9 (literal in SQL; 9 = team)",
+     "fixedValue": 9,
+     "condition": null,
+     "evidence": "Update Owner SqlCommand DTSX 4696-4699"
+    }
+   ],
+   "evidence": "Update Owner OLE DB Command DTSX 4693; SQL \"update Gen_fundenrolmentBase set OwnerId = ?, OwnerIdType = 9 where Gen_fundenrolmentId = ?\" (2 placeholders: Param_0 OwnerId, Param_1 Gen_fundenrolmentId)"
+  },
+  {
+   "component": "Package\\Create FundEnrolment For Pension\\Create Fund Enrolment",
+   "identicalCopies": [],
+   "entity": "gen_fundenrolment",
+   "verb": "CREATE",
+   "mechanism": "SDK (IOrganizationService.Create via CRM.Proxy CrmProxy.GetCrmService)",
+   "status": "Supported",
+   "recordKey": "new record; returned id → Row.FundEnrolmentId",
+   "recordKeyColumns": [],
+   "declaredRowFilters": [],
+   "condition": "Data flow \"Create FundEnrolment For Pension\" runs after Create Fundenrolment (Success, DTSX 15642). Rows: gen_pensionjoining with gen_fundenrolmentid IS NULL and (gen_joiningstatus in (2,4) or gen_passedandreject = 1) and at least one of gen_rejectionreason1..4 / gen_rejectreasonsnotes not NULL or a related active-or-inactive gen_rejectmanagement exists (SQL DTSX 6872). No lookup/split; every row is created inside try/catch, failures → CustingError (unconnected).",
+   "attributes": [
+    {
+     "attribute": "gen_joiningstatus",
+     "from": [
+      {
+       "column": "gen_joiningstatus",
+       "role": "value"
+      },
+      {
+       "column": "gen_passedandreject",
+       "role": "condition"
+      }
+     ],
+     "expression": "if (gen_passedandreject == true) → new OptionSetValue(FUND_ENROLMENT_JOINING_STATUS_AVAR_BAKARA_AND_REJECT) = 17 (const main.cs:36, \"passed control and reject\"); else → new OptionSetValue(Row.genjoiningstatus) copied 1:1 from pj.gen_joiningstatus when not NULL (source filter allows 2, 4, or any status when gen_passedandreject = 1).",
+     "fixedValue": null,
+     "condition": "gen_passedandreject true → 17; else only when !Row.genjoiningstatus_IsNull",
+     "evidence": "Create Fund Enrolment main.cs:136-150"
+    },
+    {
+     "attribute": "gen_pensionjoiningid",
+     "from": [
+      {
+       "column": "gen_pensionjoiningid",
+       "role": "value"
+      }
+     ],
+     "expression": "new EntityReference(\"gen_pensionjoining\", Row.genpensionjoiningid) when not NULL. Source: pj.gen_pensionjoiningid in source \"Get Pension Joining\" (OLE DB Source, [CRM] altshuler_mscrm, SqlCommand DTSX 6872).",
+     "fixedValue": null,
+     "condition": "!Row.genpensionjoiningid_IsNull",
+     "evidence": "Create Fund Enrolment main.cs:154-155"
+    },
+    {
+     "attribute": "gen_agencyaccountname",
+     "from": [
+      {
+       "column": "gen_agencyaccount",
+       "role": "value"
+      }
+     ],
+     "expression": "new EntityReference(\"account\", Row.genagencyaccount) when not NULL. Source: gen_agencie.gen_agencyname AS gen_agencyaccount, via LEFT JOIN Gen_agentcontract ac ON pj.gen_agentcontract = ac.Gen_agentcontractid LEFT JOIN gen_agencie ON ac.gen_agencyname = gen_agencie.gen_agencieid in source \"Get Pension Joining\" (OLE DB Source, [CRM] altshuler_mscrm, SqlCommand DTSX 6872).",
+     "fixedValue": null,
+     "condition": "!Row.genagencyaccount_IsNull",
+     "evidence": "Create Fund Enrolment main.cs:157-158"
+    },
+    {
+     "attribute": "gen_agnetcontactname",
+     "from": [
+      {
+       "column": "gen_agentcontact",
+       "role": "value"
+      }
+     ],
+     "expression": "new EntityReference(\"contact\", Row.genagentcontact) when not NULL. Source: gen_agents.gen_contactname AS gen_agentcontact, via LEFT JOIN Gen_agentcontract ac ON pj.gen_agentcontract = ac.Gen_agentcontractid LEFT JOIN gen_agents ON ac.gen_agentname = gen_agentsid in source \"Get Pension Joining\" (OLE DB Source, [CRM] altshuler_mscrm, SqlCommand DTSX 6872).",
+     "fixedValue": null,
+     "condition": "!Row.genagentcontact_IsNull",
+     "evidence": "Create Fund Enrolment main.cs:160-161"
+    },
+    {
+     "attribute": "gen_brokernumber",
+     "from": [
+      {
+       "column": "gen_agentcontract",
+       "role": "value"
+      }
+     ],
+     "expression": "new EntityReference(\"gen_agentcontract\", Row.genagentcontract) when not NULL — assigned twice with the identical expression (main.cs:163-164 and 178-179). Source: pj.gen_agentcontract in source \"Get Pension Joining\" (OLE DB Source, [CRM] altshuler_mscrm, SqlCommand DTSX 6872).",
+     "fixedValue": null,
+     "condition": "!Row.genagentcontract_IsNull",
+     "evidence": "Create Fund Enrolment main.cs:163-164, 178-179"
+    },
+    {
+     "attribute": "gen_fundtypename",
+     "from": [
+      {
+       "column": "gen_product",
+       "role": "condition"
+      },
+      {
+       "column": "ComprehensivePension",
+       "role": "value"
+      },
+      {
+       "column": "GeneralPension",
+       "role": "value"
+      }
+     ],
+     "expression": "when gen_product == 1 (מקיפה) → new EntityReference(\"product\", Row.ComprehensivePension); when gen_product == 2 (כללית) → new EntityReference(\"product\", Row.GeneralPension); other values or NULL → not sent. ComprehensivePension = (select top(1) productid from product where producttypecode = '200003'), GeneralPension = (select top(1) productid from product where producttypecode = '200004') — scalar sub-queries in source \"Get Pension Joining\" (OLE DB Source, [CRM] altshuler_mscrm, SqlCommand DTSX 6872), TOP(1) without ORDER BY.",
+     "fixedValue": null,
+     "condition": "!Row.genproduct_IsNull && genproduct in (1,2)",
+     "evidence": "Create Fund Enrolment main.cs:166-173"
+    },
+    {
+     "attribute": "gen_enrolmentfundfinancenumber",
+     "from": [
+      {
+       "column": "gen_fundtype",
+       "role": "value"
+      }
+     ],
+     "expression": "new EntityReference(\"competitor\", Row.genfundtype) when not NULL. Source: pj.gen_fundtype in source \"Get Pension Joining\" (OLE DB Source, [CRM] altshuler_mscrm, SqlCommand DTSX 6872).",
+     "fixedValue": null,
+     "condition": "!Row.genfundtype_IsNull",
+     "evidence": "Create Fund Enrolment main.cs:175-176"
+    },
+    {
+     "attribute": "gen_rejectreason1_new",
+     "from": [
+      {
+       "column": "gen_rejectionreason1",
+       "role": "value"
+      }
+     ],
+     "expression": "new EntityReference(\"gen_rejectreasonautomatedjoining\", Row.genrejectionreason1) when not NULL. Source: pj.gen_rejectionreason1 in source \"Get Pension Joining\" (OLE DB Source, [CRM] altshuler_mscrm, SqlCommand DTSX 6872).",
+     "fixedValue": null,
+     "condition": "!Row.genrejectionreason1_IsNull",
+     "evidence": "Create Fund Enrolment main.cs:181-182"
+    },
+    {
+     "attribute": "gen_rejectreason2_new",
+     "from": [
+      {
+       "column": "gen_rejectionreason2",
+       "role": "value"
+      }
+     ],
+     "expression": "new EntityReference(\"gen_rejectreasonautomatedjoining\", Row.genrejectionreason2) when not NULL. Source: pj.gen_rejectionreason2 in source \"Get Pension Joining\" (OLE DB Source, [CRM] altshuler_mscrm, SqlCommand DTSX 6872).",
+     "fixedValue": null,
+     "condition": "!Row.genrejectionreason2_IsNull",
+     "evidence": "Create Fund Enrolment main.cs:184-185"
+    },
+    {
+     "attribute": "gen_rejectreason3_new",
+     "from": [
+      {
+       "column": "gen_rejectionreason3",
+       "role": "value"
+      }
+     ],
+     "expression": "new EntityReference(\"gen_rejectreasonautomatedjoining\", Row.genrejectionreason3) when not NULL. Source: pj.gen_rejectionreason3 in source \"Get Pension Joining\" (OLE DB Source, [CRM] altshuler_mscrm, SqlCommand DTSX 6872).",
+     "fixedValue": null,
+     "condition": "!Row.genrejectionreason3_IsNull",
+     "evidence": "Create Fund Enrolment main.cs:187-188"
+    },
+    {
+     "attribute": "gen_rejectreason4_new",
+     "from": [
+      {
+       "column": "gen_rejectionreason4",
+       "role": "value"
+      }
+     ],
+     "expression": "new EntityReference(\"gen_rejectreasonautomatedjoining\", Row.genrejectionreason4) when not NULL. Source: pj.gen_rejectionreason4 in source \"Get Pension Joining\" (OLE DB Source, [CRM] altshuler_mscrm, SqlCommand DTSX 6872).",
+     "fixedValue": null,
+     "condition": "!Row.genrejectionreason4_IsNull",
+     "evidence": "Create Fund Enrolment main.cs:190-191"
+    },
+    {
+     "attribute": "gen_sourcefundnumber",
+     "from": [
+      {
+       "column": "gen_fundnumber",
+       "role": "value"
+      }
+     ],
+     "expression": "direct string copy of Row.genfundnumber when not NULL. Source: pj.gen_fundnumber in source \"Get Pension Joining\" (OLE DB Source, [CRM] altshuler_mscrm, SqlCommand DTSX 6872).",
+     "fixedValue": null,
+     "condition": "!Row.genfundnumber_IsNull",
+     "evidence": "Create Fund Enrolment main.cs:194-195"
+    },
+    {
+     "attribute": "gen_identitynumber",
+     "from": [
+      {
+       "column": "gen_identification",
+       "role": "value"
+      }
+     ],
+     "expression": "direct string copy of Row.genidentification when not NULL. Source: pj.gen_identification in source \"Get Pension Joining\" (OLE DB Source, [CRM] altshuler_mscrm, SqlCommand DTSX 6872).",
+     "fixedValue": null,
+     "condition": "!Row.genidentification_IsNull",
+     "evidence": "Create Fund Enrolment main.cs:197-198"
+    },
+    {
+     "attribute": "gen_contactname",
+     "from": [
+      {
+       "column": "gen_firstname",
+       "role": "value"
+      },
+      {
+       "column": "gen_lastname",
+       "role": "value"
+      }
+     ],
+     "expression": "fullname = \"\" ; if first name not NULL fullname += \" \" + gen_firstname; if last name not NULL fullname += \" \" + gen_lastname → value always starts with a LEADING SPACE (\" <first> <last>\", or \" <first>\" / \" <last>\"); no Trim. Set only when !String.IsNullOrWhiteSpace(fullname). Sources: pj.gen_firstname, pj.gen_lastname in source \"Get Pension Joining\" (OLE DB Source, [CRM] altshuler_mscrm, SqlCommand DTSX 6872).",
+     "fixedValue": null,
+     "condition": "!String.IsNullOrWhiteSpace(fullname)",
+     "evidence": "Create Fund Enrolment main.cs:200-209"
+    },
+    {
+     "attribute": "gen_enrolmentid",
+     "from": [
+      {
+       "column": "gen_firstname",
+       "role": "value"
+      },
+      {
+       "column": "gen_lastname",
+       "role": "value"
+      }
+     ],
+     "expression": "same value as gen_contactname: \" \" + gen_firstname + \" \" + gen_lastname (each part only when not NULL, leading space kept) — record name.",
+     "fixedValue": null,
+     "condition": "!String.IsNullOrWhiteSpace(fullname)",
+     "evidence": "Create Fund Enrolment main.cs:200-209"
+    },
+    {
+     "attribute": "gen_mobilephone",
+     "from": [
+      {
+       "column": "gen_mobilephone",
+       "role": "value"
+      }
+     ],
+     "expression": "direct string copy of Row.genmobilephone when not NULL. Source: pj.gen_mobilephone in source \"Get Pension Joining\" (OLE DB Source, [CRM] altshuler_mscrm, SqlCommand DTSX 6872).",
+     "fixedValue": null,
+     "condition": "!Row.genmobilephone_IsNull",
+     "evidence": "Create Fund Enrolment main.cs:211-212"
+    },
+    {
+     "attribute": "gen_joiningrejectreason1",
+     "from": [
+      {
+       "column": "gen_rejectionreason1Name",
+       "role": "value"
+      }
+     ],
+     "expression": "direct string copy of Row.genrejectionreason1Name when not NULL. Source: pj.gen_rejectionreason1Name in source \"Get Pension Joining\" (OLE DB Source, [CRM] altshuler_mscrm, SqlCommand DTSX 6872).",
+     "fixedValue": null,
+     "condition": "!Row.genrejectionreason1Name_IsNull",
+     "evidence": "Create Fund Enrolment main.cs:214-215"
+    },
+    {
+     "attribute": "gen_joiningrejectreason2",
+     "from": [
+      {
+       "column": "gen_rejectionreason2Name",
+       "role": "value"
+      }
+     ],
+     "expression": "direct string copy of Row.genrejectionreason2Name when not NULL. Source: pj.gen_rejectionreason2Name in source \"Get Pension Joining\" (OLE DB Source, [CRM] altshuler_mscrm, SqlCommand DTSX 6872).",
+     "fixedValue": null,
+     "condition": "!Row.genrejectionreason2Name_IsNull",
+     "evidence": "Create Fund Enrolment main.cs:217-218"
+    },
+    {
+     "attribute": "gen_joiningrejectreason3",
+     "from": [
+      {
+       "column": "gen_rejectionreason3Name",
+       "role": "value"
+      }
+     ],
+     "expression": "direct string copy of Row.genrejectionreason3Name when not NULL. Source: pj.gen_rejectionreason3Name in source \"Get Pension Joining\" (OLE DB Source, [CRM] altshuler_mscrm, SqlCommand DTSX 6872).",
+     "fixedValue": null,
+     "condition": "!Row.genrejectionreason3Name_IsNull",
+     "evidence": "Create Fund Enrolment main.cs:220-221"
+    },
+    {
+     "attribute": "gen_joiningrejectreason4",
+     "from": [
+      {
+       "column": "gen_rejectionreason4Name",
+       "role": "value"
+      }
+     ],
+     "expression": "direct string copy of Row.genrejectionreason4Name when not NULL. Source: pj.gen_rejectionreason4Name in source \"Get Pension Joining\" (OLE DB Source, [CRM] altshuler_mscrm, SqlCommand DTSX 6872).",
+     "fixedValue": null,
+     "condition": "!Row.genrejectionreason4Name_IsNull",
+     "evidence": "Create Fund Enrolment main.cs:223-224"
+    },
+    {
+     "attribute": "gen_city",
+     "from": [
+      {
+       "column": "gen_city",
+       "role": "value"
+      }
+     ],
+     "expression": "new EntityReference(\"gen_cities\", Row.gencity) when not NULL. Source: pj.gen_city in source \"Get Pension Joining\" (OLE DB Source, [CRM] altshuler_mscrm, SqlCommand DTSX 6872).",
+     "fixedValue": null,
+     "condition": "!Row.gencity_IsNull",
+     "evidence": "Create Fund Enrolment main.cs:227-228"
+    },
+    {
+     "attribute": "gen_street",
+     "from": [
+      {
+       "column": "gen_street",
+       "role": "value"
+      }
+     ],
+     "expression": "direct string copy when not NULL. Source: pj.gen_street in source \"Get Pension Joining\" (OLE DB Source, [CRM] altshuler_mscrm, SqlCommand DTSX 6872).",
+     "fixedValue": null,
+     "condition": "!Row.genstreet_IsNull",
+     "evidence": "Create Fund Enrolment main.cs:230-231"
+    },
+    {
+     "attribute": "gen_house_number",
+     "from": [
+      {
+       "column": "gen_housenumber",
+       "role": "value"
+      }
+     ],
+     "expression": "direct string copy when not NULL. Source: pj.gen_housenumber in source \"Get Pension Joining\" (OLE DB Source, [CRM] altshuler_mscrm, SqlCommand DTSX 6872).",
+     "fixedValue": null,
+     "condition": "!Row.genhousenumber_IsNull",
+     "evidence": "Create Fund Enrolment main.cs:233-234"
+    },
+    {
+     "attribute": "gen_index",
+     "from": [
+      {
+       "column": "gen_postalcode",
+       "role": "value"
+      }
+     ],
+     "expression": "direct string copy of the postal code when not NULL. Source: pj.gen_postalcode in source \"Get Pension Joining\" (OLE DB Source, [CRM] altshuler_mscrm, SqlCommand DTSX 6872).",
+     "fixedValue": null,
+     "condition": "!Row.genpostalcode_IsNull",
+     "evidence": "Create Fund Enrolment main.cs:236-237"
+    },
+    {
+     "attribute": "gen_flat_number",
+     "from": [
+      {
+       "column": "gen_apartment",
+       "role": "value"
+      }
+     ],
+     "expression": "direct string copy when not NULL. Source: pj.gen_apartment in source \"Get Pension Joining\" (OLE DB Source, [CRM] altshuler_mscrm, SqlCommand DTSX 6872).",
+     "fixedValue": null,
+     "condition": "!Row.genapartment_IsNull",
+     "evidence": "Create Fund Enrolment main.cs:239-240"
+    },
+    {
+     "attribute": "gen_post_box",
+     "from": [
+      {
+       "column": "gen_pobox",
+       "role": "value"
+      }
+     ],
+     "expression": "direct string copy when not NULL. Source: pj.gen_pobox in source \"Get Pension Joining\" (OLE DB Source, [CRM] altshuler_mscrm, SqlCommand DTSX 6872).",
+     "fixedValue": null,
+     "condition": "!Row.genpobox_IsNull",
+     "evidence": "Create Fund Enrolment main.cs:242-243"
+    },
+    {
+     "attribute": "gen_email",
+     "from": [
+      {
+       "column": "gen_email",
+       "role": "value"
+      }
+     ],
+     "expression": "direct string copy when not NULL. Source: pj.gen_email in source \"Get Pension Joining\" (OLE DB Source, [CRM] altshuler_mscrm, SqlCommand DTSX 6872).",
+     "fixedValue": null,
+     "condition": "!Row.genemail_IsNull",
+     "evidence": "Create Fund Enrolment main.cs:245-246"
+    },
+    {
+     "attribute": "gen_notes",
+     "from": [
+      {
+       "column": "gen_note",
+       "role": "value"
+      }
+     ],
+     "expression": "direct copy of Row.gennote when not NULL. gen_note is built by script \"Set gen_note\" (see scriptOutputs): \"1: <gen_rejectionreason1Name>; \" … \"4: <…4Name>; \" (each part only when not null/whitespace) + gen_rejectreasonsnotes (cast(gen_rejectreasonsnotes as nvarchar(2000))). When Set gen_note succeeds the value is always a string (possibly \"\"), so the attribute is always sent. HYPOTHESIS: Set gen_note reads all five inputs without NULL checks and without try/catch (Set gen_note main.cs:119-128) — a NULL input would likely fail the entire pension flow before this writer is reached.",
+     "fixedValue": null,
+     "condition": "!Row.gennote_IsNull",
+     "evidence": "Create Fund Enrolment main.cs:248-249"
+    },
+    {
+     "attribute": "gen_employername",
+     "from": [
+      {
+       "column": "gen_employername",
+       "role": "value"
+      }
+     ],
+     "expression": "direct string copy when not NULL. Source: pj.gen_employername in source \"Get Pension Joining\" (OLE DB Source, [CRM] altshuler_mscrm, SqlCommand DTSX 6872).",
+     "fixedValue": null,
+     "condition": "!Row.genemployername_IsNull",
+     "evidence": "Create Fund Enrolment main.cs:251-252"
+    },
+    {
+     "attribute": "gen_accountnumber",
+     "from": [
+      {
+       "column": "gen_employernumber",
+       "role": "value"
+      }
+     ],
+     "expression": "direct string copy of the employer number when not NULL. Source: pj.gen_employernumber in source \"Get Pension Joining\" (OLE DB Source, [CRM] altshuler_mscrm, SqlCommand DTSX 6872).",
+     "fixedValue": null,
+     "condition": "!Row.genemployernumber_IsNull",
+     "evidence": "Create Fund Enrolment main.cs:254-255"
+    },
+    {
+     "attribute": "gen_actiontype",
+     "from": [
+      {
+       "column": "gen_joiningtype",
+       "role": "value"
+      }
+     ],
+     "expression": "new OptionSetValue(Row.genjoiningtype) copied 1:1 (no mapping) when not NULL. Source: pj.gen_joiningtype in source \"Get Pension Joining\" (OLE DB Source, [CRM] altshuler_mscrm, SqlCommand DTSX 6872).",
+     "fixedValue": null,
+     "condition": "!Row.genjoiningtype_IsNull",
+     "evidence": "Create Fund Enrolment main.cs:259-260"
+    },
+    {
+     "attribute": "gen_enrolmentstatus",
+     "from": [],
+     "expression": "new OptionSetValue(ENROLMENT_STATUS_IN_PROCESS) = 1 (const main.cs:32) — always.",
+     "fixedValue": 1,
+     "condition": null,
+     "evidence": "Create Fund Enrolment main.cs:262"
+    },
+    {
+     "attribute": "gen_source",
+     "from": [],
+     "expression": "new OptionSetValue(ENROLMENT_SOURCE_SYSTEM) = 100000000 (const main.cs:33) — always.",
+     "fixedValue": 100000000,
+     "condition": null,
+     "evidence": "Create Fund Enrolment main.cs:264"
+    },
+    {
+     "attribute": "gen_application_receipt_date",
+     "from": [
+      {
+       "column": "gen_datestampreceived",
+       "role": "value"
+      }
+     ],
+     "expression": "Row.gendatestampreceived (DateTime) copied as is when not NULL — no +3h shift and no date truncation (unlike the automated-joining flow). Source: pj.gen_datestampreceived in source \"Get Pension Joining\" (OLE DB Source, [CRM] altshuler_mscrm, SqlCommand DTSX 6872).",
+     "fixedValue": null,
+     "condition": "!Row.gendatestampreceived_IsNull",
+     "evidence": "Create Fund Enrolment main.cs:267-268"
+    },
+    {
+     "attribute": "gen_counter",
+     "from": [
+      {
+       "column": "gen_count",
+       "role": "value"
+      }
+     ],
+     "expression": "Row.gencount (int) when not NULL; otherwise default 1 (literal, main.cs:274). Source: pj.gen_count in source \"Get Pension Joining\" (OLE DB Source, [CRM] altshuler_mscrm, SqlCommand DTSX 6872).",
+     "fixedValue": null,
+     "condition": "always set (value or default 1)",
+     "evidence": "Create Fund Enrolment main.cs:271-274"
+    },
+    {
+     "attribute": "gen_expectedtransferamount",
+     "from": [
+      {
+       "column": "gen_expectedtransferamount",
+       "role": "value"
+      }
+     ],
+     "expression": "new Money(Row.genexpectedtransferamount) when not NULL. Source: pj.gen_expectedtransferamount in source \"Get Pension Joining\" (OLE DB Source, [CRM] altshuler_mscrm, SqlCommand DTSX 6872).",
+     "fixedValue": null,
+     "condition": "!Row.genexpectedtransferamount_IsNull",
+     "evidence": "Create Fund Enrolment main.cs:277-278"
+    },
+    {
+     "attribute": "gen_marketing_and_direct_mail_services_use",
+     "from": [
+      {
+       "column": "gen_newsletterapproval",
+       "role": "value"
+      }
+     ],
+     "expression": "Row.gennewsletterapproval (bool) copied as is when not NULL. Source: pj.gen_newsletterapproval in source \"Get Pension Joining\" (OLE DB Source, [CRM] altshuler_mscrm, SqlCommand DTSX 6872).",
+     "fixedValue": null,
+     "condition": "!Row.gennewsletterapproval_IsNull",
+     "evidence": "Create Fund Enrolment main.cs:281-282"
+    },
+    {
+     "attribute": "gen_ispension",
+     "from": [
+      {
+       "column": "gen_newsletterapproval",
+       "role": "condition"
+      }
+     ],
+     "expression": "= true, but ONLY when gen_newsletterapproval is not NULL (the guard tests the newsletter flag, not anything pension-related); otherwise not sent.",
+     "fixedValue": true,
+     "condition": "!Row.gennewsletterapproval_IsNull",
+     "evidence": "Create Fund Enrolment main.cs:284-285"
+    },
+    {
+     "attribute": "gen_employersfile",
+     "from": [
+      {
+       "column": "gen_joiningsource",
+       "role": "condition"
+      }
+     ],
+     "expression": "= true when gen_joiningsource == JOINING_STATUS_INSERT_FROM_FILE (3) || == JOINING_STATUS_INSERT_FROM_EMPLOER_INTERFACE (4) (consts main.cs:34-35); otherwise not sent.",
+     "fixedValue": true,
+     "condition": "!Row.genjoiningsource_IsNull && genjoiningsource in (3,4)",
+     "evidence": "Create Fund Enrolment main.cs:287-294"
+    },
+    {
+     "attribute": "gen_movedfromunderwritingaccount",
+     "from": [
+      {
+       "column": "gen_needhealthdeclaration",
+       "role": "condition"
+      },
+      {
+       "column": "gen_underwritingstatus",
+       "role": "condition"
+      }
+     ],
+     "expression": "gen_needhealthdeclaration == 1 (No) → true; == 2 (Yes) and gen_underwritingstatus == 2 (אושר) or 3 (אושר בהחרגה) → true; == 2 and gen_underwritingstatus == 1 (בתהליך) → false; any other combination / NULLs → not sent.",
+     "fixedValue": null,
+     "condition": "see expression",
+     "evidence": "Create Fund Enrolment main.cs:296-325"
+    },
+    {
+     "attribute": "gen_foldernumber",
+     "from": [
+      {
+       "column": "gen_needhealthdeclaration",
+       "role": "condition"
+      },
+      {
+       "column": "gen_underwritingstatus",
+       "role": "condition"
+      }
+     ],
+     "expression": "= FOLDER_NUMBER = \"123456\" (const string main.cs:37) when gen_needhealthdeclaration == 1, or == 2 with gen_underwritingstatus in (2,3); otherwise not sent.",
+     "fixedValue": "123456",
+     "condition": "genneedhealthdeclaration == 1 || (== 2 && genunderwritingstatus in (2,3))",
+     "evidence": "Create Fund Enrolment main.cs:299-316"
+    }
+   ],
+   "evidence": "Create Fund Enrolment main.cs:130-335 (DTSX 4758); source SQL DTSX 6872"
+  },
+  {
+   "component": "Package\\Create FundEnrolment For Pension\\Upate Pension Joining",
+   "identicalCopies": [],
+   "entity": "gen_pensionjoining",
+   "verb": "UPDATE",
+   "mechanism": "SQL (UPDATE gen_pensionjoiningBase via OLE DB Command on [CRM])",
+   "status": "Unsupported",
+   "recordKey": "WHERE gen_pensionjoiningid = ? (Param_1, 2nd \"?\") ← gen_pensionjoiningid from source pj.gen_pensionjoiningid",
+   "recordKeyColumns": [
+    "gen_pensionjoiningid"
+   ],
+   "declaredRowFilters": [],
+   "condition": "Every row created successfully by Create Fund Enrolment (Result → Multicast Output 2).",
+   "attributes": [
+    {
+     "attribute": "gen_fundenrolmentid",
+     "from": [
+      {
+       "column": "FundEnrolmentId",
+       "role": "value"
+      }
+     ],
+     "expression": "SET gen_fundenrolmentid = ? — Param_0 (1st \"?\") bound to FundEnrolmentId = id returned by service.Create (links the pension joining to the new fund enrolment; also stops the row being picked again, since the source requires pj.gen_fundenrolmentid IS NULL)",
+     "fixedValue": null,
+     "condition": null,
+     "evidence": "Upate Pension Joining SqlCommand DTSX 8056-8058; params [0] FundEnrolmentId→Param_0, [1] gen_pensionjoiningid→Param_1"
+    }
+   ],
+   "evidence": "OLE DB Command DTSX 8053; SQL \"update gen_pensionjoiningBase set gen_fundenrolmentid = ? where gen_pensionjoiningid = ?\""
+  },
+  {
+   "component": "Package\\Create FundEnrolment For Pension\\Update Fund Enrolment Owner",
+   "identicalCopies": [],
+   "entity": "gen_fundenrolment",
+   "verb": "UPDATE",
+   "mechanism": "SQL (UPDATE Gen_fundenrolmentBase via OLE DB Command on [CRM])",
+   "status": "Unsupported",
+   "recordKey": "WHERE Gen_fundenrolmentId = ? (Param_2, 3rd \"?\") ← FundEnrolmentId = id returned by service.Create",
+   "recordKeyColumns": [
+    "FundEnrolmentId"
+   ],
+   "declaredRowFilters": [],
+   "condition": "Every row created successfully by Create Fund Enrolment (Result → Multicast Output 1).",
+   "attributes": [
+    {
+     "attribute": "ownerid",
+     "from": [
+      {
+       "column": "OwnerId",
+       "role": "value"
+      }
+     ],
+     "expression": "SET OwnerId = ? — Param_0 (1st \"?\") bound to OwnerId = gen_updatedbyreferent when gen_passedandreject == true, else the reject team Guid.Parse(Variables.RejectTeamId) — package variable User::RejectTeamId, set at run time by framework data flow \"Get Organization Variables\" → script \"Set Organization Variables\" (DTSX 12958, main.cs:24-31,38) from [CRM] gen_etlvariable.gen_Value where gen_key = 'RejectTeamId' and gen_scope = 'global' or the package scope parameter (SQL DTSX 12922); the script throws if the key is missing. Design-time value \"From DB\" (DTSX 33). Not a row value; config files not supplied could in theory override it",
+     "fixedValue": null,
+     "condition": null,
+     "evidence": "Update Fund Enrolment Owner SqlCommand DTSX 8100-8103; [0] OwnerId→Param_0"
+    },
+    {
+     "attribute": "owneridtype",
+     "from": [
+      {
+       "column": "OwnerIdType",
+       "role": "value"
+      }
+     ],
+     "expression": "SET OwnerIdType = ? — Param_1 (2nd \"?\") bound to OwnerIdType = 8 (systemuser) when gen_passedandreject == true, else 9 (team) — literals chosen in script",
+     "fixedValue": null,
+     "condition": null,
+     "evidence": "Update Fund Enrolment Owner SqlCommand DTSX 8100-8103; [1] OwnerIdType→Param_1"
+    }
+   ],
+   "evidence": "OLE DB Command DTSX 8097; SQL \"update Gen_fundenrolmentBase set OwnerId = ?, OwnerIdType = ? where Gen_fundenrolmentId = ?\" (3 placeholders)"
+  },
+  {
+   "component": "Package\\Close FundEnrolments For Pension\\Close Fund Enrolment",
+   "identicalCopies": [],
+   "entity": "gen_fundenrolment",
+   "verb": "UPDATE",
+   "mechanism": "SDK (IOrganizationService.Update via CRM.Proxy)",
+   "status": "Supported",
+   "recordKey": "fundEnrolment.Id = Row.Genfundenrolmentid (Gen_fundenrolment.Gen_fundenrolmentid joined to gen_pensionjoining.gen_fundenrolmentid)",
+   "recordKeyColumns": [
+    "Gen_fundenrolmentid"
+   ],
+   "declaredRowFilters": [],
+   "condition": "Data flow runs after Create FundEnrolment For Pension (Success, DTSX 15643). Rows (SQL DTSX 909): fund enrolments with gen_enrolmentstatus = 1 (בתהליך) linked to a pension joining with gen_joiningstatus in (5,6,7,8,13) (בוטל/הסתיים), or gen_joiningstatus = 9 with isnull(gen_existsreject,1) = 1 and no reject reasons/notes; and gen_joiningsource != 4 and gen_fellowsignature != 2 — these \"!=\" predicates are UNKNOWN for NULL, so pension joinings with NULL gen_joiningsource or NULL gen_fellowsignature are also excluded (never closed). Script skips NULL id. No try/catch: an SDK exception fails the component.",
+   "attributes": [
+    {
+     "attribute": "gen_enrolmentstatus",
+     "from": [],
+     "expression": "new OptionSetValue(3) — literal 3 = הסתיים (closed)",
+     "fixedValue": 3,
+     "condition": "!Row.Genfundenrolmentid_IsNull",
+     "evidence": "Close Fund Enrolment main.cs:121-127"
+    }
+   ],
+   "evidence": "Close Fund Enrolment main.cs:119-129 (DTSX 85); source SQL DTSX 909"
+  },
+  {
+   "component": "Package\\Update Reject Management With Fund Enrolment\\Update Reject Management With Fund Enrolment",
+   "identicalCopies": [],
+   "entity": "gen_rejectmanagement",
+   "verb": "UPDATE",
+   "mechanism": "SDK (IOrganizationService.Update via CRM.Proxy)",
+   "status": "Supported",
+   "recordKey": "entity.Id = Row.genrejectmanagementid",
+   "recordKeyColumns": [
+    "gen_rejectmanagementid"
+   ],
+   "declaredRowFilters": [],
+   "condition": "Data flow runs after the (disabled) Create FundEnrolment For Transfer Request (Success constraint DTSX 15645; disabled predecessor does not block). Rows (UNION SQL DTSX 14666): active (statecode = 0) gen_rejectmanagement with gen_fundenrolmentid NULL whose automated joining / pension joining / transfer request has a gen_fundenrolment and gen_isoldrejectmethod != 1 or NULL. Script updates only when both ids not NULL; exceptions → Failure → Derived Column (dead end). Multiple rows per reject-management record are possible only (a) in the automated-joining branch, which joins on fe.Gen_automatedjoining = aj.gen_automatedjoiningId (not unique: one automated joining can have several gen_fundenrolment records), or (b) when one gen_rejectmanagement is linked to several sources (automated joining / pension joining / transfer request) whose fund enrolments differ. The pension and transfer-request branches join on the fund enrolment id held by the joining/request (pj.gen_fundenrolmentid / tr.gen_fundenrolmentid = fe.Gen_fundenrolmentId, query lines 10 and 17) and match at most one. In cases (a)/(b) the record is updated once per row — last processed row wins, order undefined (UNION, no ORDER BY, SQL DTSX 14666).",
+   "attributes": [
+    {
+     "attribute": "gen_fundenrolmentid",
+     "from": [
+      {
+       "column": "Gen_fundenrolmentId",
+       "role": "value"
+      }
+     ],
+     "expression": "new EntityReference(\"gen_fundenrolment\", Row.GenfundenrolmentId) — fe.Gen_fundenrolmentId of a fund enrolment linked to the same automated joining (fe.Gen_automatedjoining = aj.gen_automatedjoiningId — may be several, last row wins), or the fund enrolment referenced by the pension joining (pj.gen_fundenrolmentid) or transfer request (tr.gen_fundenrolmentid) — at most one each. Column is ReadWrite in this script but is not modified.",
+     "fixedValue": null,
+     "condition": "!Row.genrejectmanagementid_IsNull && !Row.GenfundenrolmentId_IsNull",
+     "evidence": "Update Reject Management With Fund Enrolment main.cs:120-126"
+    }
+   ],
+   "evidence": "main.cs:116-136 (DTSX 14715); source SQL DTSX 14666"
+  },
+  {
+   "component": "Package\\Update FundEnrolment\\Update FundEnrolment",
+   "identicalCopies": [],
+   "entity": "gen_fundenrolment",
+   "verb": "UPDATE",
+   "mechanism": "SDK (IOrganizationService.Update via CRM.Proxy)",
+   "status": "Supported",
+   "recordKey": "entity.Id = Row.genfundenrolmentid read by \"select * from TblFundEnrolments\" ([SRS.GENERIX_STAGING] psrs/generix_staging, DTSX 13755). That staging table is truncated at package start (DTSX 13741) and filled in this run by \"Insert To TemporaryTable\" (insert into TblFundEnrolments (gen_fundenrolmentid) values(?)) in Create Fundenrolment (DTSX 3575, ← FundEnrollmentId) and Create FundEnrolment For Pension (DTSX 7098, ← FundEnrolmentId) — i.e. the ids of the fund enrolments created in this run. The lineage tool does not bridge \"select *\" so the key shows as a DB source.",
+   "recordKeyColumns": [
+    "gen_fundenrolmentid"
+   ],
+   "declaredRowFilters": [],
+   "condition": "Data flow runs after Update Reject Management With Fund Enrolment (Success, DTSX 15646). One update per id in TblFundEnrolments; script skips NULL ids; exceptions are swallowed (empty catch).",
+   "attributes": [
+    {
+     "attribute": "gen_ismailsend",
+     "from": [],
+     "expression": "new OptionSetValue(0) — literal 0",
+     "fixedValue": 0,
+     "condition": "!Row.genfundenrolmentid_IsNull",
+     "evidence": "Update FundEnrolment main.cs:120-126"
+    }
+   ],
+   "evidence": "Update FundEnrolment main.cs:116-134 (DTSX 13785); source SQL DTSX 13755"
+  }
+ ],
+ "readWriteModifications": [],
+ "lookupBridges": [],
+ "unresolved": [
+  {
+   "where": "Package\\Update FundEnrolment\\Update FundEnrolment / record key gen_fundenrolmentid",
+   "reason": "Bridge via staging table TblFundEnrolments (\"select *\") is not deterministically resolved by the lineage tool; the analyst bridge (writers: Insert To TemporaryTable in Create Fundenrolment and in Create FundEnrolment For Pension) is documented in recordKey. Only matters for which records get gen_ismailsend = 0, not for any value."
+  }
+ ],
+ "notes": [
+  "Disabled data flow (excluded from active writes): \"Package\\Create FundEnrolment For Transfer Request\" (DTS:Disabled=\"True\", DTSX 8160). It would have created gen_fundenrolment via SDK (Create Fund Enrolment, ~37 attributes incl. gen_transferrequestid, gen_handlingentity, gen_referentname, gen_rejection_description_for_contact), updated Gen_fundenrolmentBase OwnerId = reject team / OwnerIdType = 9 (SQL, DTSX 11069) and gen_transferrequestBase.gen_fundenrolmentid (SQL, DTSX 11114), and inserted into the GLOBAL TEMP table ##TblFundEnrolments on [CRM] (Insert To TemporaryTable, DTSX 10191 — not the staging TblFundEnrolments on GENERIX_STAGING used by the active flows). None of these execute.",
+  "Owner assignment by direct SQL on Gen_fundenrolmentBase (Update Owner, Update Fund Enrolment Owner) and link by direct SQL on gen_pensionjoiningBase (Upate Pension Joining) are UNSUPPORTED writes on the CRM database [CRM] = psql/altshuler_mscrm (DTSX 4); they bypass CRM plugins, auditing and sharing/POA (PrincipalObjectAccess) handling for the ownership change.",
+  "Create gen_fundEnrolment: the package never updates gen_automatedjoining.gen_lastsyncdate; repeat creation is prevented only by the full-cache Lookup on existing gen_fundenrolment. A joining with N transfer requests (LEFT JOIN gen_transferrequest) produces N rows in the same run; the lookup cache was loaded before the run, so N gen_fundenrolment records can be created for one automated joining.",
+  "Create gen_fundEnrolment: gen_enrolmentstatus = 1 is set only when gen_closedate is not NULL; otherwise the CRM default applies. Conditional Split \"No CreateRow\" is dead (requires JoiningStatus != 2 while the source selects only status 2).",
+  "Create gen_fundEnrolment: gen_closedate / gen_application_receipt_date are built in SQL as DATEADD(hh,3,…) then CONVERT(…,103) (dd/mm/yyyy) and re-parsed with ParseExact \"dd/MM/yyyy\" — the time part is lost and the +3h shift is a fixed offset (no DST handling). The pension flow copies gen_datestampreceived as DateTime without shift.",
+  "Create Fund Enrolment (pension): gen_contactname/gen_enrolmentid get a LEADING SPACE (\" first last\") because the code starts with \"\" + \" \" + first name (main.cs:202-203); no Trim.",
+  "Create Fund Enrolment (pension): gen_ispension = true is guarded by gen_newsletterapproval not NULL (main.cs:284-285) — probably a copy/paste guard; pension enrolments with NULL newsletter approval are not flagged gen_ispension.",
+  "Create Fund Enrolment (pension): gen_brokernumber is assigned twice with the same value (main.cs:163-164 and 178-179). Inputs not used by the code: gen_fundenrolmentid (always NULL by the source filter), gen_isoldrejectmethod; gen_rejectreasonsnotes is used only through gen_note.",
+  "Create Fund Enrolment (pension): when gen_passedandreject == true the owner becomes gen_updatedbyreferent (OwnerIdType 8). If gen_updatedbyreferent is NULL, reading Row.genupdatedbyreferent in SSIS throws (column is null) inside the try → the row goes to the unconnected CustingError output and no fund enrolment is created (behaviour of the SSIS buffer accessor; not tested).",
+  "Script string outputs gen_notes (wstr 4000) and gen_note (wstr 1000) can receive longer concatenations than their declared width (see scriptOutputs) — an over-long value raises an exception in a script without try/catch and would fail the data flow (risk, not observed).",
+  "Create gen_fundEnrolment / Create Fund Enrolment errors are routed to CastingError / CustingError outputs that are not connected — failed creations are silently dropped (no log).",
+  "Update Reject Management With Fund Enrolment: column Gen_fundenrolmentId is declared ReadWrite but the script does not modify it; no readWriteModifications apply. Rows with a NULL id are not directed to any output (dropped).",
+  "Insert To TemporaryTable (both flows) and Truncate Table TblFundEnrolments write only to staging (GENERIX_STAGING) — a hop toward Update FundEnrolment (gen_ismailsend = 0), not a CRM write."
+ ]
+}

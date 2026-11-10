@@ -1,0 +1,152 @@
+{
+  "verifier": "ssis-verifier",
+  "package": "0032_POAOperator",
+  "scope": "logic-claims re-check",
+  "checkedAt": "2026-11-10",
+  "source": "source/DailyProcess/0032_POAOperator.dtsx sha256 537C3F53A332ABFA9713E05BB7559DFAB2ED165C37AA40418DAC611E181DF47F (re-hashed, matches)",
+  "checked": 15,
+  "results": [
+    {
+      "id": "L|summary",
+      "hash": "9ae24b4d05e9",
+      "verdict": "WRONG",
+      "detail": "Re-derived: order from the 9 PrecedenceConstraints (DTSX:18794-18802; all Success, LogicalAnd, no expressions, no DTS:Disabled): Out Of Date -> Cancelled by Poa Account (HAVING =6, writes 6, DTSX:13889/13052) -> Invalid by Poa Account (=5, writes 5, DTSX:17699/17739) -> Expired By Poa Account (=4, writes 4, DTSX:15807/15733) -> Cancelled (!=2, writes 6, DTSX:11969/11132) -> account links -> gen_policies links. Inner join gives at least one link; NULL link status is never counted by count(case ...), so count(id) never equals -> blocks every operator update. Creation conditions, Lookup keys, IS All Employees, gen_active = 1, no-prior-link check: correct (DTSX:3081-3109, 6125-6152, 483-553, 3571-3641, 3217, 6257). AccountId ownership is argued with the ambiguity rule plus Account.AccountId at DTSX:3107; for Accountid the case-insensitive match is explicitly labelled an assumption (accepted form). scopeNote verified: 0 DTS:Configuration; [psql] (DTSX:4-6) is referenced by 13 connections, all OLE DB Sources/Lookups (reads); every CRM write is service.Create or ExecuteMultipleExtension(RequestType.Update) on IOrganizationService; ServerName/OrganizationName set from gen_etlvariable (DTSX:8329, script ReadWriteVariables); SQL comments -- valid/not valid/cancelled/expired/invalid at DTSX:10055, 11969, 13889, 15807, 17699; VALID = 2 at DTSX:742, 3803; gen_poaaccountoperatorid selected alone from gen_poaaccountoperator (DTSX:10053) and used as entity.Id at main.cs:122-123 (=DTSX:10339-10340); gen_poaoperatorid used as Id at main.cs:124-126 in the four operator scripts (DTSX:12247-12248, 14166-14167, 16085-16086, 18003-18004). One unit is wrong: the link-expiry condition.",
+      "evidence": "DTSX:10053-10055 (SqlCommand of Update POA Account Operator Out Of Date\\Get Poa Account Operator); DTSX:9984 (expiredStatus = 4)",
+      "wrongUnits": [
+        {
+          "unit": "summary_he: 'קישורים בסטטוס 2 (\"valid\" לפי הערת SQL) שתאריך הסיום שלהם עבר מקבלים סטטוס 4'",
+          "problem": "The stated condition is not the DTSX condition. The query is dateadd(HH,3, gen_enddate) < GETDATE(): a link whose end date has passed by less than 3 hours is not selected in that run. The summary drops the +3 hours, so it reads as 'as soon as the end date passes'. Whether the +3 h is a time-zone correction is not shown in the files.",
+          "correct": "קישורים בסטטוס 2 (\"valid\" לפי הערת SQL) שתאריך הסיום שלהם בתוספת 3 שעות מוקדם מזמן הריצה (dateadd(HH,3,gen_enddate) < GETDATE()) מקבלים סטטוס 4",
+          "evidence": "DTSX:10053-10055"
+        }
+      ]
+    },
+    {
+      "id": "L|finding#2",
+      "hash": "d0c37d849282",
+      "verdict": "CONFIRMED",
+      "detail": "Window CreatedOn > DATEADD(dd,-2,GETDATE()) and gen_poaoperator.gen_poastatus = 2 in both sources (DTSX:3108-3109, 6151-6152); no predicate on gen_poaoperator CreatedOn/dates. 'Only if' is stated as a necessary condition, and the consequence is conditional. Join ownership: AccountId (DTSX:3106) argued by the ambiguity rule plus Account.AccountId (DTSX:3107); Accountid (DTSX:6149-6150) labelled as a case-insensitivity assumption. 'Valid' for operator status is labelled a hypothesis; VALID = 2 is defined only for gen_poaaccountoperator (DTSX:742/843, 3803/3905). Cross-package: grep of all 35 source/DailyProcess/*.dtsx finds gen_poaaccountoperator only in 0032, so no other supplied package creates it.",
+      "evidence": "DTSX:3081-3109; DTSX:6125-6152; DTSX:742, 3803; grep source/DailyProcess/*.dtsx 'poaaccountoperator' -> 0032 only",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|finding#3",
+      "hash": "18c25bdd2b03",
+      "verdict": "CONFIRMED",
+      "detail": "Existence Lookups key only on gen_poaaccountoperator.gen_customeraccount = gen_customeraccountid (DTSX:541-553) and gen_poaaccountoperator.gen_policy = gen_policiesid (DTSX:3629-3641); no operator column. CacheType = 1 (partial, DTSX:547, 3635), NoMatchCachePercentage = 0 (DTSX:549, 3637). The Match outputs are not connected; only No Match -> IS All Employees. Both creates are row-by-row service.Create downstream (DTSX:925, 3986), so the two-links-in-one-run outcome is correctly conditional ('if both rows are checked before the first link is created'). Later-run statement is correct: the Lookup then finds the existing link. The join-ownership wording is the same accepted form as in the summary.",
+      "evidence": "DTSX:541-553, 3629-3641; component paths of both Create data flows",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Create POA Account Operator|title",
+      "hash": "aef63037a87b",
+      "verdict": "WRONG",
+      "detail": "Everything else matches: Get Customer Accounts join/WHERE (DTSX:3081-3109), existence Lookup on gen_customeraccount (DTSX:541), IS All Employees !ISNULL(gen_applypoa) && gen_applypoa == 1 (DTSX:3217), Check If Employee Exist gen_active = 1 / gen_identitynumber = Gen_customeridnumber / gen_powerofattorenyoperator = gen_poaoperatorId (DTSX:483-499), Create gen_poaaccountoperator with VALID and the permissions (main.cs:123-220 = DTSX:836-933). The AccountId ownership argument is present and correct. One wrong unit in short_he.",
+      "evidence": "DTSX:3108 (Gen_customeraccount.CreatedOn > DATEADD(dd,-2,GETDATE()))",
+      "wrongUnits": [
+        {
+          "unit": "short_he: 'לחשבון לקוח שנפתח ביומיים האחרונים'",
+          "problem": "The filter is Gen_customeraccount.CreatedOn, the CRM record-creation time. The text says the account was 'opened' (נפתח), which is a business account-opening meaning. The files do not show that CreatedOn equals the opening date. An account opened earlier but created in CRM in the last two days is selected. The same claim's flow_he[1] correctly says 'שנוצרו'.",
+          "correct": "לחשבון לקוח שנוצר (CreatedOn) ביומיים האחרונים",
+          "evidence": "DTSX:3108"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Create POA Account Operator|short",
+      "hash": "72f8b6699fe2",
+      "verdict": "WRONG",
+      "detail": "Steps, branches and the AccountId ownership argument (DTSX:3106 unqualified; DTSX:3107 Account.AccountId; ambiguity rule) are correct. IS All Employees tech line DTSX:3217 is the FriendlyExpression. The paths are No Match -> split; All Employees -> Union All; default -> Check If Employee Exist; Match -> Union All -> Create. One wrong unit.",
+      "evidence": "DTSX:3108",
+      "wrongUnits": [
+        {
+          "unit": "[1] 'נאספים חשבונות לקוח שנפתחו ביומיים האחרונים'",
+          "problem": "The filter is the CRM record-creation time Gen_customeraccount.CreatedOn > DATEADD(dd,-2,GETDATE()). It is not an account-opening date, and the files do not prove that the two are equal. This claim's tech note does not state the CreatedOn condition either.",
+          "correct": "נאספים חשבונות לקוח שנוצרו (CreatedOn) ביומיים האחרונים",
+          "evidence": "DTSX:3108"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Create POA Account Operator|detailed",
+      "hash": "74b0ffd7f668",
+      "verdict": "CONFIRMED",
+      "detail": "SQL quoted correctly (minus with (nolock)), DTSX:3081-3109. Ownership argument correct. Existence Lookup partial, gen_customeraccount = gen_customeraccountid, Match unconnected (DTSX:541-553). Split DTSX:3204/3217. Employee Lookup partial, ParameterMap Gen_customeridnumber, gen_poaoperatorId (DTSX:483-499), NoMatch unconnected. Union All maps all 23 columns same-to-same on both inputs (checked by lineage, 0 mismatches). Create (DTSX:841-925): gen_poastatus = OptionSetValue(VALID=2); gen_customername = contact(gen_contactname); gen_customeraccount; gen_powerofattorenyoperator; gen_signaturedate = gen_employersignatorydate; gen_startdate; gen_receivingdate; gen_enddate; allpermissions true / else false plus the 12 individual flags set true only when true. The list and order match. Error path: catch -> ErrorBuffer -> Derived Column -> Union All 1 -> ETL Warning (gen_etlprocesswarning Create, DTSX:2438-2449) is correctly described. Note, not counted: lookups/dates are set only when the source is non-NULL. On a Create this has the same effect as leaving them empty.",
+      "evidence": "DTSX:483-553, 589, 836-933, 3076-3109, 3204-3217",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Create POA Account Operator|detail",
+      "hash": "348c32440fce",
+      "verdict": "CONFIRMED",
+      "detail": "Population, ownership argument, existence match by gen_customeraccount from any operator, active employee list by ID and operator, the applypoa/employee decision, the permissions decision and the write (gen_poaaccountoperator, Create, SDK via IOrganizationService) all match. sourceTables: [psql] = psql/ALTSHULER_MSCRM (DTSX:4-6). 0005_Customer Account builds Entity(\"gen_customeraccount\") (e.g. 0005 DTSX:18341). gen_poaemployeeemployeroperator and gen_poaoperator appear only in 0032 among the supplied packages. Unproven items are labelled השערה / proven:false.",
+      "evidence": "DTSX:4-6, 483-553, 841-925, 3081-3109; source/DailyProcess/0005_Customer Account.dtsx:18341",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Create POA Account Operator|decisions",
+      "hash": "9e90279ffa59",
+      "verdict": "CONFIRMED",
+      "detail": "All 5 decisions match: WHERE DTSX:3108-3109; Lookup DTSX:541/544 (Match -> no path); split DTSX:3204/3217; employee Lookup DTSX:483/488 (Match -> Union All -> create; NoMatch -> no path); allpermissions condition main.cs (DTSX:870). The meanings are labelled as hypotheses where they rest on names.",
+      "evidence": "DTSX:483-553, 870, 3108-3109, 3217",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Create POA Account Operator|open",
+      "hash": "78aa5f62c371",
+      "verdict": "CONFIRMED",
+      "detail": "Window, status 2 with the 'valid' hypothesis labelled, the coverage conditions (applypoa or Gen_customeridnumber in an active gen_poaemployeeemployeroperator row for this operator), the no-prior-link check, and that no creation-date comparison exists all match. The consequence is conditional. 'No other supplied package creates gen_poaaccountoperator' was verified by grep. Item [2]: the existence check is by account only (DTSX:541-553).",
+      "evidence": "DTSX:483-553, 3081-3109",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Create POA Account Operator - Pension|title",
+      "hash": "db24b869a757",
+      "verdict": "CONFIRMED",
+      "detail": "Get Policies WHERE has only CreatedOn > DATEADD(dd,-2,GETDATE()) and gen_poastatus = 2, with no product/policy-type filter (DTSX:6125-6152). 'Pension' is labelled a hypothesis from the flow name. Accountid is unqualified in both ON clauses (DTSX:6149-6150). Account.AccountId is at DTSX:3107 on the same [psql]. The ambiguity argument is given and case-insensitivity is labelled an assumption. Existence Lookup on gen_policy (DTSX:3629-3641). Split DTSX:6244/6257. Employee Lookup DTSX:3571-3587. Create with VALID (DTSX:3903-3986).",
+      "evidence": "DTSX:3571-3641, 3677, 6120-6152, 6244-6257",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Create POA Account Operator - Pension|short",
+      "hash": "303ef452c8f2",
+      "verdict": "CONFIRMED",
+      "detail": "Steps and branches match the paths (No Match -> split; All Employees -> Union All; default -> employee Lookup; Match -> Union All -> Create). Case evidence verified: gen_poaoperator.gen_poaoperatorId at DTSX:3086 and gen_poaoperator.gen_poaoperatorid at DTSX:11966. Both queries run on [psql] in every execution (Success chain, nothing disabled), which supports case-insensitive identifier resolution, and the text still labels it an assumption. The connections are at DTSX:3117 and 6160. Split expression at DTSX:6257.",
+      "evidence": "DTSX:3086, 3117, 6149-6150, 6160, 6257, 11966",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Create POA Account Operator - Pension|detailed",
+      "hash": "7cfc3cb14c1a",
+      "verdict": "CONFIRMED",
+      "detail": "SQL quoted correctly (DTSX:6125-6152). Existence Lookup gen_policy = gen_policiesid, partial, Match unconnected (DTSX:3629-3641). Employee Lookup ParameterMap Gen_identitynumber, gen_poaoperatorId (DTSX:3587). Union All maps all 22 columns same-to-same. Create (DTSX:3903-3986): gen_poastatus = VALID; gen_customername = contact; gen_policy = EntityReference(\"gen_policies\"); gen_powerofattorenyoperator; signature/start/receiving/end dates; allpermissions true / else false plus the 12 flags, each conditioned on its own column (no swaps). There is no gen_customeraccount in this write. The error path to ETL Warning is correct (DTSX:5484-5494).",
+      "evidence": "DTSX:3571-3641, 3677, 3903-3986, 5484-5494, 6120-6152",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Create POA Account Operator - Pension|detail",
+      "hash": "7812a53e4ba7",
+      "verdict": "CONFIRMED",
+      "detail": "Population, ownership argument (labelled assumption plus case evidence), matching, decisions and the write all match. sourceTables: gen_policies appears outside 0032 only in 0031_PoaAccountUpdateDaily, and only as an EntityReference target (0031 DTSX:6392, 7979), so no supplied package creates it. gen_poaemployeeemployeroperator appears only in 0032.",
+      "evidence": "DTSX:3571-3641, 3903-3986, 6125-6152; 0031_PoaAccountUpdateDaily.dtsx:6392, 7979",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Create POA Account Operator - Pension|decisions",
+      "hash": "1d842ef6423b",
+      "verdict": "CONFIRMED",
+      "detail": "All 5 decisions match: WHERE DTSX:6151-6152; Lookup DTSX:3629/3632; split DTSX:6244/6257; employee Lookup DTSX:3571/3576 (Match -> create, NoMatch -> no path); allpermissions condition in the pension main.cs.",
+      "evidence": "DTSX:3571-3641, 6151-6152, 6257",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Create POA Account Operator - Pension|open",
+      "hash": "e566d92c71fa",
+      "verdict": "CONFIRMED",
+      "detail": "Window, status 2 with the hypothesis labelled, the coverage conditions with gen_policies.Gen_identitynumber, and the no-prior-link check by gen_policy all match. The consequence is conditional, and cross-package non-creation was verified. Item [2] matches DTSX:3629-3641.",
+      "evidence": "DTSX:3571-3641, 6125-6152",
+      "wrongUnits": []
+    }
+  ],
+  "missingWrites": []
+}

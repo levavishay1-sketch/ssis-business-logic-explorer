@@ -1,0 +1,158 @@
+{
+  "verifier": "ssis-verifier",
+  "package": "0039_UpdateAgentAppointmentDate",
+  "scope": "logic-claims all",
+  "checkedAt": "2026-11-07T11:38:30.417Z",
+  "checked": 16,
+  "results": [
+    {
+      "id": "L|summary",
+      "hash": "738c7c738071",
+      "verdict": "WRONG",
+      "detail": "Technical content verified: population and latest-date subquery (DTSX:3246-3256), direct UPDATE of Gen_fundmainBase via [psql] (DTSX:3294, 3300), Gen_customeraccountname is a guid lookup (0005_Customer Account.dtsx:2644 dataType=guid; 0015_TransferIn.dtsx:75552 join to Gen_customeraccountId). Scope note verified (single connection DTSX:4 Data Source=psql;Initial Catalog=ALTSHULER_MSCRM; connection uses at DTSX:2319, 3264, 3300, 3376; gen_etlprocess created through CRM SDK at DTSX:288-293; no DTS:Configuration). Unit 1 is wrong in saying the meaning of gen_agentappointmentdate is derived from the field name only: the supplied files define it by code.",
+      "evidence": "0004_LeumiFile-MY.dtsx:75547-75577 (Set Date Fields), 92815-92820",
+      "wrongUnits": [
+        {
+          "unit": 1,
+          "problem": "'המשמעות תאריך מינוי סוכן נגזרת משם השדה בלבד (השערה)' - the files settle it.",
+          "correct": "In 0004_LeumiFile-MY (active flow Foreach Loop Container\\Minhali daily) gen_fundmain.gen_agentappointmentdate is set to DateTime.Now exactly when the fund's broker number changed and its agent or agency changed, and is then propagated to the other funds of the same account (OLE DB Command \"Update 'gen_agentappointmentdate' for the same account\"). So it is the date the current agent/agency was appointed on the fund.",
+          "evidence": "0004_LeumiFile-MY.dtsx:75547-75577, 92815-92820"
+        }
+      ]
+    },
+    {
+      "id": "L|exec",
+      "hash": "485dc6f3c702",
+      "verdict": "CONFIRMED",
+      "detail": "Three Success constraints (no DTS:Value/expression): Get Organization Variables -> Create ETL Process record (4224) -> Get All Funds (4225) -> End ETL Process record (4226). No disabled executables, no event handlers.",
+      "evidence": "DTSX:4224-4226",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|ignored",
+      "hash": "e59e4f736d77",
+      "verdict": "WRONG",
+      "detail": "Units 2-3 (ETL process record create/finish on gen_etlprocess) are plumbing. Unit 1 (Get Organization Variables) supplies CrmAdminId, ServerName, OrganizationName and throws if a key is missing; it is accepted as plumbing per CLAUDE.md. Unit 4 is not plumbing by the given test: Create System Variables produces ModifiedBy (from User::CrmAdminId) and ModifiedOn (DateTime.UtcNow), which are written into the CRM table Gen_fundmainBase as Param_1/Param_2 of the business UPDATE, and its exception on a non-GUID CrmAdminId stops all updates.",
+      "evidence": "Create System Variables main.cs:127-128 @DTSX:2370; Update agent appointment date DTSX:3294, mapping ModifiedBy->Param_1, ModifiedOn->Param_2",
+      "wrongUnits": [
+        {
+          "unit": 4,
+          "problem": "Listed as ETL plumbing although its outputs are written to CRM.",
+          "correct": "Create System Variables sets ModifiedBy = new Guid(User::CrmAdminId) and ModifiedOn = DateTime.UtcNow for every row; both are written by direct SQL to Gen_fundmainBase.ModifiedBy/ModifiedOn together with gen_agentappointmentdate.",
+          "evidence": "main.cs:127-128; DTSX:3294; input mapping lines of Update agent appointment date"
+        }
+      ]
+    },
+    {
+      "id": "L|finding#1",
+      "hash": "0da46b3c3503",
+      "verdict": "CONFIRMED",
+      "detail": "OLE DB Command 'Update agent appointment date' on [psql] (ALTSHULER_MSCRM): update Gen_fundmainBase set gen_agentappointmentdate=?, ModifiedBy=?, ModifiedOn=? where Gen_fundmainId=? - direct SQL on a CRM Base table.",
+      "evidence": "DTSX:3291-3300; DTSX:4",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|finding#2",
+      "hash": "3697a475950d",
+      "verdict": "CONFIRMED",
+      "detail": "OLE DB Command input errorRowDisposition=FailComponent, error output unconnected; End ETL Process record is behind a Success constraint. No DTS:TransactionOption anywhere in the package (all defaults), so no transaction wraps the per-row updates; the hypothesis label only concerns the mechanism.",
+      "evidence": "DTSX:3291-3354; DTSX:4226; no TransactionOption attribute in file",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|finding#3",
+      "hash": "4df4165cbb5e",
+      "verdict": "CONFIRMED",
+      "detail": "main.cs:128 new Guid(Convert.ToString(User::CrmAdminId)) without try/catch; empty or non-GUID text throws FormatException on the first row in the synchronous script, before the OLE DB Command processes that buffer; End ETL behind Success constraint. (If the key is absent from gen_etlvariable, Get Organization Variables already throws, main.cs:50-51.)",
+      "evidence": "DTSX:2622 (main.cs:128); DTSX:4180 ReadWriteVariables incl. CrmAdminId; DTSX:4226",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|finding#4",
+      "hash": "be3359a132e9",
+      "verdict": "CONFIRMED",
+      "detail": "All three Gen_fundmain references in the source query use with (nolock).",
+      "evidence": "DTSX:3248, 3252, 3255",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|finding#5",
+      "hash": "71ced80330ce",
+      "verdict": "CONFIRMED",
+      "detail": "No DTS:Configuration elements in the DTSX; runtime overrides are outside the supplied files (external_unknown).",
+      "evidence": "grep of DTSX (no Configuration elements)",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|finding#6",
+      "hash": "88cae6d5b936",
+      "verdict": "CONFIRMED",
+      "detail": "FileName/FilePath are declared with those values and referenced nowhere else in the package.",
+      "evidence": "DTSX:23-28 (only occurrences)",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Get All Funds|title",
+      "hash": "adaff86c3b3e",
+      "verdict": "CONFIRMED",
+      "detail": "Matches the source query, latest-date subquery and the direct UPDATE of date, ModifiedBy, ModifiedOn.",
+      "evidence": "DTSX:3246-3256, 3294",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Get All Funds|short",
+      "hash": "652eec1ad7fb",
+      "verdict": "CONFIRMED",
+      "detail": "Population (NULL date, account present among funds with a date), latest date per account, direct DB write, funds with a date untouched; funds without account excluded by NULL IN semantics.",
+      "evidence": "DTSX:3246-3256, 3294",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Get All Funds|detailed",
+      "hash": "800dbaeeeb74",
+      "verdict": "CONFIRMED",
+      "detail": "All units re-derived: connection, WHERE, CrmAdminId parsing, subquery top 1 order by desc with NULL guards, parameter mapping Param_0..3, FailComponent and unconnected error output, only two paths in the flow.",
+      "evidence": "DTSX:4; 3246-3256; main.cs:127-128; 3294; mapping AgentAppointmentDateToInsert->Param_0, ModifiedBy->Param_1, ModifiedOn->Param_2, Gen_fundmainId->Param_3",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Get All Funds|detail",
+      "hash": "3b0dc1530a7a",
+      "verdict": "WRONG",
+      "detail": "Units 1-4 verified (incl. cross-package guid proof and parameter mapping). Unit 5 states that the meaning 'agent appointment date' comes from the column name only (hypothesis), but 0004_LeumiFile-MY defines it by code.",
+      "evidence": "0004_LeumiFile-MY.dtsx:75547-75577, 92815-92820",
+      "wrongUnits": [
+        {
+          "unit": 5,
+          "problem": "Meaning labelled hypothesis although the supplied files settle it.",
+          "correct": "gen_agentappointmentdate is set to the current time by 0004 when the fund's agent/agency changes together with the broker number, and propagated to the account's other funds; i.e. it is the date the current agent/agency was appointed on the fund.",
+          "evidence": "0004_LeumiFile-MY.dtsx:75547-75577, 92815-92820"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Get All Funds|decisions",
+      "hash": "1b4b22a20ab9",
+      "verdict": "CONFIRMED",
+      "detail": "Both SQL conditions copied exactly; unqualified columns in the IN subquery bind to the inner Gen_fundmain.",
+      "evidence": "DTSX:3246-3256",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Get All Funds|crm",
+      "hash": "806a03429315",
+      "verdict": "CONFIRMED",
+      "detail": "Single write: SQL UPDATE of Gen_fundmainBase (gen_agentappointmentdate, ModifiedBy, ModifiedOn) per selected fund, via [psql]; Unsupported.",
+      "evidence": "DTSX:3294, 3300",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Get All Funds|open",
+      "hash": "4e19c7c1243f",
+      "verdict": "CONFIRMED",
+      "detail": "Gen_fundmain definition, runtime connection override, CrmAdminId value and business intent of 'latest' are not settled by the supplied files; all correctly labelled.",
+      "evidence": "DTSX:3246; DTSX:4; DTSX:11-13; DTSX:3251",
+      "wrongUnits": []
+    }
+  ]
+}

@@ -1,0 +1,1326 @@
+{
+ "changes": [
+  {
+   "claimId": "L|summary",
+   "field": "summary_he",
+   "before": "לחבילה שני חלקים עסקיים. (1) כשמגיע קובץ \"הטבות מעסיקים\": לכל מעסיק (לפי מספר תאגיד) מתעדכנות ברשומות gen_employers שלו, דרך ה-SDK, הטבות דמי הניהול: שיעור מצבירה לפי סוג המוצר (קופה או קרן השתלמות) ותקופתו, ושיעור מהפקדה ותאריך תחילתו, בתנאי שאחד התוקפים חל. (2) בכל ריצה, עם קובץ או בלעדיו: לכל חשבון (account) מחושבים סך יתרות קופות העובדים המשויכות למעסיק ושיעור דמי הניהול המשוקלל, ונכתבים בעדכון SQL ישיר לטבלת AccountBase (Unsupported).",
+   "after": "לחבילה שני חלקים עסקיים. (1) כשמגיע קובץ \"הטבות מעסיקים\": לכל מעסיק (לפי מספר תאגיד) מתעדכנות ברשומות gen_employers שלו, דרך ה-SDK, הטבות המעסיק מהקובץ (שדות gen_mf*; השערה: MF = דמי ניהול): שיעור הצבירה לפי סוג המוצר (עמודת \"גמל\" או \"השתלמות\") ותקופתו, ושיעור ההפקדה (עמודת \"הפקדה\") ותאריך תחילתו, בתנאי שאחד התוקפים חל. (2) כשאין קובץ, או אחרי קליטה וארכוב מוצלחים של הקובץ: לכל חשבון (account) מחושבים סך יתרות קופות העובדים המשויכות למעסיק ושיעור דמי הניהול המשוקלל, ונכתבים בעדכון SQL ישיר לטבלת AccountBase (Unsupported).",
+   "why": "משמעות MF כדמי ניהול לא מוכחת בקבצים (כותרות הקובץ: גמל / השתלמות / הפקדה) ולכן סומנה כהשערה. בנוסף, 'בכל ריצה' אינו מדויק: אם הקליטה או הארכוב נכשלים, החישוב אינו רץ (DTSX:8055, 8059).",
+   "evidence": "DTSX:9-24 (כותרות MF Source); DTSX:8055, 8058, 8059",
+   "verifierAccepted": true
+  },
+  {
+   "claimId": "L|exec",
+   "field": "executionOrder[3].title_he",
+   "before": "קליטת הטבות דמי ניהול למעסיקים",
+   "after": "קליטת הטבות מעסיקים (MF, השערה: דמי ניהול)",
+   "why": "משמעות MF כדמי ניהול לא מוכחת בקבצים.",
+   "evidence": "DTSX:9-24",
+   "verifierAccepted": true
+  },
+  {
+   "claimId": "L|finding#4",
+   "field": "findings_he[3].text",
+   "before": "רשומות מעסיק שסוג המוצר שלהן אינו 200001, 1, 200000 או 2 מדולגות בשקט, כי ל-DE Output אין נתיב.",
+   "after": "רשומות מעסיק שקוד סוג המוצר שלהן אינו ריק ואינו 200001, 1, 200000 או 2 מדולגות בלי תיעוד, כי ל-DE Output אין נתיב. אם קוד סוג המוצר ריק (NULL) ברשומת מעסיק שנמצאה, התנאים מחזירים NULL; לפלטים Pension Fund ו-Study Fund מוגדר FailComponent, ולכן כל זרימת Set MF on employers נכשלת, והארכוב והחישוב לחשבונות אינם רצים באותה ריצה.",
+   "why": "חסר מקרה קוד NULL: ה-JOIN על product אינו מונע ProductTypeCode ריק, תנאי עם NULL מחזיר NULL, ולפלטים מוגדר FailComponent.",
+   "evidence": "DTSX:5689-5695 (SQL); Check Fund type DTSX:3702-3724 (errorRowDisposition=FailComponent); DTSX:8055, 8059",
+   "verifierAccepted": true
+  },
+  {
+   "claimId": "L|finding#4",
+   "field": "findings_he[3].evidence",
+   "before": "Check Fund type DTSX:3702",
+   "after": "Check Fund type DTSX:3702-3724 (Pension Fund / Study Fund: errorRowDisposition=FailComponent; DE Output ללא נתיב); Get Employer Nunmer SQL DTSX:5689-5695; DTSX:8055, 8059",
+   "why": "עדכון הראיות לניסוח המתוקן.",
+   "evidence": "DTSX:3702-3724",
+   "verifierAccepted": true
+  },
+  {
+   "claimId": "L|finding#8",
+   "field": "findings_he[7].text",
+   "before": "במחלץ: לשני האילוצים שנכנסים ל-Update employer amount (DTSX:8058, 8059) אין DTS:LogicalAnd, בעוד ב-8053..8056 כתוב במפורש \"True\", ובכל חבילות DailyProcess לא מופיע \"False\" מפורש. כלומר הם OR, וזה מה שמאפשר לחישוב לרוץ בשני המסלולים. קובץ ה-evidence מציג logicalAnd=true, כי tools/dtsx-extract.mjs:181 מניח True כברירת מחדל. בפרשנות AND השלב לא היה רץ לעולם, ולכן יש לתקן את המחלץ.",
+   "after": "לשני האילוצים שנכנסים ל-Update employer amount (DTSX:8058, 8059) אין DTS:LogicalAnd, וב-8053..8056 כתוב במפורש \"True\". היעדר התכונה פירושו OR, וכך גם מוצג ב-evidence (logicalAnd=false, לפי tools/dtsx-extract.mjs:181). זה מה שמאפשר לחישוב לרוץ בשני המסלולים: כשאין קובץ, או אחרי הארכוב. בפרשנות AND השלב לא היה רץ, כי שני האילוצים תלויים בערכים הפוכים של isFileExist.",
+   "why": "הטענה שה-evidence מציג true ושהמחלץ מניח True מיושנת: dtsx-extract.mjs:181 מגדיר logicalAnd = (LogicalAnd === 'True'), וה-evidence מציג false ל-8057/8058/8059. אין מה לתקן במחלץ.",
+   "evidence": "DTSX:8053-8059; tools/dtsx-extract.mjs:181; evidence/0023_Employers.json precedenceConstraints",
+   "verifierAccepted": true
+  },
+  {
+   "claimId": "L|finding#8",
+   "field": "findings_he[7].severity",
+   "before": "medium",
+   "after": "info",
+   "why": "אחרי התיקון אין פער במחלץ; נשאר תיאור התנהגות בלבד.",
+   "evidence": "tools/dtsx-extract.mjs:181",
+   "verifierAccepted": true
+  },
+  {
+   "claimId": "L|finding#8",
+   "field": "findings_he[7].evidence",
+   "before": "DTSX:8053-8059; tools/dtsx-extract.mjs:181",
+   "after": "DTSX:8053-8059; tools/dtsx-extract.mjs:181; evidence/0023_Employers.json precedenceConstraints (8057-8059: logicalAnd=false)",
+   "why": "עדכון הראיות לניסוח המתוקן.",
+   "evidence": "tools/dtsx-extract.mjs:181",
+   "verifierAccepted": true
+  },
+  {
+   "claimId": "L|Package (control flow)|title",
+   "field": "components[0].short_he",
+   "before": "אם קובץ הטבות המעסיקים קיים, ההטבות נקלטות לרשומות המעסיק והקובץ מועבר לארכיון. בכל ריצה, עם קובץ או בלעדיו, מחושבים מחדש לכל חשבון מעסיק שווי קופות העובדים ודמי הניהול המשוקללים.",
+   "after": "אם קובץ הטבות המעסיקים קיים, ההטבות נקלטות לרשומות המעסיק והקובץ מועבר לארכיון. כשאין קובץ, או אחרי קליטה וארכוב מוצלחים, מחושבים מחדש לכל חשבון מעסיק שווי קופות העובדים ודמי הניהול המשוקללים.",
+   "why": "התאמה לענף הכשל של הארכוב שנוסף לתיאור המפורט: 'בכל ריצה' אינו מדויק כשהקליטה או הארכוב נכשלים.",
+   "evidence": "DTSX:8055, 8058, 8059",
+   "verifierAccepted": true
+  },
+  {
+   "claimId": "L|Package (control flow)|short",
+   "field": "components[0].short.nodes[1].branches[0].nodes[0].text",
+   "before": "הטבות דמי הניהול מהקובץ נקלטות לרשומות המעסיק, והקובץ מועבר לארכיון יומי.",
+   "after": "הטבות המעסיקים מהקובץ נקלטות לרשומות המעסיק, והקובץ מועבר לארכיון יומי.",
+   "why": "משמעות ההטבות כדמי ניהול לא מוכחת בקבצים.",
+   "evidence": "DTSX:9-24",
+   "verifierAccepted": true
+  },
+  {
+   "claimId": "L|Package (control flow)|short",
+   "field": "components[0].short.nodes[2].text",
+   "before": "בשני המקרים מחושבים מחדש לכל חשבון מעסיק שווי קופות העובדים ודמי הניהול המשוקללים.",
+   "after": "כשאין קובץ, או אחרי קליטה וארכוב מוצלחים, מחושבים מחדש לכל חשבון מעסיק שווי קופות העובדים ודמי הניהול המשוקללים. אם הקליטה או הארכוב נכשלים, החישוב אינו רץ בריצה זו.",
+   "why": "התאמה לענף הכשל: 'בשני המקרים' אינו מדויק כשהקליטה או הארכוב נכשלים.",
+   "evidence": "DTSX:8055, 8058, 8059",
+   "verifierAccepted": true
+  },
+  {
+   "claimId": "L|Package (control flow)|detailed",
+   "field": "components[0].detailed.nodes[2].branches[0].nodes[0].text",
+   "before": "נוצרת תיקיית ארכיון בשם תאריך היום, ונקלטות הטבות דמי הניהול לרשומות המעסיק.",
+   "after": "נוצרת תיקיית ארכיון בשם תאריך היום, ונקלטות הטבות המעסיקים לרשומות המעסיק.",
+   "why": "משמעות ההטבות כדמי ניהול לא מוכחת בקבצים.",
+   "evidence": "DTSX:9-24",
+   "verifierAccepted": true
+  },
+  {
+   "claimId": "L|Package (control flow)|detailed",
+   "field": "components[0].detailed.nodes[3].branches[0].nodes",
+   "before": [
+    {
+     "type": "step",
+     "text": "הקובץ מועבר לתיקיית הארכיון של היום, ואחר כך מתבצע חישוב שווי קופות העובדים.",
+     "tech": "Move FileTo Archive: MoveFile User::MFBenefitFile → User::MFBenefitFileArchive (DTSX:3693)"
+    }
+   ],
+   "after": [
+    {
+     "type": "step",
+     "text": "הקובץ מועבר לתיקיית הארכיון של היום.",
+     "tech": "Move FileTo Archive: MoveFile User::MFBenefitFile → User::MFBenefitFileArchive (DTSX:3693); אין הגדרת דריסה (OverwriteDestination) ב-FileSystemData"
+    },
+    {
+     "type": "decision",
+     "text": "האם ההעברה לארכיון הצליחה?",
+     "tech": "Move FileTo Archive → Update employer amount: Success (DTSX:8059)",
+     "branches": [
+      {
+       "label": "כן",
+       "nodes": [
+        {
+         "type": "step",
+         "text": "מתבצע חישוב שווי קופות העובדים."
+        }
+       ]
+      },
+      {
+       "label": "לא",
+       "nodes": [
+        {
+         "type": "end",
+         "text": "חישוב שווי קופות העובדים אינו רץ בריצה זו, אף שרשומות המעסיק כבר עודכנו. זה קורה למשל אם בתיקיית הארכיון של היום כבר יש קובץ באותו שם, כי לא הוגדרה דריסה."
+        }
+       ]
+      }
+     ]
+    }
+   ],
+   "why": "חסר ענף כשל של הארכוב: MoveFile בלי דריסה נכשל אם קובץ באותו שם כבר בארכיון של היום, ואז אילוץ 8059 (Success) אינו מתקיים.",
+   "evidence": "DTSX:3693 (FileSystemData ללא OverwriteDestination); DTSX:8059",
+   "verifierAccepted": true
+  },
+  {
+   "claimId": "L|Package (control flow)|detailed",
+   "field": "components[0].detailed.nodes[4].tech",
+   "before": "Update employer amount: שני אילוצים נכנסים (DTSX:8058, DTSX:8059) ללא DTS:LogicalAnd → OR. קובץ ה-evidence מציג logicalAnd=true (ברירת מחדל של המחלץ); בפרשנות AND השלב לא היה רץ לעולם",
+   "after": "Update employer amount: שני אילוצים נכנסים (DTSX:8058, DTSX:8059) ללא DTS:LogicalAnd → OR; כך גם ב-evidence: logicalAnd=false (tools/dtsx-extract.mjs:181). בפרשנות AND השלב לא היה רץ, כי שני האילוצים תלויים בערכים הפוכים של isFileExist",
+   "why": "הטענה שה-evidence מציג logicalAnd=true מיושנת; ה-evidence מציג false.",
+   "evidence": "evidence/0023_Employers.json precedenceConstraints 8058/8059; tools/dtsx-extract.mjs:181",
+   "verifierAccepted": true
+  },
+  {
+   "claimId": "L|Package (control flow)|detailed",
+   "field": "components[0].detailed.nodes[6].text",
+   "before": "הטבות המעסיקים נקלטו (אם היה קובץ), ושווי קופות העובדים ודמי הניהול המשוקללים חושבו מחדש לכל החשבונות.",
+   "after": "הטבות המעסיקים נקלטו (אם היה קובץ), ושווי קופות העובדים ודמי הניהול המשוקללים חושבו מחדש לחשבונות – אם הריצה הגיעה לשלב החישוב.",
+   "why": "התאמה לענף הכשל של הארכוב: לא בכל ריצה החישוב רץ.",
+   "evidence": "DTSX:8055, 8059",
+   "verifierAccepted": true
+  },
+  {
+   "claimId": "L|Package (control flow)|detailed",
+   "field": "components[0].evidence[4]",
+   "before": "tools/dtsx-extract.mjs:181 (logicalAnd default True)",
+   "after": "tools/dtsx-extract.mjs:181 (LogicalAnd חסר → OR; ב-evidence logicalAnd=false ל-8057-8059)",
+   "why": "מצביע הראיה תיאר ברירת מחדל True שאינה קיימת עוד.",
+   "evidence": "tools/dtsx-extract.mjs:181",
+   "verifierAccepted": true
+  },
+  {
+   "claimId": "L|Package (control flow)|detail",
+   "field": "components[0].detail_he[3].t",
+   "before": "הטבות דמי הניהול של המעסיקים נטענות כשמגיע קובץ, ונתוני ההיקף המחושבים של המעסיקים מתרעננים בכל ריצה.",
+   "after": "הטבות המעסיקים (שדות gen_mf*; השערה: דמי ניהול) נטענות כשמגיע קובץ, ונתוני ההיקף המחושבים של המעסיקים מתרעננים בכל ריצה שמגיעה לשלב החישוב.",
+   "why": "משמעות דמי הניהול לא מוכחת; 'בכל ריצה' אינו מדויק כשהקליטה או הארכוב נכשלים.",
+   "evidence": "DTSX:9-24; DTSX:8055, 8059",
+   "verifierAccepted": true
+  },
+  {
+   "claimId": "L|Package\\Set MF on employers|title",
+   "field": "components[1].title_he",
+   "before": "קליטת הטבות דמי ניהול לרשומות המעסיק (gen_employers)",
+   "after": "קליטת הטבות מעסיקים (MF, השערה: דמי ניהול) לרשומות המעסיק (gen_employers)",
+   "why": "הכותרת הציגה את משמעות MF כעובדה, בסתירה ל-short_he שמסמן אותה כהשערה.",
+   "evidence": "DTSX:9-24",
+   "verifierAccepted": true
+  },
+  {
+   "claimId": "L|Package\\Set MF on employers|title",
+   "field": "components[1].flow_he[3]",
+   "before": "סוג המוצר קובע את עמודת הצבירה: Pension Fund → provident_fund, Study Fund → study_fund; אחר → נזנח.",
+   "after": "סוג המוצר קובע את עמודת הצבירה: Pension Fund → provident_fund, Study Fund → study_fund; קוד אחר → נזנח; קוד NULL → כשל השלב.",
+   "why": "התאמה למקרה קוד NULL (FailComponent).",
+   "evidence": "Check Fund type DTSX:3702-3724",
+   "verifierAccepted": true
+  },
+  {
+   "claimId": "L|Package\\Set MF on employers|title",
+   "field": "components[1].flow_he[4]",
+   "before": "בדיקת תוקף: תאריך תחילת הפקדה עבר, או תקופת צבירה בתוקף; אחרת → אזהרה.",
+   "after": "בדיקת תוקף: תאריך תחילת הפקדה קיים ועבר, או שיש שיעור צבירה ותקופת הצבירה בתוקף; אחרת → אזהרה.",
+   "why": "התאמה לתנאי המלא (order 1 דורש גם !ISNULL(gen_mfaccumulation)).",
+   "evidence": "Check If Date Valid DTSX:3743-3767",
+   "verifierAccepted": true
+  },
+  {
+   "claimId": "L|Package\\Set MF on employers|short",
+   "field": "components[1].short.nodes[1].branches[1].nodes[0].text",
+   "before": "לכל רשומת מעסיק נבחר שיעור דמי הניהול מצבירה לפי סוג המוצר שלה (קופה או קרן השתלמות); מוצר אחר מדולג.",
+   "after": "לכל רשומת מעסיק נבחר שיעור הצבירה לפי סוג המוצר שלה: עמודת \"גמל\" או עמודת \"השתלמות\" בקובץ. מוצר מסוג אחר מדולג, וסוג מוצר חסר מכשיל את כל השלב.",
+   "why": "'שיעור דמי הניהול מצבירה' הוצג כעובדה; חסר מקרה סוג מוצר NULL.",
+   "evidence": "DTSX:9-24; Check Fund type DTSX:3702-3724",
+   "verifierAccepted": true
+  },
+  {
+   "claimId": "L|Package\\Set MF on employers|short",
+   "field": "components[1].short.nodes[2].text",
+   "before": "האם ההטבה בתוקף: תחילת ההפקדה כבר הגיעה, או שתקופת הצבירה חלה היום?",
+   "after": "האם ההטבה בתוקף: תאריך תחילת ההפקדה קיים וכבר הגיע, או שיש שיעור צבירה ותקופת הצבירה חלה היום?",
+   "why": "בדיקת התוקף של הצבירה דורשת גם שיעור צבירה קיים (!ISNULL(gen_mfaccumulation)) ושני תאריכים קיימים.",
+   "evidence": "Check If Date Valid DTSX:3767",
+   "verifierAccepted": true
+  },
+  {
+   "claimId": "L|Package\\Set MF on employers|short",
+   "field": "components[1].short.nodes[2].branches[1].nodes[0].text",
+   "before": "רשומת המעסיק מתעדכנת בדמי הניהול מצבירה ומהפקדה ובתאריכי התוקף שבקובץ.",
+   "after": "רשומת המעסיק מתעדכנת בשיעורי הצבירה וההפקדה ובתאריכי התוקף שבקובץ (השערה: אלה דמי ניהול).",
+   "why": "משמעות דמי הניהול לא מוכחת בקבצים.",
+   "evidence": "DTSX:9-24",
+   "verifierAccepted": true
+  },
+  {
+   "claimId": "L|Package\\Set MF on employers|detailed",
+   "field": "components[1].detailed.nodes[0].text",
+   "before": "קובץ הטבות המעסיקים (CSV עם שורת כותרת) נקרא. בכל שורה: מספר תאגיד, שם מעסיק, תאריך תחילה ותאריך סיום, דמי ניהול לקופה, דמי ניהול לקרן השתלמות, תאריך תחילת הפקדה ודמי ניהול מהפקדה.",
+   "after": "קובץ הטבות המעסיקים (CSV עם שורת כותרת) נקרא. כותרות העמודות בקובץ: ח פ (מספר תאגיד), שם מעסיק, ת התחלה, ת סיום, גמל, השתלמות, תאריך התחלת הסכם מהפקדה, הפקדה. הקבצים אינם מגדירים את משמעות הערכים בעמודות גמל, השתלמות והפקדה (השערה: דמי ניהול).",
+   "why": "שמות העמודות 'דמי ניהול לקופה / לקרן השתלמות / מהפקדה' הוצגו כעובדה; הכותרות בקובץ הן רק גמל / השתלמות / הפקדה.",
+   "evidence": "DTSX:9-24; MF Source File outputColumns externalMetadataColumnId",
+   "verifierAccepted": true
+  },
+  {
+   "claimId": "L|Package\\Set MF on employers|detailed",
+   "field": "components[1].detailed.nodes[5]",
+   "before": {
+    "type": "decision",
+    "text": "מה סוג המוצר של רשומת המעסיק?",
+    "tech": "Check Fund type (ConditionalSplit, DTSX:3702): ProductTypeCode == 200001 || ProductTypeCode == 1 → \"Pension Fund\" (order 0); ProductTypeCode == 200000 || ProductTypeCode == 2 → \"Study Fund\" (order 1)",
+    "branches": [
+     {
+      "label": "Pension Fund (קוד 200001 או 1)",
+      "nodes": [
+       {
+        "type": "step",
+        "text": "דמי הניהול מצבירה נלקחים מעמודת הקופה (provident fund) שבקובץ.",
+        "tech": "Set Pension Fund Columns: gen_mfaccumulation = provident_fund"
+       }
+      ]
+     },
+     {
+      "label": "Study Fund (קוד 200000 או 2)",
+      "nodes": [
+       {
+        "type": "step",
+        "text": "דמי הניהול מצבירה נלקחים מעמודת קרן ההשתלמות שבקובץ.",
+        "tech": "Set Study Fund Columns: gen_mfaccumulation = study_fund"
+       }
+      ]
+     },
+     {
+      "label": "סוג אחר",
+      "nodes": [
+       {
+        "type": "end",
+        "text": "רשומת המעסיק מדולגת בלי תיעוד.",
+        "tech": "DE Output — אין נתיב"
+       }
+      ]
+     }
+    ]
+   },
+   "after": {
+    "type": "decision",
+    "text": "מה סוג המוצר של רשומת המעסיק?",
+    "tech": "Check Fund type (ConditionalSplit, DTSX:3702): ProductTypeCode == 200001 || ProductTypeCode == 1 → \"Pension Fund\" (order 0); ProductTypeCode == 200000 || ProductTypeCode == 2 → \"Study Fund\" (order 1); לשני הפלטים errorRowDisposition=FailComponent; ProductTypeCode NULL → התנאי NULL",
+    "branches": [
+     {
+      "label": "Pension Fund (קוד 200001 או 1)",
+      "nodes": [
+       {
+        "type": "step",
+        "text": "שיעור הצבירה נלקח מעמודת \"גמל\" שבקובץ.",
+        "tech": "Set Pension Fund Columns: gen_mfaccumulation = provident_fund"
+       }
+      ]
+     },
+     {
+      "label": "Study Fund (קוד 200000 או 2)",
+      "nodes": [
+       {
+        "type": "step",
+        "text": "שיעור הצבירה נלקח מעמודת \"השתלמות\" שבקובץ.",
+        "tech": "Set Study Fund Columns: gen_mfaccumulation = study_fund"
+       }
+      ]
+     },
+     {
+      "label": "סוג אחר (קוד לא ריק)",
+      "nodes": [
+       {
+        "type": "end",
+        "text": "רשומת המעסיק מדולגת בלי תיעוד.",
+        "tech": "DE Output — אין נתיב"
+       }
+      ]
+     },
+     {
+      "label": "קוד סוג מוצר ריק (NULL)",
+      "nodes": [
+       {
+        "type": "end",
+        "text": "כל זרימת הנתונים נכשלת, והארכוב והחישוב לחשבונות אינם רצים בריצה זו.",
+        "tech": "התנאי מחזיר NULL → FailComponent (DTSX:3702-3724); Set MF on employers → Move FileTo Archive: Success (DTSX:8055); DTSX:8059"
+       }
+      ]
+     }
+    ]
+   },
+   "why": "'דמי הניהול מצבירה' הוצג כעובדה; 'סוג אחר מדולג' נכון רק לקוד לא ריק — קוד NULL מכשיל את הזרימה (FailComponent).",
+   "evidence": "DTSX:9-24; Check Fund type DTSX:3702-3724; Get Employer Nunmer SQL DTSX:5689-5695",
+   "verifierAccepted": true
+  },
+  {
+   "claimId": "L|Package\\Set MF on employers|detailed",
+   "field": "components[1].detailed.nodes[6].text",
+   "before": "בשני סוגי המוצרים, דמי הניהול מהפקדה, תאריך תחילת ההפקדה ותאריכי התחילה והסיום של הצבירה נלקחים מהקובץ כמו שהם.",
+   "after": "בשני סוגי המוצרים, שיעור ההפקדה (עמודת \"הפקדה\"), תאריך התחלת ההסכם מהפקדה ותאריכי התחילה והסיום של הצבירה נלקחים מהקובץ כמו שהם.",
+   "why": "'דמי הניהול מהפקדה' הוצג כעובדה.",
+   "evidence": "DTSX:9-24",
+   "verifierAccepted": true
+  },
+  {
+   "claimId": "L|Package\\Set MF on employers|detailed",
+   "field": "components[1].detailed.nodes[8].text",
+   "before": "רשומת המעסיק מתעדכנת בכל השדות שיש להם ערך: דמי ניהול מצבירה, תאריכי התחילה והסיום של הצבירה, דמי ניהול מהפקדה ותאריך תחילת ההפקדה. העדכון נשלח בלי השוואה לערכים הקיימים, ושדה ריק בקובץ אינו מוחק ערך קיים.",
+   "after": "רשומת המעסיק מתעדכנת בכל השדות שיש להם ערך: שיעור הצבירה, תאריכי התחילה והסיום של הצבירה, שיעור ההפקדה ותאריך התחלת ההסכם מהפקדה. העדכון נשלח בלי השוואה לערכים הקיימים, ושדה ריק בקובץ אינו מוחק ערך קיים.",
+   "why": "'דמי ניהול מצבירה / מהפקדה' הוצגו כעובדה.",
+   "evidence": "DTSX:9-24",
+   "verifierAccepted": true
+  },
+  {
+   "claimId": "L|Package\\Set MF on employers|detailed",
+   "field": "components[1].detailed.nodes[10].text",
+   "before": "רשומות המעסיקים מחזיקות את הטבות דמי הניהול שבקובץ. מעסיקים לא מוכרים ותאריכים לא תקינים מתועדים כאזהרות, ומוצרים מסוג אחר מדולגים.",
+   "after": "רשומות המעסיקים שעברו את הבדיקות מחזיקות את הטבות המעסיקים שבקובץ. מעסיקים לא מוכרים ותאריכים לא תקינים מתועדים כאזהרות, מוצרים מסוג אחר מדולגים, וסוג מוצר חסר מכשיל את השלב.",
+   "why": "'הטבות דמי הניהול' הוצג כעובדה; התאמה למקרה קוד NULL.",
+   "evidence": "DTSX:9-24; DTSX:3702-3724",
+   "verifierAccepted": true
+  },
+  {
+   "claimId": "L|Package\\Set MF on employers|detail",
+   "field": "components[1].detail_he[2].t",
+   "before": "(1) מעסיק לא נמצא → אזהרה. (2) סוג מוצר 200001/1 → שיעור הצבירה מ-provident_fund; 200000/2 → מ-study_fund; אחר → מדולג. (3) תוקף: תאריך תחילת ההפקדה עבר, או שיש שיעור צבירה והיום בתוך תקופת הצבירה; אחרת → אזהרה.",
+   "after": "(1) מעסיק לא נמצא → אזהרה. (2) סוג מוצר 200001/1 → שיעור הצבירה מ-provident_fund; 200000/2 → מ-study_fund; קוד אחר (לא ריק) → מדולג; קוד NULL → התנאי NULL ו-FailComponent, כל השלב נכשל. (3) תוקף: תאריך תחילת ההפקדה עבר, או שיש שיעור צבירה והיום בתוך תקופת הצבירה; אחרת → אזהרה.",
+   "why": "התאמה למקרה קוד NULL, כדי שהתיאורים לא יסתרו.",
+   "evidence": "Check Fund type DTSX:3702-3724",
+   "verifierAccepted": true
+  },
+  {
+   "claimId": "L|Package\\Set MF on employers|detail",
+   "field": "components[1].detail_he[4].t",
+   "before": "כל רשומת מעסיק (לפי מוצר) מקבלת את הטבות דמי הניהול שהוגדרו לה בקובץ: שיעור מצבירה ותקופתו, ושיעור מהפקדה ותאריך תחילתו.",
+   "after": "רשומות מעסיק (לפי מוצר) שעברו את הבדיקות מקבלות את הטבות המעסיקים שהוגדרו להן בקובץ: שיעור צבירה ותקופתו, ושיעור הפקדה ותאריך תחילתו (השערה: אלה דמי ניהול).",
+   "why": "'הטבות דמי הניהול' הוצג כעובדה; 'כל רשומת מעסיק' אינו מדויק כשיש ענפי דילוג ואזהרה.",
+   "evidence": "DTSX:9-24",
+   "verifierAccepted": true
+  },
+  {
+   "claimId": "L|Package\\Set MF on employers|decisions",
+   "field": "components[1].decisions[4].outcome_he",
+   "before": "אין נתיב — מדולג",
+   "after": "אין נתיב — מדולג (רק לקוד לא ריק; קוד NULL נכשל קודם ב-FailComponent של שני התנאים)",
+   "why": "התאמה למקרה קוד NULL.",
+   "evidence": "Check Fund type DTSX:3702-3724",
+   "verifierAccepted": true
+  },
+  {
+   "claimId": "L|Package\\Update employer amount|detailed",
+   "field": "components[2].detailed.nodes[2].branches[1].nodes[0].text",
+   "before": "דמי הניהול המשוקללים = סכום (יתרה × שיעור דמי ניהול) חלקי סך היתרות. קופה בלי שיעור דמי ניהול נספרת במכנה אבל לא במונה.",
+   "after": "דמי הניהול המשוקללים = סכום (יתרה × שיעור דמי ניהול) חלקי סך היתרות. קופה בלי שיעור דמי ניהול נספרת במכנה אבל לא במונה. אם לכל קופות החשבון אין שיעור דמי ניהול, המונה ריק (NULL) והתוצאה NULL.",
+   "why": "חסר המקרה שבו כל השיעורים NULL: SUM של ערכי NULL בלבד הוא NULL, ולכן התוצאה NULL.",
+   "evidence": "get employers SQL DTSX:7796-7801",
+   "verifierAccepted": true
+  },
+  {
+   "claimId": "L|Package\\Update employer amount|detailed",
+   "field": "components[2].detailed.nodes[4]",
+   "before": {
+    "type": "decision",
+    "text": "האם נדרש עדכון?",
+    "tech": "Check if to update (ConditionalSplit, DTSX:7731): Update: ISNULL(Gen_employeesweightedmanagementfeeDB) | Update2: ISNULL(Gen_EmployeesFundsValueDB) | Update3: Gen_employeesweightedmanagementfee != Gen_employeesweightedmanagementfeeDB | Update4: Gen_EmployeesFundsValue != Gen_EmployeesFundsValueDB → Union All",
+    "branches": [
+     {
+      "label": "ערך שמור ריק, או שונה מהמחושב",
+      "nodes": [
+       {
+        "type": "write",
+        "text": "שני השדות בחשבון נכתבים בעדכון SQL ישיר לטבלת AccountBase. העדכון עוקף את שכבת ה-CRM (Unsupported).",
+        "tech": "account · update (Gen_EmployeesFundsValue, Gen_employeesweightedmanagementfee) · SQL: UPDATE dbo.AccountBase SET Gen_EmployeesFundsValue = ?, Gen_employeesweightedmanagementfee = ? where accountid = ? (Update Account, OLE DB Command, DTSX:7988-7991; [CRM] = Psql/ALTSHULER_MSCRM DTSX:4)"
+       }
+      ]
+     },
+     {
+      "label": "זהים",
+      "nodes": [
+       {
+        "type": "step",
+        "text": "אין עדכון.",
+        "tech": "Conditional Split Default Output — אין נתיב"
+       }
+      ]
+     }
+    ]
+   },
+   "after": {
+    "type": "decision",
+    "text": "האם נדרש עדכון?",
+    "tech": "Check if to update (ConditionalSplit, DTSX:7731): Update: ISNULL(Gen_employeesweightedmanagementfeeDB) | Update2: ISNULL(Gen_EmployeesFundsValueDB) | Update3: Gen_employeesweightedmanagementfee != Gen_employeesweightedmanagementfeeDB | Update4: Gen_EmployeesFundsValue != Gen_EmployeesFundsValueDB → Union All; לכל ארבעת הפלטים errorRowDisposition=FailComponent",
+    "branches": [
+     {
+      "label": "ערך שמור ריק, או שונה מהמחושב",
+      "nodes": [
+       {
+        "type": "write",
+        "text": "שני השדות בחשבון נכתבים בעדכון SQL ישיר לטבלת AccountBase. העדכון עוקף את שכבת ה-CRM (Unsupported). אם דמי הניהול המחושבים ריקים (NULL) והערך השמור ריק, נכתב ערך ריק.",
+        "tech": "account · update (Gen_EmployeesFundsValue, Gen_employeesweightedmanagementfee) · SQL: UPDATE dbo.AccountBase SET Gen_EmployeesFundsValue = ?, Gen_employeesweightedmanagementfee = ? where accountid = ? (Update Account, OLE DB Command, DTSX:7988-7991; [CRM] = Psql/ALTSHULER_MSCRM DTSX:4)"
+       }
+      ]
+     },
+     {
+      "label": "זהים",
+      "nodes": [
+       {
+        "type": "step",
+        "text": "אין עדכון.",
+        "tech": "Conditional Split Default Output — אין נתיב"
+       }
+      ]
+     },
+     {
+      "label": "דמי ניהול מחושבים ריקים, ושני הערכים השמורים קיימים",
+      "nodes": [
+       {
+        "type": "end",
+        "text": "ההשוואה מחזירה NULL, וכל זרימת הנתונים נכשלת. במקרה כזה גם סגירת תהליך ה-ETL אינה רצה.",
+        "tech": "Update3: NULL != x → NULL; errorRowDisposition=FailComponent (DTSX:7731); Update employer amount → End ETL Process record: Success (DTSX:8056)"
+       }
+      ]
+     }
+    ]
+   },
+   "why": "חסר המקרה שבו דמי הניהול המחושבים NULL: אם הערך השמור NULL — order 0 כותב NULL; אם שני הערכים השמורים קיימים — order 2 מחזיר NULL והפלט מוגדר FailComponent.",
+   "evidence": "DTSX:7731-7771 (EvaluationOrder 0-3, FailComponent); DTSX:7796-7801; DTSX:8056",
+   "verifierAccepted": true
+  },
+  {
+   "claimId": "L|Package\\Update employer amount|detailed",
+   "field": "components[2].detailed.nodes[5]",
+   "before": {
+    "type": "step",
+    "text": "חשבון שאין לו מעסיקים או קופות מקבל 0 בשני השדות, כל עוד הערך השמור בו ריק.",
+    "tech": "LEFT JOIN → SUM(ISNULL(NULL,0)) = 0; תנאי ISNULL(…DB)"
+   },
+   "after": {
+    "type": "step",
+    "text": "חשבון שאין לו מעסיקים או קופות מקבל 0 בשני השדות בכל פעם שהערך השמור ריק או שונה מ-0. כך גם חשבון שהיו לו בעבר ערכים, ואיבד את המעסיקים או הקופות, מאופס ל-0.",
+    "tech": "LEFT JOIN → SUM(ISNULL(NULL,0)) = 0 → case … then 0; תנאים ISNULL(…DB) (orders 0-1) או != (orders 2-3)"
+   },
+   "why": "הניסוח 'כל עוד הערך השמור ריק' שגוי: תנאי != (orders 2/3) מעדכן ל-0 גם כשהערך השמור שונה מ-0.",
+   "evidence": "DTSX:7763, 7771; DTSX:7796-7801",
+   "verifierAccepted": true
+  },
+  {
+   "claimId": "L|Package\\Update employer amount|detailed",
+   "field": "components[2].detailed.nodes[6].text",
+   "before": "בכל החשבונות שמורים ערכים מחושבים עדכניים. כיוון שהעדכון ב-SQL ישיר, הוא אינו עובר דרך ה-SDK; ההשפעה על תוספים, ביקורת ו-ModifiedOn היא השערה.",
+   "after": "בחשבונות שעובדו שמורים ערכים מחושבים עדכניים, אלא אם זרימת הנתונים נכשלה במקרה שתואר למעלה. כיוון שהעדכון ב-SQL ישיר, הוא אינו עובר דרך ה-SDK; ההשפעה על תוספים, ביקורת ו-ModifiedOn היא השערה.",
+   "why": "'בכל החשבונות' אינו מדויק כשיש ענף כשל (Update3 FailComponent).",
+   "evidence": "DTSX:7731",
+   "verifierAccepted": true
+  },
+  {
+   "claimId": "L|Package\\Update employer amount|short",
+   "field": "components[2].short.nodes[2].text",
+   "before": "בכל חשבון מעסיק שמורים היקף הכספים של עובדיו ודמי הניהול המשוקללים שלהם.",
+   "after": "בחשבונות המעסיק שמורים היקף הכספים של עובדיו ודמי הניהול המשוקללים שלהם, אלא אם החישוב נכשל.",
+   "why": "התאמה לענף הכשל שנוסף לתיאור המפורט, כדי שהתמציתי לא יסתור אותו.",
+   "evidence": "DTSX:7731",
+   "verifierAccepted": true
+  },
+  {
+   "claimId": "L|Package\\Update employer amount|detail",
+   "field": "components[2].detail_he[2].t",
+   "before": "עדכון אם אחד הערכים השמורים NULL או שונה מהמחושב (ארבעה פלטים מאוחדים ב-Union All). שורה שעומדת ביותר מתנאי אחד יוצאת רק בפלט הראשון שמתקיים, כך שאין כפילות.",
+   "after": "עדכון אם אחד הערכים השמורים NULL או שונה מהמחושב (ארבעה פלטים מאוחדים ב-Union All). שורה שעומדת ביותר מתנאי אחד יוצאת רק בפלט הראשון שמתקיים, כך שאין כפילות. אם דמי הניהול המחושבים NULL ושני הערכים השמורים קיימים, ההשוואה מחזירה NULL והזרימה נכשלת (FailComponent).",
+   "why": "התאמה למקרה NULL, כדי שהתיאורים לא יסתרו.",
+   "evidence": "DTSX:7731-7771",
+   "verifierAccepted": true
+  },
+  {
+   "claimId": "L|Package\\Update employer amount|decisions",
+   "field": "components[2].decisions[0].outcome_he",
+   "before": "0 כשאין יתרה; אחרת ממוצע משוקלל",
+   "after": "0 כשאין יתרה; אחרת ממוצע משוקלל; NULL כשלכל קופות החשבון אין שיעור דמי ניהול",
+   "why": "התאמה למקרה NULL.",
+   "evidence": "DTSX:7796-7801",
+   "verifierAccepted": true
+  },
+  {
+   "claimId": "L|Package\\Update employer amount|decisions",
+   "field": "components[2].decisions[3].outcome_he",
+   "before": "UPDATE",
+   "after": "UPDATE; אם המחושב NULL והשמור קיים, התנאי מחזיר NULL → FailComponent (כשל הזרימה)",
+   "why": "התאמה למקרה NULL.",
+   "evidence": "DTSX:7731 (Update3 errorRowDisposition=FailComponent)",
+   "verifierAccepted": true
+  },
+  {
+   "claimId": "L|Package\\Update employer amount|open",
+   "field": "components[2].openQuestions_he[0]",
+   "before": "האם gen_fundmain.Gen_managementFeePercentage יכול להיות NULL בפועל? אם כן, הממוצע המשוקלל מוטה כלפי מטה. לא ידוע.",
+   "after": "האם gen_fundmain.Gen_managementFeePercentage יכול להיות NULL בפועל? אם כן, הממוצע המשוקלל נמוך מהממוצע על הקופות עם שיעור בלבד; ואם הוא NULL בכל קופות החשבון, התוצאה NULL (ראו ענף הכשל). לא ידוע.",
+   "why": "התאמה למקרה כל-השיעורים-NULL.",
+   "evidence": "DTSX:7796-7801",
+   "verifierAccepted": true
+  },
+  {
+   "claimId": "L|finding#7",
+   "field": "findings_he[6].text",
+   "before": "בממוצע המשוקלל, קופה בלי שיעור דמי ניהול (NULL) נכללת במכנה (היתרה) אבל לא במונה, כך שהממוצע מוטה כלפי מטה. בנוסף, חשבונות בלי מעסיקים מקבלים 0 בפעם הראשונה.",
+   "after": "בממוצע המשוקלל, קופה בלי שיעור דמי ניהול (NULL) נכללת במכנה (היתרה) אבל לא במונה. אם יש קופות כאלה לצד קופות עם שיעור, הממוצע נמוך מהממוצע על הקופות עם שיעור בלבד. אם לכל קופות החשבון אין שיעור (וסך היתרות אינו 0), התוצאה NULL; ואם אז שני הערכים השמורים בחשבון קיימים, זרימת הנתונים נכשלת (Update3 FailComponent). חשבונות בלי מעסיקים או קופות מקבלים 0 בכל פעם שהערך השמור ריק או שונה מ-0.",
+   "why": "אותה עובדה שגויה כמו ביחידה 14 של Update employer amount ('0 בפעם הראשונה'), וחסר מקרה כל-השיעורים-NULL. תוקן לשמירה על עקביות.",
+   "evidence": "get employers SQL DTSX:7796-7801; Check if to update DTSX:7731-7771",
+   "verifierAccepted": true
+  },
+  {
+   "claimId": "L|finding#7",
+   "field": "findings_he[6].evidence",
+   "before": "get employers SQL DTSX:7796",
+   "after": "get employers SQL DTSX:7796-7801; Check if to update DTSX:7731-7771",
+   "why": "עדכון הראיות לניסוח המתוקן.",
+   "evidence": "DTSX:7731-7801",
+   "verifierAccepted": true
+  },
+  {
+   "round": 2,
+   "claimId": "L|summary",
+   "field": "summary_he",
+   "before": "לחבילה שני חלקים עסקיים. (1) כשמגיע קובץ \"הטבות מעסיקים\": לכל מעסיק (לפי מספר תאגיד) מתעדכנות ברשומות gen_employers שלו, דרך ה-SDK, הטבות המעסיק מהקובץ (שדות gen_mf*; השערה: MF = דמי ניהול): שיעור הצבירה לפי סוג המוצר (עמודת \"גמל\" או \"השתלמות\") ותקופתו, ושיעור ההפקדה (עמודת \"הפקדה\") ותאריך תחילתו, בתנאי שאחד התוקפים חל. (2) כשאין קובץ, או אחרי קליטה וארכוב מוצלחים של הקובץ: לכל חשבון (account) מחושבים סך יתרות קופות העובדים המשויכות למעסיק ושיעור דמי הניהול המשוקלל, ונכתבים בעדכון SQL ישיר לטבלת AccountBase (Unsupported).",
+   "after": "לחבילה שני חלקים עסקיים. (1) כשמגיע קובץ \"הטבות מעסיקים\": לכל מעסיק (לפי מספר תאגיד) מתעדכנות ברשומות gen_employers שלו שמקושרות למוצר (רשומות בלי מוצר תואם אינן נשלפות), דרך ה-SDK, הטבות המעסיק מהקובץ (שדות gen_mf*; השערה: MF = דמי ניהול): שיעור הצבירה לפי סוג המוצר (עמודת \"גמל\" או \"השתלמות\") ותקופתו, ושיעור ההפקדה (עמודת \"הפקדה\") ותאריך תחילתו, בתנאי שאחד התוקפים חל. (2) כשאין קובץ, או אחרי קליטה וארכוב מוצלחים של הקובץ: לכל חשבון (account) ב-CRM, כולל חשבונות בלי רשומות מעסיק (שמחושב להם 0), מחושבים סך יתרות קופות העובדים המשויכות לרשומות המעסיק שלו ושיעור דמי הניהול המשוקלל. הערכים נכתבים בעדכון SQL ישיר לטבלת AccountBase (Unsupported) רק כשאחד הערכים השמורים בחשבון ריק או שונה מהמחושב. אם דמי הניהול המחושבים ריקים (NULL) ושני הערכים השמורים קיימים, ההשוואה מחזירה NULL וזרימת הנתונים נכשלת.",
+   "why": "Write condition of the account update (Check if to update), all-accounts population, and the product inner join for part (1).",
+   "evidence": "Check if to update DTSX:7731-7771 (orders 0-3, FailComponent); Update Account DTSX:7988-7991; get employers SqlCommand DTSX:7796-7808 (FROM account LEFT JOIN gen_employers LEFT JOIN gen_fundmain); Get Employer Nunmer SqlCommand DTSX:5689-5695 (from Gen_employers join product on productid = gen_fundtypename)",
+   "timestamp": "2026-11-07T12:20:11.092Z"
+  },
+  {
+   "round": 2,
+   "claimId": "L|finding#7",
+   "field": "findings_he[6].text",
+   "before": "בממוצע המשוקלל, קופה בלי שיעור דמי ניהול (NULL) נכללת במכנה (היתרה) אבל לא במונה. אם יש קופות כאלה לצד קופות עם שיעור, הממוצע נמוך מהממוצע על הקופות עם שיעור בלבד. אם לכל קופות החשבון אין שיעור (וסך היתרות אינו 0), התוצאה NULL; ואם אז שני הערכים השמורים בחשבון קיימים, זרימת הנתונים נכשלת (Update3 FailComponent). חשבונות בלי מעסיקים או קופות מקבלים 0 בכל פעם שהערך השמור ריק או שונה מ-0.",
+   "after": "בממוצע המשוקלל, קופה בלי שיעור דמי ניהול (NULL) נכללת במכנה (היתרה) אבל לא במונה. אם יש קופות כאלה לצד קופות עם שיעור, התוצאה תלויה בנתונים: כשסך היתרות של הקופות בלי שיעור הוא 0, אין הבדל מהממוצע על הקופות עם שיעור בלבד; כשכל היתרות וכל השיעורים חיוביים, הממוצע נמוך ממנו. אם לכל קופות החשבון אין שיעור (וסך היתרות אינו 0), התוצאה NULL; ואם אז שני הערכים השמורים בחשבון קיימים, זרימת הנתונים נכשלת (Update3 FailComponent). חשבונות בלי מעסיקים או קופות מקבלים 0 בכל פעם שהערך השמור ריק או שונה מ-0.",
+   "why": "\"Lower\" is data-dependent: equal when the NULL-rate funds have a zero balance total.",
+   "evidence": "DTSX:7796-7801",
+   "timestamp": "2026-11-07T12:20:11.092Z"
+  },
+  {
+   "round": 2,
+   "claimId": "L|Package (control flow)|title",
+   "field": "components[0].short_he",
+   "before": "אם קובץ הטבות המעסיקים קיים, ההטבות נקלטות לרשומות המעסיק והקובץ מועבר לארכיון. כשאין קובץ, או אחרי קליטה וארכוב מוצלחים, מחושבים מחדש לכל חשבון מעסיק שווי קופות העובדים ודמי הניהול המשוקללים.",
+   "after": "אם קובץ הטבות המעסיקים קיים, ההטבות נקלטות לרשומות המעסיק והקובץ מועבר לארכיון. כשאין קובץ, או אחרי קליטה וארכוב מוצלחים, מחושבים מחדש לכל חשבון ב-CRM, כולל חשבונות בלי רשומות מעסיק (שמחושב להם 0), שווי קופות העובדים ודמי הניהול המשוקללים, ונכתבים לחשבון כשערך שמור ריק או שונה מהמחושב.",
+   "why": "The query covers every account, not only employer accounts.",
+   "evidence": "get employers SqlCommand DTSX:7796-7808 (FROM account LEFT JOIN gen_employers LEFT JOIN gen_fundmain); Check if to update DTSX:7731-7771 (orders 0-3, FailComponent); Update Account DTSX:7988-7991",
+   "timestamp": "2026-11-07T12:20:11.092Z"
+  },
+  {
+   "round": 2,
+   "claimId": "L|Package (control flow)|short",
+   "field": "components[0].short.nodes[2].text",
+   "before": "כשאין קובץ, או אחרי קליטה וארכוב מוצלחים, מחושבים מחדש לכל חשבון מעסיק שווי קופות העובדים ודמי הניהול המשוקללים. אם הקליטה או הארכוב נכשלים, החישוב אינו רץ בריצה זו.",
+   "after": "כשאין קובץ, או אחרי קליטה וארכוב מוצלחים, מחושבים מחדש לכל חשבון ב-CRM, כולל חשבונות בלי רשומות מעסיק (שמחושב להם 0), שווי קופות העובדים ודמי הניהול המשוקללים, ונכתבים לחשבון כשערך שמור ריק או שונה מהמחושב. אם הקליטה או הארכוב נכשלים, החישוב אינו רץ בריצה זו.",
+   "why": "The query covers every account, not only employer accounts.",
+   "evidence": "get employers SqlCommand DTSX:7796-7808 (FROM account LEFT JOIN gen_employers LEFT JOIN gen_fundmain); Check if to update DTSX:7731-7771 (orders 0-3, FailComponent); Update Account DTSX:7988-7991",
+   "timestamp": "2026-11-07T12:20:11.092Z"
+  },
+  {
+   "round": 2,
+   "claimId": "L|Package\\Set MF on employers|title",
+   "field": "components[1].short_he",
+   "before": "לכל מעסיק בקובץ ההטבות (לפי מספר תאגיד) מאותרות רשומות המעסיק שלו ב-CRM, אחת לכל סוג מוצר. נקבעים בהן דמי הניהול מצבירה (לפי סוג המוצר), דמי הניהול מהפקדה ותאריכי התוקף – בתנאי שאחד מהתוקפים חל היום. (השערה: MF = Management Fee, דמי ניהול.)",
+   "after": "לכל מעסיק בקובץ ההטבות (לפי מספר תאגיד) מאותרות כל רשומות המעסיק שלו ב-CRM שמקושרות למוצר (join פנימי ל-product), כל אחת עם סוג המוצר שלה; רשומות בלי מוצר תואם אינן נשלפות. נקבעים בהן דמי הניהול מצבירה (לפי סוג המוצר), דמי הניהול מהפקדה ותאריכי התוקף – בתנאי שאחד מהתוקפים חל היום. (השערה: MF = Management Fee, דמי ניהול.)",
+   "why": "\"One per product type\" is not proven; the query inner-joins product.",
+   "evidence": "Get Employer Nunmer SqlCommand DTSX:5689-5695 (from Gen_employers join product on productid = gen_fundtypename)",
+   "timestamp": "2026-11-07T12:20:11.092Z"
+  },
+  {
+   "round": 2,
+   "claimId": "L|Package\\Set MF on employers|title",
+   "field": "components[1].flow_he[1]",
+   "before": "צירוף לרשומות gen_employers לפי מספר תאגיד (Left Join).",
+   "after": "צירוף לרשומות gen_employers שמקושרות למוצר (join פנימי ל-product) לפי מספר תאגיד (Left Join).",
+   "why": "Only gen_employers rows that inner-join to product are on the right side of the join.",
+   "evidence": "Get Employer Nunmer SqlCommand DTSX:5689-5695 (from Gen_employers join product on productid = gen_fundtypename)",
+   "timestamp": "2026-11-07T12:20:11.092Z"
+  },
+  {
+   "round": 2,
+   "claimId": "L|Package\\Set MF on employers|title",
+   "field": "components[1].flow_he[2]",
+   "before": "מעסיק לא נמצא → אזהרה.",
+   "after": "אין רשומת מעסיק מקושרת למוצר למספר התאגיד → אזהרה \"מעסיק לא נמצא\".",
+   "why": "An existing employer without a matching product also lands here.",
+   "evidence": "Get Employer Nunmer SqlCommand DTSX:5689-5695 (from Gen_employers join product on productid = gen_fundtypename); Check if employer exist DTSX:3787",
+   "timestamp": "2026-11-07T12:20:11.092Z"
+  },
+  {
+   "round": 2,
+   "claimId": "L|Package\\Set MF on employers|short",
+   "field": "components[1].short.nodes[1].text",
+   "before": "האם המעסיק קיים ב-CRM?",
+   "after": "האם קיימת ב-CRM רשומת מעסיק עם מספר התאגיד שמקושרת למוצר?",
+   "why": "The decision is on gen_employers rows that inner-join to product.",
+   "evidence": "Get Employer Nunmer SqlCommand DTSX:5689-5695 (from Gen_employers join product on productid = gen_fundtypename); Check if employer exist DTSX:3787",
+   "timestamp": "2026-11-07T12:20:11.092Z"
+  },
+  {
+   "round": 2,
+   "claimId": "L|Package\\Set MF on employers|short",
+   "field": "components[1].short.nodes[1].branches[0].nodes[0].text",
+   "before": "נרשמת אזהרה שהמעסיק לא נמצא.",
+   "after": "נרשמת אזהרה שהמעסיק לא נמצא, גם אם קיימות לו רשומות מעסיק בלי מוצר תואם.",
+   "why": "Employer records without a matching product are not fetched.",
+   "evidence": "Get Employer Nunmer SqlCommand DTSX:5689-5695 (from Gen_employers join product on productid = gen_fundtypename)",
+   "timestamp": "2026-11-07T12:20:11.092Z"
+  },
+  {
+   "round": 2,
+   "claimId": "L|Package\\Set MF on employers|detailed",
+   "field": "components[1].detailed.nodes[2].text",
+   "before": "רשומות המעסיק ב-CRM נשלפות יחד עם סוג המוצר של כל רשומה, ולכל מספר תאגיד יכולות להיות כמה רשומות.",
+   "after": "רשומות המעסיק ב-CRM נשלפות יחד עם סוג המוצר של כל רשומה, ולכל מספר תאגיד יכולות להיות כמה רשומות. נשלפות רק רשומות מעסיק שמקושרות למוצר (join פנימי ל-product); רשומה בלי מוצר תואם אינה נשלפת, ואם אין למספר התאגיד רשומה אחרת, נרשמת אזהרת \"מעסיק לא נמצא\".",
+   "why": "Inner join with product excludes employer records without a matching product.",
+   "evidence": "Get Employer Nunmer SqlCommand DTSX:5689-5695 (from Gen_employers join product on productid = gen_fundtypename)",
+   "timestamp": "2026-11-07T12:20:11.092Z"
+  },
+  {
+   "round": 2,
+   "claimId": "L|Package\\Set MF on employers|detailed",
+   "field": "components[1].detailed.nodes[4].text",
+   "before": "האם נמצאה רשומת מעסיק למספר התאגיד?",
+   "after": "האם נמצאה למספר התאגיד רשומת מעסיק שמקושרת למוצר?",
+   "why": "Consistency with the inner join.",
+   "evidence": "Get Employer Nunmer SqlCommand DTSX:5689-5695 (from Gen_employers join product on productid = gen_fundtypename); DTSX:3787",
+   "timestamp": "2026-11-07T12:20:11.092Z"
+  },
+  {
+   "round": 2,
+   "claimId": "L|Package\\Set MF on employers|detailed",
+   "field": "components[1].detailed.nodes[10].text",
+   "before": "רשומות המעסיקים שעברו את הבדיקות מחזיקות את הטבות המעסיקים שבקובץ. מעסיקים לא מוכרים ותאריכים לא תקינים מתועדים כאזהרות, מוצרים מסוג אחר מדולגים, וסוג מוצר חסר מכשיל את השלב.",
+   "after": "רשומות המעסיקים שעברו את הבדיקות מחזיקות את הטבות המעסיקים שבקובץ. מעסיקים שלא נמצאה להם רשומה מקושרת למוצר ותאריכים לא תקינים מתועדים כאזהרות, מוצרים מסוג אחר מדולגים, וסוג מוצר חסר מכשיל את השלב.",
+   "why": "Consistency with the inner join.",
+   "evidence": "Get Employer Nunmer SqlCommand DTSX:5689-5695 (from Gen_employers join product on productid = gen_fundtypename)",
+   "timestamp": "2026-11-07T12:20:11.092Z"
+  },
+  {
+   "round": 2,
+   "claimId": "L|Package\\Set MF on employers|detail",
+   "field": "components[1].detail_he[1].t",
+   "before": "gen_corporatenumber בקובץ מול gen_employers.gen_corporatenumber (Merge Join, Left outer). לכל מספר תאגיד יכולות להיות כמה רשומות gen_employers, אחת לכל מוצר (gen_fundtypename → product.ProductTypeCode), וכל אחת מהן מתעדכנת בנפרד.",
+   "after": "gen_corporatenumber בקובץ מול gen_employers.gen_corporatenumber (Merge Join, Left outer). לכל מספר תאגיד יכולות להיות כמה רשומות gen_employers, כל אחת עם המוצר שלה (gen_fundtypename → product.ProductTypeCode), וכל אחת מהן מתעדכנת בנפרד. רשומות בלי מוצר תואם אינן נשלפות (join פנימי).",
+   "why": "\"One per product\" is not proven; inner-join exclusion added.",
+   "evidence": "Get Employer Nunmer SqlCommand DTSX:5689-5695 (from Gen_employers join product on productid = gen_fundtypename)",
+   "timestamp": "2026-11-07T12:20:11.092Z"
+  },
+  {
+   "round": 2,
+   "claimId": "L|Package\\Set MF on employers|detail",
+   "field": "components[1].detail_he[2].t",
+   "before": "(1) מעסיק לא נמצא → אזהרה. (2) סוג מוצר 200001/1 → שיעור הצבירה מ-provident_fund; 200000/2 → מ-study_fund; קוד אחר (לא ריק) → מדולג; קוד NULL → התנאי NULL ו-FailComponent, כל השלב נכשל. (3) תוקף: תאריך תחילת ההפקדה עבר, או שיש שיעור צבירה והיום בתוך תקופת הצבירה; אחרת → אזהרה.",
+   "after": "(1) אין רשומת מעסיק מקושרת למוצר למספר התאגיד → אזהרה \"מעסיק לא נמצא\". (2) סוג מוצר 200001/1 → שיעור הצבירה מ-provident_fund; 200000/2 → מ-study_fund; קוד אחר (לא ריק) → מדולג; קוד NULL → התנאי NULL ו-FailComponent, כל השלב נכשל. (3) תוקף: תאריך תחילת ההפקדה עבר, או שיש שיעור צבירה והיום בתוך תקופת הצבירה; אחרת → אזהרה.",
+   "why": "Consistency with the inner join.",
+   "evidence": "Get Employer Nunmer SqlCommand DTSX:5689-5695 (from Gen_employers join product on productid = gen_fundtypename); DTSX:3787",
+   "timestamp": "2026-11-07T12:20:11.092Z"
+  },
+  {
+   "round": 2,
+   "claimId": "L|Package\\Set MF on employers|detail",
+   "field": "components[1].detail_he[4].t",
+   "before": "רשומות מעסיק (לפי מוצר) שעברו את הבדיקות מקבלות את הטבות המעסיקים שהוגדרו להן בקובץ: שיעור צבירה ותקופתו, ושיעור הפקדה ותאריך תחילתו (השערה: אלה דמי ניהול).",
+   "after": "רשומות מעסיק (המקושרות למוצר) שעברו את הבדיקות מקבלות את הטבות המעסיקים שהוגדרו להן בקובץ: שיעור צבירה ותקופתו, ושיעור הפקדה ותאריך תחילתו (השערה: אלה דמי ניהול).",
+   "why": "Consistency with the inner join.",
+   "evidence": "Get Employer Nunmer SqlCommand DTSX:5689-5695 (from Gen_employers join product on productid = gen_fundtypename)",
+   "timestamp": "2026-11-07T12:20:11.092Z"
+  },
+  {
+   "round": 2,
+   "claimId": "L|Package\\Set MF on employers|decisions",
+   "field": "components[1].decisions[0].outcome_he",
+   "before": "שורה לכל רשומת gen_employers; ללא התאמה → Gen_employersid NULL",
+   "after": "שורה לכל רשומת gen_employers שנשלפה (רק רשומות שמקושרות למוצר – join פנימי ב-Get Employer Nunmer); ללא התאמה → Gen_employersid NULL",
+   "why": "Right side of the merge join contains only rows that inner-join to product.",
+   "evidence": "Get Employer Nunmer SqlCommand DTSX:5689-5695 (from Gen_employers join product on productid = gen_fundtypename); Merge Join DTSX:5730",
+   "timestamp": "2026-11-07T12:20:11.092Z"
+  },
+  {
+   "round": 2,
+   "claimId": "L|Package\\Set MF on employers|decisions",
+   "field": "components[1].decisions[1].meaning_he",
+   "before": "מעסיק לא קיים",
+   "after": "אין רשומת מעסיק עם מספר התאגיד שמקושרת למוצר (כולל מעסיק קיים בלי מוצר תואם)",
+   "why": "An existing employer without a matching product also lands here.",
+   "evidence": "Get Employer Nunmer SqlCommand DTSX:5689-5695 (from Gen_employers join product on productid = gen_fundtypename); DTSX:3787",
+   "timestamp": "2026-11-07T12:20:11.092Z"
+  },
+  {
+   "round": 2,
+   "claimId": "L|Package\\Update employer amount|detailed",
+   "field": "components[2].detailed.nodes[4].branches[0].nodes[0].text",
+   "before": "שני השדות בחשבון נכתבים בעדכון SQL ישיר לטבלת AccountBase. העדכון עוקף את שכבת ה-CRM (Unsupported). אם דמי הניהול המחושבים ריקים (NULL) והערך השמור ריק, נכתב ערך ריק.",
+   "after": "שני השדות בחשבון נכתבים בעדכון SQL ישיר לטבלת AccountBase. העדכון עוקף את שכבת ה-CRM (Unsupported). אם דמי הניהול המחושבים ריקים (NULL) ואחד הערכים השמורים ריק, נכתב NULL בדמי הניהול. כשרק שווי הקופות השמור ריק, ערך דמי הניהול שהיה שמור בחשבון נדרס ב-NULL.",
+   "why": "Order 1 (ISNULL(Gen_EmployeesFundsValueDB)) routes the row to Update Account even when a stored fee exists, so a NULL computed fee overwrites it.",
+   "evidence": "Check if to update DTSX:7731-7771 (orders 0-3, FailComponent); Update Account DTSX:7988-7991",
+   "timestamp": "2026-11-07T12:20:11.092Z"
+  },
+  {
+   "round": 2,
+   "claimId": "L|Package\\Update employer amount|detailed",
+   "field": "components[2].detailed.nodes[4].branches[0].nodes[0].tech",
+   "before": "account · update (Gen_EmployeesFundsValue, Gen_employeesweightedmanagementfee) · SQL: UPDATE dbo.AccountBase SET Gen_EmployeesFundsValue = ?, Gen_employeesweightedmanagementfee = ? where accountid = ? (Update Account, OLE DB Command, DTSX:7988-7991; [CRM] = Psql/ALTSHULER_MSCRM DTSX:4)",
+   "after": "account · update (Gen_EmployeesFundsValue, Gen_employeesweightedmanagementfee) · SQL: UPDATE dbo.AccountBase SET Gen_EmployeesFundsValue = ?, Gen_employeesweightedmanagementfee = ? where accountid = ? (Update Account, OLE DB Command, DTSX:7988-7991; [CRM]: מחרוזת החיבור בחבילה (ערך זמן התכנון) היא Psql/ALTSHULER_MSCRM, DTSX:4; קובץ התצורה החיצוני (DTSX:33), שלא סופק, עשוי לדרוס אותה)",
+   "why": "Design-time connection string caveat (same as scopeNote).",
+   "evidence": "DTSX:4-6; DTSX:33",
+   "timestamp": "2026-11-07T12:20:11.092Z"
+  },
+  {
+   "round": 2,
+   "claimId": "L|Package\\Update employer amount|open",
+   "field": "components[2].openQuestions_he[0]",
+   "before": "האם gen_fundmain.Gen_managementFeePercentage יכול להיות NULL בפועל? אם כן, הממוצע המשוקלל נמוך מהממוצע על הקופות עם שיעור בלבד; ואם הוא NULL בכל קופות החשבון, התוצאה NULL (ראו ענף הכשל). לא ידוע.",
+   "after": "האם gen_fundmain.Gen_managementFeePercentage יכול להיות NULL בפועל? אם כן, התוצאה תלויה בנתונים: כשסך היתרות של הקופות בלי שיעור הוא 0, אין הבדל מהממוצע על הקופות עם שיעור בלבד; כשכל היתרות וכל השיעורים חיוביים, הממוצע נמוך ממנו; ואם הוא NULL בכל קופות החשבון, התוצאה NULL (ראו ענף הכשל). לא ידוע.",
+   "why": "\"Lower\" is data-dependent: equal when the NULL-rate funds have a zero balance total.",
+   "evidence": "DTSX:7796-7801",
+   "timestamp": "2026-11-07T12:20:11.092Z"
+  },
+  {
+   "round": 3,
+   "date": "2026-11-07",
+   "claimId": "L|summary",
+   "field": "summary_he",
+   "before": "לחבילה שני חלקים עסקיים. (1) כשמגיע קובץ \"הטבות מעסיקים\": לכל מעסיק (לפי מספר תאגיד) מתעדכנות ברשומות gen_employers שלו שמקושרות למוצר (רשומות בלי מוצר תואם אינן נשלפות), דרך ה-SDK, הטבות המעסיק מהקובץ (שדות gen_mf*; השערה: MF = דמי ניהול): שיעור הצבירה לפי סוג המוצר (עמודת \"גמל\" או \"השתלמות\") ותקופתו, ושיעור ההפקדה (עמודת \"הפקדה\") ותאריך תחילתו, בתנאי שאחד התוקפים חל. (2) כשאין קובץ, או אחרי קליטה וארכוב מוצלחים של הקובץ: לכל חשבון (account) ב-CRM, כולל חשבונות בלי רשומות מעסיק (שמחושב להם 0), מחושבים סך יתרות קופות העובדים המשויכות לרשומות המעסיק שלו ושיעור דמי הניהול המשוקלל. הערכים נכתבים בעדכון SQL ישיר לטבלת AccountBase (Unsupported) רק כשאחד הערכים השמורים בחשבון ריק או שונה מהמחושב. אם דמי הניהול המחושבים ריקים (NULL) ושני הערכים השמורים קיימים, ההשוואה מחזירה NULL וזרימת הנתונים נכשלת.",
+   "after": "לחבילה שני חלקים עסקיים. (1) כשהקובץ MFBenefitFile קיים בתיקייה MFBenefitFilePath (הערכים מ-gen_etlvariable או מקובץ התצורה החיצוני – לא ידועים): ההטבות נקראות מהקובץ שבחיבור MF Source (\"C:\\Banks Source Files\\Leumi Source Files\\הטבות מעסיקים.csv\" – ערך זמן התכנון; קובץ התצורה החיצוני C:\\Generix\\SSISConfigFile.dtsConfig (DTSX:33), שלא סופק, עשוי לדרוס אותו). לא הוכח שזה אותו קובץ שנבדק ומועבר לארכיון (ראו הממצא על נתיב הקובץ). לכל מספר תאגיד בקובץ מתעדכנות, דרך ה-SDK, רשומות gen_employers בעלות מספר התאגיד שמקושרות למוצר (רשומות בלי מוצר תואם אינן נשלפות), בהטבות מהקובץ (שדות gen_mf*; השערה: MF = דמי ניהול): שיעור הצבירה לפי סוג המוצר (עמודת \"גמל\" או \"השתלמות\") ותקופתו, ושיעור ההפקדה (עמודת \"הפקדה\") ותאריך תחילתו, בתנאי שאחד התוקפים חל. (2) כשהקובץ MFBenefitFile אינו קיים, או אחרי קליטה מוצלחת והעברת MFBenefitFile לארכיון: לכל חשבון (account) ב-CRM, כולל חשבונות בלי רשומות מעסיק (שמחושב להם 0), מחושבים סך יתרות קופות העובדים (gen_fundmain) המשויכות לרשומות gen_employers של החשבון ושיעור דמי הניהול המשוקלל. הערכים נכתבים בעדכון SQL ישיר לטבלת AccountBase (Unsupported) רק כשאחד הערכים השמורים בחשבון ריק או שונה מהמחושב. אם דמי הניהול המחושבים ריקים (NULL) ושני הערכים השמורים קיימים, ההשוואה מחזירה NULL וזרימת הנתונים נכשלת. שיוך העמודות שאינן מסויגות בשאילתות: העמודות gen_corporatenumber, Gen_employersid, gen_fundtypename ו-productid בשאילתת Get Employer Nunmer אינן מסויגות בשם טבלה. אילו עמודה הייתה קיימת בשתי הטבלאות (Gen_employers, product), השאילתה הייתה נכשלת; לפי המשתמש החבילה רצה בפרודקשן. בחבילה 0004 gen_corporatenumber ו-gen_fundtypename נכתבים לישות gen_employers (0004:37558, 37568, 37617), Gen_employersId מסויג כ-Gen_employers.Gen_employersId (0004:70147), ו-Gen_employers.gen_fundtypename = Product.ProductId (0004:70153). לכן מספר התאגיד, המזהה והמוצר שייכים לרשומת gen_employers, ו-productid שייך ל-product. העמודות accountid, Gen_employersId, Gen_employeesweightedmanagementfee ו-Gen_EmployeesFundsValue בשאילתת get employers אינן מסויגות בשם טבלה. אילו עמודה הייתה קיימת ביותר מאחת הטבלאות account, gen_employers ו-gen_fundmain, השאילתה הייתה נכשלת; לפי המשתמש החבילה רצה בפרודקשן. ל-AccountBase יש עמודות בשמות accountid, Gen_EmployeesFundsValue ו-Gen_employeesweightedmanagementfee (UPDATE dbo.AccountBase SET Gen_EmployeesFundsValue = ?, Gen_employeesweightedmanagementfee = ? where accountid = ?, DTSX:7991-7994), ו-Gen_employersId מסויג כ-Gen_employers.Gen_employersId בחבילה 0004 (0004:70147).",
+   "why": "זהות הקובץ שנבדק/מועבר לארכיון (MFBenefitFile) מול הקובץ הנקרא (MF Source) לא הוכחה; נוספה הסתייגות קובץ התצורה לנתיב MF Source; נוסף נימוק כלל העמימות לשיוך עמודות לא מסויגות.",
+   "evidence": "ScriptMain.cs:36-53 @DTSX:273; DTSX:9, 33, 3693; DTSX:5689-5695; 0004_LeumiFile-MY.dtsx:37558, 37568, 37617, 70147, 70153; DTSX:7796-7808, 7991-7994; 0004_LeumiFile-MY.dtsx:70147",
+   "logicSha256Before": "d83f92e45b77d422c6859eac26ded7104b3e5fb7539f0fe280af703a092189e4",
+   "logicSha256After": "99575e86cadecab464db38685c21fe104fce67c60c7b8df3e25c41f82596c1a5"
+  },
+  {
+   "round": 3,
+   "date": "2026-11-07",
+   "claimId": "L|exec",
+   "field": "executionOrder[2].title_he",
+   "before": "בדיקת קיום קובץ הטבות המעסיקים",
+   "after": "בדיקת קיום הקובץ MFBenefitFile",
+   "why": "הקובץ הנבדק הוא MFBenefitFilePath\\MFBenefitFile; לא הוכח שזה קובץ ההטבות הנקרא דרך MF Source (עקביות עם התיקון בתיאור זרימת הבקרה).",
+   "evidence": "ScriptMain.cs:36-45 @DTSX:273; DTSX:9",
+   "logicSha256Before": "d83f92e45b77d422c6859eac26ded7104b3e5fb7539f0fe280af703a092189e4",
+   "logicSha256After": "99575e86cadecab464db38685c21fe104fce67c60c7b8df3e25c41f82596c1a5"
+  },
+  {
+   "round": 3,
+   "date": "2026-11-07",
+   "claimId": "L|Package (control flow)|title",
+   "field": "title_he",
+   "before": "זרימת בקרה: בדיקת קובץ הטבות המעסיקים, קליטתו, ארכוב וחישוב שווי קופות העובדים",
+   "after": "זרימת בקרה: בדיקת הקובץ MFBenefitFile, קליטת הטבות המעסיקים, ארכוב וחישוב שווי קופות העובדים",
+   "why": "הקובץ הנבדק הוא MFBenefitFile ולא הוכח שהוא קובץ ההטבות הנקרא.",
+   "evidence": "ScriptMain.cs:36-45 @DTSX:273; DTSX:9",
+   "logicSha256Before": "d83f92e45b77d422c6859eac26ded7104b3e5fb7539f0fe280af703a092189e4",
+   "logicSha256After": "99575e86cadecab464db38685c21fe104fce67c60c7b8df3e25c41f82596c1a5"
+  },
+  {
+   "round": 3,
+   "date": "2026-11-07",
+   "claimId": "L|Package (control flow)|title",
+   "field": "short_he",
+   "before": "אם קובץ הטבות המעסיקים קיים, ההטבות נקלטות לרשומות המעסיק והקובץ מועבר לארכיון. כשאין קובץ, או אחרי קליטה וארכוב מוצלחים, מחושבים מחדש לכל חשבון ב-CRM, כולל חשבונות בלי רשומות מעסיק (שמחושב להם 0), שווי קופות העובדים ודמי הניהול המשוקללים, ונכתבים לחשבון כשערך שמור ריק או שונה מהמחושב.",
+   "after": "אם הקובץ MFBenefitFile קיים, נקלטות לרשומות המעסיק ההטבות מהקובץ שבחיבור MF Source (לא הוכח שזה אותו קובץ), והקובץ MFBenefitFile מועבר לארכיון. כשהקובץ MFBenefitFile אינו קיים, או אחרי קליטה וארכוב מוצלחים, מחושבים מחדש לכל חשבון ב-CRM, כולל חשבונות בלי רשומות מעסיק (שמחושב להם 0), שווי קופות העובדים ודמי הניהול המשוקללים, ונכתבים לחשבון כשערך שמור ריק או שונה מהמחושב.",
+   "why": "הקובץ שנבדק ומועבר לארכיון (MFBenefitFile) והקובץ הנקרא (MF Source) הוצגו כאותו קובץ בלי הוכחה.",
+   "evidence": "DTSX:9, 3693; ScriptMain.cs:36-53 @DTSX:273",
+   "logicSha256Before": "d83f92e45b77d422c6859eac26ded7104b3e5fb7539f0fe280af703a092189e4",
+   "logicSha256After": "99575e86cadecab464db38685c21fe104fce67c60c7b8df3e25c41f82596c1a5"
+  },
+  {
+   "round": 3,
+   "date": "2026-11-07",
+   "claimId": "L|Package (control flow)|short",
+   "field": "short.nodes[0].text",
+   "before": "החבילה בודקת אם קובץ הטבות המעסיקים הגיע לתיקייה שהוגדרה.",
+   "after": "החבילה בודקת אם הקובץ MFBenefitFile קיים בתיקייה MFBenefitFilePath (ערכים מטבלת ההגדרות או מקובץ התצורה).",
+   "why": "הקובץ הנבדק סומן כקובץ ההטבות על סמך שם המשתנה בלבד.",
+   "evidence": "ScriptMain.cs:36-45 @DTSX:273",
+   "logicSha256Before": "d83f92e45b77d422c6859eac26ded7104b3e5fb7539f0fe280af703a092189e4",
+   "logicSha256After": "99575e86cadecab464db38685c21fe104fce67c60c7b8df3e25c41f82596c1a5"
+  },
+  {
+   "round": 3,
+   "date": "2026-11-07",
+   "claimId": "L|Package (control flow)|short",
+   "field": "short.nodes[1].branches[כן].nodes[0].text",
+   "before": "הטבות המעסיקים מהקובץ נקלטות לרשומות המעסיק, והקובץ מועבר לארכיון יומי.",
+   "after": "הטבות המעסיקים נקלטות לרשומות המעסיק מהקובץ שבחיבור MF Source (לא הוכח שזה הקובץ שנבדק), והקובץ MFBenefitFile מועבר לארכיון יומי.",
+   "why": "הקליטה מהקובץ הנקרא והארכוב של הקובץ הנבדק הוצגו כאותו קובץ.",
+   "evidence": "DTSX:9, 3693",
+   "logicSha256Before": "d83f92e45b77d422c6859eac26ded7104b3e5fb7539f0fe280af703a092189e4",
+   "logicSha256After": "99575e86cadecab464db38685c21fe104fce67c60c7b8df3e25c41f82596c1a5"
+  },
+  {
+   "round": 3,
+   "date": "2026-11-07",
+   "claimId": "L|Package (control flow)|short",
+   "field": "short.nodes[2].text",
+   "before": "כשאין קובץ, או אחרי קליטה וארכוב מוצלחים, מחושבים מחדש לכל חשבון ב-CRM, כולל חשבונות בלי רשומות מעסיק (שמחושב להם 0), שווי קופות העובדים ודמי הניהול המשוקללים, ונכתבים לחשבון כשערך שמור ריק או שונה מהמחושב. אם הקליטה או הארכוב נכשלים, החישוב אינו רץ בריצה זו.",
+   "after": "כשהקובץ MFBenefitFile אינו קיים, או אחרי קליטה וארכוב מוצלחים, מחושבים מחדש לכל חשבון ב-CRM, כולל חשבונות בלי רשומות מעסיק (שמחושב להם 0), שווי קופות העובדים ודמי הניהול המשוקללים, ונכתבים לחשבון כשערך שמור ריק או שונה מהמחושב. אם הקליטה או הארכוב נכשלים, החישוב אינו רץ בריצה זו.",
+   "why": "עקביות: הקובץ הנבדק הוא MFBenefitFile.",
+   "evidence": "ScriptMain.cs:45 @DTSX:273; DTSX:8058",
+   "logicSha256Before": "d83f92e45b77d422c6859eac26ded7104b3e5fb7539f0fe280af703a092189e4",
+   "logicSha256After": "99575e86cadecab464db38685c21fe104fce67c60c7b8df3e25c41f82596c1a5"
+  },
+  {
+   "round": 3,
+   "date": "2026-11-07",
+   "claimId": "L|Package (control flow)|short",
+   "field": "short.nodes[3].text",
+   "before": "נתוני ההטבות ונתוני ההיקף של המעסיקים ב-CRM מעודכנים.",
+   "after": "אם הקובץ MFBenefitFile קיים, רשומות המעסיק שעברו את הבדיקות מחזיקות את ההטבות מהקובץ הנקרא. אם הריצה הגיעה לשלב החישוב והוא לא נכשל, בכל חשבון ב-CRM שבו ערך שמור ריק או שונה מהמחושב מעודכנים שווי קופות העובדים ודמי הניהול המשוקללים, כולל חשבונות בלי רשומות מעסיק (שמקבלים 0).",
+   "why": "החישוב כותב לכל חשבון (גם בלי gen_employers) ולא רק למעסיקים; \"היקף\" היה פרשנות לא מתויגת.",
+   "evidence": "DTSX:7796-7808, 7731",
+   "logicSha256Before": "d83f92e45b77d422c6859eac26ded7104b3e5fb7539f0fe280af703a092189e4",
+   "logicSha256After": "99575e86cadecab464db38685c21fe104fce67c60c7b8df3e25c41f82596c1a5"
+  },
+  {
+   "round": 3,
+   "date": "2026-11-07",
+   "claimId": "L|Package (control flow)|decisions",
+   "field": "decisions[0].meaning_he",
+   "before": "קובץ ההטבות קיים",
+   "after": "הקובץ MFBenefitFile קיים בתיקייה MFBenefitFilePath",
+   "why": "עקביות: לא הוכח שהקובץ הנבדק הוא קובץ ההטבות הנקרא.",
+   "evidence": "ScriptMain.cs:36-45 @DTSX:273; DTSX:9",
+   "logicSha256Before": "d83f92e45b77d422c6859eac26ded7104b3e5fb7539f0fe280af703a092189e4",
+   "logicSha256After": "99575e86cadecab464db38685c21fe104fce67c60c7b8df3e25c41f82596c1a5"
+  },
+  {
+   "round": 3,
+   "date": "2026-11-07",
+   "claimId": "L|Package\\Set MF on employers|title",
+   "field": "short_he",
+   "before": "לכל מעסיק בקובץ ההטבות (לפי מספר תאגיד) מאותרות כל רשומות המעסיק שלו ב-CRM שמקושרות למוצר (join פנימי ל-product), כל אחת עם סוג המוצר שלה; רשומות בלי מוצר תואם אינן נשלפות. נקבעים בהן דמי הניהול מצבירה (לפי סוג המוצר), דמי הניהול מהפקדה ותאריכי התוקף – בתנאי שאחד מהתוקפים חל היום. (השערה: MF = Management Fee, דמי ניהול.)",
+   "after": "לכל מעסיק בקובץ ההטבות (לפי מספר תאגיד) מאותרות כל רשומות המעסיק שלו ב-CRM שמקושרות למוצר (join פנימי ל-product), כל אחת עם סוג המוצר שלה; רשומות בלי מוצר תואם אינן נשלפות. נקבעים בהן דמי הניהול מצבירה (לפי סוג המוצר), דמי הניהול מהפקדה ותאריכי התוקף – בתנאי שאחד מהתוקפים חל היום. (השערה: MF = Management Fee, דמי ניהול.) (העמודות gen_corporatenumber, Gen_employersid, gen_fundtypename ו-productid בשאילתת Get Employer Nunmer אינן מסויגות בשם טבלה. אילו עמודה הייתה קיימת בשתי הטבלאות (Gen_employers, product), השאילתה הייתה נכשלת; לפי המשתמש החבילה רצה בפרודקשן. בחבילה 0004 gen_corporatenumber ו-gen_fundtypename נכתבים לישות gen_employers (0004:37558, 37568, 37617), Gen_employersId מסויג כ-Gen_employers.Gen_employersId (0004:70147), ו-Gen_employers.gen_fundtypename = Product.ProductId (0004:70153). לכן מספר התאגיד, המזהה והמוצר שייכים לרשומת gen_employers, ו-productid שייך ל-product.)",
+   "why": "שיוך העמודות הלא מסויגות הוצג בלי נימוק.",
+   "evidence": "DTSX:5689-5695; 0004_LeumiFile-MY.dtsx:37558, 37568, 37617, 70147, 70153",
+   "logicSha256Before": "d83f92e45b77d422c6859eac26ded7104b3e5fb7539f0fe280af703a092189e4",
+   "logicSha256After": "99575e86cadecab464db38685c21fe104fce67c60c7b8df3e25c41f82596c1a5"
+  },
+  {
+   "round": 3,
+   "date": "2026-11-07",
+   "claimId": "L|Package\\Set MF on employers|title",
+   "field": "flow_he[1]",
+   "before": "צירוף לרשומות gen_employers שמקושרות למוצר (join פנימי ל-product) לפי מספר תאגיד (Left Join).",
+   "after": "צירוף לרשומות gen_employers שמקושרות למוצר (join פנימי ל-product) לפי מספר תאגיד (Left Join). (שיוך העמודות הלא מסויגות gen_corporatenumber, Gen_employersid, gen_fundtypename ו-productid ל-gen_employers/product מבוסס על כלל העמימות (אילו עמודה הייתה בשתי הטבלאות השאילתה הייתה נכשלת; לפי המשתמש החבילה רצה בפרודקשן) ועל 0004:37558, 37568, 37617, 70147, 70153 – ראו הנימוק המלא בשלב שליפת רשומות המעסיק.)",
+   "why": "שיוך העמודות הלא מסויגות הוצג בלי נימוק.",
+   "evidence": "DTSX:5689-5695; 0004_LeumiFile-MY.dtsx:37558, 37568, 37617, 70147, 70153",
+   "logicSha256Before": "d83f92e45b77d422c6859eac26ded7104b3e5fb7539f0fe280af703a092189e4",
+   "logicSha256After": "99575e86cadecab464db38685c21fe104fce67c60c7b8df3e25c41f82596c1a5"
+  },
+  {
+   "round": 3,
+   "date": "2026-11-07",
+   "claimId": "L|Package\\Set MF on employers|short",
+   "field": "short.nodes[1].tech",
+   "before": null,
+   "after": "Get Employer Nunmer (DTSX:5689-5695) → Merge Join → Check if employer exist: ISNULL(Gen_employersid). העמודות gen_corporatenumber, Gen_employersid, gen_fundtypename ו-productid בשאילתת Get Employer Nunmer אינן מסויגות בשם טבלה. אילו עמודה הייתה קיימת בשתי הטבלאות (Gen_employers, product), השאילתה הייתה נכשלת; לפי המשתמש החבילה רצה בפרודקשן. בחבילה 0004 gen_corporatenumber ו-gen_fundtypename נכתבים לישות gen_employers (0004:37558, 37568, 37617), Gen_employersId מסויג כ-Gen_employers.Gen_employersId (0004:70147), ו-Gen_employers.gen_fundtypename = Product.ProductId (0004:70153). לכן מספר התאגיד, המזהה והמוצר שייכים לרשומת gen_employers, ו-productid שייך ל-product.",
+   "why": "שיוך העמודות הלא מסויגות הוצג בלי נימוק.",
+   "evidence": "DTSX:5689-5695; 0004_LeumiFile-MY.dtsx:37558, 37568, 37617, 70147, 70153",
+   "logicSha256Before": "d83f92e45b77d422c6859eac26ded7104b3e5fb7539f0fe280af703a092189e4",
+   "logicSha256After": "99575e86cadecab464db38685c21fe104fce67c60c7b8df3e25c41f82596c1a5"
+  },
+  {
+   "round": 3,
+   "date": "2026-11-07",
+   "claimId": "L|Package\\Set MF on employers|short",
+   "field": "short.nodes[1].branches[לא].nodes[0].tech",
+   "before": null,
+   "after": "Check if employer exist (DTSX:3787) → אזהרה. שיוך העמודות הלא מסויגות gen_corporatenumber, Gen_employersid, gen_fundtypename ו-productid ל-gen_employers/product מבוסס על כלל העמימות (אילו עמודה הייתה בשתי הטבלאות השאילתה הייתה נכשלת; לפי המשתמש החבילה רצה בפרודקשן) ועל 0004:37558, 37568, 37617, 70147, 70153 – ראו הנימוק המלא בשלב שליפת רשומות המעסיק.",
+   "why": "הפניה לנימוק השיוך.",
+   "evidence": "DTSX:5689-5695; 0004_LeumiFile-MY.dtsx:37558, 37568, 37617, 70147, 70153",
+   "logicSha256Before": "d83f92e45b77d422c6859eac26ded7104b3e5fb7539f0fe280af703a092189e4",
+   "logicSha256After": "99575e86cadecab464db38685c21fe104fce67c60c7b8df3e25c41f82596c1a5"
+  },
+  {
+   "round": 3,
+   "date": "2026-11-07",
+   "claimId": "L|Package\\Set MF on employers|short",
+   "field": "short.nodes[2].branches[לא].nodes[0].text",
+   "before": "נרשמת אזהרה על תאריך לא תקין, והמעסיק אינו מתעדכן.",
+   "after": "נרשמת אזהרה על תאריך לא תקין, ורשומת המעסיק הזו אינה מתעדכנת.",
+   "why": "הבדיקה היא לכל רשומת gen_employers; רשומות אחרות של אותו מספר תאגיד עשויות לעבור.",
+   "evidence": "Check If Date Valid DTSX:3743",
+   "logicSha256Before": "d83f92e45b77d422c6859eac26ded7104b3e5fb7539f0fe280af703a092189e4",
+   "logicSha256After": "99575e86cadecab464db38685c21fe104fce67c60c7b8df3e25c41f82596c1a5"
+  },
+  {
+   "round": 3,
+   "date": "2026-11-07",
+   "claimId": "L|Package\\Set MF on employers|detailed",
+   "field": "detailed.nodes[0].tech",
+   "before": "MF Source File (FlatFileSource, DTSX:5836): gen_corporatenumber, gen_employername, StartDate_Source, EndDate_Source, provident_fund_Source, study_fund_Source, Deposit_Start_Date_Source, Dposit_Source; conn MF Source = C:\\Banks Source Files\\Leumi Source Files\\הטבות מעסיקים.csv (Delimited, ColumnNamesInFirstDataRow=True, ללא Expression, DTSX:9-11)",
+   "after": "MF Source File (FlatFileSource, DTSX:5836): gen_corporatenumber, gen_employername, StartDate_Source, EndDate_Source, provident_fund_Source, study_fund_Source, Deposit_Start_Date_Source, Dposit_Source; conn MF Source = C:\\Banks Source Files\\Leumi Source Files\\הטבות מעסיקים.csv (Delimited, ColumnNamesInFirstDataRow=True, ללא Expression, DTSX:9-11; ערך זמן התכנון; קובץ התצורה החיצוני C:\\Generix\\SSISConfigFile.dtsConfig (DTSX:33), שלא סופק, עשוי לדרוס אותו; לא הוכח שזה הקובץ MFBenefitFile שנבדק ומועבר לארכיון)",
+   "why": "נתיב החיבור הוא ערך זמן התכנון וקובץ התצורה עשוי לדרוס אותו; זהות הקובץ מול MFBenefitFile לא הוכחה.",
+   "evidence": "DTSX:9, 33, 3693",
+   "logicSha256Before": "d83f92e45b77d422c6859eac26ded7104b3e5fb7539f0fe280af703a092189e4",
+   "logicSha256After": "99575e86cadecab464db38685c21fe104fce67c60c7b8df3e25c41f82596c1a5"
+  },
+  {
+   "round": 3,
+   "date": "2026-11-07",
+   "claimId": "L|Package\\Set MF on employers|detailed",
+   "field": "detailed.nodes[2].tech",
+   "before": "Get Employer Nunmer (OLEDBSource, DTSX:5684): select gen_corporatenumber, Gen_employersid, product.ProductTypeCode from Gen_employers join product on productid = gen_fundtypename",
+   "after": "Get Employer Nunmer (OLEDBSource, DTSX:5684): select gen_corporatenumber, Gen_employersid, product.ProductTypeCode from Gen_employers join product on productid = gen_fundtypename. העמודות gen_corporatenumber, Gen_employersid, gen_fundtypename ו-productid בשאילתת Get Employer Nunmer אינן מסויגות בשם טבלה. אילו עמודה הייתה קיימת בשתי הטבלאות (Gen_employers, product), השאילתה הייתה נכשלת; לפי המשתמש החבילה רצה בפרודקשן. בחבילה 0004 gen_corporatenumber ו-gen_fundtypename נכתבים לישות gen_employers (0004:37558, 37568, 37617), Gen_employersId מסויג כ-Gen_employers.Gen_employersId (0004:70147), ו-Gen_employers.gen_fundtypename = Product.ProductId (0004:70153). לכן מספר התאגיד, המזהה והמוצר שייכים לרשומת gen_employers, ו-productid שייך ל-product.",
+   "why": "שיוך העמודות הלא מסויגות הוצג בלי נימוק.",
+   "evidence": "DTSX:5689-5695; 0004_LeumiFile-MY.dtsx:37558, 37568, 37617, 70147, 70153",
+   "logicSha256Before": "d83f92e45b77d422c6859eac26ded7104b3e5fb7539f0fe280af703a092189e4",
+   "logicSha256After": "99575e86cadecab464db38685c21fe104fce67c60c7b8df3e25c41f82596c1a5"
+  },
+  {
+   "round": 3,
+   "date": "2026-11-07",
+   "claimId": "L|Package\\Set MF on employers|detailed",
+   "field": "detailed.nodes[4].tech",
+   "before": "Check if employer exist (ConditionalSplit, DTSX:3787): ISNULL(Gen_employersid) → \"Employer not exist\"",
+   "after": "Check if employer exist (ConditionalSplit, DTSX:3787): ISNULL(Gen_employersid) → \"Employer not exist\". שיוך העמודות הלא מסויגות gen_corporatenumber, Gen_employersid, gen_fundtypename ו-productid ל-gen_employers/product מבוסס על כלל העמימות (אילו עמודה הייתה בשתי הטבלאות השאילתה הייתה נכשלת; לפי המשתמש החבילה רצה בפרודקשן) ועל 0004:37558, 37568, 37617, 70147, 70153 – ראו הנימוק המלא בשלב שליפת רשומות המעסיק.",
+   "why": "הפניה מפורשת לנימוק השיוך.",
+   "evidence": "DTSX:5689-5695; 0004_LeumiFile-MY.dtsx:37558, 37568, 37617, 70147, 70153",
+   "logicSha256Before": "d83f92e45b77d422c6859eac26ded7104b3e5fb7539f0fe280af703a092189e4",
+   "logicSha256After": "99575e86cadecab464db38685c21fe104fce67c60c7b8df3e25c41f82596c1a5"
+  },
+  {
+   "round": 3,
+   "date": "2026-11-07",
+   "claimId": "L|Package\\Set MF on employers|detail",
+   "field": "detail_he[1].t",
+   "before": "gen_corporatenumber בקובץ מול gen_employers.gen_corporatenumber (Merge Join, Left outer). לכל מספר תאגיד יכולות להיות כמה רשומות gen_employers, כל אחת עם המוצר שלה (gen_fundtypename → product.ProductTypeCode), וכל אחת מהן מתעדכנת בנפרד. רשומות בלי מוצר תואם אינן נשלפות (join פנימי).",
+   "after": "gen_corporatenumber בקובץ מול gen_employers.gen_corporatenumber (Merge Join, Left outer). לכל מספר תאגיד יכולות להיות כמה רשומות gen_employers, כל אחת עם המוצר שלה (gen_fundtypename → product.ProductTypeCode), וכל אחת מהן מתעדכנת בנפרד. רשומות בלי מוצר תואם אינן נשלפות (join פנימי). (העמודות gen_corporatenumber, Gen_employersid, gen_fundtypename ו-productid בשאילתת Get Employer Nunmer אינן מסויגות בשם טבלה. אילו עמודה הייתה קיימת בשתי הטבלאות (Gen_employers, product), השאילתה הייתה נכשלת; לפי המשתמש החבילה רצה בפרודקשן. בחבילה 0004 gen_corporatenumber ו-gen_fundtypename נכתבים לישות gen_employers (0004:37558, 37568, 37617), Gen_employersId מסויג כ-Gen_employers.Gen_employersId (0004:70147), ו-Gen_employers.gen_fundtypename = Product.ProductId (0004:70153). לכן מספר התאגיד, המזהה והמוצר שייכים לרשומת gen_employers, ו-productid שייך ל-product.)",
+   "why": "סיווג טבלה לעמודות לא מסויגות בלי נימוק.",
+   "evidence": "DTSX:5689-5695; 0004_LeumiFile-MY.dtsx:37558, 37568, 37617, 70147, 70153",
+   "logicSha256Before": "d83f92e45b77d422c6859eac26ded7104b3e5fb7539f0fe280af703a092189e4",
+   "logicSha256After": "99575e86cadecab464db38685c21fe104fce67c60c7b8df3e25c41f82596c1a5"
+  },
+  {
+   "round": 3,
+   "date": "2026-11-07",
+   "claimId": "L|Package\\Set MF on employers|decisions",
+   "field": "decisions[0].outcome_he",
+   "before": "שורה לכל רשומת gen_employers שנשלפה (רק רשומות שמקושרות למוצר – join פנימי ב-Get Employer Nunmer); ללא התאמה → Gen_employersid NULL",
+   "after": "שורה לכל רשומת gen_employers שנשלפה (רק רשומות שמקושרות למוצר – join פנימי ב-Get Employer Nunmer); ללא התאמה → Gen_employersid NULL. העמודות gen_corporatenumber, Gen_employersid, gen_fundtypename ו-productid בשאילתת Get Employer Nunmer אינן מסויגות בשם טבלה. אילו עמודה הייתה קיימת בשתי הטבלאות (Gen_employers, product), השאילתה הייתה נכשלת; לפי המשתמש החבילה רצה בפרודקשן. בחבילה 0004 gen_corporatenumber ו-gen_fundtypename נכתבים לישות gen_employers (0004:37558, 37568, 37617), Gen_employersId מסויג כ-Gen_employers.Gen_employersId (0004:70147), ו-Gen_employers.gen_fundtypename = Product.ProductId (0004:70153). לכן מספר התאגיד, המזהה והמוצר שייכים לרשומת gen_employers, ו-productid שייך ל-product.",
+   "why": "שיוך עמודות ה-join הלא מסויגות בלי נימוק.",
+   "evidence": "DTSX:5689-5695; 0004_LeumiFile-MY.dtsx:37558, 37568, 37617, 70147, 70153",
+   "logicSha256Before": "d83f92e45b77d422c6859eac26ded7104b3e5fb7539f0fe280af703a092189e4",
+   "logicSha256After": "99575e86cadecab464db38685c21fe104fce67c60c7b8df3e25c41f82596c1a5"
+  },
+  {
+   "round": 3,
+   "date": "2026-11-07",
+   "claimId": "L|Package\\Set MF on employers|decisions",
+   "field": "decisions[1].meaning_he",
+   "before": "אין רשומת מעסיק עם מספר התאגיד שמקושרת למוצר (כולל מעסיק קיים בלי מוצר תואם)",
+   "after": "אין רשומת מעסיק עם מספר התאגיד שמקושרת למוצר (כולל מעסיק קיים בלי מוצר תואם) (שיוך העמודות הלא מסויגות gen_corporatenumber, Gen_employersid, gen_fundtypename ו-productid ל-gen_employers/product מבוסס על כלל העמימות (אילו עמודה הייתה בשתי הטבלאות השאילתה הייתה נכשלת; לפי המשתמש החבילה רצה בפרודקשן) ועל 0004:37558, 37568, 37617, 70147, 70153 – ראו הנימוק המלא בהחלטה הקודמת.)",
+   "why": "הפניה מפורשת לנימוק השיוך.",
+   "evidence": "DTSX:5689-5695; 0004_LeumiFile-MY.dtsx:37558, 37568, 37617, 70147, 70153",
+   "logicSha256Before": "d83f92e45b77d422c6859eac26ded7104b3e5fb7539f0fe280af703a092189e4",
+   "logicSha256After": "99575e86cadecab464db38685c21fe104fce67c60c7b8df3e25c41f82596c1a5"
+  },
+  {
+   "round": 3,
+   "date": "2026-11-07",
+   "claimId": "L|Package\\Update employer amount|detailed",
+   "field": "detailed.nodes[0].tech",
+   "before": "get employers (OLEDBSource, DTSX:7791): FROM account LEFT JOIN gen_employers ON gen_employers.gen_corporatename = accountid LEFT JOIN gen_fundmain ON gen_fundmain.gen_employernumber = Gen_employersId GROUP BY accountid, Gen_employeesweightedmanagementfee, Gen_EmployeesFundsValue",
+   "after": "get employers (OLEDBSource, DTSX:7791): FROM account LEFT JOIN gen_employers ON gen_employers.gen_corporatename = accountid LEFT JOIN gen_fundmain ON gen_fundmain.gen_employernumber = Gen_employersId GROUP BY accountid, Gen_employeesweightedmanagementfee, Gen_EmployeesFundsValue. העמודות accountid, Gen_employersId, Gen_employeesweightedmanagementfee ו-Gen_EmployeesFundsValue בשאילתת get employers אינן מסויגות בשם טבלה. אילו עמודה הייתה קיימת ביותר מאחת הטבלאות account, gen_employers ו-gen_fundmain, השאילתה הייתה נכשלת; לפי המשתמש החבילה רצה בפרודקשן. ל-AccountBase יש עמודות בשמות accountid, Gen_EmployeesFundsValue ו-Gen_employeesweightedmanagementfee (UPDATE dbo.AccountBase SET Gen_EmployeesFundsValue = ?, Gen_employeesweightedmanagementfee = ? where accountid = ?, DTSX:7991-7994), ו-Gen_employersId מסויג כ-Gen_employers.Gen_employersId בחבילה 0004 (0004:70147).",
+   "why": "שיוך accountid ו-Gen_employersId הלא מסויגים בלי נימוק.",
+   "evidence": "DTSX:7796-7808, 7991-7994; 0004_LeumiFile-MY.dtsx:70147",
+   "logicSha256Before": "d83f92e45b77d422c6859eac26ded7104b3e5fb7539f0fe280af703a092189e4",
+   "logicSha256After": "99575e86cadecab464db38685c21fe104fce67c60c7b8df3e25c41f82596c1a5"
+  },
+  {
+   "round": 3,
+   "date": "2026-11-07",
+   "claimId": "L|Package\\Update employer amount|detailed",
+   "field": "detailed.nodes[3].tech",
+   "before": "Gen_employeesweightedmanagementfee AS …DB, Gen_EmployeesFundsValue AS …DB",
+   "after": "Gen_employeesweightedmanagementfee AS …DB, Gen_EmployeesFundsValue AS …DB. העמודות Gen_employeesweightedmanagementfee ו-Gen_EmployeesFundsValue שנשלפות כערכים שמורים אינן מסויגות בשאילתה. ל-AccountBase יש עמודות בשמות אלה (UPDATE dbo.AccountBase, DTSX:7991-7993); אילו היו קיימות גם ב-gen_employers או ב-gen_fundmain השאילתה הייתה נכשלת; לפי המשתמש החבילה רצה בפרודקשן.",
+   "why": "שיוך הערכים השמורים לחשבון בלי נימוק.",
+   "evidence": "DTSX:7796-7808, 7991-7993",
+   "logicSha256Before": "d83f92e45b77d422c6859eac26ded7104b3e5fb7539f0fe280af703a092189e4",
+   "logicSha256After": "99575e86cadecab464db38685c21fe104fce67c60c7b8df3e25c41f82596c1a5"
+  },
+  {
+   "round": 3,
+   "date": "2026-11-07",
+   "claimId": "L|Package\\Update employer amount|title",
+   "field": "title_he",
+   "before": "חישוב שווי קופות העובדים ודמי ניהול משוקללים לחשבון המעסיק (account)",
+   "after": "חישוב שווי קופות העובדים ודמי ניהול משוקללים לכל חשבון (account)",
+   "why": "החישוב רץ על כל החשבונות, גם בלי רשומות gen_employers (עקביות עם התיקון בזרימת הבקרה).",
+   "evidence": "DTSX:7796-7808",
+   "logicSha256Before": "d83f92e45b77d422c6859eac26ded7104b3e5fb7539f0fe280af703a092189e4",
+   "logicSha256After": "99575e86cadecab464db38685c21fe104fce67c60c7b8df3e25c41f82596c1a5"
+  },
+  {
+   "round": 3,
+   "date": "2026-11-07",
+   "claimId": "L|Package\\Update employer amount|title",
+   "field": "short_he",
+   "before": "לכל חשבון ב-CRM מחושבים סך היתרות של כל קופות העובדים המשויכות לרשומות המעסיק שלו, ושיעור דמי הניהול הממוצע המשוקלל לפי היתרות. אם הערכים השתנו, הם נכתבים לחשבון בעדכון SQL ישיר לטבלת AccountBase (Unsupported).",
+   "after": "לכל חשבון ב-CRM מחושבים סך היתרות של כל קופות העובדים המשויכות לרשומות המעסיק שלו, ושיעור דמי הניהול הממוצע המשוקלל לפי היתרות. אם הערכים השתנו, הם נכתבים לחשבון בעדכון SQL ישיר לטבלת AccountBase (Unsupported). (שיוך העמודות הלא מסויגות בשאילתה – accountid, Gen_employersId והערכים השמורים – מבוסס על כלל העמימות ועל DTSX:7991-7994 ו-0004:70147; ראו הנימוק בתיאור המפורט.)",
+   "why": "הפניה לנימוק השיוך.",
+   "evidence": "DTSX:7796-7808, 7991-7994; 0004_LeumiFile-MY.dtsx:70147",
+   "logicSha256Before": "d83f92e45b77d422c6859eac26ded7104b3e5fb7539f0fe280af703a092189e4",
+   "logicSha256After": "99575e86cadecab464db38685c21fe104fce67c60c7b8df3e25c41f82596c1a5"
+  },
+  {
+   "round": 3,
+   "date": "2026-11-07",
+   "claimId": "L|Package\\Update employer amount|short",
+   "field": "short.nodes[0].tech",
+   "before": null,
+   "after": "get employers (DTSX:7796-7808). העמודות accountid, Gen_employersId, Gen_employeesweightedmanagementfee ו-Gen_EmployeesFundsValue בשאילתת get employers אינן מסויגות בשם טבלה. אילו עמודה הייתה קיימת ביותר מאחת הטבלאות account, gen_employers ו-gen_fundmain, השאילתה הייתה נכשלת; לפי המשתמש החבילה רצה בפרודקשן. ל-AccountBase יש עמודות בשמות accountid, Gen_EmployeesFundsValue ו-Gen_employeesweightedmanagementfee (UPDATE dbo.AccountBase SET Gen_EmployeesFundsValue = ?, Gen_employeesweightedmanagementfee = ? where accountid = ?, DTSX:7991-7994), ו-Gen_employersId מסויג כ-Gen_employers.Gen_employersId בחבילה 0004 (0004:70147).",
+   "why": "נימוק שיוך העמודות הלא מסויגות.",
+   "evidence": "DTSX:7796-7808, 7991-7994; 0004_LeumiFile-MY.dtsx:70147",
+   "logicSha256Before": "d83f92e45b77d422c6859eac26ded7104b3e5fb7539f0fe280af703a092189e4",
+   "logicSha256After": "99575e86cadecab464db38685c21fe104fce67c60c7b8df3e25c41f82596c1a5"
+  },
+  {
+   "round": 3,
+   "date": "2026-11-07",
+   "claimId": "L|Package\\Update employer amount|short",
+   "field": "short.nodes[last].text",
+   "before": "בחשבונות המעסיק שמורים היקף הכספים של עובדיו ודמי הניהול המשוקללים שלהם, אלא אם החישוב נכשל.",
+   "after": "בכל חשבון ב-CRM שעובד, גם חשבון בלי רשומות מעסיק (שמקבל 0), שמורים שווי קופות העובדים ודמי הניהול המשוקללים המחושבים, אלא אם החישוב נכשל.",
+   "why": "החישוב כותב לכל חשבון ולא רק לחשבונות מעסיק; \"היקף\" היה פרשנות לא מתויגת.",
+   "evidence": "DTSX:7796-7808, 7731",
+   "logicSha256Before": "d83f92e45b77d422c6859eac26ded7104b3e5fb7539f0fe280af703a092189e4",
+   "logicSha256After": "99575e86cadecab464db38685c21fe104fce67c60c7b8df3e25c41f82596c1a5"
+  },
+  {
+   "round": 3,
+   "date": "2026-11-07",
+   "claimId": "L|Package\\Update employer amount|detail",
+   "field": "detail_he[4].t",
+   "before": "בכרטיס חשבון המעסיק מוצגים היקף הכספים של עובדיו בקופות ושיעור דמי הניהול הממוצע המשוקלל שלהם.",
+   "after": "בכל חשבון ב-CRM שעובד, גם חשבון בלי רשומות מעסיק (שמקבל 0), נשמרים שווי קופות העובדים ושיעור דמי הניהול הממוצע המשוקלל. (אופן ההצגה בכרטיס החשבון אינו מוצג בקבצים.)",
+   "why": "החישוב כותב לכל חשבון ולא רק לחשבון מעסיק; הצגה בכרטיס אינה מוכחת.",
+   "evidence": "DTSX:7796-7808, 7991",
+   "logicSha256Before": "d83f92e45b77d422c6859eac26ded7104b3e5fb7539f0fe280af703a092189e4",
+   "logicSha256After": "99575e86cadecab464db38685c21fe104fce67c60c7b8df3e25c41f82596c1a5"
+  },
+  {
+   "round": 3,
+   "date": "2026-11-07",
+   "claimId": "L|Package\\Update employer amount|detail",
+   "field": "detail_he[0].t",
+   "before": "כל רשומות account ב-CRM (LEFT JOIN), ללא תלות בקובץ ההטבות. כל חשבון נסכם על פני רשומות gen_employers שלו (gen_corporatename = accountid) ועל פני הקופות (gen_fundmain) שבהן gen_employernumber מצביע על אחת מרשומות המעסיק.",
+   "after": "כל רשומות account ב-CRM (LEFT JOIN), ללא תלות בקובץ ההטבות. כל חשבון נסכם על פני רשומות gen_employers שלו (gen_corporatename = accountid) ועל פני הקופות (gen_fundmain) שבהן gen_employernumber מצביע על אחת מרשומות המעסיק. (העמודות accountid, Gen_employersId, Gen_employeesweightedmanagementfee ו-Gen_EmployeesFundsValue בשאילתת get employers אינן מסויגות בשם טבלה. אילו עמודה הייתה קיימת ביותר מאחת הטבלאות account, gen_employers ו-gen_fundmain, השאילתה הייתה נכשלת; לפי המשתמש החבילה רצה בפרודקשן. ל-AccountBase יש עמודות בשמות accountid, Gen_EmployeesFundsValue ו-Gen_employeesweightedmanagementfee (UPDATE dbo.AccountBase SET Gen_EmployeesFundsValue = ?, Gen_employeesweightedmanagementfee = ? where accountid = ?, DTSX:7991-7994), ו-Gen_employersId מסויג כ-Gen_employers.Gen_employersId בחבילה 0004 (0004:70147).)",
+   "why": "נימוק שיוך העמודות הלא מסויגות.",
+   "evidence": "DTSX:7796-7808, 7991-7994; 0004_LeumiFile-MY.dtsx:70147",
+   "logicSha256Before": "d83f92e45b77d422c6859eac26ded7104b3e5fb7539f0fe280af703a092189e4",
+   "logicSha256After": "99575e86cadecab464db38685c21fe104fce67c60c7b8df3e25c41f82596c1a5"
+  },
+  {
+   "round": 3,
+   "date": "2026-11-07",
+   "claimId": "L|finding#7",
+   "field": "findings_he[6].text",
+   "before": "בממוצע המשוקלל, קופה בלי שיעור דמי ניהול (NULL) נכללת במכנה (היתרה) אבל לא במונה. אם יש קופות כאלה לצד קופות עם שיעור, התוצאה תלויה בנתונים: כשסך היתרות של הקופות בלי שיעור הוא 0, אין הבדל מהממוצע על הקופות עם שיעור בלבד; כשכל היתרות וכל השיעורים חיוביים, הממוצע נמוך ממנו. אם לכל קופות החשבון אין שיעור (וסך היתרות אינו 0), התוצאה NULL; ואם אז שני הערכים השמורים בחשבון קיימים, זרימת הנתונים נכשלת (Update3 FailComponent). חשבונות בלי מעסיקים או קופות מקבלים 0 בכל פעם שהערך השמור ריק או שונה מ-0.",
+   "after": "בממוצע המשוקלל, קופה בלי שיעור דמי ניהול (NULL) נכללת במכנה (היתרה) אבל לא במונה. אם יש קופות כאלה לצד קופות עם שיעור, התוצאה תלויה בנתונים: כשסך היתרות של הקופות בלי שיעור הוא 0, אין הבדל מהממוצע על הקופות עם שיעור בלבד; כשכל היתרות וכל השיעורים חיוביים, הממוצע נמוך ממנו. אם לכל קופות החשבון אין שיעור (וסך היתרות אינו 0), התוצאה NULL; ואם אז שני הערכים השמורים בחשבון קיימים, זרימת הנתונים נכשלת (Update3 FailComponent). חשבונות בלי מעסיקים או קופות מקבלים 0 בכל פעם שהערך השמור ריק או שונה מ-0. (העמודות Gen_employeesweightedmanagementfee ו-Gen_EmployeesFundsValue שנשלפות כערכים שמורים אינן מסויגות בשאילתה. ל-AccountBase יש עמודות בשמות אלה (UPDATE dbo.AccountBase, DTSX:7991-7993); אילו היו קיימות גם ב-gen_employers או ב-gen_fundmain השאילתה הייתה נכשלת; לפי המשתמש החבילה רצה בפרודקשן.)",
+   "why": "שיוך הערכים השמורים לחשבון בלי נימוק.",
+   "evidence": "DTSX:7796-7808, 7991-7993",
+   "logicSha256Before": "d83f92e45b77d422c6859eac26ded7104b3e5fb7539f0fe280af703a092189e4",
+   "logicSha256After": "99575e86cadecab464db38685c21fe104fce67c60c7b8df3e25c41f82596c1a5"
+  },
+  {
+   "round": 3,
+   "date": "2026-11-07",
+   "claimId": "L|finding#7",
+   "field": "findings_he[6].evidence",
+   "before": "get employers SQL DTSX:7796-7801; Check if to update DTSX:7731-7771",
+   "after": "get employers SQL DTSX:7796-7801; Check if to update DTSX:7731-7771; UPDATE dbo.AccountBase DTSX:7991-7993",
+   "why": "ראיה לנימוק השיוך.",
+   "evidence": "DTSX:7991-7993",
+   "logicSha256Before": "d83f92e45b77d422c6859eac26ded7104b3e5fb7539f0fe280af703a092189e4",
+   "logicSha256After": "99575e86cadecab464db38685c21fe104fce67c60c7b8df3e25c41f82596c1a5"
+  },
+  {
+   "round": 4,
+   "date": "2026-11-07",
+   "claimId": "L|summary",
+   "field": "$.summary_he",
+   "before": "לחבילה שני חלקים עסקיים. (1) כשהקובץ MFBenefitFile קיים בתיקייה MFBenefitFilePath (הערכים מ-gen_etlvariable או מקובץ התצורה החיצוני – לא ידועים): ההטבות נקראות מהקובץ שבחיבור MF Source (\"C:\\Banks Source Files\\Leumi Source Files\\הטבות מעסיקים.csv\" – ערך זמן התכנון; קובץ התצורה החיצוני C:\\Generix\\SSISConfigFile.dtsConfig (DTSX:33), שלא סופק, עשוי לדרוס אותו). לא הוכח שזה אותו קובץ שנבדק ומועבר לארכיון (ראו הממצא על נתיב הקובץ). לכל מספר תאגיד בקובץ מתעדכנות, דרך ה-SDK, רשומות gen_employers בעלות מספר התאגיד שמקושרות למוצר (רשומות בלי מוצר תואם אינן נשלפות), בהטבות מהקובץ (שדות gen_mf*; השערה: MF = דמי ניהול): שיעור הצבירה לפי סוג המוצר (עמודת \"גמל\" או \"השתלמות\") ותקופתו, ושיעור ההפקדה (עמודת \"הפקדה\") ותאריך תחילתו, בתנאי שאחד התוקפים חל. (2) כשהקובץ MFBenefitFile אינו קיים, או אחרי קליטה מוצלחת והעברת MFBenefitFile לארכיון: לכל חשבון (account) ב-CRM, כולל חשבונות בלי רשומות מעסיק (שמחושב להם 0), מחושבים סך יתרות קופות העובדים (gen_fundmain) המשויכות לרשומות gen_employers של החשבון ושיעור דמי הניהול המשוקלל. הערכים נכתבים בעדכון SQL ישיר לטבלת AccountBase (Unsupported) רק כשאחד הערכים השמורים בחשבון ריק או שונה מהמחושב. אם דמי הניהול המחושבים ריקים (NULL) ושני הערכים השמורים קיימים, ההשוואה מחזירה NULL וזרימת הנתונים נכשלת. שיוך העמודות שאינן מסויגות בשאילתות: העמודות gen_corporatenumber, Gen_employersid, gen_fundtypename ו-productid בשאילתת Get Employer Nunmer אינן מסויגות בשם טבלה. אילו עמודה הייתה קיימת בשתי הטבלאות (Gen_employers, product), השאילתה הייתה נכשלת; לפי המשתמש החבילה רצה בפרודקשן. בחבילה 0004 gen_corporatenumber ו-gen_fundtypename נכתבים לישות gen_employers (0004:37558, 37568, 37617), Gen_employersId מסויג כ-Gen_employers.Gen_employersId (0004:70147), ו-Gen_employers.gen_fundtypename = Product.ProductId (0004:70153). לכן מספר התאגיד, המזהה והמוצר שייכים לרשומת gen_employers, ו-productid שייך ל-product. העמודות accountid, Gen_employersId, Gen_employeesweightedmanagementfee ו-Gen_EmployeesFundsValue בשאילתת get employers אינן מסויגות בשם טבלה. אילו עמודה הייתה קיימת ביותר מאחת הטבלאות account, gen_employers ו-gen_fundmain, השאילתה הייתה נכשלת; לפי המשתמש החבילה רצה בפרודקשן. ל-AccountBase יש עמודות בשמות accountid, Gen_EmployeesFundsValue ו-Gen_employeesweightedmanagementfee (UPDATE dbo.AccountBase SET Gen_EmployeesFundsValue = ?, Gen_employeesweightedmanagementfee = ? where accountid = ?, DTSX:7991-7994), ו-Gen_employersId מסויג כ-Gen_employers.Gen_employersId בחבילה 0004 (0004:70147).",
+   "after": "לחבילה שני חלקים עסקיים. (1) כשהקובץ MFBenefitFile קיים בתיקייה MFBenefitFilePath (הערכים מ-gen_etlvariable או מקובץ התצורה החיצוני – לא ידועים): ההטבות נקראות מהקובץ שבחיבור MF Source (\"C:\\Banks Source Files\\Leumi Source Files\\הטבות מעסיקים.csv\" – ערך זמן התכנון; קובץ התצורה החיצוני C:\\Generix\\SSISConfigFile.dtsConfig (DTSX:33), שלא סופק, עשוי לדרוס אותו). לא הוכח שזה אותו קובץ שנבדק ומועבר לארכיון (ראו הממצא על נתיב הקובץ). לכל מספר תאגיד בקובץ מתעדכנות, דרך ה-SDK, רשומות gen_employers בעלות מספר התאגיד שמקושרות למוצר (רשומות בלי מוצר תואם אינן נשלפות), בהטבות מהקובץ (שדות gen_mf*; השערה: MF = דמי ניהול): ערך הצבירה לפי סוג המוצר (עמודת \"גמל\" או \"השתלמות\") ותקופתו, וערך ההפקדה (עמודת \"הפקדה\") ותאריך תחילתו (ערכים מספריים מטיפוס DT_R8 שמשמעותם אינה מוגדרת בקבצים; השערה: שיעורי דמי ניהול), בתנאי שאחד התוקפים חל. (2) כשהקובץ MFBenefitFile אינו קיים, או אחרי קליטה מוצלחת והעברת MFBenefitFile לארכיון: לכל חשבון (account) ב-CRM, כולל חשבונות בלי רשומות מעסיק (שמחושב להם 0), מחושבים סך יתרות קופות העובדים (gen_fundmain) המשויכות לרשומות gen_employers של החשבון ושיעור דמי הניהול המשוקלל. הערכים נכתבים בעדכון SQL ישיר לטבלת AccountBase (Unsupported) רק כשאחד הערכים השמורים בחשבון ריק או שונה מהמחושב. אם דמי הניהול המחושבים ריקים (NULL) ושני הערכים השמורים קיימים, ההשוואה מחזירה NULL וזרימת הנתונים נכשלת. שיוך העמודות שאינן מסויגות בשאילתות: העמודות gen_corporatenumber, Gen_employersid, gen_fundtypename ו-productid בשאילתת Get Employer Nunmer אינן מסויגות בשם טבלה. אילו עמודה הייתה קיימת בשתי הטבלאות (Gen_employers, product), השאילתה הייתה נכשלת; לפי המשתמש החבילה רצה בפרודקשן. בחבילה 0004 gen_corporatenumber ו-gen_fundtypename נכתבים לישות gen_employers (0004:37558, 37568, 37617), Gen_employersId מסויג כ-Gen_employers.Gen_employersId (0004:70147), ו-Gen_employers.gen_fundtypename = Product.ProductId (0004:70153). לכן מספר התאגיד, המזהה והמוצר שייכים לרשומת gen_employers, ו-productid שייך ל-product. העמודות accountid, Gen_employersId, Gen_employeesweightedmanagementfee ו-Gen_EmployeesFundsValue בשאילתת get employers אינן מסויגות בשם טבלה. אילו עמודה הייתה קיימת ביותר מאחת הטבלאות account, gen_employers ו-gen_fundmain, השאילתה הייתה נכשלת; לפי המשתמש החבילה רצה בפרודקשן. ל-AccountBase יש עמודות בשמות accountid, Gen_EmployeesFundsValue ו-Gen_employeesweightedmanagementfee (UPDATE dbo.AccountBase SET Gen_EmployeesFundsValue = ?, Gen_employeesweightedmanagementfee = ? where accountid = ?, DTSX:7991-7994), ו-Gen_employersId מסויג כ-Gen_employers.Gen_employersId בחבילה 0004 (0004:70147).",
+   "why": "גמל/השתלמות/הפקדה are DT_R8 numbers with no defined meaning in the files; 'שיעור' removed / moved under השערה.",
+   "evidence": "convert FriendlyExpression (DT_R8)provident_fund_Source / (DT_R8)study_fund_Source / (DT_R8)Dposit_Source (raw DTSX:3820 area); Set Pension/Study Fund Columns DTSX:5917/5975",
+   "logicSha256Before": "99575e86cadecab464db38685c21fe104fce67c60c7b8df3e25c41f82596c1a5",
+   "logicSha256After": "4e5ab6a6157fd508bf14697b6d65a0a12c682e00e14c14db915abcbe9cb15f4e"
+  },
+  {
+   "round": 4,
+   "date": "2026-11-07",
+   "claimId": "L|Package\\Set MF on employers|title",
+   "field": "$.components[1].flow_he[0]",
+   "before": "קריאת קובץ ההטבות (CSV עם כותרת), ניקוי רווחים, המרת תאריכים ושיעורים.",
+   "after": "קריאת קובץ ההטבות (CSV עם כותרת), ניקוי רווחים, המרת תאריכים ומספרים.",
+   "why": "Values are DT_R8 numbers; rate meaning unproven.",
+   "evidence": "convert DTSX:3820",
+   "logicSha256Before": "99575e86cadecab464db38685c21fe104fce67c60c7b8df3e25c41f82596c1a5",
+   "logicSha256After": "4e5ab6a6157fd508bf14697b6d65a0a12c682e00e14c14db915abcbe9cb15f4e"
+  },
+  {
+   "round": 4,
+   "date": "2026-11-07",
+   "claimId": "L|Package\\Set MF on employers|title+short+detailed+detail",
+   "field": "$.components[1].flow_he[4]",
+   "before": "בדיקת תוקף: תאריך תחילת הפקדה קיים ועבר, או שיש שיעור צבירה ותקופת הצבירה בתוקף; אחרת → אזהרה.",
+   "after": "בדיקת תוקף: תאריך תחילת הפקדה קיים ועבר, או שיש ערך צבירה ותקופת הצבירה בתוקף; אחרת → אזהרה.",
+   "why": "Rate meaning unproven; neutral 'ערך'.",
+   "evidence": "convert DTSX:3820",
+   "logicSha256Before": "99575e86cadecab464db38685c21fe104fce67c60c7b8df3e25c41f82596c1a5",
+   "logicSha256After": "4e5ab6a6157fd508bf14697b6d65a0a12c682e00e14c14db915abcbe9cb15f4e"
+  },
+  {
+   "round": 4,
+   "date": "2026-11-07",
+   "claimId": "L|Package\\Set MF on employers|title+short+detailed+detail",
+   "field": "$.components[1].short.nodes[2].text",
+   "before": "האם ההטבה בתוקף: תאריך תחילת ההפקדה קיים וכבר הגיע, או שיש שיעור צבירה ותקופת הצבירה חלה היום?",
+   "after": "האם ההטבה בתוקף: תאריך תחילת ההפקדה קיים וכבר הגיע, או שיש ערך צבירה ותקופת הצבירה חלה היום?",
+   "why": "Rate meaning unproven; neutral 'ערך'.",
+   "evidence": "convert DTSX:3820",
+   "logicSha256Before": "99575e86cadecab464db38685c21fe104fce67c60c7b8df3e25c41f82596c1a5",
+   "logicSha256After": "4e5ab6a6157fd508bf14697b6d65a0a12c682e00e14c14db915abcbe9cb15f4e"
+  },
+  {
+   "round": 4,
+   "date": "2026-11-07",
+   "claimId": "L|Package\\Set MF on employers|title+short+detailed+detail",
+   "field": "$.components[1].detailed.nodes[7].branches[1].label",
+   "before": "אחרת: יש שיעור צבירה, והיום בתוך תקופת הצבירה",
+   "after": "אחרת: יש ערך צבירה, והיום בתוך תקופת הצבירה",
+   "why": "Rate meaning unproven; neutral 'ערך'.",
+   "evidence": "convert DTSX:3820",
+   "logicSha256Before": "99575e86cadecab464db38685c21fe104fce67c60c7b8df3e25c41f82596c1a5",
+   "logicSha256After": "4e5ab6a6157fd508bf14697b6d65a0a12c682e00e14c14db915abcbe9cb15f4e"
+  },
+  {
+   "round": 4,
+   "date": "2026-11-07",
+   "claimId": "L|Package\\Set MF on employers|title+short+detailed+detail",
+   "field": "$.components[1].detail_he[2].t",
+   "before": "(1) אין רשומת מעסיק מקושרת למוצר למספר התאגיד → אזהרה \"מעסיק לא נמצא\". (2) סוג מוצר 200001/1 → שיעור הצבירה מ-provident_fund; 200000/2 → מ-study_fund; קוד אחר (לא ריק) → מדולג; קוד NULL → התנאי NULL ו-FailComponent, כל השלב נכשל. (3) תוקף: תאריך תחילת ההפקדה עבר, או שיש שיעור צבירה והיום בתוך תקופת הצבירה; אחרת → אזהרה.",
+   "after": "(1) אין רשומת מעסיק מקושרת למוצר למספר התאגיד → אזהרה \"מעסיק לא נמצא\". (2) סוג מוצר 200001/1 → שיעור הצבירה מ-provident_fund; 200000/2 → מ-study_fund; קוד אחר (לא ריק) → מדולג; קוד NULL → התנאי NULL ו-FailComponent, כל השלב נכשל. (3) תוקף: תאריך תחילת ההפקדה עבר, או שיש ערך צבירה והיום בתוך תקופת הצבירה; אחרת → אזהרה.",
+   "why": "Rate meaning unproven; neutral 'ערך'.",
+   "evidence": "convert DTSX:3820",
+   "logicSha256Before": "99575e86cadecab464db38685c21fe104fce67c60c7b8df3e25c41f82596c1a5",
+   "logicSha256After": "4e5ab6a6157fd508bf14697b6d65a0a12c682e00e14c14db915abcbe9cb15f4e"
+  },
+  {
+   "round": 4,
+   "date": "2026-11-07",
+   "claimId": "L|Package\\Set MF on employers|short",
+   "field": "$.components[1].short.nodes[1].branches[1].nodes[0].text",
+   "before": "לכל רשומת מעסיק נבחר שיעור הצבירה לפי סוג המוצר שלה: עמודת \"גמל\" או עמודת \"השתלמות\" בקובץ. מוצר מסוג אחר מדולג, וסוג מוצר חסר מכשיל את כל השלב.",
+   "after": "לכל רשומת מעסיק נבחר ערך הצבירה לפי סוג המוצר שלה: עמודת \"גמל\" או עמודת \"השתלמות\" בקובץ. מוצר מסוג אחר מדולג, וסוג מוצר חסר מכשיל את כל השלב.",
+   "why": "Rate meaning unproven.",
+   "evidence": "Set Pension/Study Fund Columns DTSX:5917/5975",
+   "logicSha256Before": "99575e86cadecab464db38685c21fe104fce67c60c7b8df3e25c41f82596c1a5",
+   "logicSha256After": "4e5ab6a6157fd508bf14697b6d65a0a12c682e00e14c14db915abcbe9cb15f4e"
+  },
+  {
+   "round": 4,
+   "date": "2026-11-07",
+   "claimId": "L|Package\\Set MF on employers|short",
+   "field": "$.components[1].short.nodes[2].branches[1].nodes[0].text",
+   "before": "רשומת המעסיק מתעדכנת בשיעורי הצבירה וההפקדה ובתאריכי התוקף שבקובץ (השערה: אלה דמי ניהול).",
+   "after": "רשומת המעסיק מתעדכנת בערכי הצבירה וההפקדה ובתאריכי התוקף שבקובץ (השערה: אלה שיעורי דמי ניהול).",
+   "why": "Rate meaning only as hypothesis.",
+   "evidence": "Create main.cs:121-182",
+   "logicSha256Before": "99575e86cadecab464db38685c21fe104fce67c60c7b8df3e25c41f82596c1a5",
+   "logicSha256After": "4e5ab6a6157fd508bf14697b6d65a0a12c682e00e14c14db915abcbe9cb15f4e"
+  },
+  {
+   "round": 4,
+   "date": "2026-11-07",
+   "claimId": "L|Package\\Set MF on employers|detailed",
+   "field": "$.components[1].detailed.nodes[1].text",
+   "before": "רווחים מוסרים, ערך ריק נחשב חסר, והתאריכים והשיעורים מומרים לטיפוסים. ערך שאינו ניתן להמרה מכשיל את כל השלב, ואז אף מעסיק אינו מתעדכן.",
+   "after": "רווחים מוסרים, ערך ריק נחשב חסר, והתאריכים וערכי הצבירה וההפקדה מומרים לטיפוסים (תאריך ומספר DT_R8). ערך שאינו ניתן להמרה מכשיל את כל השלב, ואז אף מעסיק אינו מתעדכן.",
+   "why": "Rate meaning unproven.",
+   "evidence": "convert DTSX:3820",
+   "logicSha256Before": "99575e86cadecab464db38685c21fe104fce67c60c7b8df3e25c41f82596c1a5",
+   "logicSha256After": "4e5ab6a6157fd508bf14697b6d65a0a12c682e00e14c14db915abcbe9cb15f4e"
+  },
+  {
+   "round": 4,
+   "date": "2026-11-07",
+   "claimId": "L|Package\\Set MF on employers|detailed",
+   "field": "$.components[1].detailed.nodes[5].branches[0].nodes[0].text",
+   "before": "שיעור הצבירה נלקח מעמודת \"גמל\" שבקובץ.",
+   "after": "ערך הצבירה נלקח מעמודת \"גמל\" שבקובץ.",
+   "why": "Rate meaning unproven.",
+   "evidence": "Set Pension/Study Fund Columns DTSX:5917/5975",
+   "logicSha256Before": "99575e86cadecab464db38685c21fe104fce67c60c7b8df3e25c41f82596c1a5",
+   "logicSha256After": "4e5ab6a6157fd508bf14697b6d65a0a12c682e00e14c14db915abcbe9cb15f4e"
+  },
+  {
+   "round": 4,
+   "date": "2026-11-07",
+   "claimId": "L|Package\\Set MF on employers|detailed",
+   "field": "$.components[1].detailed.nodes[5].branches[1].nodes[0].text",
+   "before": "שיעור הצבירה נלקח מעמודת \"השתלמות\" שבקובץ.",
+   "after": "ערך הצבירה נלקח מעמודת \"השתלמות\" שבקובץ.",
+   "why": "Rate meaning unproven.",
+   "evidence": "Set Pension/Study Fund Columns DTSX:5917/5975",
+   "logicSha256Before": "99575e86cadecab464db38685c21fe104fce67c60c7b8df3e25c41f82596c1a5",
+   "logicSha256After": "4e5ab6a6157fd508bf14697b6d65a0a12c682e00e14c14db915abcbe9cb15f4e"
+  },
+  {
+   "round": 4,
+   "date": "2026-11-07",
+   "claimId": "L|Package\\Set MF on employers|detailed",
+   "field": "$.components[1].detailed.nodes[6].text",
+   "before": "בשני סוגי המוצרים, שיעור ההפקדה (עמודת \"הפקדה\"), תאריך התחלת ההסכם מהפקדה ותאריכי התחילה והסיום של הצבירה נלקחים מהקובץ כמו שהם.",
+   "after": "בשני סוגי המוצרים, ערך ההפקדה (עמודת \"הפקדה\"), תאריך התחלת ההסכם מהפקדה ותאריכי התחילה והסיום של הצבירה נלקחים מהקובץ כמו שהם.",
+   "why": "Rate meaning unproven.",
+   "evidence": "convert DTSX:3820",
+   "logicSha256Before": "99575e86cadecab464db38685c21fe104fce67c60c7b8df3e25c41f82596c1a5",
+   "logicSha256After": "4e5ab6a6157fd508bf14697b6d65a0a12c682e00e14c14db915abcbe9cb15f4e"
+  },
+  {
+   "round": 4,
+   "date": "2026-11-07",
+   "claimId": "L|Package\\Set MF on employers|detailed",
+   "field": "$.components[1].detailed.nodes[8].text",
+   "before": "רשומת המעסיק מתעדכנת בכל השדות שיש להם ערך: שיעור הצבירה, תאריכי התחילה והסיום של הצבירה, שיעור ההפקדה ותאריך התחלת ההסכם מהפקדה. העדכון נשלח בלי השוואה לערכים הקיימים, ושדה ריק בקובץ אינו מוחק ערך קיים.",
+   "after": "רשומת המעסיק מתעדכנת בכל השדות שיש להם ערך: ערך הצבירה, תאריכי התחילה והסיום של הצבירה, ערך ההפקדה ותאריך התחלת ההסכם מהפקדה. העדכון נשלח בלי השוואה לערכים הקיימים, ושדה ריק בקובץ אינו מוחק ערך קיים.",
+   "why": "Rate meaning unproven.",
+   "evidence": "Create main.cs:121-182",
+   "logicSha256Before": "99575e86cadecab464db38685c21fe104fce67c60c7b8df3e25c41f82596c1a5",
+   "logicSha256After": "4e5ab6a6157fd508bf14697b6d65a0a12c682e00e14c14db915abcbe9cb15f4e"
+  },
+  {
+   "round": 4,
+   "date": "2026-11-07",
+   "claimId": "L|Package\\Set MF on employers|detail",
+   "field": "$.components[1].detail_he[2].t",
+   "before": "(1) אין רשומת מעסיק מקושרת למוצר למספר התאגיד → אזהרה \"מעסיק לא נמצא\". (2) סוג מוצר 200001/1 → שיעור הצבירה מ-provident_fund; 200000/2 → מ-study_fund; קוד אחר (לא ריק) → מדולג; קוד NULL → התנאי NULL ו-FailComponent, כל השלב נכשל. (3) תוקף: תאריך תחילת ההפקדה עבר, או שיש ערך צבירה והיום בתוך תקופת הצבירה; אחרת → אזהרה.",
+   "after": "(1) אין רשומת מעסיק מקושרת למוצר למספר התאגיד → אזהרה \"מעסיק לא נמצא\". (2) סוג מוצר 200001/1 → ערך הצבירה מ-provident_fund; 200000/2 → מ-study_fund; קוד אחר (לא ריק) → מדולג; קוד NULL → התנאי NULL ו-FailComponent, כל השלב נכשל. (3) תוקף: תאריך תחילת ההפקדה עבר, או שיש ערך צבירה והיום בתוך תקופת הצבירה; אחרת → אזהרה.",
+   "why": "Rate meaning unproven.",
+   "evidence": "Check Fund type DTSX:3702-3724",
+   "logicSha256Before": "99575e86cadecab464db38685c21fe104fce67c60c7b8df3e25c41f82596c1a5",
+   "logicSha256After": "4e5ab6a6157fd508bf14697b6d65a0a12c682e00e14c14db915abcbe9cb15f4e"
+  },
+  {
+   "round": 4,
+   "date": "2026-11-07",
+   "claimId": "L|Package\\Set MF on employers|detail",
+   "field": "$.components[1].detail_he[4].t",
+   "before": "רשומות מעסיק (המקושרות למוצר) שעברו את הבדיקות מקבלות את הטבות המעסיקים שהוגדרו להן בקובץ: שיעור צבירה ותקופתו, ושיעור הפקדה ותאריך תחילתו (השערה: אלה דמי ניהול).",
+   "after": "רשומות מעסיק (המקושרות למוצר) שעברו את הבדיקות מקבלות את הטבות המעסיקים שהוגדרו להן בקובץ: ערך צבירה ותקופתו, וערך הפקדה ותאריך תחילתו (ערכים מספריים שמשמעותם אינה מוגדרת בקבצים; השערה: אלה שיעורי דמי ניהול).",
+   "why": "Consistency; rate meaning only as hypothesis.",
+   "evidence": "convert DTSX:3820",
+   "logicSha256Before": "99575e86cadecab464db38685c21fe104fce67c60c7b8df3e25c41f82596c1a5",
+   "logicSha256After": "4e5ab6a6157fd508bf14697b6d65a0a12c682e00e14c14db915abcbe9cb15f4e"
+  },
+  {
+   "round": 4,
+   "date": "2026-11-07",
+   "claimId": "L|finding#3",
+   "field": "$.findings_he[2].text",
+   "before": "בדיקת התוקף היא OR בין הפקדה לצבירה. שורה שעוברת תנאי אחד כותבת את כל השדות, כולל ערכי התנאי השני: שיעור צבירה שתקופתו הסתיימה או עדיין לא התחילה, או שיעור הפקדה עם תאריך עתידי.",
+   "after": "בדיקת התוקף היא OR בין הפקדה לצבירה. שורה שעוברת תנאי אחד כותבת את כל השדות, כולל ערכי התנאי השני: ערך צבירה שתקופתו הסתיימה או עדיין לא התחילה, או ערך הפקדה עם תאריך עתידי.",
+   "why": "Same fact as Set MF (rate meaning unproven); kept consistent across the package.",
+   "evidence": "convert DTSX:3820",
+   "logicSha256Before": "99575e86cadecab464db38685c21fe104fce67c60c7b8df3e25c41f82596c1a5",
+   "logicSha256After": "4e5ab6a6157fd508bf14697b6d65a0a12c682e00e14c14db915abcbe9cb15f4e"
+  },
+  {
+   "round": "c1",
+   "date": "2026-11-10",
+   "claimId": "L|summary",
+   "field": "ROOT.summary_he",
+   "before": "לחבילה שני חלקים עסקיים. (1) כשהקובץ MFBenefitFile קיים בתיקייה MFBenefitFilePath (הערכים מ-gen_etlvariable או מקובץ התצורה החיצוני – לא ידועים): ההטבות נקראות מהקובץ שבחיבור MF Source (\"C:\\Banks Source Files\\Leumi Source Files\\הטבות מעסיקים.csv\" – ערך זמן התכנון; קובץ התצורה החיצוני C:\\Generix\\SSISConfigFile.dtsConfig (DTSX:33), שלא סופק, עשוי לדרוס אותו). לא הוכח שזה אותו קובץ שנבדק ומועבר לארכיון (ראו הממצא על נתיב הקובץ). לכל מספר תאגיד בקובץ מתעדכנות, דרך ה-SDK, רשומות gen_employers בעלות מספר התאגיד שמקושרות למוצר (רשומות בלי מוצר תואם אינן נשלפות), בהטבות מהקובץ (שדות gen_mf*; השערה: MF = דמי ניהול): ערך הצבירה לפי סוג המוצר (עמודת \"גמל\" או \"השתלמות\") ותקופתו, וערך ההפקדה (עמודת \"הפקדה\") ותאריך תחילתו (ערכים מספריים מטיפוס DT_R8 שמשמעותם אינה מוגדרת בקבצים; השערה: שיעורי דמי ניהול), בתנאי שאחד התוקפים חל. (2) כשהקובץ MFBenefitFile אינו קיים, או אחרי קליטה מוצלחת והעברת MFBenefitFile לארכיון: לכל חשבון (account) ב-CRM, כולל חשבונות בלי רשומות מעסיק (שמחושב להם 0), מחושבים סך יתרות קופות העובדים (gen_fundmain) המשויכות לרשומות gen_employers של החשבון ושיעור דמי הניהול המשוקלל. הערכים נכתבים בעדכון SQL ישיר לטבלת AccountBase (Unsupported) רק כשאחד הערכים השמורים בחשבון ריק או שונה מהמחושב. אם דמי הניהול המחושבים ריקים (NULL) ושני הערכים השמורים קיימים, ההשוואה מחזירה NULL וזרימת הנתונים נכשלת. שיוך העמודות שאינן מסויגות בשאילתות: העמודות gen_corporatenumber, Gen_employersid, gen_fundtypename ו-productid בשאילתת Get Employer Nunmer אינן מסויגות בשם טבלה. אילו עמודה הייתה קיימת בשתי הטבלאות (Gen_employers, product), השאילתה הייתה נכשלת; לפי המשתמש החבילה רצה בפרודקשן. בחבילה 0004 gen_corporatenumber ו-gen_fundtypename נכתבים לישות gen_employers (0004:37558, 37568, 37617), Gen_employersId מסויג כ-Gen_employers.Gen_employersId (0004:70147), ו-Gen_employers.gen_fundtypename = Product.ProductId (0004:70153). לכן מספר התאגיד, המזהה והמוצר שייכים לרשומת gen_employers, ו-productid שייך ל-product. העמודות accountid, Gen_employersId, Gen_employeesweightedmanagementfee ו-Gen_EmployeesFundsValue בשאילתת get employers אינן מסויגות בשם טבלה. אילו עמודה הייתה קיימת ביותר מאחת הטבלאות account, gen_employers ו-gen_fundmain, השאילתה הייתה נכשלת; לפי המשתמש החבילה רצה בפרודקשן. ל-AccountBase יש עמודות בשמות accountid, Gen_EmployeesFundsValue ו-Gen_employeesweightedmanagementfee (UPDATE dbo.AccountBase SET Gen_EmployeesFundsValue = ?, Gen_employeesweightedmanagementfee = ? where accountid = ?, DTSX:7991-7994), ו-Gen_employersId מסויג כ-Gen_employers.Gen_employersId בחבילה 0004 (0004:70147).",
+   "after": "לחבילה שני חלקים עסקיים. (1) כשהקובץ MFBenefitFile קיים בתיקייה MFBenefitFilePath (הערכים מ-gen_etlvariable או מקובץ התצורה החיצוני – לא ידועים): ההטבות נקראות מהקובץ שבחיבור MF Source (\"C:\\Banks Source Files\\Leumi Source Files\\הטבות מעסיקים.csv\" – ערך זמן התכנון; קובץ התצורה החיצוני C:\\Generix\\SSISConfigFile.dtsConfig (DTSX:33), שלא סופק, עשוי לדרוס אותו). לא הוכח שזה אותו קובץ שנבדק ומועבר לארכיון (ראו הממצא על נתיב הקובץ). לכל מספר תאגיד בקובץ מתעדכנות, דרך ה-SDK, רשומות gen_employers בעלות מספר התאגיד שמקושרות למוצר (רשומות בלי מוצר תואם אינן נשלפות), בהטבות מהקובץ (שדות gen_mf*; השערה: MF = דמי ניהול): ערך הצבירה לפי סוג המוצר (עמודת \"גמל\" או \"השתלמות\") ותקופתו, וערך ההפקדה (עמודת \"הפקדה\") ותאריך תחילתו (ערכים מספריים מטיפוס DT_R8 שמשמעותם אינה מוגדרת בקבצים; השערה: שיעורי דמי ניהול), בתנאי שאחד התוקפים חל. רק רשומות שקוד סוג המוצר (ProductTypeCode) שלהן הוא 200001 או 1, או 200000 או 2, מתעדכנות; רשומות עם קוד סוג מוצר אחר (שאינו ריק) מדולגות (Check Fund type, DTSX:3702-3724; לפלט DE Output אין נתיב). (2) כשהקובץ MFBenefitFile אינו קיים, או אחרי קליטה מוצלחת והעברת MFBenefitFile לארכיון: לכל חשבון (account) ב-CRM, כולל חשבונות בלי רשומות מעסיק (שמחושב להם 0), מחושבים סך יתרות קופות העובדים (gen_fundmain) המשויכות לרשומות gen_employers של החשבון ושיעור דמי הניהול המשוקלל. הערכים נכתבים בעדכון SQL ישיר לטבלת AccountBase (Unsupported) רק כשאחד הערכים השמורים בחשבון ריק או שונה מהמחושב. אם דמי הניהול המחושבים ריקים (NULL) ושני הערכים השמורים קיימים, ההשוואה מחזירה NULL וזרימת הנתונים נכשלת. שיוך העמודות שאינן מסויגות בשאילתות: העמודות gen_corporatenumber, Gen_employersid, gen_fundtypename ו-productid בשאילתת Get Employer Nunmer אינן מסויגות בשם טבלה. אילו עמודה הייתה קיימת בשתי הטבלאות (Gen_employers, product), השאילתה הייתה נכשלת; לפי המשתמש החבילה רצה בפרודקשן. בחבילה 0004 gen_corporatenumber ו-gen_fundtypename נכתבים לישות gen_employers (0004:37558, 37568, 37617), Gen_employersId מסויג כ-Gen_employers.Gen_employersId (0004:70147), ו-Gen_employers.gen_fundtypename = Product.ProductId (0004:70153). לכן מספר התאגיד, המזהה והמוצר שייכים לרשומת gen_employers, ו-productid שייך ל-product. העמודות accountid, Gen_employersId, Gen_employeesweightedmanagementfee ו-Gen_EmployeesFundsValue בשאילתת get employers אינן מסויגות בשם טבלה. אילו עמודה הייתה קיימת ביותר מאחת הטבלאות account, gen_employers ו-gen_fundmain, השאילתה הייתה נכשלת; לפי המשתמש החבילה רצה בפרודקשן. ל-AccountBase יש עמודות בשמות accountid, Gen_EmployeesFundsValue ו-Gen_employeesweightedmanagementfee (UPDATE dbo.AccountBase SET Gen_EmployeesFundsValue = ?, Gen_employeesweightedmanagementfee = ? where accountid = ?, DTSX:7991-7994), ו-Gen_employersId מסויג כ-Gen_employers.Gen_employersId בחבילה 0004 (0004:70147).",
+   "why": "Verifier INCOMPLETE: missing product-type row filter (NULL-type failure is plumbing, omitted; covered by finding #4).",
+   "evidence": "DTSX:3702-3728 (FriendlyExpression 3715, 3723; DE Output 3728, no path)",
+   "logicSha256Before": "4e5ab6a6157fd508bf14697b6d65a0a12c682e00e14c14db915abcbe9cb15f4e",
+   "logicSha256After": "880492aea6082a8595a8bf8e305edab81b621db7010e7aa0df6d9c03eaf36466"
+  }
+ ]
+}

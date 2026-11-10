@@ -1,0 +1,724 @@
+{
+ "verifier": "ssis-verifier",
+ "package": "0005_Customer Account",
+ "scope": "logic-claims all",
+ "checkedAt": "2026-11-07T11:34:55.406Z",
+ "checked": 75,
+ "results": [
+  {
+   "id": "L|summary",
+   "hash": "3a05b78372ab",
+   "verdict": "CONFIRMED",
+   "detail": "Summary checked against all 8 business executables and their SQL/scripts: create/update of gen_customeraccount from gen_fundmain per customer-account-type + bank account number, fund linking, joining-mail status, aggregations, paragraph14/employer confirmation, consulting details from type-5/status-8 transfer requests to account and funds, default currency; direct SQL on qsql (psql/ALTSHULER_MSCRM). Scope note verified: configurations empty, CRM.Proxy external, all sources CRM tables via qsql, no flat files.",
+   "evidence": "0005_Customer Account.dtsx:4-6 (qsql), 33252, 2588, 62354, 68399, 79889, 79895, 70686, 77180"
+  },
+  {
+   "id": "L|exec",
+   "hash": "7123c06d9373",
+   "verdict": "CONFIRMED",
+   "detail": "Re-derived the chain from the 16 PrecedenceConstraints (none has DTS:Value/EvalOp, so all are Success, LogicalAnd=True, single incoming each); line numbers of every constraint match. OnError handler at DTSX:82430-82437. No disabled executables.",
+   "evidence": "0005_Customer Account.dtsx:82412-82427, 82430-82437"
+  },
+  {
+   "id": "L|ignored",
+   "hash": "03ed83a9687f",
+   "verdict": "CONFIRMED",
+   "detail": "Checked every listed item: ETL record/counter/error scripts write only gen_etlprocess, gen_etlprocesscounter and annotation on gen_etlprocess; insert etl process warning writes gen_etlprocesswarningBase; Split Rows/Add Row Number/Multicast/Union All/Component Task Name are pass-through (Split default output \"Case Last\" catches ProcessNumber 0). Note (not counted as business): Create System Columns / Additional Columns / Get Sytem User Id supply the system-user GUID that reaches CRM only as ModifiedBy in the direct-SQL updates, and Get Variables supplies CrmMinimumDate used by Dates To Local; these are audit/config plumbing per CLAUDE.md.",
+   "evidence": "Create System Columns main.cs:118-119 (0005_Customer Account.dtsx:29333); Additional Columns 0005_Customer Account.dtsx:69204; Error ETL Process record ScriptMain.cs:36-51"
+  },
+  {
+   "id": "L|finding#1",
+   "hash": "c5e6d6012429",
+   "verdict": "WRONG",
+   "detail": "The direct-SQL writes listed are correct, but the count is not: the package has 30 OLE DB Command components, of which 5 are \"insert etl process warning\" (ETL plumbing into gen_etlprocesswarningBase). The business direct-SQL writers are 25 OLE DB Commands + 3 Execute SQL tasks.",
+   "evidence": "OLE DB Commands: Update Customer Account 1-5 (0005_Customer Account.dtsx:40979-42287), Update Customer Account (Unsupported) 1-5 (73349-73676), Update TransferRequest 1-5 (73754-73938), Update Fund Main 1-5 (79190-79514), Update TransferRequest 1/2/4, TrasferRequest 3, TransfeRequest 5 (79595-79779); insert etl process warning x5 (e.g. 62395)",
+   "wrongUnits": [
+    {
+     "unit": 1,
+     "problem": "Total \"30 OLE DB Command\" presented as the business direct-SQL writes",
+     "correct": "25 business OLE DB Commands (5 groups x5) + 3 Execute SQL tasks; the other 5 OLE DB Commands are insert etl process warning (plumbing)",
+     "evidence": "DTSX component list; 62398 insert gen_etlprocesswarningBase"
+    }
+   ]
+  },
+  {
+   "id": "L|finding#2",
+   "hash": "042de9c98f70",
+   "verdict": "CONFIRMED",
+   "detail": "Conditional Split UnSupported = both broker numbers non-null and equal; otherwise Default (Supported) -> SDK. SQL Update Customer Account sets 40 business columns + ModifiedBy/ModifiedOn from row values incl. NULLs. Direct SQL bypasses the CRM pipeline, so the consequence is stated correctly as general.",
+   "evidence": "0005_Customer Account.dtsx:18090; SQL 0005_Customer Account.dtsx:40982"
+  },
+  {
+   "id": "L|finding#3",
+   "hash": "139f86a8a937",
+   "verdict": "CONFIRMED",
+   "detail": "Create Customer Account main.cs:84-88 (gen_agents / gen_agencie), 126-127 (gen_selfemployername <- genaccountname); Update CustomerAccounts main.cs:84-85 (account / contact), 94 (gen_selfemployername <- genselfemployername).",
+   "evidence": "Create Customer Account main.cs:84-88,123-127; Update CustomerAccounts main.cs:84-85,94"
+  },
+  {
+   "id": "L|finding#4",
+   "hash": "09508ea42e68",
+   "verdict": "CONFIRMED",
+   "detail": "Set gen_name: (DT_WSTR,4)(DT_I4)gen_producttypeid + \"-\" + (DT_WSTR,12)(DT_I8)gen_bankaccountnumber with errorRowDisposition and truncationRowDisposition = FailComponent; it sits on the main path before the lookup, so one bad row fails the data flow; all downstream constraints are Success. Wording is conditional on such a row existing.",
+   "evidence": "0005_Customer Account.dtsx:34382-34390; 82413-82427"
+  },
+  {
+   "id": "L|finding#5",
+   "hash": "27e72ebdcd8a",
+   "verdict": "CONFIRMED",
+   "detail": "WHERE abs(agg.gen_accountbalance - ca.Gen_accountbalance) > 1: with ca balance NULL the predicate is UNKNOWN; row is updated only via one of the three date predicates (> 12 hours).",
+   "evidence": "SQL 0005_Customer Account.dtsx:68399"
+  },
+  {
+   "id": "L|finding#6",
+   "hash": "153c8d23425d",
+   "verdict": "CONFIRMED",
+   "detail": "UPDATE ... FROM Gen_fundmain JOIN gen_customeraccountbase ca WHERE both fields NOT NULL; no comparison with current values; several matching funds per account -> undefined which one wins.",
+   "evidence": "SQL 0005_Customer Account.dtsx:79889"
+  },
+  {
+   "id": "L|finding#7",
+   "hash": "6f28628331cd",
+   "verdict": "INCOMPLETE",
+   "detail": "Technically right that Update Fund Main with Gen_fundmainId NULL affects 0 rows without error and the row still flows to Aggregate -> Update TransferRequest. Missing condition: such a request is selected (and marked) only if at least one of its six consulting fields is NOT NULL (WHERE tr.X is not null and (fm.X is null ...)); a request with all six empty is never selected. The same applies to a request whose gen_customeraccount is NULL.",
+   "evidence": "SQL 0005_Customer Account.dtsx:77180-77210; Union Update All -> Aggregate 0005_Customer Account.dtsx:75692",
+   "wrongUnits": [
+    {
+     "unit": 0,
+     "problem": "Missing selection condition for the no-fund case",
+     "correct": "Only requests with at least one non-null consulting field (consultbank, consultnumber, bankadvisor, consultbankbranch, consultingstartdate, consultingenddate) are selected/marked when no fund matches (LEFT JOIN gives fm.* NULL)",
+     "evidence": "SQL DTSX:77180"
+    }
+   ]
+  },
+  {
+   "id": "L|finding#8",
+   "hash": "af02098d3512",
+   "verdict": "CONFIRMED",
+   "detail": "Dates To Local (Supported path) reads CrmMinimumDate in PostExecute (main.cs:102-103), so during row processing minDate=null and minDateDate=DateTime.MinValue and the exclusion never applies; Dates To Local 1 reads it in PreExecute (main.cs:89-90).",
+   "evidence": "0005_Customer Account.dtsx:30078 main.cs:99-104; 0005_Customer Account.dtsx:31041 main.cs:86-90"
+  },
+  {
+   "id": "L|finding#9",
+   "hash": "02c5027780f7",
+   "verdict": "CONFIRMED",
+   "detail": "Create source joins cat.gen_bankname = f.gen_bankname; Connect Funds source joins p.gen_bankname = cat.gen_bankname. Consequence worded conditionally.",
+   "evidence": "SQL 0005_Customer Account.dtsx:33252 vs 2588"
+  },
+  {
+   "id": "L|finding#10",
+   "hash": "e0aae2d58843",
+   "verdict": "CONFIRMED",
+   "detail": "SQL filters only gen_existinfile = 1 and num = 1; no filter on Gen_customeraccountname; create/update decided by Get Customer Account Guid lookup.",
+   "evidence": "SQL 0005_Customer Account.dtsx:33252; Lookup 0005_Customer Account.dtsx:32121"
+  },
+  {
+   "id": "L|finding#11",
+   "hash": "d612e80ddac6",
+   "verdict": "WRONG",
+   "detail": "Normalised comparison (code, SQL, input columns with source lineage and parameter binding, outputs): all groups are identical or differ only in braces/whitespace EXCEPT Create Customer Account 4, whose main.cs moves the statement \"if(!Row.genmfratedtotal_IsNull) customeraccount[\\\"gen_mfratedtotal\\\"] = ...\" after the gen_depositmfpercentage block (statement order differs, not just spaces/brackets). Behaviour is equivalent, but the stated fact is not exact.",
+   "evidence": "Create Customer Account main.cs:48-50 vs Create Customer Account 4 main.cs (0005_Customer Account.dtsx:27118)",
+   "wrongUnits": [
+    {
+     "unit": 1,
+     "problem": "\"identical except whitespace or brackets\" for Create Customer Account",
+     "correct": "Create Customer Account 4 differs by the position of one independent assignment (gen_mfratedtotal); semantically equivalent",
+     "evidence": "diff of main.cs of Create Customer Account vs Create Customer Account 4"
+    }
+   ]
+  },
+  {
+   "id": "L|Package (control flow)|title",
+   "hash": "2e7e5ce8ffa4",
+   "verdict": "CONFIRMED",
+   "detail": "Eight business steps in one Success chain via counter tasks; flow lines match the constraints.",
+   "evidence": "0005_Customer Account.dtsx:82412-82427"
+  },
+  {
+   "id": "L|Package (control flow)|short",
+   "hash": "996b343f2f1c",
+   "verdict": "CONFIRMED",
+   "detail": "Steps and Success-only chaining verified.",
+   "evidence": "0005_Customer Account.dtsx:82412-82427"
+  },
+  {
+   "id": "L|Package (control flow)|detailed",
+   "hash": "2f6ec17cc79d",
+   "verdict": "CONFIRMED",
+   "detail": "Each step, its trigger constraint and the OnError handler verified; no Failure/Completion constraints.",
+   "evidence": "0005_Customer Account.dtsx:82412-82437"
+  },
+  {
+   "id": "L|Package (control flow)|detail",
+   "hash": "cc967f7f8d27",
+   "verdict": "CONFIRMED",
+   "detail": "All sources via qsql (psql/ALTSHULER_MSCRM); SDK writes gen_customeraccount and gen_fundmain; direct SQL to Gen_customeraccountBase, Gen_fundmainbase, gen_transferrequest.",
+   "evidence": "0005_Customer Account.dtsx:4-6; component SQL"
+  },
+  {
+   "id": "L|Package (control flow)|decisions",
+   "hash": "446ea753565f",
+   "verdict": "CONFIRMED",
+   "detail": "Success constraints, LogicalAnd=True, one incoming each.",
+   "evidence": "0005_Customer Account.dtsx:82412-82427"
+  },
+  {
+   "id": "L|Package (control flow)|open",
+   "hash": "a417d2cbadb6",
+   "verdict": "CONFIRMED",
+   "detail": "No Failure/Completion constraint exists; a re-run mechanism (job) is not in the supplied files.",
+   "evidence": "0005_Customer Account.dtsx:82412-82427"
+  },
+  {
+   "id": "L|Package\\Create or Update Customer Accounts|title",
+   "hash": "f3d1be179751",
+   "verdict": "CONFIRMED",
+   "detail": "Source SQL, block-to-deposit lookup, existence lookup, AJ merge (status 7), SDK create with joining-mail flag, broker split, SQL vs SDK update verified.",
+   "evidence": "0005_Customer Account.dtsx:33252, 31964-31984, 32121-32237, 32038, 33700, 18090"
+  },
+  {
+   "id": "L|Package\\Create or Update Customer Accounts|short",
+   "hash": "6ac3236b4fd8",
+   "verdict": "CONFIRMED",
+   "detail": "Verified against source SQL, Fund Is Block To Deposit lookup, Get Customer Account Guid, Conditional Split, Compare scripts, Create/Update scripts and Update Customer Account 1-5 SQL.",
+   "evidence": "0005_Customer Account.dtsx:33252, 31966, 32123, 18090, 12421, 14893; Create Customer Account main.cs:41-44"
+  },
+  {
+   "id": "L|Package\\Create or Update Customer Accounts|detailed",
+   "hash": "3e60af0d4f0e",
+   "verdict": "WRONG",
+   "detail": "Most units verified (source SQL and CASE, Set gen_name, lookups, Convert Product Type, Merge Join keys/left outer, Dates To Local inputs, Create field rules incl. AJ overrides and kibbutz condition, broker split, both Compare scripts, SQL update, SDK update rules). Unit 11 misdescribes the AJ selection and unit 13 claims identical code for the 5 creates.",
+   "evidence": "Get Automated Joining SQL 0005_Customer Account.dtsx:32038; Merge Join 0005_Customer Account.dtsx:33700 (JoinType=1, NumKeyColumns=3, TreatNullsAsEqual=true)",
+   "wrongUnits": [
+    {
+     "unit": 11,
+     "problem": "\"looking for an AJ that was sent to the bank ... for each customer the earliest AJ is taken\"",
+     "correct": "The query numbers ALL joinings (any status) per applicant ID + document type + bank account number without leading zeros, ordered by createdon asc, keeps only num = 1, and only then applies gen_joiningstatus = 7. So an AJ is used only if the earliest joining for that key is in status 7; a later status-7 joining is ignored if an earlier joining with another status exists. The grouping is per ID+document type+account, not per customer.",
+     "evidence": "DTSX:32038: \"row_number() over (partition by aj.gen_applicantidentitynumber, aj.gen_documenttype, SUBSTRING(...)) order by aj.createdon asc) as num ... where num = 1 AND temp.gen_joiningstatus = 7\""
+    },
+    {
+     "unit": 13,
+     "problem": "\"Create Customer Account x5 ... קוד זהה\"",
+     "correct": "Create Customer Account 4 differs in statement order (gen_mfratedtotal assignment moved); behaviour equivalent, code not identical",
+     "evidence": "main.cs of Create Customer Account vs Create Customer Account 4 (DTSX:27118)"
+    }
+   ]
+  },
+  {
+   "id": "L|Package\\Create or Update Customer Accounts|detail",
+   "hash": "f8a873ef0adb",
+   "verdict": "WRONG",
+   "detail": "Units 2-5 verified. Units 1 and 6 label as השערה upstream facts that the supplied files settle (and partly contradict).",
+   "evidence": "0004:61789, 92874; 0008:23781; 0009:27019; 0027:984, 1370-1376",
+   "wrongUnits": [
+    {
+     "unit": 1,
+     "problem": "gen_fundmain \"probably loaded by 0004 (השערה)\"; gen_automatedjoining \"probably loaded by 0027 (השערה)\"",
+     "correct": "Upstream of gen_fundmain is settled by the supplied files, so it must not be labelled השערה: 0004_LeumiFile-MY inserts gen_fundmain rows by direct SQL (Create gen_FundMain: \"insert into Gen_fundmainbase ... Gen_existinfile ... gen_employerconfirmation, gen_paragraph14\", 0004:61789-61900) and updates them (\"UPDATE Gen_fundmain Set gen_existinfile = 1, gen_modifiedbybank = getdate(), ... gen_employerconfirmation = ?, gen_paragraph14 = ?\", 0004:92874-92953); 0008_LeumiFile-PY and 0009_LeumiFile-BY also write gen_fundmain via SDK with gen_existinfile = true (0008:23781-23784, 25653-25656; 0009:27019-27026, 29368-29375); 0033_FundSetMF and others update Gen_fundmainBase too. Correct form: gen_fundmain is written (proven) by 0004 (SQL insert/update incl. gen_existinfile=1) and by 0008/0009 (SDK, gen_existinfile=true), among others. gen_automatedjoining upstream: no supplied package creates gen_automatedjoining records. 0027_AutomatedJoining only READS joinings with gen_joiningstatus = 7 (0027:984) and UPDATES their gen_joiningstatus and gen_customeraccountid (0027:1370-1376); 0029_POA only sets gen_testedtocreatepoa (0029:29686-29691). So \"loaded by 0027 (השערה)\" is contradicted by the files; correct: the records are created outside the supplied packages (external_unknown), and 0027 changes the status of status-7 joinings (which can remove them from this package's source, depending on run order, which is not in the files).",
+     "evidence": "0004_LeumiFile-MY.dtsx:61789-61900, 92874-92953; 0008:23781-23784; 0009:27019-27026; 0027_AutomatedJoining.dtsx:984, 1370-1376"
+    },
+    {
+     "unit": 6,
+     "problem": "sourceFeed.upstream_he hypotheses (0004 / 0027)",
+     "correct": "Same as unit 1: gen_fundmain proven written by 0004 (SQL) and 0008/0009 (SDK); gen_automatedjoining not created by any supplied package, 0027 only updates status of status-7 joinings",
+     "evidence": "0004:61789, 92874; 0027:984, 1370-1376"
+    }
+   ]
+  },
+  {
+   "id": "L|Package\\Create or Update Customer Accounts|decisions",
+   "hash": "1e1a84cd9080",
+   "verdict": "CONFIRMED",
+   "detail": "All 7 decisions match: lookup SQL with gen_IsDepositBlocked = '1' and ParameterMap (bankaccountnumber, customeraccounttype), Match->TRUE/No Match->FALSE; existence lookup keys; Conditional Split expression; NeedToUpdateAll == TRUE; 5050 condition; AJ override conditions main.cs:146-162; kibbutz condition main.cs:164-175.",
+   "evidence": "0005_Customer Account.dtsx:31966-31984, 33580, 33607, 32176, 32234, 18090, 33634, 33667; Create Customer Account main.cs:41-44,146-175"
+  },
+  {
+   "id": "L|Package\\Create or Update Customer Accounts|crm",
+   "hash": "87537df063d2",
+   "verdict": "CONFIRMED",
+   "detail": "Create via ExecuteMultiple RequestType.Create; Update via ExecuteMultiple RequestType.Update; Update Customer Account 1-5 direct SQL on Gen_customeraccountBase (qsql).",
+   "evidence": "Create Customer Account main.cs:254; Update CustomerAccounts main.cs:142; SQL 0005_Customer Account.dtsx:40982"
+  },
+  {
+   "id": "L|Package\\Create or Update Customer Accounts|open",
+   "hash": "4ef4d04dfe43",
+   "verdict": "CONFIRMED",
+   "detail": "Questions are correctly framed; intent of mapping differences, meaning of 5050 (only the constant name BUDGETARY_PENSION_FUNDS exists) and reason for the broker split cannot be settled from the files; the hypothesis is labelled.",
+   "evidence": "Create Customer Account main.cs:20,84-88,126-127; Update CustomerAccounts main.cs:84-85,94; SQL 0005_Customer Account.dtsx:62354"
+  },
+  {
+   "id": "L|Package\\Connect Funds to Customer Accounts|title",
+   "hash": "aab893a6502c",
+   "verdict": "CONFIRMED",
+   "detail": "Source SQL, Dates To Local inputs (gen_/fm_ consulting dates) and SDK update of gen_customeraccountname plus changed consulting fields verified.",
+   "evidence": "SQL 0005_Customer Account.dtsx:2588; Dates To Local 0005_Customer Account.dtsx:1697; Update Customer Account Guid in Fund main.cs:36-65"
+  },
+  {
+   "id": "L|Package\\Connect Funds to Customer Accounts|short",
+   "hash": "3cd74c6d682c",
+   "verdict": "CONFIRMED",
+   "detail": "Selection, matching (type from product + product bank, account number), link write and per-field copy rule verified.",
+   "evidence": "SQL 0005_Customer Account.dtsx:2588; main.cs:40-65"
+  },
+  {
+   "id": "L|Package\\Connect Funds to Customer Accounts|detailed",
+   "hash": "1aaa4c512949",
+   "verdict": "CONFIRMED",
+   "detail": "All units verified incl. WHERE (Gen_customeraccountname is null or <> ca id) and Gen_existinfile = 1, per-field condition !gen_IsNull && (fm_IsNull || gen != fm), target attributes and EntityReference types, x5 identical scripts.",
+   "evidence": "SQL 0005_Customer Account.dtsx:2588; main.cs:36-71; normalised comparison of the 5 scripts"
+  },
+  {
+   "id": "L|Package\\Connect Funds to Customer Accounts|detail",
+   "hash": "381c216fab9f",
+   "verdict": "WRONG",
+   "detail": "Units 2-5 verified (ExecuteMultiple Update in batches of 10, main.cs:68-70, 93). Units 1 and 6 label the gen_fundmain upstream as השערה although the files settle it.",
+   "evidence": "0004:61789, 92874; 0008:23781; 0009:27019",
+   "wrongUnits": [
+    {
+     "unit": 1,
+     "problem": "gen_fundmain \"probably loaded by 0004 (השערה)\"",
+     "correct": "Upstream of gen_fundmain is settled by the supplied files, so it must not be labelled השערה: 0004_LeumiFile-MY inserts gen_fundmain rows by direct SQL (Create gen_FundMain: \"insert into Gen_fundmainbase ... Gen_existinfile ... gen_employerconfirmation, gen_paragraph14\", 0004:61789-61900) and updates them (\"UPDATE Gen_fundmain Set gen_existinfile = 1, gen_modifiedbybank = getdate(), ... gen_employerconfirmation = ?, gen_paragraph14 = ?\", 0004:92874-92953); 0008_LeumiFile-PY and 0009_LeumiFile-BY also write gen_fundmain via SDK with gen_existinfile = true (0008:23781-23784, 25653-25656; 0009:27019-27026, 29368-29375); 0033_FundSetMF and others update Gen_fundmainBase too. Correct form: gen_fundmain is written (proven) by 0004 (SQL insert/update incl. gen_existinfile=1) and by 0008/0009 (SDK, gen_existinfile=true), among others.",
+     "evidence": "0004_LeumiFile-MY.dtsx:61789-61900, 92874-92953; 0008:23781-23784; 0009:27019-27026"
+    },
+    {
+     "unit": 6,
+     "problem": "sourceFeed.upstream_he: gen_fundmain probably 0004 (השערה)",
+     "correct": "Upstream of gen_fundmain is settled by the supplied files, so it must not be labelled השערה: 0004_LeumiFile-MY inserts gen_fundmain rows by direct SQL (Create gen_FundMain: \"insert into Gen_fundmainbase ... Gen_existinfile ... gen_employerconfirmation, gen_paragraph14\", 0004:61789-61900) and updates them (\"UPDATE Gen_fundmain Set gen_existinfile = 1, gen_modifiedbybank = getdate(), ... gen_employerconfirmation = ?, gen_paragraph14 = ?\", 0004:92874-92953); 0008_LeumiFile-PY and 0009_LeumiFile-BY also write gen_fundmain via SDK with gen_existinfile = true (0008:23781-23784, 25653-25656; 0009:27019-27026, 29368-29375); 0033_FundSetMF and others update Gen_fundmainBase too. Correct form: gen_fundmain is written (proven) by 0004 (SQL insert/update incl. gen_existinfile=1) and by 0008/0009 (SDK, gen_existinfile=true), among others.",
+     "evidence": "same"
+    }
+   ]
+  },
+  {
+   "id": "L|Package\\Connect Funds to Customer Accounts|decisions",
+   "hash": "42421a3af5d7",
+   "verdict": "CONFIRMED",
+   "detail": "Both conditions match SQL and main.cs.",
+   "evidence": "SQL 0005_Customer Account.dtsx:2588; main.cs:42-65"
+  },
+  {
+   "id": "L|Package\\Connect Funds to Customer Accounts|crm",
+   "hash": "ca014faa6ae9",
+   "verdict": "CONFIRMED",
+   "detail": "gen_fundmain Update via SDK ExecuteMultiple.",
+   "evidence": "main.cs:93"
+  },
+  {
+   "id": "L|Package\\Connect Funds to Customer Accounts|open",
+   "hash": "b4073b5bc8ff",
+   "verdict": "CONFIRMED",
+   "detail": "Technical difference verified (p.gen_bankname vs f.gen_bankname); consequence worded conditionally; data-dependent.",
+   "evidence": "SQL 0005_Customer Account.dtsx:2588 vs 33252"
+  },
+  {
+   "id": "L|Package\\Set Joining email to Agent|title",
+   "hash": "e7a600e7ded8",
+   "verdict": "WRONG",
+   "detail": "Flow units verified. Unit 2 labels status 2 as 'נשלח' (sent). The only proof of the meaning of 2 is the constant name SENDING_JOINING_MAIL (\"sending joining mail\"), and the package itself sends no mail.",
+   "evidence": "Update Customer Account 1 main.cs:15-17, 41-48 (0005_Customer Account.dtsx:62821)",
+   "wrongUnits": [
+    {
+     "unit": 2,
+     "problem": "status 2 = 'נשלח' (sent)",
+     "correct": "Status 2 is the constant SENDING_JOINING_MAIL (sending joining mail); whether a mail was actually sent is not in the files",
+     "evidence": "main.cs:15, 43"
+    }
+   ]
+  },
+  {
+   "id": "L|Package\\Set Joining email to Agent|short",
+   "hash": "55a725cf5f95",
+   "verdict": "WRONG",
+   "detail": "Unit 2 misstates the fallback rule, unit 5 mislabels status 2, unit 8 overstates the outcome.",
+   "evidence": "SQL 0005_Customer Account.dtsx:62354; Update Customer Account main.cs:15-17, 41-48, 59-73",
+   "wrongUnits": [
+    {
+     "unit": 2,
+     "problem": "email and do-not-email flag of the agent, and \"if there is no agent\" those of the agency",
+     "correct": "Each field falls back separately on NULL: email = isnull(c.EMailAddress1, a.EMailAddress1), donotemail = isnull(c.DoNotEMail, a.DoNotEMail). The agency email is used also when the agent contact exists but has no email, while the do-not-email flag can still come from the agent.",
+     "evidence": "SQL DTSX:62354"
+    },
+    {
+     "unit": 5,
+     "problem": "status set to 'נשלח'",
+     "correct": "Status 2 = SENDING_JOINING_MAIL (sending), not proven to mean sent",
+     "evidence": "main.cs:15, 43"
+    },
+    {
+     "unit": 8,
+     "problem": "\"no account stays in 'pending'\"",
+     "correct": "Accounts whose SDK update fails (Error output / fault) keep gen_joiningmailtoagent = 1",
+     "evidence": "main.cs:59-73, 92-97"
+    }
+   ]
+  },
+  {
+   "id": "L|Package\\Set Joining email to Agent|detailed",
+   "hash": "7999c8692034",
+   "verdict": "WRONG",
+   "detail": "Units 1-8 verified (SQL, independent isnull fallback, condition with ALLOW_EMAIL=false, values 2/4, batches of 10, sibling differences only braces/whitespace). Unit 9 again calls status 2 'נשלח'.",
+   "evidence": "main.cs:15-17, 41-48, 78; SQL 0005_Customer Account.dtsx:62354",
+   "wrongUnits": [
+    {
+     "unit": 9,
+     "problem": "accounts marked as 'נשלח' or 'נכשל'",
+     "correct": "Marked 2 (SENDING_JOINING_MAIL) or 4 (FAILED_JOINING_MAIL); failed SDK updates stay 1",
+     "evidence": "main.cs:15-16, 43, 47"
+    }
+   ]
+  },
+  {
+   "id": "L|Package\\Set Joining email to Agent|detail",
+   "hash": "7f69774243a8",
+   "verdict": "CONFIRMED",
+   "detail": "Source, matching by Gen_customeraccountId, decision and write verified; status 1 is set by Create Customer Account main.cs:43, and no other supplied package references gen_joiningmailtoagent.",
+   "evidence": "SQL 0005_Customer Account.dtsx:62354; Create Customer Account main.cs:43; grep of source/DailyProcess"
+  },
+  {
+   "id": "L|Package\\Set Joining email to Agent|decisions",
+   "hash": "1c96bac304f6",
+   "verdict": "CONFIRMED",
+   "detail": "Condition and outcomes match main.cs:41-48.",
+   "evidence": "main.cs:41-48"
+  },
+  {
+   "id": "L|Package\\Set Joining email to Agent|crm",
+   "hash": "dc67d6624a8d",
+   "verdict": "CONFIRMED",
+   "detail": "Only gen_joiningmailtoagent is set; ExecuteMultiple Update.",
+   "evidence": "main.cs:39-57, 78"
+  },
+  {
+   "id": "L|Package\\Set Joining email to Agent|open",
+   "hash": "d32005d91771",
+   "verdict": "CONFIRMED",
+   "detail": "No supplied package reads/sends based on gen_joiningmailtoagent (only 0005 references it); cannot be settled from the files.",
+   "evidence": "grep gen_joiningmailtoagent in source/DailyProcess"
+  },
+  {
+   "id": "L|Package\\Update Aggrigations on Customer Accounts|title",
+   "hash": "f04f6e6f4805",
+   "verdict": "CONFIRMED",
+   "detail": "SQL verified: sum(isnull(balance,0)), min dates, existinfile=1, group by account; thresholds >1 and >12 hours.",
+   "evidence": "SQL 0005_Customer Account.dtsx:68399"
+  },
+  {
+   "id": "L|Package\\Update Aggrigations on Customer Accounts|short",
+   "hash": "ceaa41e6a726",
+   "verdict": "CONFIRMED",
+   "detail": "Matches SQL.",
+   "evidence": "SQL 0005_Customer Account.dtsx:68399"
+  },
+  {
+   "id": "L|Package\\Update Aggrigations on Customer Accounts|detailed",
+   "hash": "badffd34c355",
+   "verdict": "INCOMPLETE",
+   "detail": "All stated units match the SQL. Missing: the aggregate is INNER-joined to the accounts, so an account with no fund having Gen_existinfile = 1 is not in the result and its balance/dates are never recalculated or cleared (stay at their last value). Also, funds with Gen_customeraccountname NULL form a group that matches no account.",
+   "evidence": "SQL 0005_Customer Account.dtsx:68399 \"from gen_customeraccount as ca join (select ... from gen_fundmain where Gen_existinfile = 1 group by Gen_customeraccountname) as agg on ...\"",
+   "wrongUnits": [
+    {
+     "unit": 0,
+     "problem": "Accounts without any active fund are not covered",
+     "correct": "Accounts with no gen_fundmain row with Gen_existinfile = 1 are excluded by the inner join and keep their previous gen_accountbalance / dates",
+     "evidence": "SQL DTSX:68399"
+    }
+   ]
+  },
+  {
+   "id": "L|Package\\Update Aggrigations on Customer Accounts|detail",
+   "hash": "8f162839b70e",
+   "verdict": "WRONG",
+   "detail": "Units 2-5 verified. Units 1 and 6 label the gen_fundmain upstream as השערה although the files settle it.",
+   "evidence": "0004:61789, 92874; 0008:23781; 0009:27019",
+   "wrongUnits": [
+    {
+     "unit": 1,
+     "problem": "fund values \"probably loaded in 0004 (השערה)\"",
+     "correct": "Upstream of gen_fundmain is settled by the supplied files, so it must not be labelled השערה: 0004_LeumiFile-MY inserts gen_fundmain rows by direct SQL (Create gen_FundMain: \"insert into Gen_fundmainbase ... Gen_existinfile ... gen_employerconfirmation, gen_paragraph14\", 0004:61789-61900) and updates them (\"UPDATE Gen_fundmain Set gen_existinfile = 1, gen_modifiedbybank = getdate(), ... gen_employerconfirmation = ?, gen_paragraph14 = ?\", 0004:92874-92953); 0008_LeumiFile-PY and 0009_LeumiFile-BY also write gen_fundmain via SDK with gen_existinfile = true (0008:23781-23784, 25653-25656; 0009:27019-27026, 29368-29375); 0033_FundSetMF and others update Gen_fundmainBase too. Correct form: gen_fundmain is written (proven) by 0004 (SQL insert/update incl. gen_existinfile=1) and by 0008/0009 (SDK, gen_existinfile=true), among others.",
+     "evidence": "0004_LeumiFile-MY.dtsx:61789-61900, 92874-92953"
+    },
+    {
+     "unit": 6,
+     "problem": "sourceFeed.upstream_he: gen_fundmain probably 0004 (השערה)",
+     "correct": "Upstream of gen_fundmain is settled by the supplied files, so it must not be labelled השערה: 0004_LeumiFile-MY inserts gen_fundmain rows by direct SQL (Create gen_FundMain: \"insert into Gen_fundmainbase ... Gen_existinfile ... gen_employerconfirmation, gen_paragraph14\", 0004:61789-61900) and updates them (\"UPDATE Gen_fundmain Set gen_existinfile = 1, gen_modifiedbybank = getdate(), ... gen_employerconfirmation = ?, gen_paragraph14 = ?\", 0004:92874-92953); 0008_LeumiFile-PY and 0009_LeumiFile-BY also write gen_fundmain via SDK with gen_existinfile = true (0008:23781-23784, 25653-25656; 0009:27019-27026, 29368-29375); 0033_FundSetMF and others update Gen_fundmainBase too. Correct form: gen_fundmain is written (proven) by 0004 (SQL insert/update incl. gen_existinfile=1) and by 0008/0009 (SDK, gen_existinfile=true), among others.",
+     "evidence": "same"
+    }
+   ]
+  },
+  {
+   "id": "L|Package\\Update Aggrigations on Customer Accounts|decisions",
+   "hash": "55f331839530",
+   "verdict": "CONFIRMED",
+   "detail": "WHERE clause copied exactly.",
+   "evidence": "SQL 0005_Customer Account.dtsx:68399"
+  },
+  {
+   "id": "L|Package\\Update Aggrigations on Customer Accounts|crm",
+   "hash": "ed147b273742",
+   "verdict": "CONFIRMED",
+   "detail": "Direct UPDATE Gen_customeraccountBase.",
+   "evidence": "SQL 0005_Customer Account.dtsx:68399"
+  },
+  {
+   "id": "L|Package\\Update Aggrigations on Customer Accounts|open",
+   "hash": "3cc6bcb7b391",
+   "verdict": "CONFIRMED",
+   "detail": "Intent cannot be settled from the files.",
+   "evidence": "SQL 0005_Customer Account.dtsx:68399"
+  },
+  {
+   "id": "L|Package\\Update Paragraph14 and Employer Confirmation fields|title",
+   "hash": "684e341d59aa",
+   "verdict": "CONFIRMED",
+   "detail": "SQL verified: both fields not null, no change check, every run.",
+   "evidence": "SQL 0005_Customer Account.dtsx:79889"
+  },
+  {
+   "id": "L|Package\\Update Paragraph14 and Employer Confirmation fields|short",
+   "hash": "35d342bb12a6",
+   "verdict": "CONFIRMED",
+   "detail": "Matches SQL.",
+   "evidence": "SQL 0005_Customer Account.dtsx:79889"
+  },
+  {
+   "id": "L|Package\\Update Paragraph14 and Employer Confirmation fields|detailed",
+   "hash": "afd3d6cedf97",
+   "verdict": "CONFIRMED",
+   "detail": "Matches SQL incl. no Gen_existinfile filter and non-deterministic UPDATE...FROM with several matches.",
+   "evidence": "SQL 0005_Customer Account.dtsx:79889"
+  },
+  {
+   "id": "L|Package\\Update Paragraph14 and Employer Confirmation fields|detail",
+   "hash": "1f87c59c0d54",
+   "verdict": "WRONG",
+   "detail": "Units 2-4 verified. Units 1 and 5 label as השערה an upstream that the files prove: 0004_LeumiFile-MY is the only supplied package that references gen_paragraph14 / gen_employerconfirmation, and it writes both into gen_fundmain in its insert and update SQL.",
+   "evidence": "0004:61789-61900 (Create gen_FundMain), 92874-92953 (Update gen_fundmain)",
+   "wrongUnits": [
+    {
+     "unit": 1,
+     "problem": "paragraph14/employer confirmation \"probably loaded by a fund package such as 0004 (השערה)\"",
+     "correct": "Proven: 0004_LeumiFile-MY writes gen_paragraph14 and gen_employerconfirmation in \"insert into Gen_fundmainbase\" (0004:61789-61900) and \"UPDATE Gen_fundmain ... gen_employerconfirmation = ?, gen_paragraph14 = ?\" (0004:92874-92953); no other supplied package references these columns",
+     "evidence": "0004_LeumiFile-MY.dtsx:61879-61880, 92935-92936"
+    },
+    {
+     "unit": 5,
+     "problem": "sourceFeed.upstream_he: probably 0004 (השערה)",
+     "correct": "Same: proven 0004 for these two fields; gen_fundmain rows are also written by 0008/0009 (SDK)",
+     "evidence": "0004:61789, 92874"
+    }
+   ]
+  },
+  {
+   "id": "L|Package\\Update Paragraph14 and Employer Confirmation fields|decisions",
+   "hash": "89df43f100d5",
+   "verdict": "CONFIRMED",
+   "detail": "Matches SQL.",
+   "evidence": "SQL 0005_Customer Account.dtsx:79889"
+  },
+  {
+   "id": "L|Package\\Update Paragraph14 and Employer Confirmation fields|crm",
+   "hash": "5d6ee15bc8ea",
+   "verdict": "CONFIRMED",
+   "detail": "Matches SQL.",
+   "evidence": "SQL 0005_Customer Account.dtsx:79889"
+  },
+  {
+   "id": "L|Package\\Update Paragraph14 and Employer Confirmation fields|open",
+   "hash": "e5ad4d7ee97b",
+   "verdict": "CONFIRMED",
+   "detail": "Business rule not in the files.",
+   "evidence": "SQL 0005_Customer Account.dtsx:79889"
+  },
+  {
+   "id": "L|Package\\Update Consulting Field  In Customer Account From Transfer Request|title",
+   "hash": "1326c6516656",
+   "verdict": "CONFIRMED",
+   "detail": "Type 5 / status 8 with SQL comments, dateofcopyingconsultingdetails null, ISNULL(tr)?ca:tr, SQL update of account then of request verified.",
+   "evidence": "SQL 0005_Customer Account.dtsx:70686; 0005_Customer Account.dtsx:71222-71265; 73352; 73757"
+  },
+  {
+   "id": "L|Package\\Update Consulting Field  In Customer Account From Transfer Request|short",
+   "hash": "3ae987789241",
+   "verdict": "WRONG",
+   "detail": "Units 1-4 verified. Unit 5 asserts \"the latest finished transfer request\" wins; nothing orders the requests.",
+   "evidence": "SQL 0005_Customer Account.dtsx:70686 (no ORDER BY); Split Rows For MultiThread 1 -> 5 parallel OLE DB Commands",
+   "wrongUnits": [
+    {
+     "unit": 5,
+     "problem": "account carries the consulting details of the LAST finished transfer request",
+     "correct": "If several unprocessed type-5/status-8 requests exist for the same account, each row updates the account; the source has no ORDER BY and rows are split over 5 parallel commands, so which request wins is undetermined. The account reflects the request(s) processed in this run, not provably the latest one.",
+     "evidence": "SQL DTSX:70686; Update Customer Account (Unsupported) 1-5 DTSX:73349-73676"
+    }
+   ]
+  },
+  {
+   "id": "L|Package\\Update Consulting Field  In Customer Account From Transfer Request|detailed",
+   "hash": "46f36e8f8a88",
+   "verdict": "CONFIRMED",
+   "detail": "All units verified incl. six-field difference condition, derived columns, SQL update (Param_0..5 -> six fields, Param_6 -> id), Output -> Multicast -> Update TransferRequest, Error -> Union All Error; x5 identical.",
+   "evidence": "SQL 0005_Customer Account.dtsx:70686, 73352, 73757; 0005_Customer Account.dtsx:71222-71265"
+  },
+  {
+   "id": "L|Package\\Update Consulting Field  In Customer Account From Transfer Request|detail",
+   "hash": "0e117a60cfc7",
+   "verdict": "WRONG",
+   "detail": "Units 2-5 verified. Units 1 and 6 name 0036 as the probable loader of gen_transferrequest, which the files contradict.",
+   "evidence": "0036_TransferRequest.dtsx:3586, 3886-3889",
+   "wrongUnits": [
+    {
+     "unit": 1,
+     "problem": "gen_transferrequest \"probably loaded by 0036_TransferRequest (השערה)\"",
+     "correct": "gen_transferrequest upstream: no supplied package creates gen_transferrequest records. 0036_TransferRequest only updates gen_tanferinstatus of requests in status 7 with gen_SendToBankDate not null (0036:3586, 3886-3889). So \"loaded by 0036 (השערה)\" is contradicted; correct: requests are created outside the supplied packages (external_unknown); 0036 only changes their status.",
+     "evidence": "0036:3584-3586, 3880-3889"
+    },
+    {
+     "unit": 6,
+     "problem": "sourceFeed.upstream_he: probably 0036 (השערה)",
+     "correct": "gen_transferrequest upstream: no supplied package creates gen_transferrequest records. 0036_TransferRequest only updates gen_tanferinstatus of requests in status 7 with gen_SendToBankDate not null (0036:3586, 3886-3889). So \"loaded by 0036 (השערה)\" is contradicted; correct: requests are created outside the supplied packages (external_unknown); 0036 only changes their status.",
+     "evidence": "same"
+    }
+   ]
+  },
+  {
+   "id": "L|Package\\Update Consulting Field  In Customer Account From Transfer Request|decisions",
+   "hash": "6e1f7660da9a",
+   "verdict": "CONFIRMED",
+   "detail": "Both decisions match SQL and derived-column expressions.",
+   "evidence": "SQL 0005_Customer Account.dtsx:70686; 0005_Customer Account.dtsx:71222-71265"
+  },
+  {
+   "id": "L|Package\\Update Consulting Field  In Customer Account From Transfer Request|crm",
+   "hash": "e64c9f934697",
+   "verdict": "CONFIRMED",
+   "detail": "Both direct SQL; TR update only on OLE DB Command Output of the account update.",
+   "evidence": "0005_Customer Account.dtsx:73352, 73757; paths Update Customer Account (Unsupported) n -> Multicast n -> Update TransferRequest n"
+  },
+  {
+   "id": "L|Package\\Update Consulting Field  In Customer Account From Transfer Request|open",
+   "hash": "5e597af6e871",
+   "verdict": "CONFIRMED",
+   "detail": "Labels come only from SQL comments; no other supplied package documents these codes; cannot be settled further.",
+   "evidence": "SQL 0005_Customer Account.dtsx:70706-70707"
+  },
+  {
+   "id": "L|Package\\Update Consulting Field  In Fund Main From Transfer Request|title",
+   "hash": "7862d5324e1e",
+   "verdict": "CONFIRMED",
+   "detail": "LEFT JOIN funds of the account, per-field ISNULL(tr)?fm:tr, SQL update per fund, Aggregate by request, TR update with ...tofund verified.",
+   "evidence": "SQL 0005_Customer Account.dtsx:77180; 77740-77783; 75692; 79193; 79598"
+  },
+  {
+   "id": "L|Package\\Update Consulting Field  In Fund Main From Transfer Request|short",
+   "hash": "1f8f6a340eca",
+   "verdict": "CONFIRMED",
+   "detail": "Matches components.",
+   "evidence": "SQL 0005_Customer Account.dtsx:77180; Aggregate 0005_Customer Account.dtsx:75692"
+  },
+  {
+   "id": "L|Package\\Update Consulting Field  In Fund Main From Transfer Request|detailed",
+   "hash": "78a3cbe74f67",
+   "verdict": "CONFIRMED",
+   "detail": "All units verified incl. Aggregate GROUP BY gen_transferrequestid, SystemUserId (AggregationType 0), names of the 5 TR updates (identical SQL/bindings), and the NULL-fund case in the context of unit 2 selection.",
+   "evidence": "SQL 0005_Customer Account.dtsx:77180, 79193, 79598-79782; Aggregate 0005_Customer Account.dtsx:75692"
+  },
+  {
+   "id": "L|Package\\Update Consulting Field  In Fund Main From Transfer Request|detail",
+   "hash": "23176a8b21d4",
+   "verdict": "WRONG",
+   "detail": "Units 2-5 verified. Units 1 and 6 carry upstream hypotheses that the files settle/contradict.",
+   "evidence": "0036:3586, 3886-3889; 0004:61789, 92874",
+   "wrongUnits": [
+    {
+     "unit": 1,
+     "problem": "gen_transferrequest \"probably loaded by 0036 (השערה)\"",
+     "correct": "gen_transferrequest upstream: no supplied package creates gen_transferrequest records. 0036_TransferRequest only updates gen_tanferinstatus of requests in status 7 with gen_SendToBankDate not null (0036:3586, 3886-3889). So \"loaded by 0036 (השערה)\" is contradicted; correct: requests are created outside the supplied packages (external_unknown); 0036 only changes their status.",
+     "evidence": "0036:3584-3586, 3880-3889"
+    },
+    {
+     "unit": 6,
+     "problem": "sourceFeed.upstream_he: 0036 / 0004 hypotheses",
+     "correct": "gen_transferrequest upstream: no supplied package creates gen_transferrequest records. 0036_TransferRequest only updates gen_tanferinstatus of requests in status 7 with gen_SendToBankDate not null (0036:3586, 3886-3889). So \"loaded by 0036 (השערה)\" is contradicted; correct: requests are created outside the supplied packages (external_unknown); 0036 only changes their status. Upstream of gen_fundmain is settled by the supplied files, so it must not be labelled השערה: 0004_LeumiFile-MY inserts gen_fundmain rows by direct SQL (Create gen_FundMain: \"insert into Gen_fundmainbase ... Gen_existinfile ... gen_employerconfirmation, gen_paragraph14\", 0004:61789-61900) and updates them (\"UPDATE Gen_fundmain Set gen_existinfile = 1, gen_modifiedbybank = getdate(), ... gen_employerconfirmation = ?, gen_paragraph14 = ?\", 0004:92874-92953); 0008_LeumiFile-PY and 0009_LeumiFile-BY also write gen_fundmain via SDK with gen_existinfile = true (0008:23781-23784, 25653-25656; 0009:27019-27026, 29368-29375); 0033_FundSetMF and others update Gen_fundmainBase too. Correct form: gen_fundmain is written (proven) by 0004 (SQL insert/update incl. gen_existinfile=1) and by 0008/0009 (SDK, gen_existinfile=true), among others.",
+     "evidence": "0036:3586; 0004:61789, 92874"
+    }
+   ]
+  },
+  {
+   "id": "L|Package\\Update Consulting Field  In Fund Main From Transfer Request|decisions",
+   "hash": "719c6cc4de0e",
+   "verdict": "CONFIRMED",
+   "detail": "Matches SQL and derived columns.",
+   "evidence": "SQL 0005_Customer Account.dtsx:77180; 77740-77783"
+  },
+  {
+   "id": "L|Package\\Update Consulting Field  In Fund Main From Transfer Request|crm",
+   "hash": "e7ca0ef433f4",
+   "verdict": "CONFIRMED",
+   "detail": "Direct SQL on Gen_fundmainbase and gen_transferrequest; TR once per Aggregate group of successfully executed fund rows.",
+   "evidence": "0005_Customer Account.dtsx:79193, 79598; 75692"
+  },
+  {
+   "id": "L|Package\\Update Consulting Field  In Fund Main From Transfer Request|open",
+   "hash": "143cf729aad1",
+   "verdict": "CONFIRMED",
+   "detail": "Questions about intent; cannot be settled from files.",
+   "evidence": "SQL 0005_Customer Account.dtsx:77180"
+  },
+  {
+   "id": "L|Package\\Update TransactionCurrencyId And ExchangeRate|title",
+   "hash": "329e744424a3",
+   "verdict": "CONFIRMED",
+   "detail": "SQL and parameter binding verified.",
+   "evidence": "SQL 0005_Customer Account.dtsx:79895; ParameterBinding 79896; variable 0005_Customer Account.dtsx:29"
+  },
+  {
+   "id": "L|Package\\Update TransactionCurrencyId And ExchangeRate|short",
+   "hash": "17c810430bc3",
+   "verdict": "CONFIRMED",
+   "detail": "Matches SQL.",
+   "evidence": "SQL 0005_Customer Account.dtsx:79895"
+  },
+  {
+   "id": "L|Package\\Update TransactionCurrencyId And ExchangeRate|detailed",
+   "hash": "12ecb0bb3a49",
+   "verdict": "WRONG",
+   "detail": "Units 1-5 verified (WHERE TransactionCurrencyId is null; CurrencyName bound to User::CurrencyName = \"שקל חדש\", not overwritten: Set Variables writes only CrmMinimumDate, OrganizationName, ServerName; NULL when name not found). Unit 6 overstates the result.",
+   "evidence": "SQL 0005_Customer Account.dtsx:79895; 0005_Customer Account.dtsx:29, 60737, 79896",
+   "wrongUnits": [
+    {
+     "unit": 6,
+     "problem": "\"every customer account has currency ILS and rate 1\"",
+     "correct": "Only accounts whose TransactionCurrencyId was NULL are touched; accounts that already have another currency keep it and their exchange rate, and if no currency named \"שקל חדש\" exists the currency stays NULL (unit 4)",
+     "evidence": "SQL DTSX:79895"
+    }
+   ]
+  },
+  {
+   "id": "L|Package\\Update TransactionCurrencyId And ExchangeRate|detail",
+   "hash": "e8d309222874",
+   "verdict": "WRONG",
+   "detail": "Units 1-3 and 5 verified. Unit 4 states an unproven business meaning as fact.",
+   "evidence": "SQL 0005_Customer Account.dtsx:79895",
+   "wrongUnits": [
+    {
+     "unit": 4,
+     "problem": "\"money fields of the account (like the balance) are shown in shekels\"",
+     "correct": "Not proven by the files: nothing in the supplied packages shows that gen_customeraccount.gen_accountbalance is a Money attribute (the only Money write of a gen_accountbalance is on gen_accountcourses in 0014). Must be labelled השערה; proven result is only: TransactionCurrencyId = currency named \"שקל חדש\", ExchangeRate = 1 for accounts that had none.",
+     "evidence": "SQL DTSX:79895; 0014_AccountCourses.dtsx new Money(Row.genaccountbalance) on gen_accountcourses"
+    }
+   ]
+  },
+  {
+   "id": "L|Package\\Update TransactionCurrencyId And ExchangeRate|decisions",
+   "hash": "20a177f0c541",
+   "verdict": "CONFIRMED",
+   "detail": "Matches SQL.",
+   "evidence": "SQL 0005_Customer Account.dtsx:79895"
+  },
+  {
+   "id": "L|Package\\Update TransactionCurrencyId And ExchangeRate|crm",
+   "hash": "41bb553624e3",
+   "verdict": "CONFIRMED",
+   "detail": "Direct UPDATE Gen_customeraccountBase.",
+   "evidence": "SQL 0005_Customer Account.dtsx:79895"
+  }
+ ]
+}

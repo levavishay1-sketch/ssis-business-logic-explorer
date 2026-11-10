@@ -1,0 +1,184 @@
+{
+  "verifier": "ssis-verifier",
+  "package": "0016_TransferOut",
+  "scope": "logic-claims all",
+  "checkedAt": "2026-11-07T12:30:00Z",
+  "checked": 20,
+  "results": [
+    {
+      "id": "L|summary",
+      "hash": "b0bccfeec105",
+      "verdict": "WRONG",
+      "detail": "Three problems. (1) Unit [1] calls the population 'טיפולי לקוח פתוחים'. The only filter is Tout.Gen_currentstate = 1, and no supplied label gives the meaning of state 1 for gen_customercare. 0009 defines CURRENT_STATE_IN_PROGRESS = 1 only for gen_transferin. The package's own detail claim labels 'state 1 = open' as השערה. (2) Unit [1] says partial transfer requires 'סכום התנועות שווה לסכום המצופה במסלול'. The query computes expected = sum(ISNULL(ac.gen_transactionamount,0)) over the joined rows of each (care, course, value date, appendix date) group, i.e. course amount × number of transactions. The comparison therefore succeeds only when the average transaction equals the course amount, as finding#1 says. (3) Unit [2] says 'שלושת כותבי ה-SDK' but then names four SDK writers: Close Transfer Out, Create ETL Process record, ETL Record Finish, ETL Warning. The other facts are verified: read-only [psql] connection, no SQL DML, external CRM2015.Proxy, empty configurations, FINISHED/PROPER constant names.",
+      "evidence": "DTSX:2119-2145 (SQL); Close Transfer Out main.cs:33-34,71-78 (DTSX:184); Create ETL Process record ScriptMain.cs:32-38; ETL Record Finish main.cs:120-129; ETL Warning main.cs:63-76; 0009_LeumiFile-BY.dtsx:82784",
+      "wrongUnits": [
+        { "unit": 1, "problem": "State-1 meaning ('open') stated as fact, and the partial-transfer condition misstated.", "correct": "טיפולי לקוח עם Gen_currentstate = 1 (משמעות 'פתוח' – השערה). בניוד חלקי נדרש ש-sum(gen_transtotalamount) של הקבוצה יהיה שווה ל-sum(ac.gen_transactionamount) על אותן שורות, כלומר סכום המסלול × מספר התנועות בקבוצה (ראה ממצא 1).", "evidence": "DTSX:2125-2127,2135-2137; Compare sums DTSX:1289" },
+        { "unit": 2, "problem": "Count mismatch: 'three' SDK writers, but four are named (and four exist).", "correct": "ארבעה כותבי SDK: Close Transfer Out (עסקי), Create ETL Process record, ETL Record Finish, ETL Warning (מסגרת).", "evidence": "DTSX:184; 2427; 2893; 1309" }
+      ]
+    },
+    {
+      "id": "L|exec",
+      "hash": "c1cee6446907",
+      "verdict": "CONFIRMED",
+      "detail": "Three Success constraints, AND, none disabled: 5476 Get Variables → Create ETL; 5478 Create ETL → Close Transfer Out; 5477 Close Transfer Out → End ETL. Get Variables has no incoming constraint. There are no event handlers and no disabled executables.",
+      "evidence": "DTSX:5476-5478; executables DTSX:82, 2427, 2887, 4630",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|ignored",
+      "hash": "7c684c1b539c",
+      "verdict": "CONFIRMED",
+      "detail": "None of these does business work. Get SystemConfigurations reads gen_etlvariable, and Set Variables fills ServerName/OrganizationName (throws if missing). Create ETL Process record creates gen_etlprocess. End ETL: Get gen_etlprocessid, a lookup on gen_etlprocess/gen_etlprocesswarning, then ETL Record Finish updates gen_etlprocess statuscode/gen_runtime. Union All 1 / Set Warning columns / ETL Warning create gen_etlprocesswarning only. The SQL log provider is logging only.",
+      "evidence": "DTSX:4641, 4677 main.cs:46-69; Create ETL ScriptMain.cs:32-38; DTSX:3750, 4561, 2893 main.cs:120-129; DTSX:2198, 2369, 1309 main.cs:63-76; log provider DTSX:16",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|finding#1",
+      "hash": "a8f1efb91407",
+      "verdict": "CONFIRMED",
+      "detail": "GROUP BY includes ac.gen_accountcoursesId, so each group has one course row duplicated once per ft row (the ftt join is on its PK). Hence sum(ac.gen_transactionamount) = amount × count, and equality holds only when the average transaction equals the course amount. Worded as unknown intent.",
+      "evidence": "DTSX:2125-2127,2129-2132,2139-2145; Compare sums DTSX:1289",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|finding#2",
+      "hash": "bbd8a09d2159",
+      "verdict": "CONFIRMED",
+      "detail": "Compare sums runs per query row (care × course × value date × appendix date). Passing rows are unioned and aggregated by care. One passing group is enough to produce an update for the care.",
+      "evidence": "DTSX:2139-2145; DTSX:1289; Aggregate DTSX:88-141; paths Union All → Aggregate → Close Transfer Out",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|finding#3",
+      "hash": "851ec860c5ab",
+      "verdict": "CONFIRMED",
+      "detail": "The IsFull output has errorRowDisposition=FailComponent, and the condition is 'Gen_isfulltransfer == TRUE'. A NULL boolean result in a Conditional Split is an evaluation error (the expression must return Boolean), so FailComponent fails the data flow. The Aggregate is blocking, so no row reaches the SDK writer in that run. Worded conditionally ('אם ... ריק').",
+      "evidence": "DTSX:2091-2094",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|finding#4",
+      "hash": "5bb42f068cfc",
+      "verdict": "CONFIRMED",
+      "detail": "The WHERE clause has only ftt.gen_transgrouptype = 2, ft.Gen_EntryDate > Tout.CreatedOn and Tout.Gen_currentstate = 1; there is no filter on care type. The consequence is worded conditionally.",
+      "evidence": "DTSX:2130-2137",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|finding#5",
+      "hash": "ddac0f5b2bb8",
+      "verdict": "CONFIRMED",
+      "detail": "Confirmed in code. ExcecuteBulk is called inside the row's try (main.cs:87-88). An exception there routes only the current row to CastingError, myEntities.Clear() (main.cs:125) is skipped, Count then exceeds 1000 and '== 1000' never fires again, and everything goes in one final call (main.cs:134-137). That final call is outside try, so a failure there fails the component. The cross-package claim holds: 0014 Update AccountCourcess has the same pattern (ExcecuteBulk inside the row try at main.cs:155-156, Clear at main.cs:202, final call outside try at main.cs:211-214).",
+      "evidence": "main.cs:85-100,103-126,128-138 (DTSX:184)",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|finding#6",
+      "hash": "45f625db7c0e",
+      "verdict": "CONFIRMED",
+      "detail": "The Aggregate groups by Gen_customercareId, Gen_deliverydate and gen_appendixghissuingdate (types 0), with gen_valuedate as type 6. Several appendix dates yield several updates of the same record; the Aggregate output order is undefined.",
+      "evidence": "DTSX:88-141 (AggregationType values 0,0,6,0)",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|finding#7",
+      "hash": "dd99f6c81d5b",
+      "verdict": "CONFIRMED",
+      "detail": "ErrorBuffer.Description = Fault.Message only. Set Warning columns sets RecordKey = \"\", WarningTitle = \"שגיאה בעדכון ניד נכנס\" and WarningDescription = \"Error: \" + Description. 'Probably copied' is hedged.",
+      "evidence": "main.cs:113-117; Set Warning columns DTSX:2198/2231",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|finding#8",
+      "hash": "132d35c73a69",
+      "verdict": "CONFIRMED",
+      "detail": "The joins are inner (plain JOIN) and count(ft.Gen_ftCurrentYearId) is computed per group, so it is at least 1 when the ID is non-null. The assumption is stated.",
+      "evidence": "DTSX:2127,2131-2132; Check number of transactions DTSX:164",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|finding#9",
+      "hash": "dc822f065f02",
+      "verdict": "CONFIRMED",
+      "detail": "AggregationType 6 on gen_valuedate; the code comment says 'min entry date'. The source of the interpretation (Microsoft documentation) is stated.",
+      "evidence": "DTSX:133; main.cs:75",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|finding#10",
+      "hash": "d0cfd1e97801",
+      "verdict": "CONFIRMED",
+      "detail": "Entity.Id is never set; the ID is set via customerCareEntity[\"gen_customercareid\"]. The consequence is conditional and marked as not checked (the proxy was not supplied).",
+      "evidence": "main.cs:71-72",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Close Transfer Out|title",
+      "hash": "2f92d7b05bd2",
+      "verdict": "WRONG",
+      "detail": "'ניוד יוצא' is supported by the package and task names (TransferOut / Close Transfer Out), and FINISHED by the constant name. However, short_he presents state 1 as 'פתוחים' (unproven), and flow_he[3] presents the partial-transfer test as 'סכום התנועות = הסכום המצופה במסלול'. The actual test compares against the course amount multiplied by the number of transactions in the group.",
+      "evidence": "DTSX:2125-2127,2137; DTSX:1289",
+      "wrongUnits": [
+        { "unit": 2, "problem": "'טיפולי לקוח פתוחים' – meaning of Gen_currentstate = 1 stated as fact.", "correct": "טיפולי לקוח במצב Gen_currentstate = 1 (משמעות 'פתוח' – השערה) ...", "evidence": "DTSX:2137" },
+        { "unit": 5, "problem": "Partial-transfer condition misstated.", "correct": "ניוד חלקי: sum(gen_transtotalamount) בקבוצה = sum(ac.gen_transactionamount) על אותן שורות (= סכום המסלול × מספר התנועות)", "evidence": "DTSX:2125-2127; 1289" }
+      ]
+    },
+    {
+      "id": "L|Package\\Close Transfer Out|short",
+      "hash": "39c7949ce8e0",
+      "verdict": "WRONG",
+      "detail": "The branch structure is right. Unit [1] states 'טיפולי לקוח פתוחים' (state-1 meaning unproven). Unit [6] gives the partial condition as transaction sum = expected course amount (actually course amount × transaction count). Unit [12] states that group-2 transactions mean the money went out ('שהכסף שלהם יצא'). That is an unproven meaning of gen_transgrouptype = 2, which the claim's own detail labels השערה.",
+      "evidence": "DTSX:2125-2137; DTSX:1289",
+      "wrongUnits": [
+        { "unit": 1, "problem": "State-1 meaning stated as fact.", "correct": "החבילה בודקת טיפולי לקוח במצב 1 (משמעות – השערה) ...", "evidence": "DTSX:2137" },
+        { "unit": 6, "problem": "Condition misstated.", "correct": "האם סכום התנועות בקבוצה שווה לסכום המסלול כפול מספר התנועות בקבוצה (expectedTransactionAmount)?", "evidence": "DTSX:2126; 1289" },
+        { "unit": 12, "problem": "Meaning of transaction group 2 asserted.", "correct": "טיפולים שנמצאו להם תנועות מקבוצת סוג 2 (משמעות 'כסף יצא' – השערה) נסגרים אוטומטית.", "evidence": "DTSX:2135" }
+      ]
+    },
+    {
+      "id": "L|Package\\Close Transfer Out|detailed",
+      "hash": "e9e29ac01ca4",
+      "verdict": "WRONG",
+      "detail": "Re-derived everything. These match: SQL, grouping, FailComponent on NULL, Has-not / Not-equal outputs unconnected, Aggregate types, ToLocalTime on the release and appendix dates, DateDiff on raw values (labelled general .NET knowledge), constants 3/34, batch of 1000 plus remainder, and Fault → warning without the ID. Problems: unit [7] asks whether 'סכום התנועות בפועל שווה לסכום המצופה במסלול', but expected = course amount × count (unit [2] tech shows sum(ac...) but the text never states the multiplication). Unit [29] asserts 'תנועות יציאה' as the meaning of group 2. Also not mentioned: row-level exceptions (including a failed batch) go to the CastingError output and become an ETL warning.",
+      "evidence": "DTSX:2119-2145; 2091-2094; 151-164; 1275-1289; 88-141; main.cs:67-146",
+      "wrongUnits": [
+        { "unit": 7, "problem": "Misleading condition text.", "correct": "האם actualTransactionAmount (סכום התנועות) שווה ל-expectedTransactionAmount = סכום המסלול × מספר התנועות בקבוצה?", "evidence": "DTSX:2125-2127; 1289" },
+        { "unit": 29, "problem": "Meaning of gen_transgrouptype = 2 stated as fact ('תנועות יציאה').", "correct": "טיפולים שבקופת המסלול שלהם נמצאו תנועות מקבוצת סוג 2 (משמעות – השערה) נסגרים במצב 3 (FINISHED).", "evidence": "DTSX:2135; main.cs:34" }
+      ]
+    },
+    {
+      "id": "L|Package\\Close Transfer Out|detail",
+      "hash": "4319a5b0a52b",
+      "verdict": "WRONG",
+      "detail": "Units [1]-[4] are verified, and [1] correctly labels the meanings of state 1 and group 2 as השערה. Unit [5] then states the business result as closure of transfer-out cares 'שהכסף יצא בהם'. That asserts the hypothesised meaning of group 2 as fact, contradicting [1].",
+      "evidence": "DTSX:2135-2137",
+      "wrongUnits": [
+        { "unit": 5, "problem": "Hypothesis stated as fact.", "correct": "סגירה אוטומטית של טיפולים במצב 1 שבקופת המסלול שלהם נקלטו תנועות מקבוצה 2 אחרי יצירתם (פירוש 'הכסף יצא' – השערה).", "evidence": "DTSX:2135-2137" }
+      ]
+    },
+    {
+      "id": "L|Package\\Close Transfer Out|decisions",
+      "hash": "1c40c78f706d",
+      "verdict": "CONFIRMED",
+      "detail": "All six decisions match the DTSX and code: conditions, outputs, unconnected outputs, FailComponent, Aggregate group-by and min, and the DateDiff rule with nulls → attribute not sent. The meanings are neutral.",
+      "evidence": "DTSX:2135-2137, 2091-2094, 164, 1289, 88-141; main.cs:83,140-146",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Close Transfer Out|crm",
+      "hash": "4ac2be6cc1de",
+      "verdict": "CONFIRMED",
+      "detail": "gen_customercare Update via ExecuteMultipleExtension(RequestType.Update), batches of 1000 plus remainder. Attributes: gen_currentstate = 3, gen_rejectreason = 34, gen_fundreleasedate, gen_appendixghissuingdate, gen_deliverydelay (the last three conditional on non-null).",
+      "evidence": "main.cs:71-88,105",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Close Transfer Out|open",
+      "hash": "fd2df7574cc8",
+      "verdict": "CONFIRMED",
+      "detail": "All five questions are genuinely unresolvable from the supplied files and correctly posed. No OptionSet labels exist for gen_customercare state or reason, nor for gen_transgrouptype (0008 maps file codes to group numbers but gives no meaning). Intent cannot be read from the files.",
+      "evidence": "DTSX:2119-2145; main.cs:33-34; 0008_LeumiFile-PY.dtsx:69197-69209",
+      "wrongUnits": []
+    }
+  ]
+}

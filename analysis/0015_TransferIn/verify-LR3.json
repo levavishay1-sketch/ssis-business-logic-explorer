@@ -1,0 +1,343 @@
+{
+  "verifier": "ssis-verifier",
+  "package": "0015_TransferIn",
+  "scope": "logic-claims re-check round 3",
+  "checkedAt": "2026-11-07",
+  "source": "source/DailyProcess/0015_TransferIn.dtsx sha256 AE7047787D737B84F33A4FCA2542A335C0FA14DB1128786C3BF969353ED14992",
+  "checked": 32,
+  "results": [
+    {
+      "id": "L|summary",
+      "hash": "860ff9064db5",
+      "verdict": "WRONG",
+      "detail": "scopeNote [2] is correct: there are no DTS:Configurations and no PropertyExpressions. [CRM] (DTSX:4-6, ALTSHULER_MSCRM) is used by all 10 business sources, which query CRM tables (none are staging tables). The 10 'Insert Etl process warning' OLE DB Commands are 'insert gen_etlprocesswarningBase' at exactly the cited lines (11303 ... 99571). No other OLE DB Command exists, and the only other INSERTs go into T-SQL table variables. Every business writer uses ExecuteMultipleExtension. In [1], the 'חיצוניות' hypothesis is labelled and the annotation DTSX:115790 supports the 5/6 labels. One unit is wrong: 'וסוגרת ... בקשות מסוג 1 או 7 כשהכסף התקבל בפיצולים' gives money in the CPs as the closing trigger. Type 1/7 requests close only when Gen_receivedstamp is not null and min(cp.gen_actualtransferdate) > Gen_receivedstamp (need to update?, DTSX:14395). Otherwise they stay in state 1, even though the money is in the CPs. finding#7 and Close TI External|short state this condition correctly.",
+      "evidence": "DTSX:4-6 connection; DTSX:11303,14277,24924,42727,46353,68630,75658,83859,92119,99571 'insert gen_etlprocesswarningBase'; DTSX:14395 need to update? condition; DTSX:115790 annotation (ParentId Package\\Close TI internal)",
+      "wrongUnits": [
+        {
+          "unit": "[1] 'ובקשות מסוג 1 או 7 כשהכסף התקבל בפיצולים'",
+          "problem": "Incomplete closing trigger stated as the condition. Receiving money in the CPs alone does not close a type 1/7 request.",
+          "correct": "סוגרת בקשות מסוג 1 או 7 שהכסף שלהן בפיצולים הגיע אחרי חותמת 'נתקבל' (חותמת קיימת ותאריך ההעברה המוקדם בפיצולים מאוחר ממנה)",
+          "evidence": "Close TI External\\need to update? DTSX:14395: !ISNULL(Gen_receivedstamp) && gen_actualtransferdate > Gen_receivedstamp"
+        }
+      ]
+    },
+    {
+      "id": "L|exec",
+      "hash": "b10605135609",
+      "verdict": "CONFIRMED",
+      "detail": "All 23 PrecedenceConstraints (DTSX:110984-111007) are Success constraints: no Value and no Expression attribute, LogicalAnd=True, one incoming constraint per executable. Each cited constraint line matches its From/To pair (e.g. 110996 = Constraint 2 Create ETL -> Clone, 110987 = Constraint 11 TI53 -> Step 10, 111000 = Constraint 23 Step 10 -> End). No executable or component is disabled. The OnError handler is at DTSX:111010-111017 (Script Task 'Error ETL Process record'). The step labels match each data flow's SQL: 57 for internal (types 5,6), 56 for types 1/7, account courses for expected, 53 for type 1 with status 11.",
+      "evidence": "DTSX:110984-111007; DTSX:111010-111017; executables list (no DTS:Disabled)",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|finding#3",
+      "hash": "776e99a66d89",
+      "verdict": "WRONG",
+      "detail": "The technical content is correct. In Clone TransferIn main.cs the unchecked reads are line 47 (gendescription), 50 (gencontactname), 51 (genidentitynumber), 73 (geninvesthousename), 74 (gensourcefundnumber), 75 (gensourcefundtype), 76 (genfundfinanceid) and 95 (genmislakanumber). Lines 41, 52 and 96 can never be NULL (ca PK, transfertype IN (1,7), sourceaccount IS NOT NULL). catch(Exception) adds an ErrorBuffer row before myEntities.Add (lines 99, 111-117). The re-selection condition and the schedule statement are correct and conditional. All 5 Clone copies have identical code (whitespace-normalised diff). One label is unsourced. 'מספר אישור' for gen_transferin.gen_fundfinanceid has no comment, constant or annotation on gen_transferin in any supplied file. The only in-package label is the SQL comment 'CP.gen_fundfinanceid,--מסםר אישור מ\"ה' (DTSX:42637), which is on gen_coursepartition. A conflicting code comment on that CP attribute says '//אחוזים מבוקשים מהפקדה' (DTSX:35665). 0009 fills gen_transferin.gen_fundfinanceid from gen_source_fundfinanceid, with no label. This is the same kind of unsourced label as 'גוף מעביר', which was removed in round 2. Other labels are literal translations of the attribute names.",
+      "evidence": "Clone TransferIn 1 main.cs:41-96,111-117 (DTSX:934 ff.); SQL DTSX:11136; DTSX:42637; DTSX:35665; 0009 DTSX:97207",
+      "wrongUnits": [
+        {
+          "unit": "[1] 'מספר אישור (gen_fundfinanceid)'",
+          "problem": "The meaning given to gen_transferin.gen_fundfinanceid is not proven for gen_transferin. The only label in the package is a SQL comment on gen_coursepartition.gen_fundfinanceid.",
+          "correct": "gen_fundfinanceid (בלי תווית), או תווית עם ייחוס מפורש: 'לפי הערת SQL על gen_coursepartition.gen_fundfinanceid, DTSX:42637 – השערה עבור gen_transferin'",
+          "evidence": "DTSX:42637; DTSX:35665"
+        }
+      ]
+    },
+    {
+      "id": "L|finding#7",
+      "hash": "b633738c4e73",
+      "verdict": "CONFIRMED",
+      "detail": "Internal SQL (DTSX:24801): state 1, types 5/6, CPs with non-null actual amount and date, and HAVING ABS(DATEDIFF(day, min(cp.gen_actualtransferdate), ti.CreatedOn)) < 30. The claim describes this as fewer than 30 day boundaries in either direction. Is Between Course or Funds (DTSX:25024): type 6 goes straight to Union All 2, then Create transferIn Column (state 3). need to update? (DTSX:25083), in evaluation order: 0 ISNULL(signature) -> not close; 1 ISNULL(receivedstamp) -> not close; 2 ISNULL(expected) || ABS(actual-expected) <= expected*0.15 -> close; default -> not close. Type 1/7 (DTSX:14175, 14395) has the same state/CP filter, no 30-day HAVING, and closes when !ISNULL(stamp) && actual date > stamp.",
+      "evidence": "DTSX:24801-24843; DTSX:25024; DTSX:25083 (EvaluationOrder 0/1/2); DTSX:25990 percent = expected*0.15; DTSX:14175; DTSX:14395",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package (control flow)|title",
+      "hash": "56a2b93aaba0",
+      "verdict": "WRONG",
+      "detail": "short_he and flow_he[1]-[5] match the 23 Success constraints and the order of steps. title_he says 'שרשרת יומית' (daily chain). Nothing in the DTSX states a run frequency: there is no 'daily'/'יומי' text in the package, and no supplied package executes it. The only basis is the folder name 'DailyProcess'. The package's own claims say the schedule is not in the files (finding#3, Package (control flow)|open).",
+      "evidence": "grep -i 'daily|יומי' in 0015 DTSX: no match; no ExecutePackageTask referencing 0015 in source/DailyProcess; DTSX:110984-111007",
+      "wrongUnits": [
+        {
+          "unit": "[1] title_he 'שרשרת יומית'",
+          "problem": "Run frequency stated as fact. It comes from the folder name only and contradicts 'לוח הזמנים אינו בקבצים' in the same package.",
+          "correct": "'זרימת בקרה: שרשרת טיפול בבקשות העברה נכנסות' (או 'יומית – לפי שם התיקייה DailyProcess, השערה')",
+          "evidence": "finding#3; Package (control flow)|open"
+        }
+      ]
+    },
+    {
+      "id": "L|Package (control flow)|short",
+      "hash": "942b0728b2f3",
+      "verdict": "CONFIRMED",
+      "detail": "Every unit matches. [1] Clone copies the request to the new account. [2] FT56 creates CPs, the CP updates use 56/57 transactions, and expectes updates the expected amount. [3] is qualified by 'לפי התנאים של כל סוג'. [4] TI/CP Joining Only. [5] covers type 1, action status 11 and transaction 53. [6] holds because every constraint is Success with a single incoming constraint. 'סטטוס המשך' is a generic description of action status 22 (the annotation DTSX:115790 calls it 'עדכון עצמי לאחר העברה').",
+      "evidence": "DTSX:110984-111007; DTSX:115790",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package (control flow)|detailed",
+      "hash": "00e80a630497",
+      "verdict": "CONFIRMED",
+      "detail": "The step summaries match each data flow. [7] now includes the 30-day HAVING (DTSX:24826-24843). Type 6 is always closed and type 5 is closed or gets action status 22. [3] says the 56 transactions are not linked to the request. [11] covers status 11 -> 12. The decision and branches match: all constraints are Success with LogicalAnd=True. OnError 'Error ETL Process record' updates gen_etlprocess statuscode 277880001 and creates an annotation (DTSX:~111197-111216). The package-level steps summarise the data flows and point to them; full conditions are in the per-data-flow claims.",
+      "evidence": "DTSX:110984-111007; DTSX:24801; DTSX:14175; DTSX:92029; OnError script",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Clone TransferIn|title",
+      "hash": "1b4edeec57cc",
+      "verdict": "CONFIRMED",
+      "detail": "SQL DTSX:11136 matches. DATEDIFF(HOUR, ca.CreatedOn, GETUTCDATE()) <= 24 includes every elapsed time up to 24h and some up to just under 25h, so '24 מעברי שעה (כ-24 עד 25 שעות)' is correct. ca.gen_sourceaccount IS NOT NULL. ti.Gen_transferType IN (1,7). DATEDIFF(MONTH, ti.gen_appendixdsent, GETUTCDATE()) <= 6 is up to 6 month boundaries, almost 7 months, and includes future dates. LEFT JOIN cloned_ti (1,7) IS NULL. ROW_NUMBER by createdon DESC = 1. Dates To Local (DTSX:10066) converts 9 dates. The SDK Create writes the literals and DateTime.Now (main.cs:40-48).",
+      "evidence": "DTSX:11136-11180; DTSX:10066; Clone TransferIn 1 main.cs:39-96",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Clone TransferIn|short",
+      "hash": "bc42242cf392",
+      "verdict": "WRONG",
+      "detail": "[1]-[6] match the SQL and code: the description prefix 'חשבון מקור – ' and gen_iscreditsheet=true (main.cs:47-48). End unit [7] 'החשבון החדש ממשיך את בקשת ההעברה הנכנסת של חשבון המקור' gives a business meaning (a continuation of the request) that no file states. The clone also sets reject fields: gen_rejectreceivedate = DateTime.Now, gen_rejecttype = 3, gen_requestrejectreason = 39 (main.cs:42-45), and gen_iscreditsheet = true. No supplied file says whether the clone continues the source request or records something else, such as a rejection or credit sheet.",
+      "evidence": "Clone TransferIn 1 main.cs:40-48",
+      "wrongUnits": [
+        {
+          "unit": "[7] (end) 'החשבון החדש ממשיך את בקשת ההעברה הנכנסת של חשבון המקור'",
+          "problem": "Unproven business meaning stated as fact. The code shows only a copy with reject fields set.",
+          "correct": "לחשבון החדש נוצרת בקשת העברה נכנסת שהיא העתק של הבקשה האחרונה של חשבון המקור (עם שדות דחייה וגיליון זיכוי); המשמעות העסקית (המשך / דחייה) – לא ידועה מהקבצים",
+          "evidence": "main.cs:42-48"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Clone TransferIn|detailed",
+      "hash": "2a90c87dc02a",
+      "verdict": "WRONG",
+      "detail": "[1]-[12] and [14] are correct: the SQL conditions and DATEDIFF wording, the isnull fallbacks, Dates To Local (9 dates, ToLocalTime from 2005, +2h before), the literals 2/1/6/3/39/true, DateTime.Now and the description expression. [13] lists every attribute written in main.cs:41-96. [15] lists the unchecked reads correctly and is conditional; the error path ends in Insert Etl process warning. The 5 copies have identical code (whitespace-normalised diff; dupes.json groups 2=3 and 4=5 with the same codeHash). Two units are wrong. (a) [13] and [15] label gen_transferin.gen_fundfinanceid 'מספר אישור'. The label is unsourced for gen_transferin; the only comment is on gen_coursepartition (DTSX:42637), and it conflicts with DTSX:35665. (b) End unit [16] 'בקשה ... שממשיכה את הבקשה של חשבון המקור' gives an unproven meaning; the clone also carries reject fields (main.cs:42-45).",
+      "evidence": "SQL DTSX:11136; Dates To Local DTSX:10066 main.cs:60-74; Clone TransferIn 1 main.cs:39-117; DTSX:42637; DTSX:35665",
+      "wrongUnits": [
+        {
+          "unit": "[13] and [15] 'מספר אישור (gen_fundfinanceid)'",
+          "problem": "Unsourced label for gen_transferin.gen_fundfinanceid (the only label in the files is for gen_coursepartition).",
+          "correct": "gen_fundfinanceid בלי תווית, או עם ייחוס מפורש ל-DTSX:42637 וסימון השערה",
+          "evidence": "DTSX:42637; DTSX:35665"
+        },
+        {
+          "unit": "[16] (end) 'שממשיכה את הבקשה של חשבון המקור'",
+          "problem": "Unproven business meaning. The copy is created with gen_rejectreceivedate=Now, gen_rejecttype=3, gen_requestrejectreason=39.",
+          "correct": "לחשבון החדש יש בקשת העברה נכנסת שהיא העתק של הבקשה האחרונה של חשבון המקור; המשמעות העסקית לא ידועה",
+          "evidence": "main.cs:42-48"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Create CP for Fund With FT 56|title",
+      "hash": "9b4fef123712",
+      "verdict": "CONFIRMED",
+      "detail": "SQL DTSX:46144 matches: state 1, types 1/7, destination-account funds joined to Product and Gen_agentcontract (INNER), the 56 subquery per year, and LEFT JOIN cp on fund with cp IS NULL. The literal 2 is gen_coursepartitiontype. Group by TransferIn (DTSX:46286) uses AggregationType 0/4/6/7 (GroupBy/Sum/Min/Max). Update Transfer In writes gen_actualtransferdate = min execution date, the arrears interest and the days. 'פתוחות (מצב 1)' matches the code comment 'מצב העברה=בתהליך' (DTSX:61348 area).",
+      "evidence": "DTSX:46144-46208; DTSX:46109; DTSX:46286 (AggregationType 0,4,6,7); Update Transfer In main.cs:46-75",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Create CP for Fund With FT 56|short",
+      "hash": "8c06bc151f36",
+      "verdict": "CONFIRMED",
+      "detail": "[1] matches: product and agent contract are required (INNER JOINs), and the 56 transactions are not linked to the request. [2]-[7] match the LEFT JOIN cp on fund only and the SDK Create. Every Result row reaches the Aggregate, and a request is updated only if one of its funds was selected. [8] labels the money link as השערה.",
+      "evidence": "DTSX:46144; SDK Create main.cs:34-87; Result output sync -> Union All -> Derived Column -> Aggregate",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Create CP for Fund With FT 56|detailed",
+      "hash": "2ed1694045f4",
+      "verdict": "WRONG",
+      "detail": "Units [1]-[11] are correct. Dates To Local (DTSX:45390) converts only CreatedOn and gen_fundcreationdate. SDK Create (x5, identical) writes 13 attributes: type 2, gen_creationdate = CreatedOn guarded by fundcreationdate, the identity number, gen_fundfinanceid = Product.Gen_FundFinanceID ('מספר האישור' matches the CP comment at DTSX:42637), gen_contractnumber = FM.gen_brokernumbername, and the lookups. The Result output is sync, so every row reaches Union All -> Derived Column (DTSX:46109) -> Aggregate Sum/Min/Max (DTSX:46286). Update Transfer In writes actualtransferdate, arrears interest (Money) and days (ToString), each only when not NULL (main.cs:54-69). The UNION ALL of the two year tables can produce two rows per fund. End unit [12] widens the population. It says a CP is created for funds 'שיש בהן תנועת 56 כלשהי' (any type-56 transaction). The SQL requires a 56 transaction with Gen_transgrouptypeid in ('01','02') and Gen_modeldependage non-null and != 2, and an existing gen_transactiontypename -> gen_banks row. The fund also needs a matching Product and Gen_agentcontract (INNER JOINs). A fund whose only 56 transactions fail these filters, or that lacks a product or agent contract, gets no CP. Units [1] and [2] of the same claim say so.",
+      "evidence": "DTSX:46144-46208 (ft subquery filters; INNER JOIN Product / Gen_agentcontract); unit [2] of the same claim",
+      "wrongUnits": [
+        {
+          "unit": "[12] (end) 'שיש בהן תנועת 56 כלשהי ואין להן פיצול נוצר פיצול מסלול'",
+          "problem": "'כלשהי' (any) contradicts the 01/02 and modeldependage filters in [2] and drops the product/agent-contract requirement in [1].",
+          "correct": "לקופות של חשבון היעד (עם מוצר וחוזה סוכן) שיש בהן תנועת 56 העומדת בסינון שבשלב 2, בלי קשר לתאריך או לבקשה, ואין להן פיצול – נוצר פיצול מסלול",
+          "evidence": "DTSX:46144"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Create CP for Fund With FT 56|decisions",
+      "hash": "7fe05b4691f6",
+      "verdict": "CONFIRMED",
+      "detail": "The conditions are quoted correctly from DTSX:46144 (WHERE, ft subquery predicate, INNER JOIN Product / Gen_agentcontract) and main.cs:41-42 (!genfundcreationdate_IsNull -> gen_creationdate = CreatedOn). The outcomes are correct. Note, not counted: the ft subquery also INNER JOINs Gen_fundtransactiontype and gen_banks (a transaction without a transaction type or bank row is dropped). This is referential and not listed.",
+      "evidence": "DTSX:46144-46208; SDK Create main.cs:41-42",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Update CoursePartition external|title",
+      "hash": "50790316b140",
+      "verdict": "WRONG",
+      "detail": "short_he and flow_he[1]-[2] match the SQL (DTSX:75517): @JoinAndTransfer_CP with state 1, types 1/7 and fm on both ca and cp.gen_fundnumberdest. The 56 filter is 01/02 with modeldependage != 2, and DATEDIFF(DAY, transferCreated, EntryDate) >= 0. flow_he[3] gets the AND/OR wrong. 'סכום > 0 ושונה מהקיים, או תאריך ערך שונה' reads as (sum>0 AND amount differs) OR date differs. The HAVING is sum>0 AND min(valuedate) IS NOT NULL AND (amount differs OR CP amount IS NULL OR DATEDIFF(day, CP date, min(valuedate)) <> 0). A changed date with a sum <= 0 is not updated. short_he states the grouping correctly.",
+      "evidence": "SQL DTSX:75517 HAVING (DTSX:75612-75620 area); Update Course Partition main.cs:42-46",
+      "wrongUnits": [
+        {
+          "unit": "flow_he[3] 'סכום > 0 ושונה מהקיים, או תאריך ערך שונה'",
+          "problem": "AND/OR precedence misstated. sum > 0 (and a non-null value date) is required in every case.",
+          "correct": "סכום > 0 ותאריך ערך קיים, וגם (הסכום שונה מהקיים או ריק בפיצול, או תאריך הערך שונה) → עדכון gen_coursepartition ב-SDK",
+          "evidence": "DTSX:75517 HAVING"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Update CoursePartition external|short",
+      "hash": "f74b95e6f558",
+      "verdict": "CONFIRMED",
+      "detail": "[1]-[7] match the SQL and main.cs:42-60. The update writes gen_actualtransferamount (Money) and gen_actualtransferdate; the code re-checks sum>0 and a non-null valuedate. Note, not counted: [8] 'משקפים את הכסף שנכנס לקופה' is an outcome summary. The package annotation on this data flow (DTSX:120760) describes the result as 'סכום העברה בפועל, עפ\"י מסלול קופת יעד'. The amount is the sum of type-56 transactions only.",
+      "evidence": "DTSX:75517; Update Course Partition main.cs:39-60; DTSX:120760",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Update CoursePartition external|detailed",
+      "hash": "5e3f3761c098",
+      "verdict": "CONFIRMED",
+      "detail": "[1] matches the @JoinAndTransfer_CP filter. [2] is correct: 56, 01/02, modeldependage != 2 (NULL excluded), entry date on or after the request-creation day, both year tables, and min value date. [3] matches the HAVING; 'שונה ביום אחד לפחות' refers to calendar dates (DATEDIFF(day) <> 0). A NULL stored CP date with an equal amount is not selected, which is consistent with the claim. [7] Dates To Local (DTSX:74833) converts only gen_valuedate. [8] Update Course Partition x5 is identical (dupes.json) and writes amount and date via ExecuteMultiple Update. [9] Close TI External reads these CP values.",
+      "evidence": "DTSX:75517; DTSX:74833; Update Course Partition main.cs:39-60; DTSX:14175",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Update CoursePartition external|detail",
+      "hash": "740a1adfa09e",
+      "verdict": "CONFIRMED",
+      "detail": "The tables match the SQL. The match is on gen_fundnumber = the CP destination fund. The decisions and the write are correct. The upstream hypothesis about 0008 is labelled. CPs created earlier in this run by Create CP for Fund With FT 56 (types 1/7, which runs before) are read by this query, which is proven by the order of steps.",
+      "evidence": "DTSX:75517; DTSX:110990-110992",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Update CoursePartition external|decisions",
+      "hash": "4d01261ae9ff",
+      "verdict": "CONFIRMED",
+      "detail": "All three conditions are quoted verbatim from DTSX:75517 (@PeriodOfTimeToCheck = 0), and the meanings and outcomes are correct.",
+      "evidence": "DTSX:75517",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Close TI internal|open",
+      "hash": "f46a3b2c08c1",
+      "verdict": "WRONG",
+      "detail": "Unit [2] is correct. Close TI internal Dates To Local (DTSX:23966) converts gen_modifiedbybankDB but not gen_modifiedByBank, which is derived from gen_actualtransferdate before the conversion (DTSX:23882/23930). Update transferin compares them (main.cs:55). In Close TI External, Dates To Local (DTSX:13300) converts both. Reject reason 1 = 'תקין' (main.cs:80) is correct. Unit [1] says no labels were found for state 3, action status 1 and action status 22, and that closure rests only on the task name. That is contradicted by this package's annotation on Close TI internal (DTSX:115790, ParentId Package\\Close TI internal). For amounts within 15%, the annotation says the system sets 'מצב העברה' to 'הסתיים' and 'סטטוס הפעולה' to 'עדכון בנק אוטומטי'. That branch is exactly Need To Close -> gen_currentstate=3, gen_actionstatus=1. Above 15%, it says the state stays 'בתהליך' with action status 'עדכון עצמי לאחר העברה'. That branch is Not To Close -> gen_actionstatus=22 with no state change. For 'העברה בין קופותינו' (type 6) it says 'הסתיים' (state 3). The Close TI External annotation (DTSX:114277) also says 'סגירת העברות'. The L|summary claim cites DTSX:115790 too. The mapping from values to labels is inferred from matching branches, so it can be stated as attributed to the annotation, but 'not found' is wrong.",
+      "evidence": "DTSX:115790; DTSX:114277; Create transferIn Column DTSX:23882 (3/1/modifiedByBank/rejectReason 1); Create transferIn Column 1 DTSX:23930 (22); need to update? DTSX:25083; Dates To Local DTSX:23966",
+      "wrongUnits": [
+        {
+          "unit": "[1] 'לא נמצאו להם תוויות ב-gen_transferin בקבצים (לפי שם המשימה מצב 3 הוא סגירה – השערה)'",
+          "problem": "The package annotation on this data flow names the outcomes: 'הסתיים' and 'עדכון בנק אוטומטי' for the close branch (state 3, action 1), and 'בתהליך' and 'עדכון עצמי לאחר העברה' for the not-close branch (action 22).",
+          "correct": "לפי הערת החבילה ב-Close TI internal (DTSX:115790), שמתאימה לענפי הקוד: מצב 3 = 'הסתיים', סטטוס פעולה 1 = 'עדכון בנק אוטומטי', סטטוס פעולה 22 = 'עדכון עצמי לאחר העברה' (ההתאמה בין הערך לתווית לפי הענף – לא תוויות option-set)",
+          "evidence": "DTSX:115790; DTSX:23882; DTSX:23930; DTSX:25083"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Close TI External|title",
+      "hash": "66c4d053ee64",
+      "verdict": "CONFIRMED",
+      "detail": "Matches SQL DTSX:14175 (state 1, types 1/7, CP actual amount and date not null, sum/min). need to update? (DTSX:14395): !ISNULL(stamp) && actual date > stamp -> state 3, action 1 (DTSX:13228). Dates To Local converts 6 dates. Set delevery delay sets the flag. Update writes only changed fields (main.cs:40-64). The annotation DTSX:114277 supports 'סגירה' and 'חותמת נתקבל'.",
+      "evidence": "DTSX:14175; DTSX:14395; DTSX:13228; DTSX:13270; DTSX:13300; DTSX:14489; DTSX:114277",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Close TI External|short",
+      "hash": "7286b6b1a639",
+      "verdict": "CONFIRMED",
+      "detail": "[1]-[8] match. The selection is CPs with an actual amount and date. The decision is stamp exists and date > stamp. The yes branch closes; the no branch only sets modifiedByBank. All selected rows go to Update transferin, which writes only changed fields (amount, date, modifiedbybank, delivery delay).",
+      "evidence": "DTSX:14175; DTSX:14395; Update transferin main.cs:40-64",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Close TI External|detailed",
+      "hash": "0f15572f9f36",
+      "verdict": "WRONG",
+      "detail": "Units [1]-[9] are correct. [1] has no time limit. [2] matches need to update? (DTSX:14395). [4] matches DTSX:13228 (3, actualtransferdate, 1). [6] matches DTSX:13270. [7] Dates To Local converts 6 inputs, including the new and existing gen_modifiedByBank. [8] Set delevery delay main.cs:117-124 sets false by default and true when (actual - delivery).Days > 0, i.e. at least one full day elapsed. [9] Update transferin x5 (identical) writes only changed fields. End unit [10] widens the population: 'ובכל הבקשות הפתוחות מסוג 1 או 7 רשומים הסכום והתאריך בפועל'. Only open type 1/7 requests that have at least one CP with non-null gen_actualtransferamount and gen_actualtransferdate are selected (unit [1]). Other open type 1/7 requests get no write in this step.",
+      "evidence": "DTSX:14175 WHERE cp.gen_actualtransferamount is not null and cp.gen_actualtransferdate is not null",
+      "wrongUnits": [
+        {
+          "unit": "[10] (end) 'ובכל הבקשות הפתוחות מסוג 1 או 7 רשומים הסכום והתאריך בפועל'",
+          "problem": "Universal claim over all open type 1/7 requests. Only those with CPs carrying an actual amount and date are written.",
+          "correct": "ובבקשות הפתוחות מסוג 1 או 7 שיש להן פיצולים עם סכום ותאריך בפועל רשומים הסכום והתאריך בפועל",
+          "evidence": "DTSX:14175"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Close TI External|detail",
+      "hash": "9fa98dd61db4",
+      "verdict": "WRONG",
+      "detail": "[1] is correct. In this package, Update CoursePartition external is the only writer of CP actual amounts for types 1/7; Update CoursePartition internal is limited to types 5/6 (DTSX:83719), and no other supplied package writes gen_coursepartition.gen_actualtransferamount. [2], [4], [5] and [6] are correct; [5] is read in the context of [3]. One unit is wrong. [3] says 'אין בדיקה של הסכום מול הצפוי, בניגוד להעברות הפנימיות'. Among internal transfers, only type 5 checks the expected amount (need to update?, DTSX:25083). Type 6 goes straight to closing with no amount check (Is Between Course or Funds BetweenOurFunds -> Union All 2 -> Create transferIn Column, DTSX:25024). finding#7 of this package says so.",
+      "evidence": "DTSX:25024; DTSX:25083; finding#7",
+      "wrongUnits": [
+        {
+          "unit": "[3] 'בניגוד להעברות הפנימיות'",
+          "problem": "Overgeneralised contrast. Internal type 6 also closes without an expected-amount check, which contradicts finding#7.",
+          "correct": "אין בדיקה של הסכום מול הצפוי, בניגוד להעברות פנימיות מסוג 5 (בסוג 6 גם אין בדיקה כזו)",
+          "evidence": "DTSX:25024; DTSX:25083"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Close TI External|decisions",
+      "hash": "fcce6523363a",
+      "verdict": "CONFIRMED",
+      "detail": "[1] quotes the WHERE of DTSX:14175 verbatim. [2] matches DTSX:14395 and its outcome DTSX:13228 (3/1). [3] matches main.cs:121-123, outcome true; the default is false (main.cs:117).",
+      "evidence": "DTSX:14175; DTSX:14395; DTSX:13228; Set delevery delay main.cs:117-124",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Close TI External|open",
+      "hash": "715805131290",
+      "verdict": "CONFIRMED",
+      "detail": "The question's premise is correct. Closing type 1/7 depends only on the received stamp and the date (DTSX:14395); there is no expected-amount comparison in this data flow. It remains a legitimate open question.",
+      "evidence": "DTSX:14395; DTSX:14175",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Create TI - Joining Only|detailed",
+      "hash": "3735fb3b61fb",
+      "verdict": "CONFIRMED",
+      "detail": "[1] matches SQL DTSX:68551: status 8, type 1, CreatedOn > '2020-01-01' with the comment 'set by altshuler', and the join to ca on aj.gen_customeraccountid. [2] dateDiff(month, aj.CreatedOn, ca.CreatedOn) BETWEEN 0 AND 12 is described correctly. [6] matches the LEFT JOIN ti on gen_automatedjoining. [11] matches Fixed Fields (DTSX:68495: 2/FALSE/1/1/6) and the labels in main.cs:74-84. [12] Dates To Local converts the signature and receiving dates. [13] matches main.cs:46-68,113-117. [14] matches main.cs:93-107. [15] matches the Create CP - Joining Only SQL (DTSX:42625-42650): INNER JOIN cp on aj, FM.gen_fundtypename = CP.gen_product, type 2, and (CP2 on the same fund with a different product, or no CP2). No other filters are in that data flow. Note, not counted: lookups contactname, accountname and automatedjoining are sent as EntityReference('gen_customeraccount', ...); runtime acceptance is not shown in the files.",
+      "evidence": "DTSX:68551; DTSX:68495; DTSX:67776; create transferin (joining only) main.cs:42-121; DTSX:42625-42650",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Update TI - first transaction (53)|title",
+      "hash": "4cf685d7c0c5",
+      "verdict": "CONFIRMED",
+      "detail": "Matches SQL DTSX:92029: ActionStatus 11, type 1, appendixdsent NULL, 53 in both year tables joined through cp.gen_fundnumberdest and cp.gen_transferin, ROW_NUMBER by gen_valuedate ASC (NULL first). main.cs:43-53 writes fixtransferdate and moneyassociatingdate guarded, and always writes 12. The labels come from SQL/code comments ('תאריך ערך העברה למועד קובע' DTSX:92773; 'תאריך רישום פעולה לתאריך שיוך כספים').",
+      "evidence": "DTSX:92029-92085; DTSX:91305; Update TransferIn By Transaction main.cs:41-62; DTSX:92773",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Update TI - first transaction (53)|short",
+      "hash": "e42af46d59ec",
+      "verdict": "CONFIRMED",
+      "detail": "[1]-[3] match the SQL and the code. [4] labels the money link as השערה. All 5 Update TransferIn By Transaction copies have identical code (whitespace-normalised diff), including copy 1, which is not in dupes.json.",
+      "evidence": "DTSX:92029; main.cs:41-62; code diff of the 5 copies",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Update TI - first transaction (53)|detailed",
+      "hash": "298c0f4e9848",
+      "verdict": "CONFIRMED",
+      "detail": "[1]-[10] are correct. The grouping is (fund, entrydate, request) with min(valuedate). gen_fundmain is joined only in the current-year branch. NULL sorts first under ASC and there is no secondary sort. No 'min(gen_valuedate) is not null' filter exists. Dates To Local converts entrydate and valuedate. Status 12 is always written (main.cs:53), and fixtransferdate/moneyassociatingdate are written only when present. 0009 writes gen_transferin.gen_fixtransferdate (0009 DTSX:114906). Note: Gen_transferinId is unqualified in the SQL. Ownership by Gen_transferin follows from the ambiguity rule, since the query runs in production.",
+      "evidence": "DTSX:92029-92085; DTSX:91305; main.cs:41-62; 0009 DTSX:114906",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Update TI - first transaction (53)|detail",
+      "hash": "31950a8952ed",
+      "verdict": "CONFIRMED",
+      "detail": "The tables, matching keys and decisions are correct, including 'סוג 1 (ולא 7)' and the literal 12. The label 'מועד קובע' is attributed to the code comment at DTSX:92773, which matches. The upstream hypotheses are labelled; no supplied package writes gen_ftpreviousyear.",
+      "evidence": "DTSX:92029; DTSX:92773; main.cs:43-53",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Update TI - first transaction (53)|decisions",
+      "hash": "18309ef0b76a",
+      "verdict": "CONFIRMED",
+      "detail": "Both conditions are quoted from DTSX:92029 and the meanings are correct (NULL first is noted).",
+      "evidence": "DTSX:92029",
+      "wrongUnits": []
+    }
+  ],
+  "missingWrites": []
+}

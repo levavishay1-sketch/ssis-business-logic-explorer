@@ -1,0 +1,194 @@
+# 0032_POAOperator.dtsx · 537C3F53A332ABFA9713E05BB7559DFAB2ED165C37AA40418DAC611E181DF47F
+
+## Connection managers
+- [psql] OLEDB Data Source=psql;Initial Catalog=ALTSHULER_MSCRM;Integrated Security=SSPI;  
+
+## Executables (disabled marked !)
+-   Create ETL Process record | Microsoft.ScriptTask  
+-   Create POA Account Operator | Microsoft.Pipeline  
+-   Create POA Account Operator - Pension | Microsoft.Pipeline  
+-   End ETL Process record | Microsoft.Pipeline  
+-   Get Organization Variables | Microsoft.Pipeline  
+-   Update POA Account Operator Out Of Date | Microsoft.Pipeline  
+-   Update Poa Operator Cancelled | Microsoft.Pipeline  
+-   Update Poa Operator Cancelled by Poa Account | Microsoft.Pipeline  
+-   Update Poa Operator Expired By Poa Account | Microsoft.Pipeline  
+-   Update Poa Operator Invalid by Poa Account | Microsoft.Pipeline  
+
+## Precedence
+- Get Organization Variables -> Create ETL Process record | Success Constraint   
+- Create ETL Process record -> Update POA Account Operator Out Of Date | Success Constraint   
+- Update POA Account Operator Out Of Date -> Update Poa Operator Cancelled by Poa Account | Success Constraint   
+- Update Poa Operator Cancelled by Poa Account -> Update Poa Operator Invalid by Poa Account | Success Constraint   
+- Update Poa Operator Invalid by Poa Account -> Update Poa Operator Expired By Poa Account | Success Constraint   
+- Update Poa Operator Expired By Poa Account -> Update Poa Operator Cancelled | Success Constraint   
+- Create POA Account Operator - Pension -> End ETL Process record | Success Constraint   
+- Update Poa Operator Cancelled -> Create POA Account Operator | Success Constraint   
+- Create POA Account Operator -> Create POA Account Operator - Pension | Success Constraint   
+
+## DataFlow Create POA Account Operator
+  - Check If Employee Exist | Lookup  | conn [psql]  | in 2 out 0
+  - Check If POA Account Operator Exist | Lookup  | conn [psql]  | in 1 out 0
+  - Create POA Account Operator | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 23 out 2
+  - Derived Column | DerivedColumn  | conn   | in 0 out 1
+  - ETL Warning | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 3 out 0
+  - Get Customer Accounts | OLEDBSource  | conn [psql]  | in 0 out 23
+  - IS All Employees | ConditionalSplit  | conn   | in 1 out 0
+  - Union All | UnionAll  | conn   | in 46 out 23
+  - Union All 1 | UnionAll  | conn   | in 3 out 3
+     path IS All Employees.Outputs[All Employees] => Union All.Inputs[Union All Input 2]
+     path IS All Employees.Outputs[Conditional Split Default Output] => Check If Employee Exist.Inputs[Lookup Input]
+     path Derived Column.Outputs[Derived Column Output] => Union All 1.Inputs[Union All Input 2]
+     path Create POA Account Operator.Outputs[Error] => Derived Column.Inputs[Derived Column Input]
+     path Check If Employee Exist.Outputs[Lookup Match Output] => Union All.Inputs[Union All Input 1]
+     path Check If POA Account Operator Exist.Outputs[Lookup No Match Output] => IS All Employees.Inputs[Conditional Split Input]
+     path Get Customer Accounts.Outputs[OLE DB Source Output] => Check If POA Account Operator Exist.Inputs[Lookup Input]
+     path Union All 1.Outputs[Union All Output 1] => ETL Warning.Inputs[Input 0]
+     path Union All.Outputs[Union All Output 1] => Create POA Account Operator.Inputs[Input 0]
+
+## DataFlow Create POA Account Operator - Pension
+  - Check If Employee Exist | Lookup  | conn [psql]  | in 2 out 0
+  - Check If POA Account Operator Exist | Lookup  | conn [psql]  | in 1 out 0
+  - Create POA Account Operator | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 22 out 2
+  - Derived Column | DerivedColumn  | conn   | in 0 out 1
+  - ETL Warning | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 3 out 0
+  - Get Policies | OLEDBSource  | conn [psql]  | in 0 out 22
+  - IS All Employees | ConditionalSplit  | conn   | in 1 out 0
+  - Union All | UnionAll  | conn   | in 44 out 22
+  - Union All 1 | UnionAll  | conn   | in 3 out 3
+     path IS All Employees.Outputs[All Employees] => Union All.Inputs[Union All Input 2]
+     path IS All Employees.Outputs[Conditional Split Default Output] => Check If Employee Exist.Inputs[Lookup Input]
+     path Derived Column.Outputs[Derived Column Output] => Union All 1.Inputs[Union All Input 1]
+     path Create POA Account Operator.Outputs[Error] => Derived Column.Inputs[Derived Column Input]
+     path Check If Employee Exist.Outputs[Lookup Match Output] => Union All.Inputs[Union All Input 1]
+     path Check If POA Account Operator Exist.Outputs[Lookup No Match Output] => IS All Employees.Inputs[Conditional Split Input]
+     path Get Policies.Outputs[OLE DB Source Output] => Check If POA Account Operator Exist.Inputs[Lookup Input]
+     path Union All.Outputs[Union All Output 1] => Create POA Account Operator.Inputs[Input 0]
+     path Union All 1.Outputs[Union All Output 1] => ETL Warning.Inputs[Input 0]
+
+## DataFlow End ETL Process record
+  - ETL Record Finish | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 2 out 0
+  - Get gen_etlprocessid | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 0 out 1
+  - Lookup | Lookup  | conn [psql]  | in 1 out 1
+     path Lookup.Outputs[Lookup Match Output] => ETL Record Finish.Inputs[Input 0]
+     path Get gen_etlprocessid.Outputs[Output 0] => Lookup.Inputs[Lookup Input]
+
+## DataFlow Get Organization Variables
+  - Get Organization Variables | OLEDBSource  | conn [psql]  | in 0 out 2
+  - Set Organization Variables | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 2 out 0
+     path Get Organization Variables.Outputs[OLE DB Source Output] => Set Organization Variables.Inputs[Input 0]
+
+## DataFlow Update POA Account Operator Out Of Date
+  - ETL Warning 1 1 | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 4 out 0
+  - Expired Status | DerivedColumn  | conn   | in 0 out 1
+  - Failed To Update Poa account operator | DerivedColumn  | conn   | in 1 out 4
+  - Get Poa Account Operator | OLEDBSource  | conn [psql]  | in 0 out 1
+  - Update POA account operator | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 2 out 1
+     path Expired Status.Outputs[Derived Column Output] => Update POA account operator.Inputs[Input 0]
+     path Failed To Update Poa account operator.Outputs[Derived Column Output] => ETL Warning 1 1.Inputs[Input 0]
+     path Update POA account operator.Outputs[Error] => Failed To Update Poa account operator.Inputs[Derived Column Input]
+     path Get Poa Account Operator.Outputs[OLE DB Source Output] => Expired Status.Inputs[Derived Column Input]
+
+## DataFlow Update Poa Operator Cancelled
+  - Cancelled Status | DerivedColumn  | conn   | in 0 out 1
+  - ETL Warning 1 1 | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 4 out 0
+  - Failed To Update Poa account operator | DerivedColumn  | conn   | in 1 out 4
+  - Get Poa Operator | OLEDBSource  | conn [psql]  | in 0 out 1
+  - Update Poa Operator Cancelled | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 2 out 1
+     path Cancelled Status.Outputs[Derived Column Output] => Update Poa Operator Cancelled.Inputs[Input 0]
+     path Failed To Update Poa account operator.Outputs[Derived Column Output] => ETL Warning 1 1.Inputs[Input 0]
+     path Update Poa Operator Cancelled.Outputs[Error] => Failed To Update Poa account operator.Inputs[Derived Column Input]
+     path Get Poa Operator.Outputs[OLE DB Source Output] => Cancelled Status.Inputs[Derived Column Input]
+
+## DataFlow Update Poa Operator Cancelled by Poa Account
+  - Cancelled Status | DerivedColumn  | conn   | in 0 out 1
+  - ETL Warning 1 1 | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 4 out 0
+  - Failed To Update Poa account operator | DerivedColumn  | conn   | in 1 out 4
+  - Get Poa Operator | OLEDBSource  | conn [psql]  | in 0 out 1
+  - Update Poa Operator Cancelled | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 2 out 1
+     path Cancelled Status.Outputs[Derived Column Output] => Update Poa Operator Cancelled.Inputs[Input 0]
+     path Failed To Update Poa account operator.Outputs[Derived Column Output] => ETL Warning 1 1.Inputs[Input 0]
+     path Update Poa Operator Cancelled.Outputs[Error] => Failed To Update Poa account operator.Inputs[Derived Column Input]
+     path Get Poa Operator.Outputs[OLE DB Source Output] => Cancelled Status.Inputs[Derived Column Input]
+
+## DataFlow Update Poa Operator Expired By Poa Account
+  - ETL Warning 1 1 | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 4 out 0
+  - Expired Status | DerivedColumn  | conn   | in 0 out 1
+  - Failed To Update Poa account operator | DerivedColumn  | conn   | in 1 out 4
+  - Get Poa Operator | OLEDBSource  | conn [psql]  | in 0 out 1
+  - Update Poa Operator Cancelled | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 2 out 1
+     path Expired Status.Outputs[Derived Column Output] => Update Poa Operator Cancelled.Inputs[Input 0]
+     path Failed To Update Poa account operator.Outputs[Derived Column Output] => ETL Warning 1 1.Inputs[Input 0]
+     path Update Poa Operator Cancelled.Outputs[Error] => Failed To Update Poa account operator.Inputs[Derived Column Input]
+     path Get Poa Operator.Outputs[OLE DB Source Output] => Expired Status.Inputs[Derived Column Input]
+
+## DataFlow Update Poa Operator Invalid by Poa Account
+  - ETL Warning 1 1 | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 4 out 0
+  - Failed To Update Poa account operator | DerivedColumn  | conn   | in 1 out 4
+  - Get Poa Operator | OLEDBSource  | conn [psql]  | in 0 out 1
+  - Invalid Status | DerivedColumn  | conn   | in 0 out 1
+  - Update Invalid Poa Operator | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 2 out 1
+     path Invalid Status.Outputs[Derived Column Output] => Update Invalid Poa Operator.Inputs[Input 0]
+     path Failed To Update Poa account operator.Outputs[Derived Column Output] => ETL Warning 1 1.Inputs[Input 0]
+     path Update Invalid Poa Operator.Outputs[Error] => Failed To Update Poa account operator.Inputs[Derived Column Input]
+     path Get Poa Operator.Outputs[OLE DB Source Output] => Invalid Status.Inputs[Derived Column Input]
+
+## SQL statements
+- Create POA Account Operator\Check If Employee Exist | Microsoft.Lookup.SqlCommand | [psql] 
+    select gen_poaemployeeemployeroperator.gen_identitynumber,gen_poaemployeeemployeroperator.gen_powerofattorenyoperator from gen_poaemployeeemployeroperator with (nolock) where gen_active = 1
+- Create POA Account Operator\Check If Employee Exist | Microsoft.Lookup.SqlCommandParam | [psql] 
+    select * from (select gen_poaemployeeemployeroperator.gen_identitynumber,gen_poaemployeeemployeroperator.gen_powerofattorenyoperator from gen_poaemployeeemployeroperator with (nolock) where gen_active = 1) [refTable] where [refTable].[gen_identitynumber] = ? and [refTable].[gen_powerofattorenyoperator] = ?
+- Create POA Account Operator\Check If POA Account Operator Exist | Microsoft.Lookup.SqlCommand | [psql] 
+    select gen_customeraccount from gen_poaaccountoperator with (nolock)
+- Create POA Account Operator\Check If POA Account Operator Exist | Microsoft.Lookup.SqlCommandParam | [psql] 
+    select * from (select gen_customeraccount from gen_poaaccountoperator with (nolock)) [refTable] where [refTable].[gen_customeraccount] = ?
+- Create POA Account Operator\Get Customer Accounts | Microsoft.OLEDBSource.SqlCommand | [psql] 
+    select gen_poaoperator.gen_applypoa, Gen_customeraccount.Gen_customeridnumber , Gen_customeraccount.gen_contactname , Gen_customeraccount.gen_customeraccountid, Gen_customeraccount.gen_productsubcustomeraccount, gen_poaoperator.gen_poaoperatorId, gen_poaoperator.gen_employersignatorydate, gen_poaoperator.gen_startdate , gen_poaoperator.gen_receivingdate, gen_poaoperator.gen_enddate, gen_poaoperato
+- Create POA Account Operator - Pension\Check If Employee Exist | Microsoft.Lookup.SqlCommand | [psql] 
+    select gen_poaemployeeemployeroperator.gen_identitynumber,gen_poaemployeeemployeroperator.gen_powerofattorenyoperator from gen_poaemployeeemployeroperator with (nolock) where gen_active = 1
+- Create POA Account Operator - Pension\Check If Employee Exist | Microsoft.Lookup.SqlCommandParam | [psql] 
+    select * from (select gen_poaemployeeemployeroperator.gen_identitynumber,gen_poaemployeeemployeroperator.gen_powerofattorenyoperator from gen_poaemployeeemployeroperator with (nolock) where gen_active = 1) [refTable] where [refTable].[gen_identitynumber] = ? and [refTable].[gen_powerofattorenyoperator] = ?
+- Create POA Account Operator - Pension\Check If POA Account Operator Exist | Microsoft.Lookup.SqlCommand | [psql] 
+    select gen_policy from gen_poaaccountoperator with (nolock)
+- Create POA Account Operator - Pension\Check If POA Account Operator Exist | Microsoft.Lookup.SqlCommandParam | [psql] 
+    select * from (select gen_policy from gen_poaaccountoperator with (nolock)) [refTable] where [refTable].[gen_policy] = ?
+- Create POA Account Operator - Pension\Get Policies | Microsoft.OLEDBSource.SqlCommand | [psql] 
+    select gen_poaoperator.gen_applypoa, gen_policies.Gen_identitynumber , gen_policies.gen_contactname , gen_policies.gen_policiesid, gen_poaoperator.gen_poaoperatorId, gen_poaoperator.gen_employersignatorydate, gen_poaoperator.gen_startdate , gen_poaoperator.gen_receivingdate, gen_poaoperator.gen_enddate, gen_poaoperator.gen_allpermissions, gen_poaoperator.gen_addemployeetodefaultfundundersection20b
+- End ETL Process record\Lookup | Microsoft.Lookup.SqlCommand | [psql] 
+    SELECT p.gen_etlprocessId, CASE WHEN pw.gen_etlprocessid IS NULL THEN 0 ELSE 1 END AS isWarningExist FROM gen_etlprocess AS p LEFT OUTER JOIN (SELECT DISTINCT gen_etlprocessId FROM gen_etlprocesswarning) AS pw ON p.gen_etlprocessId = pw.gen_etlprocessId
+- End ETL Process record\Lookup | Microsoft.Lookup.SqlCommandParam | [psql] 
+    select * from (SELECT p.gen_etlprocessId, CASE WHEN pw.gen_etlprocessid IS NULL THEN 0 ELSE 1 END AS isWarningExist FROM gen_etlprocess AS p LEFT OUTER JOIN (SELECT DISTINCT gen_etlprocessId FROM gen_etlprocesswarning) AS pw ON p.gen_etlprocessId = pw.gen_etlprocessId) [refTable] where [refTable].[gen_etlprocessId] = ?
+- Get Organization Variables\Get Organization Variables | Microsoft.OLEDBSource.SqlCommand | [psql] 
+    SELECT gen_key ,gen_Value FROM gen_etlvariable where gen_scope ='global' or gen_scope = ?
+- Update POA Account Operator Out Of Date\Get Poa Account Operator | Microsoft.OLEDBSource.SqlCommand | [psql] 
+    select gen_poaaccountoperatorid from gen_poaaccountoperator where dateadd(HH,3, gen_enddate) < GETDATE() and gen_poaaccountoperator.gen_poastatus = 2 -- valid
+- Update Poa Operator Cancelled\Get Poa Operator | Microsoft.OLEDBSource.SqlCommand | [psql] 
+    select gen_poaoperatorid from gen_poaoperator join gen_poaaccountoperator on gen_poaaccountoperator.gen_powerofattorenyoperator = gen_poaoperator.gen_poaoperatorid where gen_poaoperator.gen_poastatus = 2 group by gen_poaoperatorid having count(gen_poaaccountoperatorid) = count(case when gen_poaaccountoperator.gen_poastatus != 2 then 1 else null end) -- not valid
+- Update Poa Operator Cancelled by Poa Account\Get Poa Operator | Microsoft.OLEDBSource.SqlCommand | [psql] 
+    select gen_poaoperatorid from gen_poaoperator join gen_poaaccountoperator on gen_poaaccountoperator.gen_powerofattorenyoperator = gen_poaoperator.gen_poaoperatorid where gen_poaoperator.gen_poastatus = 2 group by gen_poaoperatorid having count(gen_poaaccountoperatorid) = count(case when gen_poaaccountoperator.gen_poastatus = 6 then 1 else null end)-- cancelled
+- Update Poa Operator Expired By Poa Account\Get Poa Operator | Microsoft.OLEDBSource.SqlCommand | [psql] 
+    select gen_poaoperatorid from gen_poaoperator join gen_poaaccountoperator on gen_poaaccountoperator.gen_powerofattorenyoperator = gen_poaoperator.gen_poaoperatorid where gen_poaoperator.gen_poastatus = 2 group by gen_poaoperatorid having count(gen_poaaccountoperatorid) = count(case when gen_poaaccountoperator.gen_poastatus = 4 then 1 else null end) -- expired
+- Update Poa Operator Invalid by Poa Account\Get Poa Operator | Microsoft.OLEDBSource.SqlCommand | [psql] 
+    select gen_poaoperatorid from gen_poaoperator join gen_poaaccountoperator on gen_poaaccountoperator.gen_powerofattorenyoperator = gen_poaoperator.gen_poaoperatorid where gen_poaoperator.gen_poastatus = 2 group by gen_poaoperatorid having count(gen_poaaccountoperatorid) = count(case when gen_poaaccountoperator.gen_poastatus = 5 then 1 else null end) -- invalid
+
+## Code write candidates (per owner)
+- Create ETL Process record {"crm-entity":1,"crm-sdk-create":1,"variables-write":1}
+- Create POA Account Operator\Create POA Account Operator {"crm-service":1,"sql-command":2,"crm-entity":5,"crm-sdk-create":1,"output-buffer":1}
+- Create POA Account Operator\ETL Warning {"sql-command":2,"crm-entity":2,"crm-sdk-create":1}
+- Create POA Account Operator - Pension\Create POA Account Operator {"crm-service":1,"sql-command":2,"crm-entity":5,"crm-sdk-create":1,"output-buffer":1}
+- Create POA Account Operator - Pension\ETL Warning {"sql-command":2,"crm-entity":2,"crm-sdk-create":1}
+- End ETL Process record\ETL Record Finish {"sql-command":2,"crm-entity":3,"output-buffer":1,"crm-sdk-update":1}
+- End ETL Process record\Get gen_etlprocessid {"sql-command":2,"output-buffer":2}
+- Get Organization Variables\Set Organization Variables {"sql-command":2}
+- Update POA Account Operator Out Of Date\ETL Warning 1 1 {"crm-entity":3,"crm-sdk-create":1}
+- Update POA Account Operator Out Of Date\Update POA account operator {"sql-command":2,"crm-service":1,"crm-entity":2,"output-buffer":1,"crm-sdk-execute":3}
+- Update Poa Operator Cancelled\ETL Warning 1 1 {"crm-entity":3,"crm-sdk-create":1}
+- Update Poa Operator Cancelled\Update Poa Operator Cancelled {"sql-command":2,"crm-service":1,"crm-entity":2,"output-buffer":1,"crm-sdk-execute":3}
+- Update Poa Operator Cancelled by Poa Account\ETL Warning 1 1 {"crm-entity":3,"crm-sdk-create":1}
+- Update Poa Operator Cancelled by Poa Account\Update Poa Operator Cancelled {"sql-command":2,"crm-service":1,"crm-entity":2,"output-buffer":1,"crm-sdk-execute":3}
+- Update Poa Operator Expired By Poa Account\ETL Warning 1 1 {"crm-entity":3,"crm-sdk-create":1}
+- Update Poa Operator Expired By Poa Account\Update Poa Operator Cancelled {"sql-command":2,"crm-service":1,"crm-entity":2,"output-buffer":1,"crm-sdk-execute":3}
+- Update Poa Operator Invalid by Poa Account\ETL Warning 1 1 {"crm-entity":3,"crm-sdk-create":1}
+- Update Poa Operator Invalid by Poa Account\Update Invalid Poa Operator {"sql-command":2,"crm-service":1,"crm-entity":2,"output-buffer":1,"crm-sdk-execute":3}
+
+## External refs (non-framework) CRM2015.Proxy

@@ -1,0 +1,812 @@
+{
+  "package": "0025_Agents_Agencies",
+  "analyst": "ssis-business-logic",
+  "source": {
+    "file": "source/DailyProcess/0025_Agents_Agencies.dtsx",
+    "sha256": "829A8BDEFB30A1C25460DBA62A83427763EBF1EBEC1EE73F0CF1DE50E83D0B0B",
+    "lines": 8257
+  },
+  "scopeNote_he": "החבילה אינה קוראת קובץ; כל הנתונים נקראים ממסד הנתונים של ה-CRM. מנהל החיבורים [CRM] (DTSX:4-6, DTSID {D51CCED1-9F31-4C56-840C-E21FF6667EC7}) מוגדר בזמן תכנון ל-Data Source=Psql; Initial Catalog=ALTSHULER_MSCRM. שני עדכוני ה-OLE DB Command (Gen_agentsBase, Gen_agencieBase) רצים עליו, ולכן הם SQL ישיר על טבלאות CRM (Unsupported). גם ה-Execute SQL Task המושבת מפנה לאותו DTSID (DTSX:3160). עדכוני 'עמלה מושהית' נעשים דרך ה-SDK (namespace CRM.Proxy, ExecuteMultipleExtension, RequestType.Update), כלומר Supported. האסמבלי CRM2015.Proxy (גרסה 4.1.9.1, HintPath D:\\CRM2015.Proxy.dll; DTSX:4336, 6553), שממנו מגיע ה-namespace CRM.Proxy, חיצוני (external_unknown). קובץ התצורה C:\\Generix\\SSISConfigFile.dtsConfig (EnableConfig=True) לא סופק (blocked_external_dependency) וייתכן שהוא דורס את מחרוזת החיבור או משתנים. ניתוח קוד המקור (C#) בלבד; ה-DLL לא פוענח.",
+  "summary_he": "החבילה מתחזקת שני נתונים עסקיים על סוכנים וסוכנויות ב-CRM. (1) היא מחשבת את סך יתרות הקופות שמשויכות לכל צירוף של סוכן וסוכנות, דרך חוזה הסוכן וחוזה האב שלו, ושולפת רק צירופים שבהם ABS(הסכום − isnull(gen_agentvalue,0) + isnull(gen_agencyvalue,0)) > 1 (gen_agencyvalue מתווסף ולא מחוסר, כלשון הביטוי). כשבצירוף יש סוכן (gen_agentsid אינו ריק; תנאי זה נבדק ראשון) הסכום נכתב לשדה gen_agentvalue של הסוכן ('שווי סוכן'); רק כשאין סוכן ויש סוכנות (gen_agencieid אינו ריק) הוא נכתב לשדה gen_agencyvalue של הסוכנות ('שווי סוכנות'); צירוף בלי סוכן ובלי סוכנות אינו נכתב. הכתיבה היא SQL ישיר (Unsupported). (2) היא מסמנת 'עמלה מושהית' לסוכנים ולסוכנויות שהדגל 'עמלה מושהית' שלהם אינו 1 וגם אינו ריק (NULL), ושתאריך התפוגה של הרישיון, של אישור ניהול הספרים או של אישור ניכוי המס שלהם ריק (השערה: מסמך חסר) או מוקדם מהיום אחרי הוספת 3 שעות. היא גם קובעת סיבת השהיה: 5 כשתאריך התפוגה של הרישיון ריק או מוקדם מהיום, ו-4 אחרת. העדכון נעשה דרך ה-SDK.",
+  "executionOrder": [
+    {
+      "step": 1,
+      "refId": "Package\\Get Variables From SystemConfigurarion",
+      "title_he": "טעינת משתני ETL (מסגרת)",
+      "trigger": "start (no incoming constraint)"
+    },
+    {
+      "step": 2,
+      "refId": "Package\\Create ETL Process record",
+      "title_he": "רשומת תהליך ETL (מסגרת)",
+      "trigger": "after Get Variables From SystemConfigurarion · Success (DTSX:7071)"
+    },
+    {
+      "step": 3,
+      "refId": "Package\\Update agents balance",
+      "title_he": "עדכון שווי תיק לסוכנים ולסוכנויות",
+      "trigger": "after Create ETL Process record · Success (DTSX:7072)"
+    },
+    {
+      "step": 4,
+      "refId": "Package\\Set Gen_commissionpostponed",
+      "title_he": "סימון עמלה מושהית ב-SQL (מושבת, לא רץ)",
+      "trigger": "after Update agents balance · Success (DTSX:7073); DTS:Disabled=True (DTSX:3156)"
+    },
+    {
+      "step": 5,
+      "refId": "Package\\update agents commissionpostponed field",
+      "title_he": "השהיית עמלה לסוכנים שתאריך תפוגה של אחד ממסמכיהם ריק או עבר",
+      "trigger": "after Set Gen_commissionpostponed · Success (DTSX:7074). המשימה הקודמת מושבתת; לפי התנהגות SSIS משימה מושבתת נחשבת כמצליחה לצורך אילוצי קדימות"
+    },
+    {
+      "step": 6,
+      "refId": "Package\\update agencies commissionpostponed field",
+      "title_he": "השהיית עמלה לסוכנויות שתאריך תפוגה של אחד ממסמכיהן ריק או עבר",
+      "trigger": "after update agents commissionpostponed field · Success (DTSX:7075)"
+    },
+    {
+      "step": 7,
+      "refId": "Package\\End ETL Process record",
+      "title_he": "סגירת רשומת תהליך ETL (מסגרת)",
+      "trigger": "after update agencies commissionpostponed field · Success (DTSX:7076)"
+    },
+    {
+      "step": 8,
+      "refId": "Package.EventHandlers[OnError]\\Error ETL Process record",
+      "title_he": "רישום שגיאת תהליך ETL (מסגרת)",
+      "trigger": "OnError event handler (DTSX:7086)"
+    }
+  ],
+  "ignoredAsFramework": [
+    "Package\\Get Variables From SystemConfigurarion",
+    "Package\\Create ETL Process record",
+    "Package\\End ETL Process record",
+    "Package.EventHandlers[OnError]\\Error ETL Process record",
+    "Package\\update agents commissionpostponed field\\Set Warning columns 1",
+    "Package\\update agents commissionpostponed field\\ETL Warning 1",
+    "Package\\update agencies commissionpostponed field\\Set Warning columns 1",
+    "Package\\update agencies commissionpostponed field\\ETL Warning 1",
+    "LogProvider SSIS log provider for SQL Server (SRS.SSIS_Logs)"
+  ],
+  "components": [
+    {
+      "refId": "Package\\Update agents balance",
+      "title_he": "עדכון שווי תיק לסוכנים ולסוכנויות",
+      "techName": "Update agents balance",
+      "short_he": "מסכמת את יתרות הקופות לפי צירוף של סוכן וסוכנות, וכותבת את הסכום לשדה שווי הסוכן, או לשווי הסוכנות כשאין סוכן. לסוכן שמופיע ביותר מצירוף אחד שעבר את הסינון, נשאר הסכום של הצירוף שעובד אחרון, ולא סך כל הצירופים. לסוכן עם צירוף אחד נכתב הסכום המלא של אותו צירוף. העדכון נעשה רק לצירופים שבהם ABS(הסכום − gen_agentvalue + gen_agencyvalue) > 1, כשערך שמור ריק נחשב 0 (gen_agencyvalue מתווסף ולא מחוסר).",
+      "flow_he": [
+        "סיכום יתרות הקופות לפי סוכן וסוכנות, מחוזה הסוכן ומחוזה האב",
+        "סינון: רק צירופים שבהם ABS(sum − isnull(gen_agentvalue,0) + isnull(gen_agencyvalue,0)) > 1 (gen_agencyvalue מתווסף)",
+        "יש סוכן: עדכון שווי הסוכן (SQL ישיר)",
+        "אין סוכן ויש סוכנות: עדכון שווי הסוכנות (SQL ישיר)"
+      ],
+      "short": {
+        "nodes": [
+          {
+            "type": "step",
+            "text": "המערכת מסכמת את יתרות כל הקופות לפי צירוף של סוכן וסוכנות. כל קופה נספרת גם לסוכן ולסוכנות של חוזה הסוכן שלה, וגם לאלה של חוזה האב."
+          },
+          {
+            "type": "step",
+            "text": "רק צירופים שבהם הערך המוחלט של (הסכום, פחות gen_agentvalue, ועוד gen_agencyvalue) גדול מ-1 ממשיכים לעדכון. ערך שמור ריק נחשב 0, ו-gen_agencyvalue מתווסף ולא מחוסר (ראו ממצא 4). (השערה: אלה שווי הסוכן ושווי הסוכנות; טבלת המקור של כל אחד מהם בשאילתה לא ידועה.)"
+          },
+          {
+            "type": "decision",
+            "text": "האם לצירוף יש סוכן?",
+            "branches": [
+              {
+                "label": "כן",
+                "nodes": [
+                  {
+                    "type": "write",
+                    "text": "שווי הסוכן מתעדכן לסכום שחושב."
+                  }
+                ]
+              },
+              {
+                "label": "לא, אבל יש סוכנות",
+                "nodes": [
+                  {
+                    "type": "write",
+                    "text": "שווי הסוכנות מתעדכן לסכום שחושב."
+                  }
+                ]
+              },
+              {
+                "label": "אין סוכן ואין סוכנות",
+                "nodes": [
+                  {
+                    "type": "step",
+                    "text": "השורה מושלכת."
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "type": "end",
+            "text": "אם העדכונים הושלמו (התנהגות הכשל – מחוץ להיקף): לסוכן שמופיע ביותר מצירוף אחד שעבר את הסינון, נשאר הסכום של צירוף אחד בלבד, זה שעובד אחרון, ולא סך כל הצירופים. לסוכן עם צירוף אחד נשמר הסכום המלא של אותו צירוף. כשהסוכנות מתעדכנת, נכתב לה רק סכום היתרות של צירופים בלי סוכן."
+          }
+        ]
+      },
+      "detailed": {
+        "nodes": [
+          {
+            "type": "step",
+            "text": "המערכת לוקחת את כל הקופות שמקושרות לחוזה סוכן, ללא סינון לפי סטטוס הקופה. היתרה של כל קופה משויכת לסוכן ולסוכנות של חוזה הסוכן.",
+            "tech": "Get agent Data (OLEDBSource, [CRM], DTSX:5056-5094): from gen_fundmain f join gen_agentcontract as ac on ac.Gen_agentcontractId = f.gen_brokernumber → ac.gen_agentname, ac.gen_agencyname, gen_accountbalance"
+          },
+          {
+            "type": "step",
+            "text": "אותה יתרה מתווספת גם לסוכן ולסוכנות של חוזה האב (חוזה הסוכנות) של אותו חוזה סוכן.",
+            "tech": "union all … join gen_agentcontract as acc on acc.Gen_agentcontractId = ac.gen_agencycontractnumber → acc.gen_agentname, acc.gen_agencyname"
+          },
+          {
+            "type": "step",
+            "text": "היתרות מסוכמות לפי צירוף של סוכן וסוכנות, ויתרה חסרה נחשבת 0. סוכן שמופיע עם כמה סוכנויות מקבל כמה שורות נפרדות. הסוכן והסוכנות מותאמים לפי gen_agentsid ו-gen_agencieid, שמופיעים בלי שם טבלה. הם של gen_agents ושל Gen_agencie בהתאמה: אילו עמודה הייתה קיימת בשתי הטבלאות השאילתה הייתה נכשלת; לפי המשתמש החבילה רצה בפרודקשן; ובאותה חבילה, על אותו חיבור, השאילתות 'select Gen_agentsId … from Gen_agents' ו-'select Gen_agencieId … from Gen_agencie' מראות שלכל אחת מהטבלאות יש את העמודה שלה. גם ערכי השווי השמורים gen_agentvalue ו-gen_agencyvalue מופיעים בלי שם טבלה. מאותה סיבה כל אחד מהם שייך לטבלה אחת בלבד מבין gen_agents ו-Gen_agencie (הטבלה הנגזרת agent_balance חושפת רק את gen_agentname, gen_agencyname ו-gen_accountbalance), אבל איזו טבלה – לא ידוע (השערה: gen_agentvalue של gen_agents ו-gen_agencyvalue של Gen_agencie, כי לשם החבילה כותבת אותם דרך Gen_agentsBase ו-Gen_agencieBase).",
+            "tech": "left join gen_agents on gen_agentsid = agent_balance.gen_agentname · left join Gen_agencie on gen_agencieid = agent_balance.gen_agencyname · group by gen_agentsid, gen_agencieid, gen_agentvalue, gen_agencyvalue · balance = sum(isnull(gen_accountbalance,0)) · בעלות המפתחות: Gen_agentsId (DTSX:6007), Gen_agencieId (DTSX:3946) + כלל העמימות; בעלות gen_agentvalue / gen_agencyvalue: לא ידועה"
+          },
+          {
+            "type": "decision",
+            "text": "האם הערך המוחלט של (הסכום שחושב, פחות gen_agentvalue, ועוד gen_agencyvalue) גדול מ-1, כשערך שמור ריק נחשב 0?",
+            "tech": "having ABS(sum(isnull(gen_accountbalance,0)) - isnull(gen_agentvalue,0)+isnull(gen_agencyvalue,0)) > 1 (הביטוי מחסר את gen_agentvalue ומוסיף את gen_agencyvalue, כלשונו; טבלת המקור של שתי העמודות לא ידועה)",
+            "branches": [
+              {
+                "label": "לא (1 או פחות)",
+                "nodes": [
+                  {
+                    "type": "step",
+                    "text": "הצירוף אינו נשלף ואינו מתעדכן."
+                  }
+                ]
+              },
+              {
+                "label": "כן (יותר מ-1)",
+                "nodes": [
+                  {
+                    "type": "decision",
+                    "text": "האם לצירוף יש סוכן? התנאי הזה נבדק ראשון.",
+                    "tech": "Agent Or Agency (ConditionalSplit, DTSX:5014): Update Agent = !ISNULL(gen_agentsid) (EvaluationOrder 0); Update Agency = !ISNULL(gen_agencieid) (EvaluationOrder 1); Default Output אינו מחובר",
+                    "branches": [
+                      {
+                        "label": "יש סוכן",
+                        "nodes": [
+                          {
+                            "type": "write",
+                            "text": "שווי הסוכן מוחלף בסכום של הצירוף. גם כשיש לצירוף סוכנות, שווי הסוכנות אינו מתעדכן מהשורה הזו. לסוכן עם כמה צירופים (כמה סוכנויות, או גם עם סוכנות וגם בלעדיה) מגיעות כמה פקודות עדכון. הערך שנשאר הוא הסכום החלקי של הצירוף שעובד אחרון, ואין ORDER BY.",
+                            "tech": "Update Agents (OLEDBCommand, [CRM], DTSX:5171-5174): Update Gen_agentsBase set gen_agentvalue = ? (balance) where gen_agentsid = ? · SQL · Unsupported"
+                          }
+                        ]
+                      },
+                      {
+                        "label": "אין סוכן, יש סוכנות",
+                        "nodes": [
+                          {
+                            "type": "write",
+                            "text": "שווי הסוכנות מוחלף בסכום של הצירוף. שורות בלי סוכן מקובצות לפי gen_agentsid (ריק), gen_agencieid, gen_agentvalue ו-gen_agencyvalue. כל אחד משני ערכי השווי שייך לטבלה אחת בלבד מבין gen_agents ו-Gen_agencie (ראו שלב הסיכום), ולכן בשורה בלי סוכן הוא ריק (אם הוא של gen_agents) או ערך אחד של הסוכנות (אם הוא של Gen_agencie, בהנחה שמזהה הסוכנות ייחודי בטבלה – השערה). בשני המקרים כל השורות בלי סוכן של אותה סוכנות מתקבצות לשורה אחת, ולכן הסוכנות מתעדכנת פעם אחת לכל היותר, עם סכום היתרות של צירופים בלי סוכן בלבד.",
+                            "tech": "Update Agencies (OLEDBCommand, [CRM], DTSX:5127-5130): Update Gen_agencieBase set gen_agencyvalue = ? (balance) where gen_agencieid = ? · SQL · Unsupported"
+                          }
+                        ]
+                      },
+                      {
+                        "label": "אין סוכן ואין סוכנות",
+                        "nodes": [
+                          {
+                            "type": "step",
+                            "text": "השורה מושלכת ללא עדכון."
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "type": "end",
+            "text": "שדות שווי הסוכן ושווי הסוכנות מתעדכנים ישירות במסד הנתונים, בלי לעבור דרך פלטפורמת ה-CRM. אם העדכונים הושלמו (התנהגות הכשל – מחוץ להיקף): לסוכן שמופיע ביותר מצירוף אחד שעבר את הסינון נשאר הסכום החלקי של הצירוף שעובד אחרון, ולא סך כל הצירופים. לסוכן עם צירוף אחד נשמר הסכום המלא של אותו צירוף. כשהסוכנות מתעדכנת, נכתב לה רק סכום הצירופים בלי סוכן."
+          }
+        ]
+      },
+      "detail_he": [
+        {
+          "h": "מקור ואוכלוסייה",
+          "t": "כל רשומות gen_fundmain שמקושרות לחוזה סוכן דרך gen_brokernumber, ללא סינון לפי סטטוס. היתרה (gen_accountbalance) משויכת גם לסוכן ולסוכנות של החוזה, וגם לאלה של חוזה האב (gen_agencycontractnumber)."
+        },
+        {
+          "h": "התאמה לרשומות קיימות",
+          "t": "חיבור לפי מזהה: gen_agentsid = gen_agentname של החוזה, gen_agencieid = gen_agencyname של החוזה. gen_agentsid ו-gen_agencieid מופיעים בלי שם טבלה; הם של gen_agents ושל Gen_agencie, כי אילו עמודה הייתה קיימת בשתי הטבלאות השאילתה הייתה נכשלת (לפי המשתמש החבילה רצה בפרודקשן), ובאותה חבילה Gen_agentsId נשלף מ-Gen_agents (DTSX:6007) ו-Gen_agencieId מ-Gen_agencie (DTSX:3946). הערכים השמורים gen_agentvalue ו-gen_agencyvalue נקראים לצורך זיהוי שינוי; גם הם בלי שם טבלה, וכל אחד מהם שייך לטבלה אחת בלבד מבין gen_agents ו-Gen_agencie, אבל טבלת המקור של כל אחד מהם לא ידועה (השערה: הסוכן והסוכנות בהתאמה)."
+        },
+        {
+          "h": "החלטות",
+          "t": "סינון: ABS(sum - isnull(gen_agentvalue,0) + isnull(gen_agencyvalue,0)) > 1. אחריו פיצול לפי סדר הבדיקה: קודם !ISNULL(gen_agentsid) (עדכון סוכן), ואחר כך !ISNULL(gen_agencieid) (עדכון סוכנות). שורה ללא סוכן וללא סוכנות מושלכת."
+        },
+        {
+          "h": "כתיבה ל-CRM",
+          "t": "UPDATE ישיר על Gen_agentsBase.gen_agentvalue ועל Gen_agencieBase.gen_agencyvalue דרך חיבור [CRM] (Data Source=Psql; Initial Catalog=ALTSHULER_MSCRM – מחרוזת חיבור בזמן תכנון; קובץ התצורה C:\\Generix\\SSISConfigFile.dtsConfig שלא סופק עשוי לדרוס אותה). זו כתיבה ישירה לטבלאות CRM (Unsupported)."
+        },
+        {
+          "h": "תוצאה עסקית",
+          "t": "אם העדכונים הושלמו (התנהגות הכשל – מחוץ להיקף): לסוכן שמופיע ביותר מצירוף אחד של סוכן וסוכנות שעבר את הסינון, נשאר ב-CRM הסכום החלקי של הצירוף שעובד אחרון (אין ORDER BY), ולא סך כל הצירופים. לסוכן עם צירוף אחד נשמר הסכום המלא של אותו צירוף. כשסוכנות מתעדכנת, נכתב לה רק סכום היתרות של צירופים שאין בהם סוכן (מסקנה מהשאילתה ומהפיצול; ראו ממצאים)."
+        }
+      ],
+      "decisions": [
+        {
+          "where": "Get agent Data",
+          "condition": "having ABS(sum(isnull(gen_accountbalance,0)) - isnull(gen_agentvalue,0)+isnull(gen_agencyvalue,0) ) > 1",
+          "meaning_he": "הערך המוחלט של (הסכום − gen_agentvalue + gen_agencyvalue) גדול מ-1; gen_agencyvalue מתווסף, כלשון הביטוי",
+          "outcome_he": "הצירוף נשלף לעדכון"
+        },
+        {
+          "where": "Agent Or Agency",
+          "condition": "!ISNULL(gen_agentsid) [EvaluationOrder 0]",
+          "meaning_he": "יש סוכן",
+          "outcome_he": "עדכון gen_agentvalue בסוכן"
+        },
+        {
+          "where": "Agent Or Agency",
+          "condition": "!ISNULL(gen_agencieid) [EvaluationOrder 1]",
+          "meaning_he": "אין סוכן ויש סוכנות",
+          "outcome_he": "עדכון gen_agencyvalue בסוכנות"
+        },
+        {
+          "where": "Agent Or Agency",
+          "condition": "Default Output (לא מחובר)",
+          "meaning_he": "אין סוכן ואין סוכנות",
+          "outcome_he": "השורה מושלכת"
+        }
+      ],
+      "crmEffects": [
+        {
+          "entity": "gen_agents (טבלה Gen_agentsBase)",
+          "verb": "Update gen_agentvalue",
+          "mechanism": "SQL",
+          "when_he": "לכל צירוף שיש בו סוכן ושעבר את תנאי הסינון ABS(sum − gen_agentvalue + gen_agencyvalue) > 1. Unsupported."
+        },
+        {
+          "entity": "gen_agencie (טבלה Gen_agencieBase)",
+          "verb": "Update gen_agencyvalue",
+          "mechanism": "SQL",
+          "when_he": "לכל צירוף בלי סוכן ועם סוכנות שעבר את תנאי הסינון ABS(sum − gen_agentvalue + gen_agencyvalue) > 1. Unsupported."
+        }
+      ],
+      "evidence": [
+        "Get agent Data DTSX:5056-5094 (SqlCommand line 5061)",
+        "Agent Or Agency DTSX:5014-5047 (FriendlyExpression 5028/5036, EvaluationOrder 0/1)",
+        "Update Agencies DTSX:5127-5130; Update Agents DTSX:5171-5174",
+        "Paths DTSX:5217-5219 (Default Output not connected)",
+        "[CRM] connection DTSX:4-6",
+        "analysis/0025_Agents_Agencies/verify-A.json (Update Agents / Update Agencies)"
+      ],
+      "openQuestions_he": [
+        "נענה: gen_accountbalance מופיע בשאילתה בלי שם טבלה. בקבצים שסופקו העמודה מופיעה עם שם הטבלה gen_fundmain: 0023_Employers.dtsx:7797 (gen_fundmain.gen_accountbalance) ו-0026_Expectedtransfervalue.dtsx:172 (Gen_fundmain.Gen_AccountBalance). לכן ל-gen_fundmain יש עמודה כזו. ב-0025 העמודה מופיעה בלי קידומת בשאילתות שמחברות את gen_fundmain ל-gen_agentcontract. אילו גם ל-gen_agentcontract הייתה עמודה בשם זה, השאילתה הייתה נכשלת על שם עמודה דו-משמעי, ולפי המשתמש החבילה רצה בפרודקשן. לכן הסכום הוא של יתרת הקופה (gen_fundmain).",
+        "לא ידוע אם הביטוי sum - agentvalue + agencyvalue בתנאי הסינון מכוון, או שהכוונה הייתה להשוואה אחרת.",
+        "טבלת המקור של gen_agentvalue ושל gen_agencyvalue בשאילתה Get agent Data (DTSX:5061-5090) לא ידועה. שתי העמודות מופיעות בלי שם טבלה; אילו אחת מהן הייתה קיימת גם ב-gen_agents וגם ב-Gen_agencie השאילתה הייתה נכשלת, ולפי המשתמש החבילה רצה בפרודקשן, כך שכל אחת שייכת לטבלה אחת בלבד. בקבצים שסופקו אין שאילתה שמפנה אליהן עם שם טבלה (gen_agents / Gen_agencie). השערה: gen_agentvalue של gen_agents ו-gen_agencyvalue של Gen_agencie, כי החבילה כותבת אותן ל-Gen_agentsBase (DTSX:5174) ול-Gen_agencieBase (DTSX:5130)."
+      ]
+    },
+    {
+      "refId": "Package\\update agents commissionpostponed field",
+      "title_he": "השהיית עמלה לסוכנים שתאריך תפוגה של אחד ממסמכיהם ריק או עבר",
+      "techName": "update agents commissionpostponed field",
+      "short_he": "מאתרת סוכנים שהדגל 'עמלה מושהית' שלהם אינו 1 וגם אינו ריק (NULL), ושתאריך התפוגה של הרישיון, של אישור ניהול הספרים או של אישור ניכוי המס שלהם ריק (השערה: מסמך חסר) או מוקדם מהיום אחרי הוספת 3 שעות. היא מסמנת להם עמלה מושהית עם סיבת השהיה.",
+      "flow_he": [
+        "איתור סוכנים שתאריך תפוגה של אחד ממסמכיהם ריק (השערה: מסמך חסר) או מוקדם מהיום",
+        "קביעת סיבת השהיה: 5 כשתאריך התפוגה של הרישיון ריק או מוקדם מהיום, 4 אחרת",
+        "עדכון הסוכן ב-CRM: עמלה מושהית וסיבת השהיה (SDK)"
+      ],
+      "short": {
+        "nodes": [
+          {
+            "type": "step",
+            "text": "המערכת מאתרת סוכנים שהדגל 'עמלה מושהית' שלהם אינו 1 וגם אינו ריק, ושתאריך התפוגה של הרישיון, של אישור ניהול הספרים או של אישור ניכוי המס שלהם ריק (השערה: מסמך חסר) או מוקדם מהיום אחרי הוספת 3 שעות."
+          },
+          {
+            "type": "decision",
+            "text": "האם תאריך התפוגה של הרישיון של הסוכן ריק (השערה: רישיון חסר), או שהוא (אחרי הוספת 3 שעות) מוקדם מהיום?",
+            "branches": [
+              {
+                "label": "כן",
+                "nodes": [
+                  {
+                    "type": "step",
+                    "text": "סיבת ההשהיה נקבעת לקוד 5."
+                  }
+                ]
+              },
+              {
+                "label": "לא",
+                "nodes": [
+                  {
+                    "type": "step",
+                    "text": "סיבת ההשהיה נקבעת לקוד 4."
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "type": "write",
+            "text": "הסוכן מסומן ב-CRM כבעל עמלה מושהית, עם סיבת ההשהיה שנקבעה."
+          },
+          {
+            "type": "end",
+            "text": "הסוכנים שנשלפו נשלחים לסימון בעמלה מושהית. סוכן שה-CRM החזיר שגיאה על העדכון שלו אינו מסומן (התנהגות הכשל מעבר לכך – מחוץ להיקף)."
+          }
+        ]
+      },
+      "detailed": {
+        "nodes": [
+          {
+            "type": "step",
+            "text": "המערכת מאתרת סוכנים שהדגל 'עמלה מושהית' שלהם שונה מ-1. לפי סמנטיקת SQL, סוכן שבו הדגל ריק (NULL) אינו נכלל.",
+            "tech": "get Agents details (OLEDBSource, [CRM], DTSX:6002-6016): from Gen_agents where gen_commissionpostponed != 1"
+          },
+          {
+            "type": "decision",
+            "text": "האם תאריך התפוגה של אחד משלושת המסמכים של הסוכן (רישיון, ניהול ספרים, ניכוי מס) ריק, או שהוא (בתוספת 3 שעות) מוקדם מהיום? (משמעות תאריך ריק – השערה: מסמך חסר.)",
+            "tech": "gen_licenseexpdate is null OR dateadd(HOUR,3,gen_licenseexpdate) < CONVERT(DATE,GETDATE()) OR gen_bookkeepingexpdate is null OR dateadd(HOUR,3,gen_bookkeepingexpdate) < CONVERT(DATE,GETDATE()) OR gen_taxdeductionexpdate is null OR dateadd(HOUR,3,gen_taxdeductionexpdate) < CONVERT(DATE,GETDATE())",
+            "branches": [
+              {
+                "label": "לא",
+                "nodes": [
+                  {
+                    "type": "step",
+                    "text": "הסוכן אינו נשלף ואינו מתעדכן."
+                  }
+                ]
+              },
+              {
+                "label": "כן",
+                "nodes": [
+                  {
+                    "type": "decision",
+                    "text": "האם תאריך התפוגה של הרישיון ריק (השערה: רישיון חסר), או שהוא (כבר בתוספת 3 שעות מהמקור) מוקדם מהיום?",
+                    "tech": "set 'pausereason' field (DerivedColumn, DTSX:6047-6055), מחליף את gen_pausereason: ISNULL(gen_licenseexpdate) || DATEDIFF(\"dd\",GETDATE(),gen_licenseexpdate) < 0 ? 5 : 4 (gen_licenseexpdate כבר מוזז ב-3 שעות במקור)",
+                    "branches": [
+                      {
+                        "label": "כן",
+                        "nodes": [
+                          {
+                            "type": "step",
+                            "text": "סיבת ההשהיה היא קוד 5. תווית הקוד אינה מוגדרת בחבילה (לא ידוע)."
+                          }
+                        ]
+                      },
+                      {
+                        "label": "לא (בהנחה ששעון שרת ה-SQL ושעון ה-SSIS מראים אותו יום – לא מוצג בקבצים – הסוכן נבחר בגלל תאריך ניהול הספרים או ניכוי המס)",
+                        "nodes": [
+                          {
+                            "type": "step",
+                            "text": "סיבת ההשהיה היא קוד 4. תווית הקוד אינה מוגדרת בחבילה (לא ידוע)."
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  {
+                    "type": "step",
+                    "text": "הסיבה שחושבה מחליפה תמיד את הסיבה הקודמת שהייתה שמורה בסוכן.",
+                    "tech": "gen_pausereason usageType readWrite + Expression (DTSX:6047-6055)"
+                  },
+                  {
+                    "type": "write",
+                    "text": "הסוכן מתעדכן ב-CRM: הדגל 'עמלה מושהית' מסומן כ-true, וסיבת ההשהיה נקבעת לקוד שחושב. העדכונים נשלחים בקבוצות של עד 1000.",
+                    "tech": "update agetns commissionpostponed field main.cs:71-77, 79-80, 97 · gen_agents · Update (gen_commissionpostponed = true; gen_pausereason = OptionSetValue) · SDK ExecuteMultipleExtension RequestType.Update · Supported"
+                  },
+                  {
+                    "type": "decision",
+                    "text": "האם ה-CRM החזיר שגיאה לעדכון מסוים?",
+                    "tech": "main.cs:99-115 (resultItem.Fault != null → ErrorBuffer; אין תגובה → ApplicationException); חריגה בבניית השורה → CastingError (main.cs:83-92), פלט שאינו מחובר",
+                    "branches": [
+                      {
+                        "label": "כן",
+                        "nodes": [
+                          {
+                            "type": "step",
+                            "text": "העדכון של הסוכן הזה לא נשמר, והוא נשאר ללא הסימון. שורת הסוכן עצמה אינה מועברת: הקוד מוסיף לפלט Error שורה חדשה שבה רק הודעת השגיאה, בלי מזהה הסוכן (רישום השגיאה – מסגרת ETL, מחוץ להיקף)."
+                          }
+                        ]
+                      },
+                      {
+                        "label": "לא",
+                        "nodes": [
+                          {
+                            "type": "step",
+                            "text": "לא הוחזרה שגיאה לסוכן הזה, והעדכון נחשב מבוצע. (ההתנהגות של ExecuteMultipleExtension, למשל אחרי שגיאה באותה קבוצה, לא ידועה – מחוץ להיקף.)"
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "type": "end",
+            "text": "סוכן שהדגל 'עמלה מושהית' שלו אינו 1 וגם אינו ריק, ושתאריך התפוגה של אחד ממסמכיו ריק (השערה: מסמך חסר) או מוקדם מהיום אחרי הוספת 3 שעות, נשלח לעדכון לסימון בעמלה מושהית עם סיבה: 5 כשתאריך התפוגה של הרישיון ריק או מוקדם מהיום, 4 אחרת. סוכן שה-CRM החזיר שגיאה על העדכון שלו אינו מסומן (התנהגות הכשל מעבר לכך – מחוץ להיקף)."
+          }
+        ]
+      },
+      "detail_he": [
+        {
+          "h": "מקור ואוכלוסייה",
+          "t": "סוכנים (Gen_agents) עם gen_commissionpostponed != 1, שלפחות אחד משלושת התאריכים שלהם (רישיון, ניהול ספרים, ניכוי מס) ריק או מוקדם מהיום אחרי הוספת 3 שעות. אם הדגל עצמו ריק (NULL), הסוכן אינו נכלל."
+        },
+        {
+          "h": "התאמה לרשומות קיימות",
+          "t": "העדכון נעשה ישירות לפי Gen_agentsId שנשלף מה-CRM. אין חיפוש נוסף."
+        },
+        {
+          "h": "החלטות",
+          "t": "סיבת השהיה = ISNULL(gen_licenseexpdate) || DATEDIFF(\"dd\",GETDATE(),gen_licenseexpdate) < 0 ? 5 : 4."
+        },
+        {
+          "h": "כתיבה ל-CRM",
+          "t": "Update של gen_agents דרך ה-SDK (ExecuteMultiple בקבוצות של 1000): gen_commissionpostponed = true (ערך קבוע, main.cs:73), gen_pausereason = 4 או 5 (main.cs:74-75). זו כתיבה Supported."
+        },
+        {
+          "h": "תוצאה עסקית",
+          "t": "סוכנים שנשלפו (דגל 'עמלה מושהית' שאינו 1 ואינו ריק, ואחד מתאריכי התפוגה ריק או מוקדם מהיום אחרי הוספת 3 שעות; משמעות תאריך ריק – השערה: מסמך חסר) נשלחים לסימון בעמלה מושהית עם סיבת ההשהיה. סוכן שה-CRM החזיר שגיאה על העדכון שלו אינו מסומן (התנהגות הכשל מעבר לכך – מחוץ להיקף)."
+        }
+      ],
+      "decisions": [
+        {
+          "where": "get Agents details",
+          "condition": "gen_commissionpostponed != 1 AND (gen_licenseexpdate is null OR dateadd(HOUR, 3, gen_licenseexpdate) < CONVERT(DATE, GETDATE()) OR gen_bookkeepingexpdate is null OR dateadd(HOUR, 3, gen_bookkeepingexpdate) < CONVERT(DATE, GETDATE()) OR gen_taxdeductionexpdate is null OR dateadd(HOUR, 3, gen_taxdeductionexpdate) < CONVERT(DATE, GETDATE()))",
+          "meaning_he": "סוכן שהדגל 'עמלה מושהית' שלו אינו 1 וגם אינו ריק (NULL), ושתאריך התפוגה של אחד ממסמכיו ריק (השערה: מסמך חסר) או מוקדם מהיום אחרי הוספת 3 שעות",
+          "outcome_he": "נשלף להשהיה"
+        },
+        {
+          "where": "set 'pausereason' field",
+          "condition": "ISNULL(gen_licenseexpdate) || DATEDIFF(\"dd\",GETDATE(),gen_licenseexpdate) < 0 ? 5 : 4",
+          "meaning_he": "תאריך התפוגה של הרישיון ריק (השערה: רישיון חסר) או מוקדם מהיום",
+          "outcome_he": "כן: סיבה 5; לא: סיבה 4"
+        }
+      ],
+      "crmEffects": [
+        {
+          "entity": "gen_agents",
+          "verb": "Update (gen_commissionpostponed = true, gen_pausereason)",
+          "mechanism": "SDK",
+          "when_he": "לכל סוכן שנשלף: הדגל 'עמלה מושהית' אינו 1 וגם אינו ריק (NULL), ותאריך התפוגה של אחד ממסמכיו ריק (השערה: מסמך חסר) או מוקדם מהיום אחרי הוספת 3 שעות."
+        }
+      ],
+      "evidence": [
+        "get Agents details DTSX:6002-6016 (SqlCommand line 6007)",
+        "set 'pausereason' field DTSX:6047-6055",
+        "update agetns commissionpostponed field DTSX:6123, ReadOnlyVariables DTSX:7023, main.cs (sha a13245cf5ef3) lines 45-46, 71-80, 95-129",
+        "Paths DTSX:7061-7064 (CastingError not connected)"
+      ],
+      "openQuestions_he": [
+        "תוויות ערכי סיבת ההשהיה 4 ו-5 (gen_pausereason) אינן מוגדרות בחבילה.",
+        "המטרה של הוספת 3 שעות לתאריכים אינה מוסברת בחבילה (השערה: התאמת UTC לשעון ישראל).",
+        "ההתנהגות של ExecuteMultipleExtension (למשל ContinueOnError) אינה ידועה, כי האסמבלי CRM2015.Proxy (גרסה 4.1.9.1; namespace CRM.Proxy) חיצוני (external_unknown)."
+      ]
+    },
+    {
+      "refId": "Package\\update agencies commissionpostponed field",
+      "title_he": "השהיית עמלה לסוכנויות שתאריך תפוגה של אחד ממסמכיהן ריק או עבר",
+      "techName": "update agencies commissionpostponed field",
+      "short_he": "אותה לוגיקה כמו בסוכנים, אבל לסוכנויות: סוכנות שהדגל 'עמלה מושהית' שלה אינו 1 וגם אינו ריק (NULL), ושתאריך התפוגה של אחד ממסמכיה ריק (השערה: מסמך חסר) או מוקדם מהיום אחרי הוספת 3 שעות, מסומנת בעמלה מושהית עם סיבת השהיה.",
+      "flow_he": [
+        "איתור סוכנויות שתאריך תפוגה של אחד ממסמכיהן ריק (השערה: מסמך חסר) או מוקדם מהיום",
+        "קביעת סיבת השהיה: 5 כשתאריך התפוגה של הרישיון ריק או מוקדם מהיום, 4 אחרת",
+        "עדכון הסוכנות ב-CRM: עמלה מושהית וסיבת השהיה (SDK)"
+      ],
+      "short": {
+        "nodes": [
+          {
+            "type": "step",
+            "text": "המערכת מאתרת סוכנויות שהדגל 'עמלה מושהית' שלהן אינו 1 וגם אינו ריק, ושתאריך התפוגה של הרישיון, של אישור ניהול הספרים או של אישור ניכוי המס שלהן ריק (השערה: מסמך חסר) או מוקדם מהיום אחרי הוספת 3 שעות."
+          },
+          {
+            "type": "decision",
+            "text": "האם תאריך התפוגה של הרישיון של הסוכנות ריק (השערה: רישיון חסר), או שהוא (אחרי הוספת 3 שעות) מוקדם מהיום?",
+            "branches": [
+              {
+                "label": "כן",
+                "nodes": [
+                  {
+                    "type": "step",
+                    "text": "סיבת ההשהיה נקבעת לקוד 5."
+                  }
+                ]
+              },
+              {
+                "label": "לא",
+                "nodes": [
+                  {
+                    "type": "step",
+                    "text": "סיבת ההשהיה נקבעת לקוד 4."
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "type": "write",
+            "text": "הסוכנות מסומנת ב-CRM כבעלת עמלה מושהית, עם סיבת ההשהיה שנקבעה."
+          },
+          {
+            "type": "end",
+            "text": "הסוכנויות שנשלפו נשלחות לסימון בעמלה מושהית. סוכנות שה-CRM החזיר שגיאה על העדכון שלה אינה מסומנת (התנהגות הכשל מעבר לכך – מחוץ להיקף)."
+          }
+        ]
+      },
+      "detailed": {
+        "nodes": [
+          {
+            "type": "step",
+            "text": "המערכת מאתרת סוכנויות שהדגל 'עמלה מושהית' שלהן שונה מ-1. לפי סמנטיקת SQL, סוכנות שבה הדגל ריק (NULL) אינה נכללת.",
+            "tech": "get Agencies details (OLEDBSource, [CRM], DTSX:3941-3955): from Gen_agencie where gen_commissionpostponed != 1"
+          },
+          {
+            "type": "decision",
+            "text": "האם תאריך התפוגה של אחד משלושת המסמכים של הסוכנות (רישיון, ניהול ספרים, ניכוי מס) ריק, או שהוא (בתוספת 3 שעות) מוקדם מהיום? (משמעות תאריך ריק – השערה: מסמך חסר.)",
+            "tech": "gen_licenseexpdate is null OR dateadd(HOUR,3,gen_licenseexpdate) < CONVERT(DATE,GETDATE()) OR gen_bookkeepingexp is null OR dateadd(HOUR,3,gen_bookkeepingexp) < CONVERT(DATE,GETDATE()) OR gen_taxdeductionexp is null OR dateadd(HOUR,3,gen_taxdeductionexp) < CONVERT(DATE,GETDATE())",
+            "branches": [
+              {
+                "label": "לא",
+                "nodes": [
+                  {
+                    "type": "step",
+                    "text": "הסוכנות אינה נשלפת ואינה מתעדכנת."
+                  }
+                ]
+              },
+              {
+                "label": "כן",
+                "nodes": [
+                  {
+                    "type": "decision",
+                    "text": "האם תאריך התפוגה של הרישיון ריק (השערה: רישיון חסר), או שהוא (כבר בתוספת 3 שעות מהמקור) מוקדם מהיום?",
+                    "tech": "set 'pausereason' field (DerivedColumn, DTSX:3986-3994), מחליף את gen_pausereason: ISNULL(gen_licenseexpdate) || DATEDIFF(\"dd\",GETDATE(),gen_licenseexpdate) < 0 ? 5 : 4 (gen_licenseexpdate כבר מוזז ב-3 שעות במקור, DTSX:3946)",
+                    "branches": [
+                      {
+                        "label": "כן",
+                        "nodes": [
+                          {
+                            "type": "step",
+                            "text": "סיבת ההשהיה היא קוד 5. תווית הקוד אינה מוגדרת בחבילה (לא ידוע)."
+                          }
+                        ]
+                      },
+                      {
+                        "label": "לא (בהנחה ששעון שרת ה-SQL ושעון ה-SSIS מראים אותו יום – לא מוצג בקבצים – הסוכנות נבחרה בגלל תאריך ניהול הספרים או ניכוי המס)",
+                        "nodes": [
+                          {
+                            "type": "step",
+                            "text": "סיבת ההשהיה היא קוד 4. תווית הקוד אינה מוגדרת בחבילה (לא ידוע)."
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  {
+                    "type": "write",
+                    "text": "הסוכנות מתעדכנת ב-CRM: הדגל 'עמלה מושהית' מסומן כ-true, וסיבת ההשהיה נקבעת לקוד שחושב. העדכונים נשלחים בקבוצות של עד 1000.",
+                    "tech": "update agencies commissionpostponed field main.cs (sha 213708d439cc):71-77 · gen_agencie · Update · SDK ExecuteMultipleExtension RequestType.Update · Supported. הקוד זהה לסקריפט הסוכנים, פרט ל-Entity(\"gen_agencie\") ול-Row.GenagencieId"
+                  },
+                  {
+                    "type": "decision",
+                    "text": "האם ה-CRM החזיר שגיאה לעדכון מסוים?",
+                    "tech": "main.cs:99-115 → ErrorBuffer → ETL Warning 1; CastingError לא מחובר",
+                    "branches": [
+                      {
+                        "label": "כן",
+                        "nodes": [
+                          {
+                            "type": "step",
+                            "text": "העדכון של הסוכנות הזו לא נשמר, והיא נשארת ללא הסימון. שורת הסוכנות עצמה אינה מועברת: הקוד מוסיף לפלט Error שורה חדשה שבה רק הודעת השגיאה, בלי מזהה הסוכנות (רישום השגיאה – מסגרת ETL, מחוץ להיקף)."
+                          }
+                        ]
+                      },
+                      {
+                        "label": "לא",
+                        "nodes": [
+                          {
+                            "type": "step",
+                            "text": "לא הוחזרה שגיאה לסוכנות הזו, והעדכון נחשב מבוצע. (ההתנהגות של ExecuteMultipleExtension, למשל אחרי שגיאה באותה קבוצה, לא ידועה – מחוץ להיקף.)"
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "type": "end",
+            "text": "סוכנות שהדגל 'עמלה מושהית' שלה אינו 1 וגם אינו ריק, ושתאריך התפוגה של אחד ממסמכיה ריק (השערה: מסמך חסר) או מוקדם מהיום אחרי הוספת 3 שעות, נשלחת לעדכון לסימון בעמלה מושהית עם סיבת השהיה. סוכנות שה-CRM החזיר שגיאה על העדכון שלה אינה מסומנת (התנהגות הכשל מעבר לכך – מחוץ להיקף)."
+          }
+        ]
+      },
+      "detail_he": [
+        {
+          "h": "מקור ואוכלוסייה",
+          "t": "סוכנויות (Gen_agencie) עם gen_commissionpostponed != 1, שלפחות אחד מהתאריכים gen_licenseexpdate, gen_bookkeepingexp או gen_taxdeductionexp שלהן ריק או מוקדם מהיום אחרי הוספת 3 שעות. אם הדגל עצמו ריק (NULL), הסוכנות אינה נכללת."
+        },
+        {
+          "h": "התאמה לרשומות קיימות",
+          "t": "העדכון נעשה ישירות לפי Gen_agencieId שנשלף מה-CRM."
+        },
+        {
+          "h": "החלטות",
+          "t": "סיבת השהיה = ISNULL(gen_licenseexpdate) || DATEDIFF(\"dd\",GETDATE(),gen_licenseexpdate) < 0 ? 5 : 4."
+        },
+        {
+          "h": "כתיבה ל-CRM",
+          "t": "Update של gen_agencie דרך ה-SDK: gen_commissionpostponed = true, gen_pausereason = 4 או 5. זו כתיבה Supported."
+        },
+        {
+          "h": "תוצאה עסקית",
+          "t": "סוכנויות שנשלפו (דגל 'עמלה מושהית' שאינו 1 ואינו ריק, ואחד מתאריכי התפוגה ריק או מוקדם מהיום אחרי הוספת 3 שעות; משמעות תאריך ריק – השערה: מסמך חסר) נשלחות לסימון בעמלה מושהית עם סיבת ההשהיה. סוכנות שה-CRM החזיר שגיאה על העדכון שלה אינה מסומנת (התנהגות הכשל מעבר לכך – מחוץ להיקף)."
+        }
+      ],
+      "decisions": [
+        {
+          "where": "get Agencies details",
+          "condition": "gen_commissionpostponed != 1 AND (gen_licenseexpdate is null OR dateadd(HOUR, 3, gen_licenseexpdate) < CONVERT(DATE, GETDATE()) OR gen_bookkeepingexp is null OR dateadd(HOUR, 3, gen_bookkeepingexp) < CONVERT(DATE, GETDATE()) OR gen_taxdeductionexp is null OR dateadd(HOUR, 3, gen_taxdeductionexp) < CONVERT(DATE, GETDATE()))",
+          "meaning_he": "סוכנות שהדגל 'עמלה מושהית' שלה אינו 1 וגם אינו ריק (NULL), ושתאריך התפוגה של אחד ממסמכיה ריק (השערה: מסמך חסר) או מוקדם מהיום אחרי הוספת 3 שעות",
+          "outcome_he": "נשלפת להשהיה"
+        },
+        {
+          "where": "set 'pausereason' field",
+          "condition": "ISNULL(gen_licenseexpdate) || DATEDIFF(\"dd\",GETDATE(),gen_licenseexpdate) < 0 ? 5 : 4",
+          "meaning_he": "תאריך התפוגה של הרישיון ריק (השערה: רישיון חסר) או מוקדם מהיום",
+          "outcome_he": "כן: סיבה 5; לא: סיבה 4"
+        }
+      ],
+      "crmEffects": [
+        {
+          "entity": "gen_agencie",
+          "verb": "Update (gen_commissionpostponed = true, gen_pausereason)",
+          "mechanism": "SDK",
+          "when_he": "לכל סוכנות שנשלפה: הדגל 'עמלה מושהית' אינו 1 וגם אינו ריק (NULL), ותאריך התפוגה של אחד ממסמכיה ריק (השערה: מסמך חסר) או מוקדם מהיום אחרי הוספת 3 שעות."
+        }
+      ],
+      "evidence": [
+        "get Agencies details DTSX:3941-3955 (SqlCommand line 3946)",
+        "set 'pausereason' field DTSX:3986-3994",
+        "update agencies commissionpostponed field DTSX:4062, main.cs (sha 213708d439cc); diff vs agents script: lines 71-72 only",
+        "Paths DTSX:5000-5003"
+      ],
+      "openQuestions_he": [
+        "תוויות ערכי סיבת ההשהיה 4 ו-5 אינן מוגדרות בחבילה.",
+        "הודעת האזהרה בזרימה זו היא ' שגיאה בעדכון סטטוס מושהה עמלה בסוכן ' (DTSX:4047), למרות שמדובר בסוכנויות. זו הודעת מסגרת בלבד."
+      ]
+    },
+    {
+      "refId": "Package\\Set Gen_commissionpostponed",
+      "title_he": "סימון עמלה מושהית ב-SQL (מושבת)",
+      "techName": "Set Gen_commissionpostponed",
+      "short_he": "משימה מושבתת שאינה רצה. היא הייתה מסמנת עמלה מושהית ב-SQL ישיר לסוכנים ולסוכנויות שהרישיון או אישור ניהול הספרים שלהם פג.",
+      "flow_he": [
+        "המשימה מושבתת ואינה רצה; הזרימה ממשיכה לשלב הבא"
+      ],
+      "short": {
+        "nodes": [
+          {
+            "type": "step",
+            "text": "משימה זו מושבתת ואינה מבצעת דבר בריצה."
+          },
+          {
+            "type": "step",
+            "text": "אילו הייתה פעילה, היא הייתה מסמנת עמלה מושהית לסוכנים ולסוכנויות שהרישיון או אישור ניהול הספרים שלהם פג."
+          },
+          {
+            "type": "end",
+            "text": "ההשהיה בפועל מתבצעת בשני השלבים הבאים, דרך ה-SDK."
+          }
+        ]
+      },
+      "detailed": {
+        "nodes": [
+          {
+            "type": "step",
+            "text": "המשימה מסומנת כמושבתת ולכן אינה רצה.",
+            "tech": "DTS:Disabled=True (DTSX:3156)"
+          },
+          {
+            "type": "step",
+            "text": "הזרימה ממשיכה ממנה לשלב השהיית העמלה לסוכנים, כי משימה מושבתת נחשבת כמצליחה לצורך אילוצי קדימות (התנהגות SSIS).",
+            "tech": "Precedence DTSX:7073-7074 (Success)"
+          },
+          {
+            "type": "step",
+            "text": "אילו הייתה פעילה, היא הייתה מסמנת עמלה מושהית לסוכנים שאישור ניהול הספרים או הרישיון שלהם פג, ושהדגל שלהם ריק או 0.",
+            "tech": "Update Gen_agentsBase set Gen_commissionpostponed = 1 where ((Gen_bookkeepingexpdate is not null and Gen_bookkeepingexpdate < getutcdate()) or (Gen_LicenseExpDate is not null and Gen_LicenseExpDate < getutcdate())) AND (Gen_commissionpostponed IS NULL OR Gen_commissionpostponed = 0)"
+          },
+          {
+            "type": "step",
+            "text": "באותו אופן היא הייתה מסמנת עמלה מושהית גם לסוכנויות.",
+            "tech": "Update Gen_agencieBase set Gen_commissionpostponed = 1 where ((gen_bookkeepingexp is not null and gen_bookkeepingexp < getutcdate()) or (Gen_LicenseExpDate is not null and Gen_LicenseExpDate < getutcdate())) AND (Gen_commissionpostponed IS NULL OR Gen_commissionpostponed = 0)"
+          },
+          {
+            "type": "step",
+            "text": "בגרסה הזו לא נקבעה סיבת השהיה, ואישור ניכוי המס לא נבדק.",
+            "tech": "SQLTask:Connection={D51CCED1-9F31-4C56-840C-E21FF6667EC7} = [CRM] (DTSX:3160) · SQL ישיר (היה Unsupported)"
+          },
+          {
+            "type": "end",
+            "text": "כל עוד המשימה מושבתת, אין לה השפעה על ה-CRM."
+          }
+        ]
+      },
+      "detail_he": [
+        {
+          "h": "מקור ואוכלוסייה",
+          "t": "לא רלוונטי; המשימה מושבתת."
+        },
+        {
+          "h": "התאמה לרשומות קיימות",
+          "t": "לא רלוונטי."
+        },
+        {
+          "h": "החלטות",
+          "t": "אין (מושבתת)."
+        },
+        {
+          "h": "כתיבה ל-CRM",
+          "t": "אין כתיבה פעילה. ה-SQL המתועד הוא UPDATE ישיר על Gen_agentsBase ועל Gen_agencieBase דרך [CRM], ואילו היה פעיל היה Unsupported."
+        },
+        {
+          "h": "תוצאה עסקית",
+          "t": "אין."
+        }
+      ],
+      "decisions": [],
+      "crmEffects": [],
+      "evidence": [
+        "Set Gen_commissionpostponed DTSX:3156-3160 (Disabled=True)"
+      ],
+      "openQuestions_he": []
+    }
+  ],
+  "findings_he": [
+    {
+      "severity": "high",
+      "text": "עדכון SQL ישיר על טבלאות CRM (Unsupported): gen_agentvalue ב-Gen_agentsBase ו-gen_agencyvalue ב-Gen_agencieBase. מנהל החיבורים [CRM] מצביע בזמן תכנון על Psql/ALTSHULER_MSCRM; קובץ התצורה החיצוני עשוי לדרוס זאת (לא סופק). העדכון עוקף את פלטפורמת ה-CRM (השערה לגבי ההשפעה: תוספים, ביקורת, ModifiedOn).",
+      "evidence": "Update Agents DTSX:5171-5174; Update Agencies DTSX:5127-5130; [CRM] DTSX:4-6"
+    },
+    {
+      "severity": "medium",
+      "text": "בפיצול 'Agent Or Agency' נבדק קודם קיום סוכן. לכן צירוף שיש בו גם סוכן וגם סוכנות מעדכן רק את שווי הסוכן, ושווי הסוכנות מתעדכן רק מצירופים בלי סוכן. כך שווי הסוכנות אינו כולל יתרות של קופות שמשויכות לסוכן שלה (מסקנה מהזרימה).",
+      "evidence": "Agent Or Agency DTSX:5025-5037 (EvaluationOrder 0 = Update Agent)"
+    },
+    {
+      "severity": "medium",
+      "text": "הסכום מחושב לפי צירוף של סוכן וסוכנות, ולא לפי סוכן בלבד. סוכן שמופיע עם יותר מסוכנות אחת, או גם עם סוכנות וגם בלעדיה, יקבל כמה פקודות עדכון בריצה אחת עם סכומים חלקיים שונים. הערך הסופי נקבע לפי השורה האחרונה שעובדה, ואין ORDER BY. כלומר, הערך הסופי אינו בהכרח סך כל התיק (מסקנה מהשאילתה).",
+      "evidence": "Get agent Data SqlCommand DTSX:5061 (group by gen_agentsid, gen_agencieid, …)"
+    },
+    {
+      "severity": "low",
+      "text": "בתנאי הסינון ABS(sum - isnull(gen_agentvalue,0) + isnull(gen_agencyvalue,0)) > 1 הערך gen_agencyvalue מתווסף ולא מחוסר. הניתוח הבא מניח ש-gen_agentvalue הוא של gen_agents ו-gen_agencyvalue של Gen_agencie (השערה; טבלת המקור של שתי העמודות לא ידועה). (א) בצירוף בלי סוכן gen_agentvalue נחשב 0, והתנאי הוא ABS(sum + gen_agencyvalue השמור) > 1. אם הערך השמור הוא הסכום שנכתב בעדכון הקודם, ויתרות הצירופים בלי סוכן של אותה סוכנות לא השתנו מאז, התנאי שווה ל-ABS(2×sum) ומתקיים לכל סכום שערכו המוחלט גדול מ-0.5, ולכן בכל ריצה כזו הסוכנות נכתבת מחדש עם אותו ערך. אם היתרות השתנו, התנאי הוא ABS(הסכום החדש + הסכום הקודם) > 1: כשהוא מתקיים נכתב הסכום החדש, וכשלא (הסכום החדש קרוב להיפוך של הקודם) העדכון מדלג. (ב) גם בצירוף שיש בו סוכן וגם סוכנות, הוספת gen_agencyvalue משפיעה על זיהוי השינוי. גם כשהסכום שווה ל-gen_agentvalue, התנאי מצטמצם ל-ABS(gen_agencyvalue) > 1: אם |gen_agencyvalue| > 1, הצירוף נשלף ונכתב מחדש עם אותו ערך; אם לא (למשל gen_agencyvalue ריק או 0), הוא אינו נשלף. מנגד, עדכון עשוי להידלג כשהפער sum − gen_agentvalue קרוב ל-gen_agencyvalue בסימן הפוך (מסקנה מהביטוי).",
+      "evidence": "Get agent Data DTSX:5061 (having clause); verify-A.json"
+    },
+    {
+      "severity": "medium",
+      "text": "התנאי gen_commissionpostponed != 1 אינו מחזיר רשומות שבהן הדגל ריק (NULL), לפי סמנטיקת SQL. לכן סוכן או סוכנות שהדגל שלהם מעולם לא נקבע לא יושהו, גם אם מסמכיהם פגו. לעומת זאת, המשימה המושבתת טיפלה במפורש ב-IS NULL.",
+      "evidence": "get Agents details DTSX:6007; get Agencies details DTSX:3946; Set Gen_commissionpostponed DTSX:3160"
+    },
+    {
+      "severity": "info",
+      "text": "החבילה רק מסמנת עמלה כמושהית. אין בה כתיבה שמחזירה את gen_commissionpostponed ל-false כשהמסמכים מתחדשים. אם יש מנגנון כזה, הוא נמצא מחוץ לחבילה (external_unknown).",
+      "evidence": "update agetns… main.cs:73; update agencies… main.cs:73"
+    },
+    {
+      "severity": "medium",
+      "text": "פלט CastingError של שני סקריפטי ההשהיה אינו מחובר, ולכן שורה שמנותבת אליו (main.cs:83-92) אינה מתועדת. עם זאת, הישות כבר נוספה לרשימה (main.cs:77) לפני הקריאה ל-ExcecuteBulk (main.cs:79-80), ולכן היא אינה הולכת לאיבוד. אם ExcecuteBulk זורק חריגה, הפקודה myEntities.Clear() (main.cs:117) אינה מתבצעת. מכיוון שהרשימה כבר לא תחזור לגודל של בדיוק 1000, לא תהיה עוד שליחה בקבוצות. כל הישויות שנותרו, כולל אלה של הקבוצה שנכשלה, יישלחו ב-ExcecuteBulk הסופי ב-EndOfRowset (main.cs:126-128). הקריאה הזו נמצאת מחוץ ל-try/catch, ולכן חריגה בה מכשילה את זרימת הנתונים. (השערה: קבוצה של יותר מ-1000 בקשות עלולה להיכשל בגלל מגבלת ExecuteMultiple.)",
+      "evidence": "main.cs:77, 79-92, 114-117, 120-129; paths DTSX:7061-7064, 5000-5003; verify-A.json"
+    },
+    {
+      "severity": "info",
+      "text": "המשימה Set Gen_commissionpostponed מושבתת (DTS:Disabled=True), ולכן אינה כותבת. התיעוד שלה הוא מידע בלבד.",
+      "evidence": "DTSX:3156"
+    }
+  ]
+}

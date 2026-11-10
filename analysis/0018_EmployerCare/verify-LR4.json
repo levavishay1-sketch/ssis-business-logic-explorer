@@ -1,0 +1,205 @@
+{
+  "verifier": "ssis-verifier",
+  "package": "0018_EmployerCare",
+  "scope": "logic-claims re-check round 4",
+  "checkedAt": "2026-11-07",
+  "source": "source/DailyProcess/0018_EmployerCare.dtsx sha256 D6F9EBA66CF8A0F5EA167A05EB2E97C324F912E0F3A421045651D73ACD049746",
+  "checked": 12,
+  "results": [
+    {
+      "id": "L|summary",
+      "hash": "f544cdf2a5db",
+      "verdict": "WRONG",
+      "detail": "Correct units: the stage-1 population (DTSX:1425-1432: state 2, deposit reason NULL or not in 6,7,8,9,11, INNER JOIN to gen_customeraccount and Gen_fundmain); the full-cache lookup on gen_fundmainid = gen_fundnumber (DTSX:1364-1368, ParameterMap DTSX:1384); main.cs:132-133 (OptionSetValue(3) //Finished, gen_modifiedbybank = DateTime.Now). The stage-2 text is now correct. The WHERE (DTSX:6777-6779) cannot see the SELECT alias, so the unqualified gen_employeroperationpersonname is a base-table column of unknown owner. The text says so and labels the guess השערה. The condition reads: account value NOT NULL AND (different OR column NULL). That is exactly the SQL three-valued result. 'NULL in the account does not clear the care record' is true: those rows are never selected, and no other writer in the package writes the attribute. scopeNote verified: one connection manager [CRM] (DTSX:3-9), EnableConfig=True, config at DTSX:11, 8 SDK writers at the lines cited (247, 256, 821, 1946, 2669, 3209, 5689, 5698, 6226, 7290), and the two ETL Warning components are identical apart from line numbers. One unit is wrong, on NULL semantics in stage 1. The text says the qualifying transaction is one 'שקוד סוג התנועה שלה אינו מכיל '99''. The SQL is 'gen_transactiontypeid NOT LIKE '%99%''. For a NULL code this evaluates to UNKNOWN, so the row is excluded. As written, the text includes a transaction whose code is empty. The column is a string (Gen_TransactionTypeID is DT_WSTR(10) on gen_fundtransactiontype in 0008_LeumiFile-PY DTSX:62960), so NULL is a possible value. The same summary spells out the NULL case for the deposit reason and for the operation person, but not here.",
+      "evidence": "DTSX:1364-1368 (Get All Transaction SqlCommand), DTSX:1384, DTSX:1425-1432, main.cs:127-133 (DTSX:1540 block), DTSX:6772-6779, main.cs:127-132 (DTSX:6884 block)",
+      "wrongUnits": [
+        {
+          "unit": "[1] summary_he: 'מקבוצת תנועה 1 שקוד סוג התנועה שלה אינו מכיל '99''",
+          "problem": "NULL semantics. NOT LIKE '%99%' excludes rows where gen_transactiontypeid is NULL. The text would include them.",
+          "correct": "'... שקוד סוג התנועה שלה (gen_transactiontypeid, עמודה לא מסויגת) קיים (אינו ריק) ואינו מכיל '99''",
+          "evidence": "DTSX:1368"
+        }
+      ]
+    },
+    {
+      "id": "L|exec",
+      "hash": "75bc24fe40c5",
+      "verdict": "CONFIRMED",
+      "detail": "Checked because step 4 names the operation-person sync. The DTSX:7925-7928 chain is Get Organization Variables -> Create ETL Process record -> Close Gen_employercare -> Update operation person -> End ETL Process record. All four constraints are default Success, and nothing is disabled. The step-4 label 'סנכרון איש תפעול מחשבון המעסיק' states no ownership and no condition.",
+      "evidence": "DTSX:7925-7928",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|finding#3",
+      "hash": "32772d454ff0",
+      "verdict": "WRONG",
+      "detail": "The first part is correct. main.cs:132 hard-codes new EntityReference(\"account\", ...), and no supplied file proves the lookup target. The consequence is stated as fact: 'אם לא, כל עדכון ייכשל ויירשם כאזהרת ETL'. This is failure handling, and the files do not prove it. Per-item faults reach ErrorBuffer only if ExecuteMultipleExtension.ExecuteMultipleRequest() returns a response whose 'Responses' contain a Fault for every item (main.cs:150-169). That depends on the external CRM.Proxy assembly (its ContinueOnError setting, and whether it throws). The assembly was not supplied. If the request is sent with ContinueOnError=false, processing stops at the first fault and the remaining items in the batch get no response row. If the call throws, the data flow fails and the OnError handler runs (DTSX:5482 ff.). No ETL warning is created in either case. Whether the CRM rejects a reference of the wrong type is also documented platform behaviour, not shown in the files.",
+      "evidence": "Update CustomerCare main.cs:132, 150-169 (DTSX:6884 block, ExecuteMultipleExtension DTSX:7290); OnError handler DTSX:5482",
+      "wrongUnits": [
+        {
+          "unit": "[1] 'אם לא, כל עדכון ייכשל ויירשם כאזהרת ETL'",
+          "problem": "This failure-handling consequence depends on the external ExecuteMultipleExtension and on CRM runtime behaviour. It is stated as fact.",
+          "correct": "'אם לא, צפוי שהעדכונים ייכשלו (התנהגות CRM, לא מוצגת בקבצים); תקלה שתחזור כ-Fault בתשובת ExecuteMultiple תירשם כאזהרת ETL, וחריגה תכשיל את זרימת הנתונים ותפעיל את מטפל ה-OnError. האופן שבו CRM.Proxy מטפל בתקלות – לא ידוע (external_unknown)'",
+          "evidence": "main.cs:150-169"
+        }
+      ]
+    },
+    {
+      "id": "L|finding#4",
+      "hash": "eab1295cd2a8",
+      "verdict": "CONFIRMED",
+      "detail": "When a.gen_operationperson is NULL, '!=' yields UNKNOWN and the second disjunct requires a.gen_operationperson IS NOT NULL, so the row is not selected (DTSX:6778-6779). No other writer in the package writes gen_employeroperationpersonname, so the old value stays. This holds whichever table owns the unqualified compared column. The finding makes no ownership statement.",
+      "evidence": "DTSX:6772-6779; Update CustomerCare main.cs:132",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|finding#5",
+      "hash": "18ced5df98a9",
+      "verdict": "CONFIRMED",
+      "detail": "Precedence Close Gen_employercare -> Update operation person is Success (DTSX:7927). The SQL has no state filter (DTSX:6772-6779), so records moved to state 3 earlier in the run are eligible. 'על כל רשומות' is read as 'regardless of state'. The update still applies only to rows that pass the WHERE.",
+      "evidence": "DTSX:7927, DTSX:6772-6779",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Update operation person|title",
+      "hash": "0b05c094c5e6",
+      "verdict": "WRONG",
+      "detail": "The write is correct: Update CustomerCare main.cs:130-132 sets gen_employeroperationpersonname = EntityReference(\"account\", a.gen_operationperson alias), and the data path is a direct source -> script (component.mjs --list). But the text states as fact that the compared value is the care record's own operation person. In the WHERE (DTSX:6777-6779), gen_employeroperationpersonname is unqualified. A SELECT alias cannot be used in a WHERE, so it is a base-table column, and the files do not prove which of gen_employercare / account it belongs to. The summary itself says this is unknown, so the title contradicts it. flow_he[2] also omits that a NULL account value never selects a row: 'הערך שונה' is true in plain language when the care has a value and the account is NULL, but such rows are not selected.",
+      "evidence": "DTSX:6772-6779; main.cs:127-132",
+      "wrongUnits": [
+        {
+          "unit": "[2] short_he: 'לכל רשומת טיפול מעסיק שאיש התפעול שלה שונה מאיש התפעול שמוגדר בחשבון המעסיק'",
+          "problem": "States that the compared column belongs to the care record. Its owner is unknown (unqualified column).",
+          "correct": "'... כשבחשבון המעסיק מוגדר איש תפעול והוא שונה מהערך בעמודה gen_employeroperationpersonname שבשאילתה (עמודה לא מסויגת; הטבלה לא ידועה), או כשערך זה ריק ...'",
+          "evidence": "DTSX:6777-6779"
+        },
+        {
+          "unit": "[3] flow_he[1]: 'השוואת איש התפעול ברשומת טיפול המעסיק לאיש התפעול בחשבון המעסיק'",
+          "problem": "States the owner of the compared column as fact.",
+          "correct": "'השוואת איש התפעול בחשבון המעסיק לעמודה הלא-מסויגת gen_employeroperationpersonname'",
+          "evidence": "DTSX:6777"
+        },
+        {
+          "unit": "[4] flow_he[2]: 'בחירת רשומות שבהן הערך שונה, או שהוא ריק בטיפול וקיים בחשבון'",
+          "problem": "States the owner ('ריק בטיפול') as fact. 'הערך שונה' omits that the account value must be non-NULL: account NULL with a care value is 'different' but is not selected.",
+          "correct": "'בחירת רשומות שבהן בחשבון יש ערך, והוא שונה מהעמודה שבשאילתה או שהעמודה ריקה'",
+          "evidence": "DTSX:6778-6779"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Update operation person|short",
+      "hash": "60e12990ac86",
+      "verdict": "WRONG",
+      "detail": "The decision text 'קיים ושונה' does include the NULL-account case. But [1] and [2] state as fact that the compared value is the care record's ('את איש התפעול שלה', 'מזה שברשומת הטיפול'). The column is unqualified and its owner is unknown, as the package summary says. [7] 'איש התפעול בטיפולי המעסיק תואם לזה שבחשבון המעסיק' is false when the account value is NULL: the old value is kept (finding#4). It is also unproven while the ownership of the compared column is unknown.",
+      "evidence": "DTSX:6772-6779",
+      "wrongUnits": [
+        {
+          "unit": "[1] 'משווה, לכל רשומת טיפול מעסיק, את איש התפעול שלה לאיש התפעול שמוגדר בחשבון המעסיק'",
+          "problem": "Ownership stated as fact.",
+          "correct": "'משווה את איש התפעול בחשבון המעסיק לעמודה gen_employeroperationpersonname שבשאילתה (לא מסויגת; הטבלה לא ידועה)'",
+          "evidence": "DTSX:6777"
+        },
+        {
+          "unit": "[2] 'האם איש התפעול בחשבון המעסיק קיים ושונה מזה שברשומת הטיפול?'",
+          "problem": "Ownership stated as fact.",
+          "correct": "'... קיים, ושונה מהעמודה שבשאילתה או שהיא ריקה?'",
+          "evidence": "DTSX:6778-6779"
+        },
+        {
+          "unit": "[7] (end) 'איש התפעול בטיפולי המעסיק תואם לזה שבחשבון המעסיק'",
+          "problem": "False when the account value is NULL, because the care value is not cleared.",
+          "correct": "'רשומות שנבחרו מקבלות את איש התפעול מחשבון המעסיק; ערך ריק בחשבון אינו מועתק'",
+          "evidence": "DTSX:6778-6779"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Update operation person|detailed",
+      "hash": "86b337fc2254",
+      "verdict": "WRONG",
+      "detail": "Correct: the write in [7] (EntityReference(\"account\", ...), RequestType.Update, batches of 100 plus the remainder, main.cs:132-139, 185-187); 'גם כשאיש התפעול נמחק ... הערך הישן נשאר' in [6]; the condition quoted in the tech of [2]. Wrong: [2] states ownership as fact ('איש התפעול ברשומת הטיפול', 'ריק בטיפול'). The tech of [1] adds '(בפועל INNER JOIN)'. That holds only if the unqualified 'accountid' in 'ec.gen_employername = accountid' is a.accountid, which is not argued or proven (same ownership rule). [8] 'עדכון שנכשל מועבר לרישום אזהרות ה-ETL' is an absolute failure-handling statement. Only Faults returned inside the ExecuteMultiple response reach ErrorBuffer (main.cs:164-168). A thrown exception fails the data flow and triggers the OnError handler. Which happens depends on the external ExecuteMultipleExtension.",
+      "evidence": "DTSX:6772-6779; main.cs:127-189 (DTSX:6884 block); OnError DTSX:5482",
+      "wrongUnits": [
+        {
+          "unit": "[2] decision: 'האם איש התפעול ברשומת הטיפול שונה ... או ריק בטיפול כשבחשבון יש ערך?'",
+          "problem": "Ownership of the unqualified column is stated as fact.",
+          "correct": "'האם בחשבון המעסיק יש ערך, והוא שונה מהעמודה gen_employeroperationpersonname שבשאילתה (לא מסויגת; הטבלה לא ידועה) או שהעמודה ריקה?'",
+          "evidence": "DTSX:6777-6779"
+        },
+        {
+          "unit": "[1] tech '(בפועל INNER JOIN)'",
+          "problem": "This relies on the unqualified 'accountid' belonging to account. It is not stated as an assumption and not argued.",
+          "correct": "Say that the column is unqualified, or give the ambiguity argument with evidence that only account has accountid.",
+          "evidence": "DTSX:6776"
+        },
+        {
+          "unit": "[8] 'עדכון שנכשל מועבר לרישום אזהרות ה-ETL'",
+          "problem": "Absolute failure-handling statement. Only per-item Faults in the ExecuteMultiple response are routed to ErrorBuffer. A thrown exception fails the data flow (OnError). External behaviour is unknown.",
+          "correct": "'תקלה שחוזרת כ-Fault בתשובת ExecuteMultiple מועברת לאזהרות ה-ETL (מסגרת); חריגה מכשילה את זרימת הנתונים'",
+          "evidence": "main.cs:150-169"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Update operation person|detail",
+      "hash": "35df95647e92",
+      "verdict": "WRONG",
+      "detail": "[2] and [4] are correct (main.cs:131-132). 'ריק בחשבון אינו מתפשט לטיפול' in [3] is correct. But [3] states ownership as fact: 'או ריק בטיפול וקיים בחשבון'. The column in 'gen_employeroperationpersonname is null' is unqualified and its owner is unknown. [5] 'איש התפעול בטיפול המעסיק עוקב אחרי איש התפעול שמוגדר בחשבון המעסיק' is not exact: when the account value becomes NULL the care keeps its old value. [1] 'קיים ב-account' likewise relies on the unqualified accountid being account's. That is a minor point and is not argued.",
+      "evidence": "DTSX:6772-6779; main.cs:127-132",
+      "wrongUnits": [
+        {
+          "unit": "[3] 'עדכון רק אם gen_employeroperationpersonname != a.gen_operationperson, או ריק בטיפול וקיים בחשבון'",
+          "problem": "Ownership ('בטיפול') stated as fact.",
+          "correct": "'... או כשהעמודה gen_employeroperationpersonname שבשאילתה (לא מסויגת; הטבלה לא ידועה) ריקה וקיים ערך בחשבון'",
+          "evidence": "DTSX:6779"
+        },
+        {
+          "unit": "[5] 'איש התפעול בטיפול המעסיק עוקב אחרי איש התפעול שמוגדר בחשבון המעסיק'",
+          "problem": "Omits the NULL case. A NULL account value is not copied, so the care record does not follow it.",
+          "correct": "'... עוקב אחרי ערך קיים בחשבון המעסיק; ערך ריק בחשבון אינו מועתק'",
+          "evidence": "DTSX:6778-6779"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Update operation person|decisions",
+      "hash": "5a81cc51a888",
+      "verdict": "WRONG",
+      "detail": "The condition text in [1] is verbatim (DTSX:6776-6779), and [2] is correct (main.cs:127-128). But meaning_he of [1], 'יש חשבון מעסיק ואיש התפעול בו שונה מזה שבטיפול או שבטיפול הוא ריק', states ownership as fact ('שבטיפול'). It also omits the NULL case: an account with a NULL value and a care with a value are 'different' in plain language, but the row is not selected.",
+      "evidence": "DTSX:6776-6779",
+      "wrongUnits": [
+        {
+          "unit": "[1] meaning_he",
+          "problem": "Ownership stated as fact, and the NULL-account case is omitted.",
+          "correct": "'יש חשבון מעסיק עם ערך באיש התפעול, והוא שונה מהעמודה שבשאילתה (לא מסויגת; הטבלה לא ידועה) או שהעמודה ריקה'",
+          "evidence": "DTSX:6778-6779"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Update operation person|crm",
+      "hash": "c272ddceb690",
+      "verdict": "WRONG",
+      "detail": "Entity gen_employercare, Update (RequestType.Update), mechanism SDK, and the attribute gen_employeroperationpersonname are all correct. when_he 'כשאיש התפעול בחשבון המעסיק קיים ושונה מזה שבטיפול' includes the NULL case but states as fact that the compared value is the care record's ('שבטיפול'). The column is unqualified and its owner is unknown.",
+      "evidence": "DTSX:6777-6779; main.cs:99, 130-132",
+      "wrongUnits": [
+        {
+          "unit": "[1] when_he",
+          "problem": "Ownership stated as fact.",
+          "correct": "'כשאיש התפעול בחשבון המעסיק קיים, ושונה מהעמודה gen_employeroperationpersonname שבשאילתה (לא מסויגת; הטבלה לא ידועה) או שהיא ריקה'",
+          "evidence": "DTSX:6777-6779"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Update operation person|open",
+      "hash": "2d4f9e295fa8",
+      "verdict": "CONFIRMED",
+      "detail": "[1] No supplied file defines the lookup targets. main.cs:132 hard-codes 'account'. 'העדכון ייכשל' is stated conditionally, as an open question. [2] The ownership is labelled השערה. This agrees with the summary.",
+      "evidence": "main.cs:132; DTSX:6777",
+      "wrongUnits": []
+    }
+  ],
+  "missingWrites": []
+}

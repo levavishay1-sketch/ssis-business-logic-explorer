@@ -1,0 +1,159 @@
+{
+ "package": "0023_Employers",
+ "dataFlows": [
+  "Package\\Set MF on employers",
+  "Package\\Update employer amount"
+ ],
+ "analyst": "ssis-field-lineage",
+ "scriptOutputs": [],
+ "crmWrites": [
+  {
+   "component": "Package\\Set MF on employers\\Create",
+   "identicalCopies": [],
+   "entity": "gen_employers",
+   "verb": "UPDATE",
+   "mechanism": "SDK (CRM.Proxy ExecuteMultipleExtension, RequestType.Update, batches of 1000) — despite the component name 'Create'",
+   "status": "Supported",
+   "recordKey": "Entity.Id = Row.Genemployersid (main.cs:126) — Gen_employersid from OLE DB Source 'Get Employer Nunmer' (select gen_corporatenumber, Gen_employersid, product.ProductTypeCode from Gen_employers join product on productid = gen_fundtypename, DTSX 5689), attached by LEFT Merge Join (JoinType=1, 1 key, DTSX 5732-5734) on gen_corporatenumber = trimmed file 'ח פ'. One write per matching gen_employers record (an employer number can have one record per fund type). Not listed in recordKeyColumns: the column's origin is a CRM SQL projection with a JOIN (no file lineage, tool marks it open); its file influence ('ח פ') is declared per attribute.",
+   "recordKeyColumns": [],
+   "declaredRowFilters": [
+    {
+     "file": "MF Source",
+     "field": "ח פ",
+     "via": "Package\\Set MF on employers\\Merge Join → Check if employer exist",
+     "why": "LEFT Merge Join of the file (Sort by trimmed gen_corporatenumber = 'ח פ') with CRM gen_employers⋈product (Sort 1 by gen_corporatenumber); rows without a CRM employer get Gen_employersid NULL and go to 'Employer not exist' (ISNULL(Gen_employersid)) → ETL warning, never to the writer; a file row matching several gen_employers records is multiplied (one update per record)",
+     "evidence": "Merge Join DTSX 5732-5734; Check if employer exist DTSX 3800; Get Employer Nunmer SQL DTSX 5689"
+    }
+   ],
+   "condition": "Executable 'Set MF on employers' runs only when @[User::isFileExist] (Constraint 4, DTSX 8057). Per file row: LEFT Merge Join with gen_employers⋈product on gen_corporatenumber = trimmed 'ח פ'; 'Check if employer exist' not ISNULL(Gen_employersid) (else ETL warning); 'Check Fund type' (CRM product type of the matched record): ProductTypeCode == 200001 || == 1 → 'Pension Fund', == 200000 || == 2 → 'Study Fund', any other code → 'DE Output' (unconnected, dropped); 'Check If Date Valid' (evaluation order): 'Deposit Date Valid' = !ISNULL(gen_mfdepositstartdate) && gen_mfdepositstartdate < GETDATE(), else 'MF Accumulation Date Valid' = accumulation, start and end not NULL && start < GETDATE() && end > GETDATE(); otherwise Default → ETL warning (no write). Both valid outputs → Union All 1 → this writer.",
+   "attributes": [
+    {
+     "attribute": "gen_mfaccumulation",
+     "from": [ { "column": "gen_mfaccumulation", "role": "value" } ],
+     "expression": "Entity[\"gen_mfaccumulation\"] = Row.genmfaccumulation (double) when not NULL. Pension branch 'Set Pension Fund Columns': gen_mfaccumulation = provident_fund (DTSX 5936) = 'convert' ISNULL(provident_fund_Source) || provident_fund_Source == \"\" ? NULL(DT_R8) : (DT_R8)provident_fund_Source (DTSX 3864) on trimmed file 'גמל'; Study branch 'Set Study Fund Columns': gen_mfaccumulation = study_fund (DTSX 5994) = (DT_R8) of trimmed file 'השתלמות' (DTSX 3858). The branch is chosen by the CRM ProductTypeCode of the matched gen_employers record, not by the file.",
+     "fixedValue": null,
+     "condition": "!Row.genmfaccumulation_IsNull",
+     "evidence": "main.cs:127-128",
+     "declaredSources": [
+      { "file": "MF Source", "field": "ח פ", "role": "key", "why": "identifies the gen_employers record(s) updated (Entity.Id = Gen_employersid matched by Merge Join on gen_corporatenumber = trimmed 'ח פ') and, through the matched record's ProductTypeCode, whether 'גמל' or 'השתלמות' is written", "evidence": "main.cs:126; DTSX 5689, 5732-5734, 3715, 3723" }
+     ]
+    },
+    {
+     "attribute": "gen_mfaccumulationenddate",
+     "from": [ { "column": "gen_mfaccumulationenddate", "role": "value" } ],
+     "expression": "Entity[\"gen_mfaccumulationenddate\"] = Row.genmfaccumulationenddate (DateTime) when not NULL; = EndDate (both branches, DTSX 5948/6006) = 'convert' ISNULL(EndDate_Source) || EndDate_Source == \"\" ? NULL(DT_DBTIMESTAMP) : (DT_DBTIMESTAMP)EndDate_Source (DTSX 3846) on trimmed file 'ת סיום' (cast failure: FailComponent)",
+     "fixedValue": null,
+     "condition": "!Row.genmfaccumulationenddate_IsNull",
+     "evidence": "main.cs:129-130",
+     "declaredSources": [
+      { "file": "MF Source", "field": "ח פ", "role": "key", "why": "identifies the gen_employers record(s) updated (Merge Join on gen_corporatenumber = trimmed 'ח פ' → Entity.Id = Gen_employersid)", "evidence": "main.cs:126; DTSX 5689, 5732-5734" }
+     ]
+    },
+    {
+     "attribute": "gen_mfaccumulationstartdate",
+     "from": [ { "column": "gen_mfaccumulationstartdate", "role": "value" } ],
+     "expression": "Entity[\"gen_mfaccumulationstartdate\"] = Row.genmfaccumulationstartdate (DateTime) when not NULL; = StartDate (DTSX 5942/6000) = 'convert' ISNULL(StartDate_Source) || StartDate_Source == \"\" ? NULL(DT_DBTIMESTAMP) : (DT_DBTIMESTAMP)StartDate_Source (DTSX 3840) on trimmed file 'ת התחלה'",
+     "fixedValue": null,
+     "condition": "!Row.genmfaccumulationstartdate_IsNull",
+     "evidence": "main.cs:131-132",
+     "declaredSources": [
+      { "file": "MF Source", "field": "ח פ", "role": "key", "why": "identifies the gen_employers record(s) updated (Merge Join on gen_corporatenumber = trimmed 'ח פ' → Entity.Id = Gen_employersid)", "evidence": "main.cs:126; DTSX 5689, 5732-5734" }
+     ]
+    },
+    {
+     "attribute": "gen_mfdeposit",
+     "from": [ { "column": "gen_mfdeposit", "role": "value" } ],
+     "expression": "Entity[\"gen_mfdeposit\"] = Row.genmfdeposit (double) when not NULL; = Dposit (DTSX 5954/6012) = 'convert' ISNULL(Dposit_Source) || Dposit_Source == \"\" ? NULL(DT_R8) : (DT_R8)Dposit_Source (DTSX 3870) on trimmed file 'הפקדה'",
+     "fixedValue": null,
+     "condition": "!Row.genmfdeposit_IsNull",
+     "evidence": "main.cs:133-134",
+     "declaredSources": [
+      { "file": "MF Source", "field": "ח פ", "role": "key", "why": "identifies the gen_employers record(s) updated (Merge Join on gen_corporatenumber = trimmed 'ח פ' → Entity.Id = Gen_employersid)", "evidence": "main.cs:126; DTSX 5689, 5732-5734" }
+     ]
+    },
+    {
+     "attribute": "gen_mfdepositstartdate",
+     "from": [ { "column": "gen_mfdepositstartdate", "role": "value" } ],
+     "expression": "Entity[\"gen_mfdepositstartdate\"] = Row.genmfdepositstartdate (DateTime) when not NULL; = Deposit_Start_Date (DTSX 5960/6018) = 'convert' ISNULL(Deposit_Start_Date_Source) || Deposit_Start_Date_Source == \"\" ? NULL(DT_DBTIMESTAMP) : (DT_DBTIMESTAMP)Deposit_Start_Date_Source (DTSX 3852) on trimmed file 'תאריך התחלת הסכם מהפקדה'",
+     "fixedValue": null,
+     "condition": "!Row.genmfdepositstartdate_IsNull",
+     "evidence": "main.cs:135-136",
+     "declaredSources": [
+      { "file": "MF Source", "field": "ח פ", "role": "key", "why": "identifies the gen_employers record(s) updated (Merge Join on gen_corporatenumber = trimmed 'ח פ' → Entity.Id = Gen_employersid)", "evidence": "main.cs:126; DTSX 5689, 5732-5734" }
+     ]
+    }
+   ],
+   "evidence": "main.cs:121-170 (component DTSX line 3885; Entity.LogicalName = \"gen_employers\" main.cs:125; Entity.Id main.cs:126; ExecuteMultipleExtension(myEntities, RequestType.Update, crmServiceProxy.GetCrmService()) main.cs:147; flush at 1000 main.cs:140-143 and at EndOfRowset main.cs:178-181)"
+  },
+  {
+   "component": "Package\\Update employer amount\\Update Account",
+   "identicalCopies": [],
+   "entity": "account",
+   "verb": "UPDATE",
+   "mechanism": "SQL (UPDATE dbo.AccountBase via OLE DB Command) on connection CRM (psql / altshuler_mscrm)",
+   "status": "Unsupported",
+   "recordKey": "WHERE accountid = ? — 3rd '?' = Param_2 = input accountid = account.accountid from OLE DB Source 'get employers' (every CRM account); no file origin. Not listed in recordKeyColumns because the column comes from a CRM SQL projection with JOINs (no file lineage; tool marks it open).",
+   "recordKeyColumns": [],
+   "declaredRowFilters": [],
+   "condition": "Executable 'Update employer amount' follows 'Check File Existence' with !@[User::isFileExist] (Constraint 5) and 'Move FileTo Archive' (Constraint 6). Rows: every account returned by 'get employers'; 'Check if to update' (evaluation order 0-3): ISNULL(Gen_employeesweightedmanagementfeeDB) | ISNULL(Gen_EmployeesFundsValueDB) | Gen_employeesweightedmanagementfee != Gen_employeesweightedmanagementfeeDB | Gen_EmployeesFundsValue != Gen_EmployeesFundsValueDB → Union All → Update Account; otherwise Default output (unconnected, no write). Independent of the file content.",
+   "attributes": [
+    {
+     "attribute": "gen_employeesfundsvalue",
+     "from": [],
+     "expression": "SET Gen_EmployeesFundsValue = ? — 1st '?' = Param_0 = input Gen_EmployeesFundsValue = 'get employers' SUM(ISNULL(gen_fundmain.gen_accountbalance,0)) over FROM account LEFT JOIN gen_employers ON gen_employers.gen_corporatename = accountid LEFT JOIN gen_fundmain ON gen_fundmain.gen_employernumber = Gen_employersId GROUP BY accountid, Gen_employeesweightedmanagementfee, Gen_EmployeesFundsValue (0 when the account has no employer funds). Computed from CRM data only; no file field.",
+     "fixedValue": null,
+     "condition": "row passed 'Check if to update' (see write condition)",
+     "evidence": "SqlCommand DTSX 7991-7994 (Param_0); get employers SQL DTSX 7796-7808; split DTSX 7747-7771"
+    },
+    {
+     "attribute": "gen_employeesweightedmanagementfee",
+     "from": [],
+     "expression": "SET Gen_employeesweightedmanagementfee = ? — 2nd '?' = Param_1 = input Gen_employeesweightedmanagementfee = 'get employers' CASE WHEN SUM(ISNULL(gen_fundmain.gen_accountbalance,0)) = 0 THEN 0 ELSE SUM(ISNULL(gen_fundmain.Gen_AccountBalance,0) * gen_fundmain.Gen_managementFeePercentage) / SUM(ISNULL(gen_fundmain.gen_accountbalance,0)) END (balance-weighted management fee over the same joins). Computed from CRM data only; no file field.",
+     "fixedValue": null,
+     "condition": "row passed 'Check if to update' (see write condition)",
+     "evidence": "SqlCommand DTSX 7991-7994 (Param_1); get employers SQL DTSX 7796-7808"
+    }
+   ],
+   "evidence": "OLE DB Command DTSX 7988 (SqlCommand line 7991: UPDATE dbo.AccountBase SET Gen_EmployeesFundsValue = ?, Gen_employeesweightedmanagementfee = ? where accountid = ?; input→param binding accountid→Param_2, Gen_EmployeesFundsValue→Param_0, Gen_employeesweightedmanagementfee→Param_1)"
+  }
+ ],
+ "readWriteModifications": [
+  {
+   "component": "Package\\Set MF on employers\\TRIM",
+   "column": "*",
+   "from": [],
+   "expression": "reflection over every string property of the row: if (!String.IsNullOrEmpty(str)) str = str.Trim() (empty strings stay \"\"; 'convert' then maps \"\"/NULL to NULL)",
+   "condition": null,
+   "evidence": "main.cs:33-58 (DTSX 6368)"
+  }
+ ],
+ "lookupBridges": [],
+ "unresolved": [
+  {
+   "where": "Set MF on employers\\Create (all attributes)",
+   "reason": "blocked_external_dependency: CRM.Proxy (CrmProxy, ExecuteMultipleExtension, RequestType) is an external assembly not supplied; that RequestType.Update issues Update requests and its error options are not provable from the DTSX. CRM attribute metadata is not supplied: gen_mfaccumulation/gen_mfdeposit are assigned as double and the dates as DateTime (Kind unspecified) — whether CRM accepts these types is unverified."
+  },
+  {
+   "where": "Set MF on employers\\Create input Gen_employersid / Update employer amount\\Update Account (all inputs)",
+   "reason": "Origins are CRM SQL projections with JOINs ('Get Employer Nunmer', 'get employers') that the lineage tool leaves as open sql-expressions; resolved here in prose (record key / from: [] with the SQL quoted). They carry no file field."
+  },
+  {
+   "where": "Package precedence into 'Update employer amount' (DTSX 8058-8059)",
+   "reason": "Constraints 5 and 6 omit DTS:LogicalAnd while constraints 0-3 carry LogicalAnd=\"True\"; this is consistent with OR (run when no file, or after archiving) but the serialization default is not proven from the DTSX alone."
+  },
+  {
+   "where": "End ETL Process record\\ETL Record Finish, Set MF on employers\\ETL Warning 1 (OPEN Create.Error.ErrorDescription, Get gen_etlprocessid)",
+   "reason": "ETL plumbing (gen_etlprocess / gen_etlprocesswarning) — out of scope by CLAUDE.md focus; not mapped."
+  }
+ ],
+ "notes": [
+  "Component 'Create' in 'Set MF on employers' performs an UPDATE of gen_employers (RequestType.Update, Entity.Id set), not a create.",
+  "Only rows that pass 'Check If Date Valid' are written, but then ALL five non-NULL values are sent: a row with a valid deposit start date writes the accumulation amount/dates even when the accumulation period is expired or not yet started, and vice versa.",
+  "gen_mfaccumulation comes from 'גמל' for pension-fund employer records (ProductTypeCode 200001/1) and from 'השתלמות' for study-fund records (200000/2); records with any other product type are dropped (unconnected 'DE Output'). The same file row updates every gen_employers record with that corporate number.",
+  "The corporate number 'ח פ' is only trimmed (no zero padding) and must equal gen_employers.gen_corporatenumber exactly (Merge Join, case/space-sensitive sort compare). 'שם מעסיק' is read but never reaches CRM.",
+  "Every cast error in 'convert' (bad date/number text) and every source parse error has errorRowDisposition=FailComponent → the data flow fails rather than skipping the row.",
+  "Create's ExcecuteBulk ignores a null/empty ExecuteMultiple response (no exception, main.cs:149-169); faults are routed to the Error output → ETL warning only.",
+  "'Update employer amount' (direct SQL on AccountBase, Unsupported) does not use the file at all: it recomputes, for every account, the sum of gen_fundmain.gen_accountbalance of its employers' funds and the balance-weighted management fee. Funds whose Gen_managementFeePercentage is NULL drop out of the numerator (NULL product ignored by SUM) but still count in the denominator, lowering the weighted fee. modifiedon/modifiedby are not touched (bypasses CRM auditing/plugins).",
+  "Out of scope (ETL plumbing): Create/End/Error ETL Process record, ETL Warning 1 (+ Set Warning columns*), Get Variables From SystemConfigurarion, Check File Existence, Move FileTo Archive."
+ ]
+}

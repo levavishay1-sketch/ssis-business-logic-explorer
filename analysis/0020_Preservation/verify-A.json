@@ -1,0 +1,92 @@
+{
+ "verifier": "ssis-verifier",
+ "package": "0020_Preservation",
+ "scope": "mapping-A.json",
+ "source": {
+  "file": "source/DailyProcess/0020_Preservation.dtsx",
+  "sha256": "69cba21e4a1769624497ebc9fc63dc7555ad20272bec64070b4e8a70770b7511"
+ },
+ "checked": 13,
+ "results": [
+  {
+   "id": "Dynamics CRM Destination|gen_preservation|UPDATE|gen_currentstate",
+   "verdict": "CONFIRMED",
+   "detail": "Literal 2 (Set columns Expression '2', DTSX:4860) -> destination input gen_currentstate (DTSX:3205, lineageId = Set columns output) -> external column gen_currentstate FieldType Picklist (DTSX:3331-3334). Path: Get preservations -> Set PipeCounter -> Set columns -> Dynamics CRM Destination (paths DTSX:4972, 4973, 4970). Write condition re-derived from SQL DTSX:4806-4817: 'gen_transferoutamountinactual is not null or( <date> is not null and <date> < dateadd(\"dd\",-1,getdate()) and p.gen_currentstate = 1)' - the first term stands outside the explicit parentheses, as claimed. Record key: input gen_preservationid (DTSX:3207) from Get preservations, external column Uniqueidentifier (DTSX:3727); gen_preservationid is unqualified in the SELECT but can only bind to Gen_Preservation (its PK) or the query would fail as ambiguous. Verb: ActionType=3 (DTSX:3182) is an enum of the unsupplied KingswaySoft assembly; the claim keeps it unresolved and states UPDATE only as effective outcome - acceptable, but the verb itself is not proven by the DTSX (Upsert vs Update stays open). No DTS:Configurations or PropertyExpressions in the package. Minor: SQL ends at DTSX:4817; cited range 4806-4820 overshoots.",
+   "evidence": "0020_Preservation.dtsx:3181-3182,3205,3207,3331-3334,3727,4806-4817,4860,4970,4972-4973"
+  },
+  {
+   "id": "Dynamics CRM Destination|gen_preservation|UPDATE|gen_preservationresault",
+   "verdict": "CONFIRMED",
+   "detail": "Literal 57 (Set columns Expression '57', DTSX:4866) -> input gen_preservationresault (DTSX:3208) -> Picklist gen_preservationresault (DTSX:3739-3742). Same path, key, WHERE and ActionType caveat as gen_currentstate (verb UPDATE = effective outcome only; ActionType=3 unresolved).",
+   "evidence": "0020_Preservation.dtsx:3182,3208,3739-3742,4806-4817,4866,4970"
+  },
+  {
+   "id": "Dynamics CRM Destination|gen_preservation|UPDATE|gen_generalresult",
+   "verdict": "CONFIRMED",
+   "detail": "Literal 2 (Set columns Expression '2', DTSX:4872) -> input gen_generalresult (DTSX:3206) -> Picklist gen_generalresult (DTSX:3541-3544). Same path, key, WHERE and ActionType caveat as gen_currentstate. Destination has exactly 4 input columns (3205-3208): 3 attributes + key; nothing missing.",
+   "evidence": "0020_Preservation.dtsx:3182,3205-3208,3541-3544,4806-4817,4872,4970"
+  },
+  {
+   "id": "LOGIC scopeNote_he",
+   "verdict": "CONFIRMED",
+   "detail": "RE-CHECK 2026-11-06: Now lists five SDK writers, all ETL plumbing, with lines DTSX:283-289, 842-851, 4207-4220, 5225-5235, 5816-5831 (incl. annotation create) - matches raw DTSX. Rest of the note unchanged and correct. | Previous finding: Correct: no DTS:Configuration; the only business write is the KingswaySoft destination on [Kingsway Connection]; [Crm Connection]=PSQL/ALTSHULER_MSCRM is used read-only (Get preservations, Get SystemConfigurations, End ETL Lookup). Wrong count: it says two script components write to CRM (ETL Warning, Close Preservations ETL Counter). There are five SDK writers, all ETL plumbing: Create ETL Process record (Create gen_etlprocess DTSX:283-289), End ETL Process record ETL Record Finish (Update gen_etlprocess DTSX:842-851), ETL Warning (Create gen_etlprocesswarning DTSX:4207-4220), Close Preservations ETL Counter (Create gen_etlprocesscounter DTSX:5225-5235), and the OnError handler (Update gen_etlprocess and Create annotation linked to it, DTSX:5816-5831). No business impact, but the statement as written is false.",
+   "evidence": "0020_Preservation.dtsx:283-289,842-851,4207-4220,5225-5235,5816-5831",
+   "previousVerdict": "INCOMPLETE"
+  },
+  {
+   "id": "LOGIC summary_he",
+   "verdict": "CONFIRMED",
+   "detail": "Selection rule, date priority (withdrawal -> customercare -> pensiontransferout) and three literal values match SQL DTSX:4806-4817 and Set columns DTSX:4860/4866/4872.",
+   "evidence": "0020_Preservation.dtsx:4806-4817,4860,4866,4872"
+  },
+  {
+   "id": "LOGIC executionOrder",
+   "verdict": "CONFIRMED",
+   "detail": "Get Variables -> Create ETL (5620), Create ETL -> Handle Expired Preservations (5621), sequence -> End ETL (5622), inside sequence Close preservations -> Close Preservations ETL Counter (5615). No DTS:Value attribute => Success. OnError handler DTSX:5625.",
+   "evidence": "0020_Preservation.dtsx:5615,5620-5622,5625"
+  },
+  {
+   "id": "LOGIC components[0]",
+   "verdict": "CONFIRMED",
+   "detail": "Flow, decisions, write and RedirectRow error path (DTSX:3203; Error Output -> Set ErrorCounter -> Set Warning columns -> ETL Warning, paths 4971/4974/4969) verified. ActionType=3 'Upsert' is labelled השערה - acceptable; the node text 'מתעדכן' is the effective outcome. Wording nit: detail_he says 'בגלל קדימות האופרטורים' - the grouping comes from the explicit parentheses in the SQL, not operator precedence; the effect stated is correct. Open question that gen_pensiontransferout and gen_transferoutamountinactual are absent from the destination metadata verified (gen_preservationnumber and gen_withdrawalname are present).",
+   "evidence": "0020_Preservation.dtsx:3179-3208,3203,4806-4817,4849-4880,4969-4974"
+  },
+  {
+   "id": "LOGIC findings_he[0]",
+   "verdict": "CONFIRMED",
+   "detail": "'gen_transferoutamountinactual is not null or(' (DTSX:4814) stands outside the parenthesised AND group; such rows are selected regardless of gen_currentstate and date, and rewritten every run (IgnoreUnchangedFields=false in destination properties).",
+   "evidence": "0020_Preservation.dtsx:4814-4817"
+  },
+  {
+   "id": "LOGIC findings_he[1]",
+   "verdict": "CONFIRMED",
+   "detail": "Column is unqualified in a 4-table join (p, w, t_out, pto); owning table not determinable from the DTSX.",
+   "evidence": "0020_Preservation.dtsx:4809-4814"
+  },
+  {
+   "id": "LOGIC findings_he[2]",
+   "verdict": "CONFIRMED",
+   "detail": "Only SELECT statements on [Crm Connection] (End ETL Lookup DTSX:2257, Get SystemConfigurations DTSX:2337, Get preservations DTSX:4806); no OLE DB Command or Execute SQL DML in the package.",
+   "evidence": "0020_Preservation.dtsx:2257,2337,4806"
+  },
+  {
+   "id": "LOGIC findings_he[3]",
+   "verdict": "CONFIRMED",
+   "detail": "Literals 2 / 57 / 2 are in the write path (Set columns -> destination); option-set labels not in the DTSX.",
+   "evidence": "0020_Preservation.dtsx:3205-3208,4860,4866,4872"
+  },
+  {
+   "id": "LOGIC findings_he[4]",
+   "verdict": "CONFIRMED",
+   "detail": "errorRowDisposition=RedirectRow on the destination input; failed rows go to the ETL Warning path and the flow continues.",
+   "evidence": "0020_Preservation.dtsx:3203,4969,4971,4974"
+  },
+  {
+   "id": "LOGIC findings_he[5]",
+   "verdict": "CONFIRMED",
+   "detail": "Comparison with dateadd(\"dd\",-1,getdate()) verified; the UTC remark is explicitly labelled as hypothesis (platform knowledge).",
+   "evidence": "0020_Preservation.dtsx:4816"
+  }
+ ],
+ "missingWrites": []
+}

@@ -1,0 +1,854 @@
+# 0004_LeumiFile-MY.dtsx · E22BEC283D4ED4A103C1F51FD283DBC70CF958E2E932AB903F7BEE1CAC24B10C
+
+## Connection managers
+- [CRM] OLEDB Data Source=psql;Initial Catalog=ALTSHULER_MSCRM;Integrated Security=SSPI;  
+- [Minhali Daily Source] FLATFILE FromDB EXPR ConnectionString=@[User::FullFileName] FLAT RaggedRight cp1255 cols=303
+- [PSRS_GENERIX_STAGING] OLEDB Data Source=psrs;Initial Catalog=GENERIX_STAGING;Integrated Security=SSPI;  
+- [SQL.GENERIX_STAGING] OLEDB Data Source=psql;Initial Catalog=GENERIX_STAGING;Integrated Security=SSPI;  
+- [SRS.SSIS_Logs] OLEDB Data Source=psrs;Initial Catalog=SSIS_Logs;Integrated Security=SSPI;  
+
+## Executables (disabled marked !)
+-   Foreach Loop Container | STOCK:FOREACHLOOP | FOREACH Microsoft.ForEachADOEnumerator ["User::FileName#0","User::FullFileName#1"] 
+-   Foreach Loop Container\Aggregate Account Balance | Microsoft.Pipeline  
+-   Foreach Loop Container\Create Account For Employers | Microsoft.Pipeline  
+-   Foreach Loop Container\Create Accounts For Minhali | Microsoft.Pipeline  
+-   Foreach Loop Container\Create Contacts For Minhali | Microsoft.Pipeline  
+-   Foreach Loop Container\Create Employers | Microsoft.Pipeline  
+-   Foreach Loop Container\Create ETL Process record With File Name | Microsoft.ScriptTask  
+-   Foreach Loop Container\Create Kibutz | Microsoft.Pipeline  
+-   Foreach Loop Container\End ETL Process record | Microsoft.Pipeline  
+-   Foreach Loop Container\Minhali daily | Microsoft.Pipeline  
+-   Foreach Loop Container\Truncate MY_FileData From Staging | Microsoft.ExecuteSQLTask  | SQL: truncate table MY_FileData
+-   Foreach Loop Container\Truncate table AggregateFunds | Microsoft.ExecuteSQLTask  | SQL: truncate table [dbo].[AggregateFunds]
+-   Foreach Loop Container\Write Errors to ETLProcessCounter - Step 1 | Microsoft.ScriptTask  
+-   Foreach Loop Container\Write Errors to ETLProcessCounter - Step 2 | Microsoft.ScriptTask  
+-   Foreach Loop Container\Write Errors to ETLProcessCounter - Step 3 | Microsoft.ScriptTask  
+-   Foreach Loop Container\Write Errors to ETLProcessCounter - Step 4 | Microsoft.ScriptTask  
+-   Foreach Loop Container\Write Errors to ETLProcessCounter - Step 5 | Microsoft.ScriptTask  
+-   Foreach Loop Container\Write MY File To Staging | Microsoft.Pipeline  
+-   Foreach Loop Container.EventHandlers[OnError] | EventHandler  
+-   Foreach Loop Container.EventHandlers[OnError]\Error ETL Process record | Microsoft.ScriptTask  
+- ! Foreach Loop Container 1 | STOCK:FOREACHLOOP | FOREACH Microsoft.ForEachADOEnumerator ["User::FileName#0","User::FullFileName#1"] 
+- ! Foreach Loop Container 1\Move file To Archive | Microsoft.FileSystemTask  
+-   Get closer dates from CalendarRule table | Microsoft.ExecuteSQLTask  | SQL: select starttime FROM CalendarRule where LTRIM(RTRIM(ISNULL(CalendarRule.Name,''))) in ('Friday','Saturday','Holiday') ORDER BY starttime DESC
+-   Get Organization Variables | Microsoft.Pipeline  
+-   Get Sytem User Id | Microsoft.Pipeline  
+-   Set Files | Microsoft.ScriptTask  
+
+## Precedence
+- Foreach Loop Container -> Foreach Loop Container 1 | Success Constraint   
+- Get Organization Variables -> Get Sytem User Id | Success Constraint   
+- Get Sytem User Id -> Get closer dates from CalendarRule table | Success Constraint   
+- Get closer dates from CalendarRule table -> Set Files | Success Constraint   
+- Set Files -> Foreach Loop Container | Success ExpressionAndConstraint @[User::isFileExist]  
+- Foreach Loop Container\Create ETL Process record With File Name -> Foreach Loop Container\Create Account For Employers | Success Constraint   
+- Foreach Loop Container\Create Account For Employers -> Foreach Loop Container\Write Errors to ETLProcessCounter - Step 1 | Success Constraint   
+- Foreach Loop Container\Write Errors to ETLProcessCounter - Step 5 -> Foreach Loop Container\End ETL Process record | Success Constraint   
+- Foreach Loop Container\Create Kibutz -> Foreach Loop Container\Truncate table AggregateFunds | Success Constraint   
+- Foreach Loop Container\Aggregate Account Balance -> Foreach Loop Container\Minhali daily | Success Constraint   
+- Foreach Loop Container\Truncate table AggregateFunds -> Foreach Loop Container\Aggregate Account Balance | Success Constraint   
+- Foreach Loop Container\Write MY File To Staging -> Foreach Loop Container\Create ETL Process record With File Name | Success Constraint   
+- Foreach Loop Container\Truncate MY_FileData From Staging -> Foreach Loop Container\Write MY File To Staging | Success Constraint   
+- Foreach Loop Container\Create Employers -> Foreach Loop Container\Write Errors to ETLProcessCounter - Step 2 | Success Constraint   
+- Foreach Loop Container\Create Contacts For Minhali -> Foreach Loop Container\Write Errors to ETLProcessCounter - Step 3 | Success Constraint   
+- Foreach Loop Container\Create Accounts For Minhali -> Foreach Loop Container\Write Errors to ETLProcessCounter - Step 4 | Success Constraint   
+- Foreach Loop Container\Write Errors to ETLProcessCounter - Step 4 -> Foreach Loop Container\Create Kibutz | Success Constraint   
+- Foreach Loop Container\Write Errors to ETLProcessCounter - Step 1 -> Foreach Loop Container\Create Employers | Success Constraint   
+- Foreach Loop Container\Write Errors to ETLProcessCounter - Step 2 -> Foreach Loop Container\Create Contacts For Minhali | Success Constraint   
+- Foreach Loop Container\Write Errors to ETLProcessCounter - Step 3 -> Foreach Loop Container\Create Accounts For Minhali | Success Constraint   
+- Foreach Loop Container\Minhali daily -> Foreach Loop Container\Write Errors to ETLProcessCounter - Step 5 | Success Constraint   
+
+## DataFlow Foreach Loop Container\Aggregate Account Balance
+  - Aggregate | Aggregate  | conn   | in 4 out 4
+  - Check for last row and product exist | ConditionalSplit  | conn   | in 2 out 0
+  - Count Pipe Rows | RowCount  | conn   | in 0 out 0
+  - Fill table AggregateFunds | OLEDBCommand  | conn [SQL.GENERIX_STAGING]  | in 4 out 0
+  - Format money fields | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 15 out 0
+  - Format money fileds | DerivedColumn  | conn   | in 3 out 3
+  - Get fund type name(product) | Lookup  | conn [CRM]  | in 1 out 5
+  - Multicast | Multicast  | conn   | in 0 out 0
+  - Read MY Data From Staging | OLEDBSource  | conn [PSRS_GENERIX_STAGING] | table [dbo].[MY_FileData] | in 0 out 75
+  - Set fund field data | DerivedColumn  | conn   | in 3 out 1
+  - Set Task Name Variable | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 4 out 0
+     path Aggregate.Outputs[Aggregate Output 1] => Fill table AggregateFunds.Inputs[OLE DB Command Input]
+     path Format money fileds.Outputs[Derived Column Output] => Set fund field data.Inputs[Derived Column Input]
+     path Set fund field data.Outputs[Derived Column Output] => Check for last row and product exist.Inputs[Conditional Split Input]
+     path Check for last row and product exist.Outputs[else] => Get fund type name(product).Inputs[Lookup Input]
+     path Get fund type name(product).Outputs[Lookup Match Output] => Aggregate.Inputs[Aggregate Input 1]
+     path Multicast.Outputs[Multicast Output 1] => Format money fields.Inputs[Input 0]
+     path Multicast.Outputs[Multicast Output 2] => Count Pipe Rows.Inputs[Row Count Input 1]
+     path Read MY Data From Staging.Outputs[OLE DB Source Output] => Set Task Name Variable.Inputs[Input 0]
+     path Set Task Name Variable.Outputs[Output 0] => Multicast.Inputs[Multicast Input 1]
+     path Format money fields.Outputs[Output 0] => Format money fileds.Inputs[Derived Column Input]
+
+## DataFlow Foreach Loop Container\Create Account For Employers
+  - Add 0 to short id num | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 3 out 0
+  - Check for employer funds | ConditionalSplit  | conn   | in 4 out 0
+  - Check for last row | ConditionalSplit  | conn   | in 1 out 0
+  - Check if account exists | Lookup  | conn [CRM]  | in 1 out 14
+  - Check if customer id number | ConditionalSplit  | conn   | in 1 out 0
+  - Count Error Rows 1 | RowCount  | conn   | in 0 out 0
+  - Count Filtered Rows | RowCount  | conn   | in 0 out 0
+  - Count Pipe Rows | RowCount  | conn   | in 0 out 0
+  - Count Update Rows | RowCount  | conn   | in 0 out 0
+  - Counter No Need To Update | RowCount  | conn   | in 0 out 0
+  - Create Account | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 12 out 3
+  - Create Additional Columns | DerivedColumn  | conn   | in 6 out 2
+  - Created | DerivedColumn  | conn   | in 0 out 0
+  - ETL Warning | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 4 out 0
+  - Format Dates | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 1 out 0
+  - Get bank branch Id | Lookup  | conn [CRM]  | in 1 out 1
+  - Get Employer Number Estate | Lookup  | conn [CRM]  | in 1 out 1
+  - Get fund type name(product) | Lookup  | conn [CRM]  | in 1 out 2
+  - merge customer id number and corporate number | DerivedColumn  | conn   | in 5 out 1
+  - Multicast | Multicast  | conn   | in 0 out 0
+  - Multicast 1 | Multicast  | conn   | in 0 out 0
+  - no need to update | DerivedColumn  | conn   | in 0 out 0
+  - Read MY Data From Staging | OLEDBSource  | conn [PSRS_GENERIX_STAGING] | table [dbo].[MY_FileData] | in 0 out 32
+  - Remove accounts with funds | ConditionalSplit  | conn   | in 1 out 0
+  - remove duplicates account | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 1 out 0
+  - Row Insert Count | RowCount  | conn   | in 0 out 0
+  - Set CastingError columns | DerivedColumn  | conn   | in 1 out 4
+  - Set CastingError columns 1 | DerivedColumn  | conn   | in 1 out 4
+  - Set Error columns | DerivedColumn  | conn   | in 1 out 4
+  - Set Error columns 1 | DerivedColumn  | conn   | in 1 out 4
+  - Set null to empty String fileds | DerivedColumn  | conn   | in 9 out 0
+  - Set Task Name Variable | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 0 out 0
+  - Set unknwon customer data | DerivedColumn  | conn   | in 1 out 0
+  - Trim String Fields | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 26 out 0
+  - Union All | UnionAll  | conn   | in 66 out 33
+  - Union All 1 | UnionAll  | conn   | in 16 out 4
+  - Union All 2 | UnionAll  | conn   | in 94 out 47
+  - Update Account | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 25 out 3
+  - Updated | DerivedColumn  | conn   | in 0 out 0
+     path Remove accounts with funds.Outputs[Account has funds] => Union All 2.Inputs[Union All Input 3]
+     path Remove accounts with funds.Outputs[Account without funds] => Set null to empty String fileds.Inputs[Derived Column Input]
+     path Create Account.Outputs[CastingError] => Set CastingError columns 1.Inputs[Derived Column Input]
+     path Update Account.Outputs[CastingError] => Set CastingError columns.Inputs[Derived Column Input]
+     path remove duplicates account.Outputs[Default] => Format Dates.Inputs[Input 0]
+     path Set Error columns.Outputs[Derived Column Output] => Union All 1.Inputs[Union All Input 1]
+     path Set CastingError columns.Outputs[Derived Column Output] => Union All 1.Inputs[Union All Input 2]
+     path merge customer id number and corporate number.Outputs[Derived Column Output] => Check if customer id number.Inputs[Conditional Split Input]
+     path Set CastingError columns 1.Outputs[Derived Column Output] => Union All 1.Inputs[Union All Input 3]
+     path Updated.Outputs[Derived Column Output] => Count Update Rows.Inputs[Row Count Input 1]
+     path Set Error columns 1.Outputs[Derived Column Output] => Union All 1.Inputs[Union All Input 4]
+     path no need to update.Outputs[Derived Column Output] => Counter No Need To Update.Inputs[Row Count Input 1]
+     path Set null to empty String fileds.Outputs[Derived Column Output] => Update Account.Inputs[Input 0]
+     path Set unknwon customer data.Outputs[Derived Column Output] => Union All.Inputs[Union All Input 2]
+     path Create Additional Columns.Outputs[Derived Column Output] => merge customer id number and corporate number.Inputs[Derived Column Input]
+     path Created.Outputs[Derived Column Output] => Row Insert Count.Inputs[Row Count Input 1]
+     path Update Account.Outputs[DontNeedToUpdate] => Union All 2.Inputs[Union All Input 1]
+     path Check for last row.Outputs[else] => Get fund type name(product).Inputs[Lookup Input]
+     path Check if customer id number.Outputs[else] => Union All.Inputs[Union All Input 1]
+     path Update Account.Outputs[Error] => Set Error columns.Inputs[Derived Column Input]
+     path Create Account.Outputs[Error] => Set Error columns 1.Inputs[Derived Column Input]
+     path Get Employer Number Estate.Outputs[Lookup Match Output] => Check for employer funds.Inputs[Conditional Split Input]
+     path Get fund type name(product).Outputs[Lookup Match Output] => Add 0 to short id num.Inputs[Input 0]
+     path Check if account exists.Outputs[Lookup Match Output] => Remove accounts with funds.Inputs[Conditional Split Input]
+     path Get bank branch Id.Outputs[Lookup Match Output] => Get Employer Number Estate.Inputs[Lookup Input]
+     path Check if account exists.Outputs[Lookup No Match Output] => Create Account.Inputs[Input 0]
+     path Multicast 1.Outputs[Multicast Output 1] => Check if account exists.Inputs[Lookup Input]
+     path Multicast.Outputs[Multicast Output 1] => Trim String Fields.Inputs[Input 0]
+     path Multicast 1.Outputs[Multicast Output 2] => Count Filtered Rows.Inputs[Row Count Input 1]
+     path Multicast.Outputs[Multicast Output 2] => Count Pipe Rows.Inputs[Row Count Input 1]
+     path Create Account.Outputs[Ok] => Created.Inputs[Derived Column Input]
+     path Read MY Data From Staging.Outputs[OLE DB Source Output] => Set Task Name Variable.Inputs[Input 0]
+     path Add 0 to short id num.Outputs[Output 0] => Get bank branch Id.Inputs[Lookup Input]
+     path ETL Warning.Outputs[Output 0] => Count Error Rows 1.Inputs[Row Count Input 1]
+     path Format Dates.Outputs[Output 0] => Multicast 1.Inputs[Multicast Input 1]
+     path Set Task Name Variable.Outputs[Output 0] => Multicast.Inputs[Multicast Input 1]
+     path Trim String Fields.Outputs[Output 0] => Check for last row.Inputs[Conditional Split Input]
+     path Update Account.Outputs[Result] => Updated.Inputs[Derived Column Input]
+     path Union All.Outputs[Union All Output 1] => remove duplicates account.Inputs[Input 0]
+     path Union All 2.Outputs[Union All Output 1] => no need to update.Inputs[Derived Column Input]
+     path Union All 1.Outputs[Union All Output 1] => ETL Warning.Inputs[Input 0]
+     path Check if customer id number.Outputs[לקוח לא מזוהה] => Set unknwon customer data.Inputs[Derived Column Input]
+     path Check for employer funds.Outputs[מעסיקים-כספי פיצולים] => Create Additional Columns.Inputs[Derived Column Input]
+
+## DataFlow Foreach Loop Container\Create Accounts For Minhali
+  - Add 0 to short id num | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 1 out 0
+  - Add Additional Fields | DerivedColumn  | conn   | in 2 out 3
+  - Check customer type | ConditionalSplit  | conn   | in 4 out 0
+  - Check for last row | ConditionalSplit  | conn   | in 1 out 0
+  - Check if account exists | Lookup  | conn [CRM]  | in 1 out 12
+  - Check if customer id number | ConditionalSplit  | conn   | in 1 out 0
+  - Convert To Date | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 2 out 0
+  - Count Error Rows 1 | RowCount  | conn   | in 0 out 0
+  - Count Filtered Rows | RowCount  | conn   | in 0 out 0
+  - Count Pipe Rows | RowCount  | conn   | in 0 out 0
+  - Count Update Rows | RowCount  | conn   | in 0 out 0
+  - Create Account | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 15 out 4
+  - Created | DerivedColumn  | conn   | in 0 out 0
+  - Derived Column | DerivedColumn  | conn   | in 0 out 0
+  - ETL Warning | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 4 out 0
+  - Format Dates 1 | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 1 out 0
+  - Multicast | Multicast  | conn   | in 0 out 0
+  - Multicast 1 | Multicast  | conn   | in 0 out 0
+  - Read MY Data From Staging | OLEDBSource  | conn [PSRS_GENERIX_STAGING] | table [dbo].[MY_FileData] | in 0 out 27
+  - remove duplicates account | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 1 out 0
+  - Row Insert Count | RowCount  | conn   | in 0 out 0
+  - Set CastingError columns | DerivedColumn  | conn   | in 1 out 4
+  - Set columns | DerivedColumn  | conn   | in 6 out 5
+  - Set Error columns | DerivedColumn  | conn   | in 1 out 4
+  - Set Task Name Variable | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 0 out 0
+  - Set unknwon customer data | DerivedColumn  | conn   | in 2 out 0
+  - Trim String Fields | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 19 out 0
+  - Union All 6 | UnionAll  | conn   | in 30 out 15
+  - Union All Errors 1 | UnionAll  | conn   | in 8 out 4
+  - Update Account | OLEDBCommand  | conn [CRM]  | in 11 out 0
+     path Create Account.Outputs[CastingError] => Set CastingError columns.Inputs[Derived Column Input]
+     path Set columns.Outputs[Derived Column Output] => Check if customer id number.Inputs[Conditional Split Input]
+     path Add Additional Fields.Outputs[Derived Column Output] => Convert To Date.Inputs[Input 0]
+     path Created.Outputs[Derived Column Output] => Row Insert Count.Inputs[Row Count Input 1]
+     path Set unknwon customer data.Outputs[Derived Column Output] => Union All 6.Inputs[Union All Input 3]
+     path Derived Column.Outputs[Derived Column Output] => Count Update Rows.Inputs[Row Count Input 1]
+     path Set Error columns.Outputs[Derived Column Output] => Union All Errors 1.Inputs[Union All Input 1]
+     path Set CastingError columns.Outputs[Derived Column Output] => Union All Errors 1.Inputs[Union All Input 2]
+     path Check if customer id number.Outputs[else] => Union All 6.Inputs[Union All Input 1]
+     path Check for last row.Outputs[else] => Check customer type.Inputs[Conditional Split Input]
+     path Create Account.Outputs[Error] => Set Error columns.Inputs[Derived Column Input]
+     path Check if account exists.Outputs[Lookup Match Output] => Add Additional Fields.Inputs[Derived Column Input]
+     path Check if account exists.Outputs[Lookup No Match Output] => Create Account.Inputs[Input 0]
+     path Multicast.Outputs[Multicast Output 1] => Trim String Fields.Inputs[Input 0]
+     path Multicast 1.Outputs[Multicast Output 1] => Check if account exists.Inputs[Lookup Input]
+     path Multicast 1.Outputs[Multicast Output 2] => Count Filtered Rows.Inputs[Row Count Input 1]
+     path Multicast.Outputs[Multicast Output 2] => Count Pipe Rows.Inputs[Row Count Input 1]
+     path Create Account.Outputs[Ok] => Created.Inputs[Derived Column Input]
+     path Update Account.Outputs[OLE DB Command Output] => Derived Column.Inputs[Derived Column Input]
+     path Read MY Data From Staging.Outputs[OLE DB Source Output] => Set Task Name Variable.Inputs[Input 0]
+     path Format Dates 1.Outputs[Output 0] => Multicast 1.Inputs[Multicast Input 1]
+     path ETL Warning.Outputs[Output 0] => Count Error Rows 1.Inputs[Row Count Input 1]
+     path Set Task Name Variable.Outputs[Output 0] => Multicast.Inputs[Multicast Input 1]
+     path Add 0 to short id num.Outputs[Output 0] => remove duplicates account.Inputs[Input 0]
+     path remove duplicates account.Outputs[Output 0] => Set columns.Inputs[Derived Column Input]
+     path Trim String Fields.Outputs[Output 0] => Check for last row.Inputs[Conditional Split Input]
+     path Convert To Date.Outputs[Output 0] => Update Account.Inputs[OLE DB Command Input]
+     path Union All 6.Outputs[Union All Output 1] => Format Dates 1.Inputs[Input 0]
+     path Union All Errors 1.Outputs[Union All Output 1] => ETL Warning.Inputs[Input 0]
+     path Check customer type.Outputs[חברה-כספי פיצולים-מרכזית פיצויים] => Add 0 to short id num.Inputs[Input 0]
+     path Check if customer id number.Outputs[לקוח לא מזוהה] => Set unknwon customer data.Inputs[Derived Column Input]
+
+## DataFlow Foreach Loop Container\Create Contacts For Minhali
+  - Add 0 | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 1 out 0
+  - Check customer type | ConditionalSplit  | conn   | in 3 out 0
+  - Check for last row | ConditionalSplit  | conn   | in 1 out 0
+  - Check if contact exists | Lookup  | conn [CRM]  | in 1 out 42
+  - Check if customer id number | ConditionalSplit  | conn   | in 1 out 0
+  - Conditional Split | ConditionalSplit  | conn   | in 1 out 0
+  - Convert To Date Time | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 6 out 0
+  - Count Error Rows 1 | RowCount  | conn   | in 0 out 0
+  - Count Filtered Rows | RowCount  | conn   | in 0 out 0
+  - Count Pipe Rows | RowCount  | conn   | in 0 out 0
+  - Count Update Rows | RowCount  | conn   | in 0 out 0
+  - Create Contact | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 23 out 4
+  - Create ContactLog | OLEDBCommand  | conn [CRM]  | in 16 out 0
+  - Created | DerivedColumn  | conn   | in 0 out 0
+  - Custom Fields | DerivedColumn  | conn   | in 7 out 6
+  - Derived Column | DerivedColumn  | conn   | in 3 out 11
+  - Derived Column 1 | DerivedColumn  | conn   | in 0 out 0
+  - ETL Warning | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 4 out 0
+  - Format date | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 3 out 0
+  - Is Contact | ConditionalSplit  | conn   | in 1 out 0
+  - Multicast | Multicast  | conn   | in 0 out 0
+  - Multicast 1 | Multicast  | conn   | in 0 out 0
+  - Read MY Data From Staging | OLEDBSource  | conn [PSRS_GENERIX_STAGING] | table [dbo].[MY_FileData] | in 0 out 30
+  - Remove Duplicate | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 1 out 0
+  - Row Insert Count | RowCount  | conn   | in 0 out 0
+  - Set CastingError columns | DerivedColumn  | conn   | in 1 out 4
+  - Set Error columns | DerivedColumn  | conn   | in 1 out 4
+  - Set MobilePhone End EmailAddress1 | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 3 out 1
+  - Set Task Name Variable | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 0 out 0
+  - Set unknwon customer data | DerivedColumn  | conn   | in 4 out 0
+  - Trim String Fields | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 22 out 0
+  - Union All | UnionAll  | conn   | in 194 out 97
+  - Union All 6 | UnionAll  | conn   | in 40 out 20
+  - Union All Errors 1 | UnionAll  | conn   | in 8 out 4
+  - UPDate contact and CustomerAddress | OLEDBCommand  | conn [CRM]  | in 44 out 0
+  - Update Correct Value | DerivedColumn  | conn   | in 20 out 16
+  - Update fields by mobilephone and email | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 13 out 1
+     path Create Contact.Outputs[CastingError] => Set CastingError columns.Inputs[Derived Column Input]
+     path Conditional Split.Outputs[create contact log] => Create ContactLog.Inputs[OLE DB Command Input]
+     path Derived Column.Outputs[Derived Column Output] => Convert To Date Time.Inputs[Input 0]
+     path Set unknwon customer data.Outputs[Derived Column Output] => Union All 6.Inputs[Union All Input 3]
+     path Update Correct Value.Outputs[Derived Column Output] => Update fields by mobilephone and email.Inputs[Input 0]
+     path Created.Outputs[Derived Column Output] => Row Insert Count.Inputs[Row Count Input 1]
+     path Set Error columns.Outputs[Derived Column Output] => Union All Errors 1.Inputs[Union All Input 1]
+     path Custom Fields.Outputs[Derived Column Output] => Multicast 1.Inputs[Multicast Input 1]
+     path Derived Column 1.Outputs[Derived Column Output] => Count Update Rows.Inputs[Row Count Input 1]
+     path Set CastingError columns.Outputs[Derived Column Output] => Union All Errors 1.Inputs[Union All Input 2]
+     path Conditional Split.Outputs[do not create contact log] => Union All.Inputs[Union All Input 2]
+     path Check if customer id number.Outputs[else] => Union All 6.Inputs[Union All Input 1]
+     path Check for last row.Outputs[else] => Check customer type.Inputs[Conditional Split Input]
+     path Create Contact.Outputs[Error] => Set Error columns.Inputs[Derived Column Input]
+     path Is Contact.Outputs[IsContact] => Add 0.Inputs[Input 0]
+     path Check if contact exists.Outputs[Lookup Match Output] => Derived Column.Inputs[Derived Column Input]
+     path Check if contact exists.Outputs[Lookup No Match Output] => Create Contact.Inputs[Input 0]
+     path Multicast.Outputs[Multicast Output 1] => Trim String Fields.Inputs[Input 0]
+     path Multicast 1.Outputs[Multicast Output 2] => Count Filtered Rows.Inputs[Row Count Input 1]
+     path Multicast.Outputs[Multicast Output 2] => Count Pipe Rows.Inputs[Row Count Input 1]
+     path Multicast 1.Outputs[Multicast Output 3] => Set MobilePhone End EmailAddress1.Inputs[Input 0]
+     path Create Contact.Outputs[Ok] => Created.Inputs[Derived Column Input]
+     path Create ContactLog.Outputs[OLE DB Command Output] => Union All.Inputs[Union All Input 1]
+     path UPDate contact and CustomerAddress.Outputs[OLE DB Command Output] => Conditional Split.Inputs[Conditional Split Input]
+     path Read MY Data From Staging.Outputs[OLE DB Source Output] => Set Task Name Variable.Inputs[Input 0]
+     path Trim String Fields.Outputs[Output 0] => Check for last row.Inputs[Conditional Split Input]
+     path ETL Warning.Outputs[Output 0] => Count Error Rows 1.Inputs[Row Count Input 1]
+     path Add 0.Outputs[Output 0] => Remove Duplicate.Inputs[Input 0]
+     path Format date.Outputs[Output 0] => Custom Fields.Inputs[Derived Column Input]
+     path Set MobilePhone End EmailAddress1.Outputs[Output 0] => Check if contact exists.Inputs[Lookup Input]
+     path Set Task Name Variable.Outputs[Output 0] => Multicast.Inputs[Multicast Input 1]
+     path Update fields by mobilephone and email.Outputs[Output 0] => UPDate contact and CustomerAddress.Inputs[OLE DB Command Input]
+     path Convert To Date Time.Outputs[Output 0] => Update Correct Value.Inputs[Derived Column Input]
+     path Remove Duplicate.Outputs[Output 0] => Check if customer id number.Inputs[Conditional Split Input]
+     path Union All 6.Outputs[Union All Output 1] => Format date.Inputs[Input 0]
+     path Union All.Outputs[Union All Output 1] => Derived Column 1.Inputs[Derived Column Input]
+     path Union All Errors 1.Outputs[Union All Output 1] => ETL Warning.Inputs[Input 0]
+     path Check if customer id number.Outputs[לקוח לא מזוהה] => Set unknwon customer data.Inputs[Derived Column Input]
+     path Check customer type.Outputs[פרטי] => Is Contact.Inputs[Conditional Split Input]
+
+## DataFlow Foreach Loop Container\Create Employers
+  - Add 0 to short id num | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 4 out 0
+  - Check for employer funds 1 | ConditionalSplit  | conn   | in 4 out 0
+  - Check for last row | ConditionalSplit  | conn   | in 1 out 0
+  - Check if account exists | Lookup  | conn [CRM]  | in 1 out 1
+  - Check if employer number exists | Lookup  | conn [CRM]  | in 2 out 12
+  - Count Error Rows 1 | RowCount  | conn   | in 0 out 0
+  - Count Filtered Rows | RowCount  | conn   | in 0 out 0
+  - Count Pipe Rows | RowCount  | conn   | in 0 out 0
+  - Count Update Rows | RowCount  | conn   | in 0 out 0
+  - Create Employer | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 22 out 4
+  - Created | DerivedColumn  | conn   | in 0 out 0
+  - Derived Column | DerivedColumn  | conn   | in 0 out 0
+  - ETL Warning | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 4 out 0
+  - Format Dates | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 2 out 0
+  - Get bank branch Id | Lookup  | conn [CRM]  | in 1 out 1
+  - Get Employer Number Estate | Lookup  | conn [CRM]  | in 1 out 1
+  - Get fund estate code | Lookup  | conn [CRM]  | in 1 out 1
+  - Get fund type name(product) | Lookup  | conn [CRM]  | in 1 out 3
+  - merge customer id number and corporate number | DerivedColumn  | conn   | in 2 out 1
+  - Multicast | Multicast  | conn   | in 0 out 0
+  - Multicast 1 | Multicast  | conn   | in 0 out 0
+  - no Need To Update | RowCount  | conn   | in 0 out 0
+  - Read MY Data From Staging | OLEDBSource  | conn [PSRS_GENERIX_STAGING] | table [dbo].[MY_FileData] | in 0 out 32
+  - remove duplicate employer | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 2 out 0
+  - remove duplicates corporate number | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 2 out 0
+  - Row Insert Count | RowCount  | conn   | in 0 out 0
+  - set bank id value | DerivedColumn  | conn   | in 2 out 2
+  - Set CastingError columns | DerivedColumn  | conn   | in 1 out 4
+  - Set CastingError columns 1 | DerivedColumn  | conn   | in 1 out 4
+  - Set Error columns | DerivedColumn  | conn   | in 1 out 4
+  - Set Error columns 1 | DerivedColumn  | conn   | in 1 out 4
+  - Set inputsource for update employers | DerivedColumn  | conn   | in 1 out 0
+  - Set null to empty field | DerivedColumn  | conn   | in 3 out 0
+  - Set Task Name Variable | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 0 out 0
+  - Trim String Fields | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 26 out 0
+  - Union All 1 | UnionAll  | conn   | in 16 out 4
+  - Update Employer | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 22 out 3
+  - UpdatedColumns | DerivedColumn  | conn   | in 0 out 0
+     path Update Employer.Outputs[CastingError] => Set CastingError columns.Inputs[Derived Column Input]
+     path Create Employer.Outputs[CastingError] => Set CastingError columns 1.Inputs[Derived Column Input]
+     path remove duplicates corporate number.Outputs[Default] => Check if account exists.Inputs[Lookup Input]
+     path Set CastingError columns.Outputs[Derived Column Output] => Union All 1.Inputs[Union All Input 2]
+     path Set Error columns 1.Outputs[Derived Column Output] => Union All 1.Inputs[Union All Input 5]
+     path Set Error columns.Outputs[Derived Column Output] => Union All 1.Inputs[Union All Input 3]
+     path Set CastingError columns 1.Outputs[Derived Column Output] => Union All 1.Inputs[Union All Input 1]
+     path set bank id value.Outputs[Derived Column Output] => Create Employer.Inputs[Input 0]
+     path Set inputsource for update employers.Outputs[Derived Column Output] => Set null to empty field.Inputs[Derived Column Input]
+     path Set null to empty field.Outputs[Derived Column Output] => Update Employer.Inputs[Input 0]
+     path UpdatedColumns.Outputs[Derived Column Output] => Count Update Rows.Inputs[Row Count Input 1]
+     path merge customer id number and corporate number.Outputs[Derived Column Output] => remove duplicates corporate number.Inputs[Input 0]
+     path Created.Outputs[Derived Column Output] => Row Insert Count.Inputs[Row Count Input 1]
+     path Update Employer.Outputs[DontNeedToUpdate] => no Need To Update.Inputs[Row Count Input 1]
+     path Check for last row.Outputs[else] => Check for employer funds 1.Inputs[Conditional Split Input]
+     path Update Employer.Outputs[Error] => Set Error columns.Inputs[Derived Column Input]
+     path Create Employer.Outputs[Error] => Set Error columns 1.Inputs[Derived Column Input]
+     path Check if employer number exists.Outputs[Lookup Match Output] => Set inputsource for update employers.Inputs[Derived Column Input]
+     path Get Employer Number Estate.Outputs[Lookup Match Output] => Get fund estate code.Inputs[Lookup Input]
+     path Check if account exists.Outputs[Lookup Match Output] => Format Dates.Inputs[Input 0]
+     path Get bank branch Id.Outputs[Lookup Match Output] => Get Employer Number Estate.Inputs[Lookup Input]
+     path Get fund type name(product).Outputs[Lookup Match Output] => Add 0 to short id num.Inputs[Input 0]
+     path Get fund estate code.Outputs[Lookup Match Output] => merge customer id number and corporate number.Inputs[Derived Column Input]
+     path Check if employer number exists.Outputs[Lookup No Match Output] => set bank id value.Inputs[Derived Column Input]
+     path Get fund type name(product).Outputs[Lookup No Match Output] => Derived Column.Inputs[Derived Column Input]
+     path Multicast.Outputs[Multicast Output 1] => Trim String Fields.Inputs[Input 0]
+     path Multicast 1.Outputs[Multicast Output 1] => Check if employer number exists.Inputs[Lookup Input]
+     path Multicast 1.Outputs[Multicast Output 2] => Count Filtered Rows.Inputs[Row Count Input 1]
+     path Multicast.Outputs[Multicast Output 2] => Count Pipe Rows.Inputs[Row Count Input 1]
+     path Update Employer.Outputs[Ok] => UpdatedColumns.Inputs[Derived Column Input]
+     path Read MY Data From Staging.Outputs[OLE DB Source Output] => Set Task Name Variable.Inputs[Input 0]
+     path Set Task Name Variable.Outputs[Output 0] => Multicast.Inputs[Multicast Input 1]
+     path ETL Warning.Outputs[Output 0] => Count Error Rows 1.Inputs[Row Count Input 1]
+     path Add 0 to short id num.Outputs[Output 0] => Get bank branch Id.Inputs[Lookup Input]
+     path Trim String Fields.Outputs[Output 0] => Check for last row.Inputs[Conditional Split Input]
+     path Format Dates.Outputs[Output 0] => remove duplicate employer.Inputs[Input 0]
+     path remove duplicate employer.Outputs[Output 0] => Multicast 1.Inputs[Multicast Input 1]
+     path Create Employer.Outputs[Result] => Created.Inputs[Derived Column Input]
+     path Union All 1.Outputs[Union All Output 1] => ETL Warning.Inputs[Input 0]
+     path Check for employer funds 1.Outputs[מעסיקים-כספי פיצולים] => Get fund type name(product).Inputs[Lookup Input]
+
+## DataFlow Foreach Loop Container\Create Kibutz
+  - Add 0 to short id num | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 2 out 0
+  - Add Additional Columns | DerivedColumn  | conn   | in 0 out 2
+  - Conditional Split | ConditionalSplit  | conn   | in 1 out 0
+  - Conditional Split 1 | ConditionalSplit  | conn   | in 1 out 0
+  - Create Kibutz | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 4 out 1
+  - Create Kibutz 1 | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 4 out 1
+  - Create Kibutz 2 | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 4 out 1
+  - Create Kibutz 3 | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 4 out 1
+  - Create Kibutz 4 | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 4 out 1
+  - If Kibutz Exsits | Lookup  | conn [CRM]  | in 1 out 0
+  - Is Account Exists | Lookup  | conn [CRM]  | in 1 out 1
+  - Read MY Data From Staging | OLEDBSource  | conn [PSRS_GENERIX_STAGING] | table [dbo].[MY_FileData] | in 0 out 13
+  - Set AccountName And AccountNumber | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 8 out 2
+  - Set Row Number | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 0 out 1
+  - Sort | Sort  | conn   | in 2 out 2
+  - Trim String Fields | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 9 out 0
+  - Update Account | OLEDBCommand  | conn [CRM]  | in 3 out 0
+  - Update Account 1 | OLEDBCommand  | conn [CRM]  | in 3 out 0
+  - Update Account 2 | OLEDBCommand  | conn [CRM]  | in 3 out 0
+  - Update Account 3 | OLEDBCommand  | conn [CRM]  | in 3 out 0
+  - Update Account 4 | OLEDBCommand  | conn [CRM]  | in 3 out 0
+     path Conditional Split 1.Outputs[1] => Create Kibutz 1.Inputs[Input 0]
+     path Conditional Split 1.Outputs[2] => Create Kibutz 2.Inputs[Input 0]
+     path Conditional Split 1.Outputs[3] => Create Kibutz 3.Inputs[Input 0]
+     path Conditional Split 1.Outputs[4] => Create Kibutz 4.Inputs[Input 0]
+     path Conditional Split 1.Outputs[Conditional Split Default Output] => Create Kibutz.Inputs[Input 0]
+     path Conditional Split.Outputs[Conditional Split Default Output] => Add 0 to short id num.Inputs[Input 0]
+     path Add Additional Columns.Outputs[Derived Column Output] => Set Row Number.Inputs[Input 0]
+     path Is Account Exists.Outputs[Lookup Match Output] => If Kibutz Exsits.Inputs[Lookup Input]
+     path If Kibutz Exsits.Outputs[Lookup No Match Output] => Add Additional Columns.Inputs[Derived Column Input]
+     path Read MY Data From Staging.Outputs[OLE DB Source Output] => Trim String Fields.Inputs[Input 0]
+     path Set Row Number.Outputs[Output 0] => Conditional Split 1.Inputs[Conditional Split Input]
+     path Set AccountName And AccountNumber.Outputs[Output 0] => Sort.Inputs[Sort Input]
+     path Trim String Fields.Outputs[Output 0] => Conditional Split.Inputs[Conditional Split Input]
+     path Add 0 to short id num.Outputs[Output 0] => Set AccountName And AccountNumber.Inputs[Input 0]
+     path Sort.Outputs[Sort Output] => Is Account Exists.Inputs[Lookup Input]
+     path Create Kibutz 3.Outputs[Success] => Update Account 3.Inputs[OLE DB Command Input]
+     path Create Kibutz 1.Outputs[Success] => Update Account 1.Inputs[OLE DB Command Input]
+     path Create Kibutz 4.Outputs[Success] => Update Account 4.Inputs[OLE DB Command Input]
+     path Create Kibutz.Outputs[Success] => Update Account.Inputs[OLE DB Command Input]
+     path Create Kibutz 2.Outputs[Success] => Update Account 2.Inputs[OLE DB Command Input]
+
+## DataFlow Foreach Loop Container\End ETL Process record
+  - ETL Record Finish | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 2 out 0
+  - Get gen_etlprocessid | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 0 out 1
+  - Lookup | Lookup  | conn [CRM]  | in 1 out 1
+     path Lookup.Outputs[Lookup Match Output] => ETL Record Finish.Inputs[Input 0]
+     path Get gen_etlprocessid.Outputs[Output 0] => Lookup.Inputs[Lookup Input]
+
+## DataFlow Foreach Loop Container\Minhali daily
+  - Add Additional Fields | DerivedColumn  | conn   | in 2 out 22
+  - Add System Columns | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 0 out 12
+  - Change gen_depositmfpercentage From 99 To 0 | DerivedColumn  | conn   | in 1 out 0
+  - Check customer type | ConditionalSplit  | conn   | in 3 out 0
+  - Check employer number 1 | ConditionalSplit  | conn   | in 2 out 0
+  - Check for last row and product exist | ConditionalSplit  | conn   | in 2 out 0
+  - Check if account exists | Lookup  | conn [CRM]  | in 1 out 1
+  - check if broker number has been change | ConditionalSplit  | conn   | in 1 out 0
+  - Check if contact exists | Lookup  | conn [CRM]  | in 1 out 2
+  - Check if customer id number | ConditionalSplit  | conn   | in 1 out 0
+  - Check if fund exists | Lookup  | conn [CRM]  | in 2 out 66
+  - Conditional Split | ConditionalSplit  | conn   | in 1 out 0
+  - Conditional Split 1 | ConditionalSplit  | conn   | in 1 out 0
+  - Convesrt fund estate id and status in sector to picklist values | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 5 out 1
+  - Count Filtered Rows | RowCount  | conn   | in 0 out 0
+  - Count Pipe Rows | RowCount  | conn   | in 0 out 0
+  - Count Update Rows | RowCount  | conn   | in 0 out 0
+  - Create gen_FundMain | OLEDBCommand  | conn [CRM]  | in 106 out 0
+  - Employee or indipendent | ConditionalSplit  | conn   | in 1 out 0
+  - ETL Warning 1 | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 4 out 0
+  - ETL Warning 1 1 | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 4 out 0
+  - ETL Warning 1 2 | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 4 out 0
+  - Fields From File Or DB | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 34 out 3
+  - Format dates | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 24 out 0
+  - Format money fields | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 15 out 0
+  - Format money fileds | DerivedColumn  | conn   | in 11 out 11
+  - Get Account Blocking Code | Lookup  | conn [CRM]  | in 1 out 4
+  - Get active agent contract guid | Lookup  | conn [CRM]  | in 1 out 4
+  - Get Aggregate Fund Balance | Lookup  | conn [SQL.GENERIX_STAGING]  | in 3 out 1
+  - Get bank branch Id | Lookup  | conn [CRM]  | in 1 out 1
+  - Get corporate number 1 | Lookup  | conn [CRM]  | in 1 out 1
+  - get Employer | Lookup  | conn [CRM]  | in 3 out 2
+  - Get fund estate code | Lookup  | conn [CRM]  | in 1 out 1
+  - Get fund MF template data | Lookup  | conn [CRM]  | in 2 out 3
+  - Get fund type name(product) | Lookup  | conn [CRM]  | in 1 out 5
+  - Get Kibutz | Lookup  | conn [CRM]  | in 1 out 2
+  - Get Product | Lookup  | conn [CRM]  | in 1 out 1
+  - Handale financial track | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 10 out 6
+  - Handle Deposit Blocking Logic | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 7 out 3
+  - Is Kibutz | ConditionalSplit  | conn   | in 2 out 0
+  - Multicast | Multicast  | conn   | in 0 out 0
+  - Multicast 1 | Multicast  | conn   | in 0 out 0
+  - Multicast 1 1 | Multicast  | conn   | in 0 out 0
+  - Multicast 2 | Multicast  | conn   | in 0 out 0
+  - Multicast 5 | Multicast  | conn   | in 0 out 0
+  - Read MY Data From Staging | OLEDBSource  | conn [PSRS_GENERIX_STAGING] | table [dbo].[MY_FileData] | in 0 out 87
+  - Remove Leading Zeros In Forbidden Deposit Code | DerivedColumn  | conn   | in 1 out 0
+  - Row Insert Count | RowCount  | conn   | in 0 out 0
+  - Set Additional Columns | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 23 out 8
+  - Set Date Fields | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 47 out 1
+  - Set Deposit Mf Percentage | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 10 out 3
+  - Set depositMFpercentage Fields | DerivedColumn  | conn   | in 4 out 4
+  - Set empty kibutz id and number | DerivedColumn  | conn   | in 0 out 2
+  - Set fund field data | DerivedColumn  | conn   | in 31 out 24
+  - Set gen_depositmfpercentage | DerivedColumn  | conn   | in 3 out 0
+  - Set MF | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 3 out 3
+  - Set String Fields | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 4 out 0
+  - Set Task Name Variable | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 0 out 0
+  - Set unknwon customer data | DerivedColumn  | conn   | in 4 out 0
+  - Set Warning columns 1 | DerivedColumn  | conn   | in 2 out 4
+  - Set Warning columns 1 1 | DerivedColumn  | conn   | in 2 out 4
+  - Set Warning columns 1 2 | DerivedColumn  | conn   | in 2 out 4
+  - Trim String Fields | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 71 out 0
+  - Union All | UnionAll  | conn   | in 198 out 102
+  - Union All 1 | UnionAll  | conn   | in 186 out 93
+  - Union All 2 | UnionAll  | conn   | in 370 out 125
+  - Union All 3 | UnionAll  | conn   | in 193 out 98
+  - Union All 4 | UnionAll  | conn   | in 240 out 120
+  - Union All 5 | UnionAll  | conn   | in 298 out 102
+  - Update 'gen_agentappointmentdate' for the same account | OLEDBCommand  | conn [CRM]  | in 3 out 0
+  - Update gen_fundmain | OLEDBCommand  | conn [CRM]  | in 78 out 0
+  - Update Loaneligibilitycalculationrequired In Contact To Yes | OLEDBCommand  | conn [CRM]  | in 1 out 0
+  - Update Loaneligibilitycalculationrequired In Contact To Yes 1 | OLEDBCommand  | conn [CRM]  | in 1 out 0
+     path check if broker number has been change.Outputs[Case 1] => Update 'gen_agentappointmentdate' for the same account.Inputs[OLE DB Command Input]
+     path Is Kibutz.Outputs[Conditional Split Default Output] => Set empty kibutz id and number.Inputs[Derived Column Input]
+     path Conditional Split 1.Outputs[deposit blocker type 992] => Remove Leading Zeros In Forbidden Deposit Code.Inputs[Derived Column Input]
+     path Format money fileds.Outputs[Derived Column Output] => Set fund field data.Inputs[Derived Column Input]
+     path Set empty kibutz id and number.Outputs[Derived Column Output] => Union All 4.Inputs[Union All Input 2]
+     path Set Warning columns 1.Outputs[Derived Column Output] => ETL Warning 1.Inputs[Input 0]
+     path Set Warning columns 1 2.Outputs[Derived Column Output] => ETL Warning 1 2.Inputs[Input 0]
+     path Set gen_depositmfpercentage.Outputs[Derived Column Output] => Update gen_fundmain.Inputs[OLE DB Command Input]
+     path Set unknwon customer data.Outputs[Derived Column Output] => Union All 1.Inputs[Union All Input 2]
+     path Set fund field data.Outputs[Derived Column Output] => Check customer type.Inputs[Conditional Split Input]
+     path Add Additional Fields.Outputs[Derived Column Output] => Set Date Fields.Inputs[Input 0]
+     path Set depositMFpercentage Fields.Outputs[Derived Column Output] => Set Deposit Mf Percentage.Inputs[Input 0]
+     path Change gen_depositmfpercentage From 99 To 0.Outputs[Derived Column Output] => Conditional Split 1.Inputs[Conditional Split Input]
+     path Remove Leading Zeros In Forbidden Deposit Code.Outputs[Derived Column Output] => Get Account Blocking Code.Inputs[Lookup Input]
+     path Set Warning columns 1 1.Outputs[Derived Column Output] => ETL Warning 1 1.Inputs[Input 0]
+     path Conditional Split 1.Outputs[else] => Union All 5.Inputs[Union All Input 4]
+     path Check if customer id number.Outputs[else] => Union All 1.Inputs[Union All Input 1]
+     path Check employer number 1.Outputs[else] => Union All 2.Inputs[Union All Input 2]
+     path Check for last row and product exist.Outputs[else] => Get fund type name(product).Inputs[Lookup Input]
+     path Employee or indipendent.Outputs[Employee] => Get corporate number 1.Inputs[Lookup Input]
+     path Employee or indipendent.Outputs[Indipendent] => Union All 2.Inputs[Union All Input 3]
+     path Is Kibutz.Outputs[Is Kibutz] => Get Kibutz.Inputs[Lookup Input]
+     path Check if contact exists.Outputs[Lookup Match Output] => Employee or indipendent.Inputs[Conditional Split Input]
+     path Check if account exists.Outputs[Lookup Match Output] => Union All.Inputs[Union All Input 2]
+     path Check if fund exists.Outputs[Lookup Match Output] => Add Additional Fields.Inputs[Derived Column Input]
+     path Get fund type name(product).Outputs[Lookup Match Output] => Get bank branch Id.Inputs[Lookup Input]
+     path Get fund estate code.Outputs[Lookup Match Output] => Set String Fields.Inputs[Input 0]
+     path get Employer.Outputs[Lookup Match Output] => Union All 2.Inputs[Union All Input 1]
+     path Get Account Blocking Code.Outputs[Lookup Match Output] => Union All 5.Inputs[Union All Input 1]
+     path Get Kibutz.Outputs[Lookup Match Output] => Union All 4.Inputs[Union All Input 1]
+     path Get fund MF template data.Outputs[Lookup Match Output] => Set MF.Inputs[Input 0]
+     path Get corporate number 1.Outputs[Lookup Match Output] => Check employer number 1.Inputs[Conditional Split Input]
+     path Get active agent contract guid.Outputs[Lookup Match Output] => Convesrt fund estate id and status in sector to picklist values.Inputs[Input 0]
+     path Get Aggregate Fund Balance.Outputs[Lookup Match Output] => Get fund MF template data.Inputs[Lookup Input]
+     path Get Product.Outputs[Lookup Match Output] => Format money fileds.Inputs[Derived Column Input]
+     path Check if account exists.Outputs[Lookup No Match Output] => Set Warning columns 1 2.Inputs[Derived Column Input]
+     path Get fund type name(product).Outputs[Lookup No Match Output] => Set Warning columns 1.Inputs[Derived Column Input]
+     path Get Account Blocking Code.Outputs[Lookup No Match Output] => Union All 5.Inputs[Union All Input 2]
+     path Check if fund exists.Outputs[Lookup No Match Output] => Add System Columns.Inputs[Input 0]
+     path Check if contact exists.Outputs[Lookup No Match Output] => Set Warning columns 1 1.Inputs[Derived Column Input]
+     path Get bank branch Id.Outputs[Lookup Match Output] => Get fund estate code.Inputs[Lookup Input]
+     path Multicast.Outputs[Multicast Output 1] => Trim String Fields.Inputs[Input 0]
+     path Multicast 2.Outputs[Multicast Output 1] => Set gen_depositmfpercentage.Inputs[Derived Column Input]
+     path Multicast 1 1.Outputs[Multicast Output 1] => Row Insert Count.Inputs[Row Count Input 1]
+     path Multicast 1.Outputs[Multicast Output 1] => Check if fund exists.Inputs[Lookup Input]
+     path Multicast 5.Outputs[Multicast Output 1] => Fields From File Or DB.Inputs[Input 0]
+     path Multicast 1.Outputs[Multicast Output 2] => Count Filtered Rows.Inputs[Row Count Input 1]
+     path Multicast 5.Outputs[Multicast Output 2] => check if broker number has been change.Inputs[Conditional Split Input]
+     path Multicast 1 1.Outputs[Multicast Output 2] => Create gen_FundMain.Inputs[OLE DB Command Input]
+     path Multicast.Outputs[Multicast Output 2] => Count Pipe Rows.Inputs[Row Count Input 1]
+     path Multicast 2.Outputs[Multicast Output 3] => Count Update Rows.Inputs[Row Count Input 1]
+     path Update gen_fundmain.Outputs[OLE DB Command Output] => Update Loaneligibilitycalculationrequired In Contact To Yes.Inputs[OLE DB Command Input]
+     path Create gen_FundMain.Outputs[OLE DB Command Output] => Update Loaneligibilitycalculationrequired In Contact To Yes 1.Inputs[OLE DB Command Input]
+     path Read MY Data From Staging.Outputs[OLE DB Source Output] => Set Task Name Variable.Inputs[Input 0]
+     path Format dates.Outputs[Output 0] => Format money fields.Inputs[Input 0]
+     path Set String Fields.Outputs[Output 0] => Check if customer id number.Inputs[Conditional Split Input]
+     path Fields From File Or DB.Outputs[Output 0] => Multicast 2.Inputs[Multicast Input 1]
+     path Set Date Fields.Outputs[Output 0] => Multicast 5.Inputs[Multicast Input 1]
+     path Set MF.Outputs[Output 0] => Conditional Split.Inputs[Conditional Split Input]
+     path Handle Deposit Blocking Logic.Outputs[Output 0] => Multicast 1.Inputs[Multicast Input 1]
+     path Convesrt fund estate id and status in sector to picklist values.Outputs[Output 0] => Get Aggregate Fund Balance.Inputs[Lookup Input]
+     path Set Task Name Variable.Outputs[Output 0] => Multicast.Inputs[Multicast Input 1]
+     path Set Deposit Mf Percentage.Outputs[Output 0] => Union All 3.Inputs[Union All Input 3]
+     path Trim String Fields.Outputs[Output 0] => Check for last row and product exist.Inputs[Conditional Split Input]
+     path Format money fields.Outputs[Output 0] => Handale financial track.Inputs[Input 0]
+     path Handale financial track.Outputs[Output 0] => Get Product.Inputs[Lookup Input]
+     path Add System Columns.Outputs[Output 0] => Set Additional Columns.Inputs[Input 0]
+     path Set Additional Columns.Outputs[Result] => Is Kibutz.Inputs[Conditional Split Input]
+     path Union All 5.Outputs[Union All Output 1] => Handle Deposit Blocking Logic.Inputs[Input 0]
+     path Union All 2.Outputs[Union All Output 1] => Union All.Inputs[Union All Input 1]
+     path Union All 4.Outputs[Union All Output 1] => Multicast 1 1.Inputs[Multicast Input 1]
+     path Union All 1.Outputs[Union All Output 1] => Format dates.Inputs[Input 0]
+     path Union All.Outputs[Union All Output 1] => Get active agent contract guid.Inputs[Lookup Input]
+     path Union All 3.Outputs[Union All Output 1] => Change gen_depositmfpercentage From 99 To 0.Inputs[Derived Column Input]
+     path Conditional Split.Outputs[גמל] => Set depositMFpercentage Fields.Inputs[Derived Column Input]
+     path Check customer type.Outputs[חברה-כספי פיצולים-מרכזית פיצויים] => Check if account exists.Inputs[Lookup Input]
+     path Conditional Split.Outputs[לא גמל] => Union All 3.Inputs[Union All Input 2]
+     path Check if customer id number.Outputs[לקוח לא מזוהה] => Set unknwon customer data.Inputs[Derived Column Input]
+     path Check employer number 1.Outputs[מעמד במיגזר תואם] => get Employer.Inputs[Lookup Input]
+     path Check customer type.Outputs[פרטי] => Check if contact exists.Inputs[Lookup Input]
+
+## DataFlow Foreach Loop Container\Write MY File To Staging
+  - Insert To MY_FileData | OLEDBDestination  | conn [PSRS_GENERIX_STAGING] | table [dbo].[MY_FileData] | in 302 out 0
+  - Read minhali data | FlatFileSource  | conn [Minhali Daily Source]  | in 0 out 303
+     path Read minhali data.Outputs[Flat File Source Output] => Insert To MY_FileData.Inputs[OLE DB Destination Input]
+
+## DataFlow Get Organization Variables
+  - Get Etl Variables | OLEDBSource  | conn [CRM]  | in 0 out 2
+  - Set Variables | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 2 out 0
+     path Get Etl Variables.Outputs[OLE DB Source Output] => Set Variables.Inputs[Input 0]
+
+## DataFlow Get Sytem User Id
+  - Get organization id | Lookup  | conn [CRM]  | in 1 out 1
+  - Get Owner Type | Lookup  | conn [CRM]  | in 1 out 1
+  - Get Transaction Currency id | Lookup  | conn [CRM]  | in 1 out 1
+  - Get User Id 1 | OLEDBSource  | conn [CRM]  | in 0 out 2
+  - Set Varibales | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 7 out 0
+  - System User Domain Name | DerivedColumn  | conn   | in 0 out 2
+     path System User Domain Name.Outputs[Derived Column Output] => Get Transaction Currency id.Inputs[Lookup Input]
+     path Get Owner Type.Outputs[Lookup Match Output] => Set Varibales.Inputs[Input 0]
+     path Get Transaction Currency id.Outputs[Lookup Match Output] => Get organization id.Inputs[Lookup Input]
+     path Get organization id.Outputs[Lookup Match Output] => Get Owner Type.Inputs[Lookup Input]
+     path Get User Id 1.Outputs[OLE DB Source Output] => System User Domain Name.Inputs[Derived Column Input]
+
+## SQL statements
+- Foreach Loop Container\Aggregate Account Balance\Fill table AggregateFunds | Microsoft.OLEDBCommand.SqlCommand | [SQL.GENERIX_STAGING] 
+    Insert into [dbo].[AggregateFunds] (gen_bankname,gen_bankaccountnumber,gen_producttypeid ,gen_accountbalance)values(?,?,?,?)
+- Foreach Loop Container\Aggregate Account Balance\Get fund type name(product) | Microsoft.Lookup.SqlCommand | [CRM] 
+    SELECT ProductId, gen_producttypeid, ProductNumber, product.gen_bankname, ProductTypeCode ,gen_subproduct FROM product join gen_banks on product.gen_bankname = gen_banksid where gen_banks.Gen_BankNumber = '10'
+- Foreach Loop Container\Aggregate Account Balance\Get fund type name(product) | Microsoft.Lookup.SqlCommandParam | [CRM] 
+    select * from (SELECT ProductId, gen_producttypeid, ProductNumber, product.gen_bankname, ProductTypeCode ,gen_subproduct FROM product join gen_banks on product.gen_bankname = gen_banksid where gen_banks.Gen_BankNumber = '10') [refTable] where [refTable].[ProductNumber] = ?
+- Foreach Loop Container\Aggregate Account Balance\Read MY Data From Staging | Microsoft.OLEDBSource.SqlCommand | [PSRS_GENERIX_STAGING] 
+    SELECT Address_Apartment_Number_101 ,Address_Building_Number_99 ,Address_Neighborhood_103 ,Address_Street_98 ,ChangedByAge_Compensation_240 ,ChangedByAge_PensionPayment_239 ,Revaluation_Date_1 ,Deposit_Mf_Expiration_Date_CustomerAccount_245 ,Deposit_Mf_Expiration_Date_Employer_207 ,Deposit_MF_Expiration_Date_Entity_204 ,Deposit_Mf_Percentage_CustomerAccount_246 ,Deposit_MF_Percentage_Employer_208 
+- Foreach Loop Container\Create Account For Employers\Check if account exists | Microsoft.Lookup.SqlCommand | [CRM] 
+    SELECT accountid, name as name_db, accountnumber as accountnumber_db, gen_inputsource as gen_inputsource_db, gen_address1_city as gen_address1_city_db, gen_address1_buildingid as gen_address1_buildingid_db, gen_returnedmailcount as gen_returnedmailcount_db, address1_line1 as address1_line1_db, isnull(Address1_PostalCode,'0000000') as address1_postalcode_db, fax as fax_db, telephone1 as telephone1_
+- Foreach Loop Container\Create Account For Employers\Check if account exists | Microsoft.Lookup.SqlCommandParam | [CRM] 
+    select * from (SELECT accountid, name as name_db, accountnumber as accountnumber_db, gen_inputsource as gen_inputsource_db, gen_address1_city as gen_address1_city_db, gen_address1_buildingid as gen_address1_buildingid_db, gen_returnedmailcount as gen_returnedmailcount_db, address1_line1 as address1_line1_db, isnull(Address1_PostalCode,'0000000') as address1_postalcode_db, fax as fax_db, telephone1
+- Foreach Loop Container\Create Account For Employers\Get bank branch Id | Microsoft.Lookup.SqlCommand | [CRM] 
+    SELECT Gen_bankbranch.Gen_bankbranchId, Gen_bankbranch.Gen_Number, dbo.Gen_bankbranch.gen_bank FROM Gen_bankbranch join gen_banks on gen_banksid = gen_bankbranch.gen_bank WHERE gen_banknumber = 10
+- Foreach Loop Container\Create Account For Employers\Get bank branch Id | Microsoft.Lookup.SqlCommandParam | [CRM] 
+    select * from (SELECT Gen_bankbranch.Gen_bankbranchId, Gen_bankbranch.Gen_Number, dbo.Gen_bankbranch.gen_bank FROM Gen_bankbranch join gen_banks on gen_banksid = gen_bankbranch.gen_bank WHERE gen_banknumber = 10) [refTable] where [refTable].[Gen_Number] = ?
+- Foreach Loop Container\Create Account For Employers\Get Employer Number Estate | Microsoft.Lookup.SqlCommand | [CRM] 
+    SELECT gen_estatetypeid, Gen_estatecodeidId, Gen_estatecodeid.gen_bankname FROM Gen_estatecodeid join gen_banks on gen_banksid = Gen_estatecodeid.gen_bankname WHERE gen_banknumber = 10
+- Foreach Loop Container\Create Account For Employers\Get Employer Number Estate | Microsoft.Lookup.SqlCommandParam | [CRM] 
+    select * from (SELECT gen_estatetypeid, Gen_estatecodeidId, Gen_estatecodeid.gen_bankname FROM Gen_estatecodeid join gen_banks on gen_banksid = Gen_estatecodeid.gen_bankname WHERE gen_banknumber = 10) [refTable] where [refTable].[gen_estatetypeid] = ?
+- Foreach Loop Container\Create Account For Employers\Get fund type name(product) | Microsoft.Lookup.SqlCommand | [CRM] 
+    SELECT ProductId, ProductNumber, product.gen_bankname, Gen_ProductTypeId, ProductTypeCode FROM product join gen_banks on gen_banksid = product.gen_bankname where Gen_ProductTypeId = productnumber and gen_banknumber = 10
+- Foreach Loop Container\Create Account For Employers\Get fund type name(product) | Microsoft.Lookup.SqlCommandParam | [CRM] 
+    select * from (SELECT ProductId, ProductNumber, product.gen_bankname, Gen_ProductTypeId, ProductTypeCode FROM product join gen_banks on gen_banksid = product.gen_bankname where Gen_ProductTypeId = productnumber and gen_banknumber = 10) [refTable] where [refTable].[Gen_ProductTypeId] = ?
+- Foreach Loop Container\Create Account For Employers\Read MY Data From Staging | Microsoft.OLEDBSource.SqlCommand | [PSRS_GENERIX_STAGING] 
+    SELECT Account_Verification_Indication_243 ,Customer_Id_Number_6 ,Address_Apartment_Number_101 ,Address_Neighborhood_103 ,Address_Street_98 ,Address_Zip_Code_104 ,Bank_Account_Number_27 ,Deposit_Mf_Expiration_Date_CustomerAccount_245 ,Deposit_Mf_Percentage_CustomerAccount_246 ,Deposit_Mf_Start_Date_CustomerAccount_244 ,Email_108 ,Employer_Agreement_Number_35 ,Employer_Agreement_Segment_176 ,Employ
+- Foreach Loop Container\Create Accounts For Minhali\Check if account exists | Microsoft.Lookup.SqlCommand | [CRM] 
+    select accountid , gen_isoperate as gen_isoperateDB, accountnumber, name as nameDB, telephone1 as telephone1DB, telephone2 as telephone2DB, fax as faxDB, gen_address1_buildingid as gen_address1_buildingidDB, gen_address1_city as gen_address1_cityDB, address1_line1 as address1_line1DB, address1_postalcode as address1_postalcodeDB, Gen_customerdateofbirth as gen_customerdateofbirthDB, gen_returnedma
+- Foreach Loop Container\Create Accounts For Minhali\Check if account exists | Microsoft.Lookup.SqlCommandParam | [CRM] 
+    select * from (select accountid , gen_isoperate as gen_isoperateDB, accountnumber, name as nameDB, telephone1 as telephone1DB, telephone2 as telephone2DB, fax as faxDB, gen_address1_buildingid as gen_address1_buildingidDB, gen_address1_city as gen_address1_cityDB, address1_line1 as address1_line1DB, address1_postalcode as address1_postalcodeDB, Gen_customerdateofbirth as gen_customerdateofbirthDB,
+- Foreach Loop Container\Create Accounts For Minhali\Read MY Data From Staging | Microsoft.OLEDBSource.SqlCommand | [PSRS_GENERIX_STAGING] 
+    SELECT Account_Verification_Indication_243 ,Customer_Id_Number_6 ,Address_Apartment_Number_101 ,Address_Building_Number_99 ,Address_Neighborhood_103 ,Address_Street_98 ,Address_Zip_Code_104 ,Revaluation_Date_1 ,Deposit_Mf_Expiration_Date_CustomerAccount_245 ,Deposit_Mf_Percentage_CustomerAccount_246 ,Deposit_Mf_Start_Date_CustomerAccount_244 ,Email_108 ,Employer_Agreement_Number_35 ,Fax_107 ,First
+- Foreach Loop Container\Create Accounts For Minhali\Update Account | Microsoft.OLEDBCommand.SqlCommand | [CRM] 
+    UPDATE AccountBase Set gen_inputsource = 1 , gen_isoperate = 1 , name = ? , gen_address1_buildingid = ? , gen_address1_city = ? , gen_returnedmailcount = ? , Gen_customerdateofbirth = ? , gen_modifiedbybank = getDate(), ModifiedOn = GETDATE() , ModifiedBy = ?, gen_postalcode = ? Where accountId = ? UPDATE CustomerAddressBase SET postalcode = ? , line1=? WHERE ParentId = ? AND AddressNumber = 1 AND
+- Foreach Loop Container\Create Contacts For Minhali\Check if contact exists | Microsoft.Lookup.SqlCommand | [CRM] 
+    select contactid , gendercode as gendercodeDB, gen_isoperate as gen_isoperateDB, gen_leumi as gen_leumiDB, gen_identitynumber as gen_identitynumberDB, firstname as firstnameDB, lastname as lastnameDB, fullname as fullnameDB, telephone1 as telephone1DB, telephone2 as telephone2DB, fax as faxDB, gen_bankcustomeridnumber as gen_bankcustomeridnumberDB, gen_address1_buildingid as gen_address1_buildingi
+- Foreach Loop Container\Create Contacts For Minhali\Check if contact exists | Microsoft.Lookup.SqlCommandParam | [CRM] 
+    select * from (select contactid , gendercode as gendercodeDB, gen_isoperate as gen_isoperateDB, gen_leumi as gen_leumiDB, gen_identitynumber as gen_identitynumberDB, firstname as firstnameDB, lastname as lastnameDB, fullname as fullnameDB, telephone1 as telephone1DB, telephone2 as telephone2DB, fax as faxDB, gen_bankcustomeridnumber as gen_bankcustomeridnumberDB, gen_address1_buildingid as gen_add
+- Foreach Loop Container\Create Contacts For Minhali\Create ContactLog | Microsoft.OLEDBCommand.SqlCommand | [CRM] 
+    declare @customerpreference int declare @customerpreferencetransmissionstatus int set @customerpreference = ? set @customerpreferencetransmissionstatus = ? INSERT INTO gen_contactlogsbase ( CreatedOn, CreatedBy, ModifiedOn, ModifiedBy, OwnerId, OwnerIdType, OwningBusinessUnit, statecode, statuscode, gen_processname, gen_contact, gen_contactlogsid, gen_emailaddress1, gen_oldemailaddress1, gen_mobil
+- Foreach Loop Container\Create Contacts For Minhali\Read MY Data From Staging | Microsoft.OLEDBSource.SqlCommand | [PSRS_GENERIX_STAGING] 
+    SELECT Account_Verification_Indication_243 ,Address_Neighborhood_103 ,Address_Street_98 ,Address_Apartment_Number_101 ,Address_Zip_Code_104 ,Revaluation_Date_1 ,Deposit_Mf_Expiration_Date_CustomerAccount_245 ,Deposit_Mf_Percentage_CustomerAccount_246 ,Deposit_Mf_Start_Date_CustomerAccount_244 ,Email_108 ,Employer_Agreement_Number_35 ,Fax_107 ,First_Name_10 ,Address_Building_Number_99 ,Address_City
+- Foreach Loop Container\Create Contacts For Minhali\UPDate contact and CustomerAddress | Microsoft.OLEDBCommand.SqlCommand | [CRM] 
+    update ContactBase set gendercode = ?, --0 gen_inputsource = 1, gen_isoperate = 1, gen_leumi = 1, firstname = ?, --1 lastname = ?, --2 fullname = ?, --3 gen_bankcustomeridnumber = ?, --4 gen_address1_buildingid = ?, --5 gen_address1_city = ?, --6 gen_customerdateofbirth = ?, --7 gen_deathdate = ?, --8 gen_identitynumberissuingdate = ?, --9 gen_modifiedbybank = GETDATE(), ModifiedOn = GETDATE(), Mo
+- Foreach Loop Container\Create Employers\Check if account exists | Microsoft.Lookup.SqlCommand | [CRM] 
+    SELECT accountid, name as name_db, accountnumber as accountnumber_db FROM account WHERE ( statecode = 0 )
+- Foreach Loop Container\Create Employers\Check if account exists | Microsoft.Lookup.SqlCommandParam | [CRM] 
+    select * from (SELECT accountid, name as name_db, accountnumber as accountnumber_db FROM account WHERE ( statecode = 0 )) [refTable] where [refTable].[accountnumber_db] = ?
+- Foreach Loop Container\Create Employers\Check if employer number exists | Microsoft.Lookup.SqlCommand | [CRM] 
+    SELECT Gen_employersId, Gen_EmployerNumber, gen_employerName as gen_employerNamedb, gen_inputsource as gen_inputsourcedb, gen_creationdate as gen_creationdatedb, gen_activecustomernumber as gen_activecustomernumberdb, Gen_existinfile as gen_existinfiledb, gen_branchname as gen_branchnamedb, Gen_isactiveemplyer as gen_isactiveemplyerdb, Gen_address1_telephone1 as gen_address1_telephone1db, Gen_empl
+- Foreach Loop Container\Create Employers\Check if employer number exists | Microsoft.Lookup.SqlCommandParam | [CRM] 
+    select * from (SELECT Gen_employersId, Gen_EmployerNumber, gen_employerName as gen_employerNamedb, gen_inputsource as gen_inputsourcedb, gen_creationdate as gen_creationdatedb, gen_activecustomernumber as gen_activecustomernumberdb, Gen_existinfile as gen_existinfiledb, gen_branchname as gen_branchnamedb, Gen_isactiveemplyer as gen_isactiveemplyerdb, Gen_address1_telephone1 as gen_address1_telepho
+- Foreach Loop Container\Create Employers\Get bank branch Id | Microsoft.Lookup.SqlCommand | [CRM] 
+    SELECT Gen_bankbranch.Gen_bankbranchId, Gen_bankbranch.Gen_Number FROM Gen_bankbranch join gen_banks on gen_banksid = gen_bankbranch.gen_bank WHERE gen_banknumber = 10
+- Foreach Loop Container\Create Employers\Get bank branch Id | Microsoft.Lookup.SqlCommandParam | [CRM] 
+    select * from (SELECT Gen_bankbranch.Gen_bankbranchId, Gen_bankbranch.Gen_Number FROM Gen_bankbranch join gen_banks on gen_banksid = gen_bankbranch.gen_bank WHERE gen_banknumber = 10) [refTable] where [refTable].[Gen_Number] = ?
+- Foreach Loop Container\Create Employers\Get Employer Number Estate | Microsoft.Lookup.SqlCommand | [CRM] 
+    SELECT gen_estatetypeid, Gen_estatecodeidId FROM Gen_estatecodeid join gen_banks on gen_banksid = Gen_estatecodeid.gen_bankname WHERE gen_banknumber = 10
+- Foreach Loop Container\Create Employers\Get Employer Number Estate | Microsoft.Lookup.SqlCommandParam | [CRM] 
+    select * from (SELECT gen_estatetypeid, Gen_estatecodeidId FROM Gen_estatecodeid join gen_banks on gen_banksid = Gen_estatecodeid.gen_bankname WHERE gen_banknumber = 10) [refTable] where [refTable].[gen_estatetypeid] = ?
+- Foreach Loop Container\Create Employers\Get fund estate code | Microsoft.Lookup.SqlCommand | [CRM] 
+    SELECT gen_estatetypeid, Gen_estatecodeidId, Gen_estatecodeid.gen_bankname FROM Gen_estatecodeid join gen_banks on gen_banksid = Gen_estatecodeid.gen_bankname WHERE gen_banknumber = 10
+- Foreach Loop Container\Create Employers\Get fund estate code | Microsoft.Lookup.SqlCommandParam | [CRM] 
+    select * from (SELECT gen_estatetypeid, Gen_estatecodeidId, Gen_estatecodeid.gen_bankname FROM Gen_estatecodeid join gen_banks on gen_banksid = Gen_estatecodeid.gen_bankname WHERE gen_banknumber = 10) [refTable] where [refTable].[gen_estatetypeid] = ?
+- Foreach Loop Container\Create Employers\Get fund type name(product) | Microsoft.Lookup.SqlCommand | [CRM] 
+    SELECT ProductId, product.gen_bankname, Gen_ProductTypeId, ProductTypeCode FROM product join gen_banks on gen_banksid = product.gen_bankname where Gen_ProductTypeId = productnumber AND gen_banknumber = 10
+- Foreach Loop Container\Create Employers\Get fund type name(product) | Microsoft.Lookup.SqlCommandParam | [CRM] 
+    select * from (SELECT ProductId, product.gen_bankname, Gen_ProductTypeId, ProductTypeCode FROM product join gen_banks on gen_banksid = product.gen_bankname where Gen_ProductTypeId = productnumber AND gen_banknumber = 10) [refTable] where [refTable].[Gen_ProductTypeId] = ?
+- Foreach Loop Container\Create Employers\Read MY Data From Staging | Microsoft.OLEDBSource.SqlCommand | [PSRS_GENERIX_STAGING] 
+    SELECT Account_Verification_Indication_243 ,Address_Apartment_Number_101 ,Address_Neighborhood_103 ,Address_Street_98 ,Customer_Id_Number_6 ,Customer_Id_Type_5 ,Deposit_Mf_Expiration_Date_CustomerAccount_245 ,Deposit_Mf_Percentage_CustomerAccount_246 ,Deposit_Mf_Start_Date_CustomerAccount_244 ,Employer_Agreement_Segment_176 ,Employer_Number_38 ,Employer_Type_41 ,First_Name_10 ,Fund_Type_Number_21 
+- Foreach Loop Container\Create Kibutz\If Kibutz Exsits | Microsoft.Lookup.SqlCommand | [CRM] 
+    select Right('000000000' + gen_accountnumber, 9) as AccountNumberDB from gen_kibutz --with (nolock) Goldman where gen_accountnumber is not null
+- Foreach Loop Container\Create Kibutz\If Kibutz Exsits | Microsoft.Lookup.SqlCommandParam | [CRM] 
+    select * from (select Right('000000000' + gen_accountnumber, 9) as AccountNumberDB from gen_kibutz --with (nolock) Goldman where gen_accountnumber is not null) [refTable] where [refTable].[AccountNumberDB] = ?
+- Foreach Loop Container\Create Kibutz\Is Account Exists | Microsoft.Lookup.SqlCommand | [CRM] 
+    select Right('000000000' + accountnumber, 9) as AccountNumberDB, AccountId from account with (nolock) where accountnumber is not null
+- Foreach Loop Container\Create Kibutz\Is Account Exists | Microsoft.Lookup.SqlCommandParam | [CRM] 
+    select * from (select Right('000000000' + accountnumber, 9) as AccountNumberDB, AccountId from account with (nolock) where accountnumber is not null) [refTable] where [refTable].[AccountNumberDB] = ?
+- Foreach Loop Container\Create Kibutz\Read MY Data From Staging | Microsoft.OLEDBSource.SqlCommand | [PSRS_GENERIX_STAGING] 
+    SELECT Revaluation_Date_1 ,Customer_Id_Number_6 ,Customer_Id_Type_5 ,Deposit_Mf_Expiration_Date_CustomerAccount_245 ,Deposit_Mf_Percentage_CustomerAccount_246 ,Deposit_Mf_Start_Date_CustomerAccount_244 ,Employer_Name_39 ,Employer_Number_38 ,First_Name_10 ,Last_Name_9 ,Sector_Code_17 ,Sector_Estate_Type_23 ,Spacer149 FROM [MY_FileData]
+- Foreach Loop Container\Create Kibutz\Update Account | Microsoft.OLEDBCommand.SqlCommand | [CRM] 
+    update Account set gen_kibutz = ?, ModifiedBy = ?, ModifiedOn = GETUTCDATE() where AccountId = ?
+- Foreach Loop Container\Create Kibutz\Update Account 1 | Microsoft.OLEDBCommand.SqlCommand | [CRM] 
+    update Account set gen_kibutz = ?, ModifiedBy = ?, ModifiedOn = GETUTCDATE() where AccountId = ?
+- Foreach Loop Container\Create Kibutz\Update Account 2 | Microsoft.OLEDBCommand.SqlCommand | [CRM] 
+    update Account set gen_kibutz = ?, ModifiedBy = ?, ModifiedOn = GETUTCDATE() where AccountId = ?
+- Foreach Loop Container\Create Kibutz\Update Account 3 | Microsoft.OLEDBCommand.SqlCommand | [CRM] 
+    update Account set gen_kibutz = ?, ModifiedBy = ?, ModifiedOn = GETUTCDATE() where AccountId = ?
+- Foreach Loop Container\Create Kibutz\Update Account 4 | Microsoft.OLEDBCommand.SqlCommand | [CRM] 
+    update Account set gen_kibutz = ?, ModifiedBy = ?, ModifiedOn = GETUTCDATE() where AccountId = ?
+- Foreach Loop Container\End ETL Process record\Lookup | Microsoft.Lookup.SqlCommand | [CRM] 
+    select p.gen_etlprocessid , case when pw.gen_etlprocessid is null then 0 else 1 end as isWarningExist from gen_etlprocess p left join (select distinct gen_etlprocessId from gen_etlprocesswarning ) as pw on p.gen_etlprocessId = pw.gen_etlprocessId
+- Foreach Loop Container\End ETL Process record\Lookup | Microsoft.Lookup.SqlCommandParam | [CRM] 
+    select * from (select p.gen_etlprocessid , case when pw.gen_etlprocessid is null then 0 else 1 end as isWarningExist from gen_etlprocess p left join (select distinct gen_etlprocessId from gen_etlprocesswarning ) as pw on p.gen_etlprocessId = pw.gen_etlprocessId) [refTable] where [refTable].[gen_etlprocessid] = ?
+- Foreach Loop Container\Minhali daily\Check if account exists | Microsoft.Lookup.SqlCommand | [CRM] 
+    SELECT accountid, AccountNumber FROM Account WHERE StateCode = 0
+- Foreach Loop Container\Minhali daily\Check if account exists | Microsoft.Lookup.SqlCommandParam | [CRM] 
+    select * from (SELECT accountid, AccountNumber FROM Account WHERE StateCode = 0) [refTable] where [refTable].[AccountNumber] = ?
+- Foreach Loop Container\Minhali daily\Check if contact exists | Microsoft.Lookup.SqlCommand | [CRM] 
+    SELECT ContactId, Gen_Identitynumber, Gen_CustomerCategory FROM contact WHERE gen_leumi = 1 and statecode = 0
+- Foreach Loop Container\Minhali daily\Check if contact exists | Microsoft.Lookup.SqlCommandParam | [CRM] 
+    select * from (SELECT ContactId, Gen_Identitynumber, Gen_CustomerCategory FROM contact WHERE gen_leumi = 1 and statecode = 0) [refTable] where [refTable].[Gen_Identitynumber] = ?
+- Foreach Loop Container\Minhali daily\Check if fund exists | Microsoft.Lookup.SqlCommand | [CRM] 
+    select gen_fundmainid, gen_fundtypename, gen_bankaccountnumber, gen_accountname as gen_accountnameDB, gen_address1_buildingid as gen_address1_buildingidDB, gen_address1_city as gen_address1_cityDB, gen_address1_line1 as gen_address1_line1DB, gen_address1_postalcode as gen_address1_postalcodeDB, gen_agencyname as gen_agencynameDB, gen_agentname as gen_agentnameDB, gen_allowancevalue as gen_allowanc
+- Foreach Loop Container\Minhali daily\Check if fund exists | Microsoft.Lookup.SqlCommandParam | [CRM] 
+    select * from (select gen_fundmainid, gen_fundtypename, gen_bankaccountnumber, gen_accountname as gen_accountnameDB, gen_address1_buildingid as gen_address1_buildingidDB, gen_address1_city as gen_address1_cityDB, gen_address1_line1 as gen_address1_line1DB, gen_address1_postalcode as gen_address1_postalcodeDB, gen_agencyname as gen_agencynameDB, gen_agentname as gen_agentnameDB, gen_allowancevalue 
+- Foreach Loop Container\Minhali daily\Create gen_FundMain | Microsoft.OLEDBCommand.SqlCommand | [CRM] 
+    insert into Gen_fundmainbase (CreatedBy, CreatedOn, Gen_AccountBalance, gen_accountname, Gen_address1_buildingId, Gen_address1_city, Gen_address1_line1, Gen_address1_name, Gen_address1_postalcode, gen_agencyname, gen_agentname, Gen_AllowanceValue, Gen_BankAccountNumber, gen_bankname, Gen_banknumber, gen_branchname, gen_brokernumber, Gen_brokerstartdate, Gen_CommissionExpirationDate, Gen_commission
+- Foreach Loop Container\Minhali daily\Get Account Blocking Code | Microsoft.Lookup.SqlCommand | [CRM] 
+    select gen_accountblockingcodeid,gen_BlockingReasonCode, gen_IsGemelDepositBlocked,gen_IsInvestmentGemelDepositBlocked, gen_IsOtherDepositProductsBlocked from gen_accountblockingcode
+- Foreach Loop Container\Minhali daily\Get Account Blocking Code | Microsoft.Lookup.SqlCommandParam | [CRM] 
+    select * from (select gen_accountblockingcodeid,gen_BlockingReasonCode, gen_IsGemelDepositBlocked,gen_IsInvestmentGemelDepositBlocked, gen_IsOtherDepositProductsBlocked from gen_accountblockingcode) [refTable] where [refTable].[gen_BlockingReasonCode] = ?
+- Foreach Loop Container\Minhali daily\Get active agent contract guid | Microsoft.Lookup.SqlCommand | [CRM] 
+    select * from( SELECT Row_Number()over(partition by gen_agentcontract.Gen_brokernumber order by gen_agentcontract.statecode) as RowNum, gen_agentcontract.Gen_brokernumber, gen_agentcontract.Gen_agentcontractId, gen_agentcontract.gen_CreditCheck, gen_agents.gen_contactname AS gen_agentname, Gen_agencie.gen_agencyname FROM gen_agentcontract LEFT JOIN gen_agents ON gen_agents.Gen_agentsId = gen_agent
+- Foreach Loop Container\Minhali daily\Get active agent contract guid | Microsoft.Lookup.SqlCommandParam | [CRM] 
+    select * from (select * from( SELECT Row_Number()over(partition by gen_agentcontract.Gen_brokernumber order by gen_agentcontract.statecode) as RowNum, gen_agentcontract.Gen_brokernumber, gen_agentcontract.Gen_agentcontractId, gen_agentcontract.gen_CreditCheck, gen_agents.gen_contactname AS gen_agentname, Gen_agencie.gen_agencyname FROM gen_agentcontract LEFT JOIN gen_agents ON gen_agents.Gen_agent
+- Foreach Loop Container\Minhali daily\Get Aggregate Fund Balance | Microsoft.Lookup.SqlCommand | [SQL.GENERIX_STAGING] 
+    select * from [dbo].[AggregateFunds]
+- Foreach Loop Container\Minhali daily\Get Aggregate Fund Balance | Microsoft.Lookup.SqlCommandParam | [SQL.GENERIX_STAGING] 
+    select * from (select * from [dbo].[AggregateFunds]) [refTable] where [refTable].[gen_bankaccountnumber] = ? and [refTable].[gen_bankname] = ? and [refTable].[gen_producttypeid] = ?
+- Foreach Loop Container\Minhali daily\Get bank branch Id | Microsoft.Lookup.SqlCommand | [CRM] 
+    SELECT Gen_bankbranch.Gen_bankbranchId, Gen_bankbranch.Gen_Number, dbo.Gen_bankbranch.gen_bank FROM Gen_bankbranch join gen_banks on Gen_bankbranch.gen_bank = gen_banksid where gen_banks.Gen_BankNumber = '10' and Gen_bankbranch.statecode = 0 and gen_banks.statecode = 0
+- Foreach Loop Container\Minhali daily\Get bank branch Id | Microsoft.Lookup.SqlCommandParam | [CRM] 
+    select * from (SELECT Gen_bankbranch.Gen_bankbranchId, Gen_bankbranch.Gen_Number, dbo.Gen_bankbranch.gen_bank FROM Gen_bankbranch join gen_banks on Gen_bankbranch.gen_bank = gen_banksid where gen_banks.Gen_BankNumber = '10' and Gen_bankbranch.statecode = 0 and gen_banks.statecode = 0) [refTable] where [refTable].[Gen_Number] = ?
+- Foreach Loop Container\Minhali daily\Get corporate number 1 | Microsoft.Lookup.SqlCommand | [CRM] 
+    select accountnumber, accountid from account where accountnumber <> '000000000' and StateCode = 0
+- Foreach Loop Container\Minhali daily\Get corporate number 1 | Microsoft.Lookup.SqlCommandParam | [CRM] 
+    select * from (select accountnumber, accountid from account where accountnumber <> '000000000' and StateCode = 0) [refTable] where [refTable].[accountnumber] = ?
+- Foreach Loop Container\Minhali daily\get Employer | Microsoft.Lookup.SqlCommand | [CRM] 
+    SELECT Gen_employers.Gen_employersId, Gen_employers.Gen_employerName, Gen_employers.Gen_EmployerNumber, Gen_employers.gen_corporatename, Product.ProductNumber FROM Gen_employers JOIN Product ON Gen_employers.gen_fundtypename = Product.ProductId join gen_banks on gen_banksid = gen_employers.gen_bankname WHERE (Gen_employers.statecode = 0) and gen_banknumber = 10
+- Foreach Loop Container\Minhali daily\get Employer | Microsoft.Lookup.SqlCommandParam | [CRM] 
+    select * from (SELECT Gen_employers.Gen_employersId, Gen_employers.Gen_employerName, Gen_employers.Gen_EmployerNumber, Gen_employers.gen_corporatename, Product.ProductNumber FROM Gen_employers JOIN Product ON Gen_employers.gen_fundtypename = Product.ProductId join gen_banks on gen_banksid = gen_employers.gen_bankname WHERE (Gen_employers.statecode = 0) and gen_banknumber = 10) [refTable] where [re
+- Foreach Loop Container\Minhali daily\Get fund estate code | Microsoft.Lookup.SqlCommand | [CRM] 
+    SELECT gen_estatetypeid, Gen_estatecodeidId FROM Gen_estatecodeid join gen_banks on gen_banksid = Gen_estatecodeid.gen_bankname where gen_banknumber = 10
+- Foreach Loop Container\Minhali daily\Get fund estate code | Microsoft.Lookup.SqlCommandParam | [CRM] 
+    select * from (SELECT gen_estatetypeid, Gen_estatecodeidId FROM Gen_estatecodeid join gen_banks on gen_banksid = Gen_estatecodeid.gen_bankname where gen_banknumber = 10) [refTable] where [refTable].[gen_estatetypeid] = ?
+- Foreach Loop Container\Minhali daily\Get fund MF template data | Microsoft.Lookup.SqlCommand | [CRM] 
+    select Gen_mftemplateid,CAST(Gen_mfpercentage AS DECIMAL(6, 4)) Gen_mfpercentage,(select count(gen_mftemplateid) from Gen_fundmftemplates where Gen_mftemplateid = ?) as numofrecords,CAST(gen_maxamount as MONEY) as amount from Gen_fundmftemplates join gen_banks on gen_banksid = Gen_fundmftemplates.gen_bankname and Gen_fundmftemplates.statecode = 0 and gen_banknumber = 10 where gen_maxamount = ( sel
+- Foreach Loop Container\Minhali daily\Get fund MF template data | Microsoft.Lookup.SqlCommandParam | [CRM] 
+    select Gen_mftemplateid,CAST(Gen_mfpercentage AS DECIMAL(6, 4)) Gen_mfpercentage,(select count(gen_mftemplateid) from Gen_fundmftemplates where Gen_mftemplateid = ?) as numofrecords,CAST(gen_maxamount as MONEY) as amount from Gen_fundmftemplates join gen_banks on gen_banksid = Gen_fundmftemplates.gen_bankname and Gen_fundmftemplates.statecode = 0 and gen_banknumber = 10 where gen_maxamount = ( sel
+- Foreach Loop Container\Minhali daily\Get fund type name(product) | Microsoft.Lookup.SqlCommand | [CRM] 
+    SELECT ProductId, gen_producttypeid, ProductNumber, product.gen_bankname, ProductTypeCode ,gen_subproduct FROM product join gen_banks on product.gen_bankname = gen_banksid where gen_banks.Gen_BankNumber = '10'
+- Foreach Loop Container\Minhali daily\Get fund type name(product) | Microsoft.Lookup.SqlCommandParam | [CRM] 
+    select * from (SELECT ProductId, gen_producttypeid, ProductNumber, product.gen_bankname, ProductTypeCode ,gen_subproduct FROM product join gen_banks on product.gen_bankname = gen_banksid where gen_banks.Gen_BankNumber = '10') [refTable] where [refTable].[ProductNumber] = ?
+- Foreach Loop Container\Minhali daily\Get Kibutz | Microsoft.Lookup.SqlCommand | [CRM] 
+    select Right('000000000' + gen_accountnumber , 9) as gen_accountnumber , gen_kibutzid from gen_kibutz
+- Foreach Loop Container\Minhali daily\Get Kibutz | Microsoft.Lookup.SqlCommandParam | [CRM] 
+    select * from (select Right('000000000' + gen_accountnumber , 9) as gen_accountnumber , gen_kibutzid from gen_kibutz) [refTable] where [refTable].[gen_accountnumber] = ?
+- Foreach Loop Container\Minhali daily\Get Product | Microsoft.Lookup.SqlCommand | [CRM] 
+    select ProductId, gen_fundfinanceid,productnumber from product with(nolock)
+- Foreach Loop Container\Minhali daily\Get Product | Microsoft.Lookup.SqlCommandParam | [CRM] 
+    select * from (select ProductId, gen_fundfinanceid,productnumber from product with(nolock)) [refTable] where [refTable].[productnumber] = ?
+- Foreach Loop Container\Minhali daily\Read MY Data From Staging | Microsoft.OLEDBSource.SqlCommand | [PSRS_GENERIX_STAGING] 
+    SELECT Address_Apartment_Number_101 ,Address_Building_Number_99 ,Address_Neighborhood_103 ,Address_Street_98 ,ChangedByAge_Compensation_240 ,ChangedByAge_PensionPayment_239 ,Revaluation_Date_1 ,Deposit_Mf_Expiration_Date_CustomerAccount_245 ,Deposit_Mf_Expiration_Date_Employer_207 ,Deposit_MF_Expiration_Date_Entity_204 ,Deposit_Mf_Percentage_CustomerAccount_246 ,Deposit_MF_Percentage_Employer_208 
+- Foreach Loop Container\Minhali daily\Update 'gen_agentappointmentdate' for the same account | Microsoft.OLEDBCommand.SqlCommand | [CRM] 
+    UPDATE Gen_fundmain SET gen_agentappointmentdate = ? WHERE gen_customeraccountname = ? and Gen_fundmainid <> ?
+- Foreach Loop Container\Minhali daily\Update gen_fundmain | Microsoft.OLEDBCommand.SqlCommand | [CRM] 
+    UPDATE Gen_fundmain Set gen_existinfile = 1 , gen_modifiedbybank = getdate() , gen_forbidendeposit = ? , gen_identitycardimage = ? , gen_isactiveaccount = ? , gen_isconfiscate = ? , gen_isexplanationdocument = ? , gen_ismortgaged = ? , gen_iswarning = ? , gen_depositmfpercentage = ? , gen_managementfeepercentage = ? , gen_weightedmanagementfeepercentage = ? , gen_customeridtype = ? , gen_address1_
+- Foreach Loop Container\Minhali daily\Update Loaneligibilitycalculationrequired In Contact To Yes | Microsoft.OLEDBCommand.SqlCommand | [CRM] 
+    update ContactBase set gen_loaneligibilitycalculationrequired =1 where ContactId =?
+- Foreach Loop Container\Minhali daily\Update Loaneligibilitycalculationrequired In Contact To Yes 1 | Microsoft.OLEDBCommand.SqlCommand | [CRM] 
+    update ContactBase set gen_loaneligibilitycalculationrequired =1 where ContactId =?
+- Foreach Loop Container\Truncate MY_FileData From Staging | ExecuteSQLTask | [PSRS_GENERIX_STAGING] 
+    truncate table MY_FileData
+- Foreach Loop Container\Truncate table AggregateFunds | ExecuteSQLTask | [SQL.GENERIX_STAGING] 
+    truncate table [dbo].[AggregateFunds]
+- Get closer dates from CalendarRule table | ExecuteSQLTask | [CRM] 
+    select starttime FROM CalendarRule where LTRIM(RTRIM(ISNULL(CalendarRule.Name,''))) in ('Friday','Saturday','Holiday') ORDER BY starttime DESC
+- Get Organization Variables\Get Etl Variables | Microsoft.OLEDBSource.SqlCommand | [CRM] 
+    select gen_key, gen_value from gen_etlvariable where (gen_scope = 'global' OR gen_scope = 'LeumiFile-MY')
+- Get Sytem User Id\Get organization id | Microsoft.Lookup.SqlCommand | [CRM] 
+    SELECT LOWER([Name]) as Name,OrganizationId FROM OrganizationBase
+- Get Sytem User Id\Get organization id | Microsoft.Lookup.SqlCommandParam | [CRM] 
+    select * from (SELECT LOWER([Name]) as Name,OrganizationId FROM OrganizationBase) [refTable] where [refTable].[Name] = ?
+- Get Sytem User Id\Get Owner Type | Microsoft.Lookup.SqlCommand | [CRM] 
+    select OwnerId, OwnerIdType from OwnerBase
+- Get Sytem User Id\Get Owner Type | Microsoft.Lookup.SqlCommandParam | [CRM] 
+    select * from (select OwnerId, OwnerIdType from OwnerBase) [refTable] where [refTable].[OwnerId] = ?
+- Get Sytem User Id\Get Transaction Currency id | Microsoft.Lookup.SqlCommand | [CRM] 
+    select ExchangeRate, TransactionCurrency.CurrencyName,TransactionCurrency.TransactionCurrencyId from TransactionCurrency
+- Get Sytem User Id\Get Transaction Currency id | Microsoft.Lookup.SqlCommandParam | [CRM] 
+    select * from (select ExchangeRate, TransactionCurrency.CurrencyName,TransactionCurrency.TransactionCurrencyId from TransactionCurrency) [refTable] where [refTable].[CurrencyName] = ?
+- Get Sytem User Id\Get User Id 1 | Microsoft.OLEDBSource.SqlCommand | [CRM] 
+    select systemuserid,BusinessUnitId from systemuser where lower(domainname) LIKE '%crmadmin'
+
+## Code write candidates (per owner)
+- Foreach Loop Container\Create Account For Employers\Create Account {"crm-service":1,"sql-command":2,"crm-entity":3,"output-buffer":4,"crm-sdk-execute":3}
+- Foreach Loop Container\Create Account For Employers\ETL Warning {"crm-entity":3,"crm-sdk-create":1}
+- Foreach Loop Container\Create Account For Employers\remove duplicates account {"sql-command":2}
+- Foreach Loop Container\Create Account For Employers\Update Account {"crm-service":1,"sql-command":2,"crm-entity":1,"output-buffer":4,"crm-sdk-execute":3}
+- Foreach Loop Container\Create Accounts For Minhali\Convert To Date {"sql-command":2,"output-buffer":1}
+- Foreach Loop Container\Create Accounts For Minhali\Create Account {"crm-service":1,"sql-command":2,"crm-entity":2,"output-buffer":5,"crm-sdk-execute":3}
+- Foreach Loop Container\Create Accounts For Minhali\ETL Warning {"crm-entity":3,"crm-sdk-create":1}
+- Foreach Loop Container\Create Contacts For Minhali\Convert To Date Time {"sql-command":2,"output-buffer":3}
+- Foreach Loop Container\Create Contacts For Minhali\Create Contact {"crm-service":1,"crm-entity":5,"output-buffer":5,"crm-sdk-execute":3}
+- Foreach Loop Container\Create Contacts For Minhali\ETL Warning {"crm-entity":3,"crm-sdk-create":1}
+- Foreach Loop Container\Create Contacts For Minhali\Remove Duplicate {"sql-command":2}
+- Foreach Loop Container\Create Contacts For Minhali\Set MobilePhone End EmailAddress1 {"output-buffer":8}
+- Foreach Loop Container\Create Contacts For Minhali\Update fields by mobilephone and email {"sql-command":2,"output-buffer":9}
+- Foreach Loop Container\Create Employers\Create Employer {"crm-service":1,"sql-command":2,"crm-entity":8,"output-buffer":5,"crm-sdk-execute":3}
+- Foreach Loop Container\Create Employers\ETL Warning {"crm-entity":3,"crm-sdk-create":1}
+- Foreach Loop Container\Create Employers\remove duplicate employer {"sql-command":2}
+- Foreach Loop Container\Create Employers\remove duplicates corporate number {"sql-command":2}
+- Foreach Loop Container\Create Employers\Update Employer {"crm-service":1,"sql-command":2,"crm-entity":4,"output-buffer":5,"crm-sdk-execute":3}
+- Foreach Loop Container\Create ETL Process record With File Name {"crm-entity":1,"crm-sdk-create":1,"variables-write":1}
+- Foreach Loop Container\Create Kibutz\Create Kibutz {"crm-service":1,"crm-entity":1,"crm-sdk-create":1,"output-buffer":2}
+- Foreach Loop Container\Create Kibutz\Create Kibutz 1 {"crm-service":1,"crm-entity":1,"crm-sdk-create":1,"output-buffer":2}
+- Foreach Loop Container\Create Kibutz\Create Kibutz 2 {"crm-service":1,"crm-entity":1,"crm-sdk-create":1,"output-buffer":2}
+- Foreach Loop Container\Create Kibutz\Create Kibutz 3 {"crm-service":1,"crm-entity":1,"crm-sdk-create":1,"output-buffer":2}
+- Foreach Loop Container\Create Kibutz\Create Kibutz 4 {"crm-service":1,"crm-entity":1,"crm-sdk-create":1,"output-buffer":2}
+- Foreach Loop Container\Create Kibutz\Set AccountName And AccountNumber {"sql-command":2,"output-buffer":9}
+- Foreach Loop Container\Create Kibutz\Set Row Number {"output-buffer":1}
+- Foreach Loop Container\End ETL Process record\ETL Record Finish {"sql-command":2,"crm-entity":3,"output-buffer":1,"crm-sdk-update":1}
+- Foreach Loop Container\End ETL Process record\Get gen_etlprocessid {"sql-command":2,"output-buffer":2}
+- Foreach Loop Container\Minhali daily\Add System Columns {"sql-command":2,"output-buffer":12}
+- Foreach Loop Container\Minhali daily\Convesrt fund estate id and status in sector to picklist values {"output-buffer":16}
+- Foreach Loop Container\Minhali daily\ETL Warning 1 {"crm-entity":3,"crm-sdk-create":1}
+- Foreach Loop Container\Minhali daily\ETL Warning 1 1 {"crm-entity":3,"crm-sdk-create":1}
+- Foreach Loop Container\Minhali daily\ETL Warning 1 2 {"crm-entity":3,"crm-sdk-create":1}
+- Foreach Loop Container\Minhali daily\Fields From File Or DB {"output-buffer":34}
+- Foreach Loop Container\Minhali daily\Handale financial track {"output-buffer":15}
+- Foreach Loop Container\Minhali daily\Handle Deposit Blocking Logic {"output-buffer":9}
+- Foreach Loop Container\Minhali daily\Set Additional Columns {"sql-command":2,"output-buffer":27}
+- Foreach Loop Container\Minhali daily\Set Date Fields {"sql-command":2,"output-buffer":25}
+- Foreach Loop Container\Minhali daily\Set Deposit Mf Percentage {"output-buffer":7}
+- Foreach Loop Container\Minhali daily\Set MF {"sql-command":2,"output-buffer":3}
+- Foreach Loop Container\Write Errors to ETLProcessCounter - Step 1 {"crm-entity":2,"crm-sdk-create":1,"variables-write":12}
+- Foreach Loop Container\Write Errors to ETLProcessCounter - Step 2 {"crm-entity":2,"crm-sdk-create":1,"variables-write":12}
+- Foreach Loop Container\Write Errors to ETLProcessCounter - Step 3 {"crm-entity":2,"crm-sdk-create":1,"variables-write":12}
+- Foreach Loop Container\Write Errors to ETLProcessCounter - Step 4 {"crm-entity":2,"crm-sdk-create":1,"variables-write":12}
+- Foreach Loop Container\Write Errors to ETLProcessCounter - Step 5 {"crm-entity":2,"crm-sdk-create":1,"variables-write":12}
+- Foreach Loop Container.EventHandlers[OnError]\Error ETL Process record {"crm-entity":4,"crm-sdk-update":1,"crm-sdk-create":1}
+- Get Organization Variables\Set Variables {"sql-command":2}
+- Get Sytem User Id\Set Varibales {"sql-command":2}
+- Set Files {"variables-write":3,"crm-sdk-create":1}
+
+## External refs (non-framework) CRM2015.Proxy, CRM.Proxy

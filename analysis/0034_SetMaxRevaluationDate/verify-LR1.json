@@ -1,0 +1,86 @@
+{
+ "verifier": "ssis-verifier",
+ "package": "0034_SetMaxRevaluationDate",
+ "scope": "logic-claims re-check after fixes",
+ "checkedAt": "2026-11-07T16:44:30.263Z",
+ "checked": 7,
+ "results": [
+  {
+   "id": "L|summary",
+   "hash": "6088906d7968",
+   "verdict": "CONFIRMED",
+   "detail": "Re-derived from DTSX:15: MAX(dateadd(hh,3,gen_revaluationdate)) over Gen_fundmain where gen_existinfile = 1 and gen_revaluationdate < \"yyyy/m/1\" string, CONVERT style 103, then UPDATE [gen_SystemConfigurationBase] set gen_Value where gen_name = MaxRevaluationDate. The filter compares the raw value and the +3h can roll the stored date to the next day when the max time >= 21:00 (correct). Unsupported direct SQL is correct. Scope note: one Execute SQL Task, DTS:Variables empty, no PrecedenceConstraints, configurations [] in evidence, no event handlers or logging elements; [PCRM] = PSQL/ALTSHULER_MSCRM (DTSX:6); job override flagged as unknown. grep: MaxRevaluationDate appears only in 0034. Note (not blocking): the month boundary depends on session DATEFORMAT; finding#3 and open[4] already carry that caveat.",
+   "evidence": "DTSX:4-6, 10, 12-16",
+   "wrongUnits": []
+  },
+  {
+   "id": "L|Package\\Execute SQL Task|title",
+   "hash": "9957f2588d23",
+   "verdict": "CONFIRMED",
+   "detail": "Units [2]-[5] match DTSX:15: population Gen_fundmain gen_existinfile = 1 with revaluation date before the 1st of the current month, MAX of date +3h, format 103 (dd/mm/yyyy), UPDATE of gen_SystemConfigurationBase where gen_name = MaxRevaluationDate. The flag is stated neutrally (no unproven meaning).",
+   "evidence": "DTSX:15",
+   "wrongUnits": []
+  },
+  {
+   "id": "L|Package\\Execute SQL Task|short",
+   "hash": "446dd91ede8d",
+   "verdict": "WRONG",
+   "detail": "Units [2]-[4] are correct (+3h before MAX, text dd/mm/yyyy, direct DB write, consumer unknown). Unit [1] still states the unproven meaning of the flag.",
+   "evidence": "DTSX:15; analysis fixlog-L decisions[0].meaning_he change",
+   "wrongUnits": [
+    {
+     "unit": 1,
+     "problem": "\"הקופות/החשבונות שמסומנים כקיימים בקובץ\" presents a meaning taken from the column name gen_existinfile as fact (and adds \"accounts\", although the table is Gen_fundmain). In this same fix round, the package changed decisions[0].meaning_he from this exact phrase to the neutral wording because the meaning of the flag is not proven, so this unit now contradicts the corrected decisions/title/detailed texts.",
+     "correct": "החבילה בוחנת רשומות Gen_fundmain שהדגל gen_existinfile שלהן שווה 1 (משמעות הדגל לא מוכחת) ושתאריך השערוך שלהן קודם לתחילת החודש הנוכחי.",
+     "evidence": "DTSX:15 (from Gen_fundmain where gen_existinfile = 1)"
+    }
+   ]
+  },
+  {
+   "id": "L|Package\\Execute SQL Task|detailed",
+   "hash": "3f5860d64434",
+   "verdict": "INCOMPLETE",
+   "detail": "The SQL logic units ([1], [3]-[15]) are correct: NULL dates are excluded, MAX over an empty set gives NULL so the UPDATE writes NULL, and a missing parameter row means 0 rows updated with no INSERT. The text of unit [2] is correct: gen_existinfile is set to 1/true on gen_fundmain only by 0004/0008/0009, and no supplied package resets it to 0 on gen_fundmain. The resets that exist target gen_ftrequestbase in 0009 (DTSX:189416) and gen_warningnotebase/gen_contactlinkBase in 0012 (DTSX:92723, 92729). However, its tech list of writers is incomplete.",
+   "evidence": "0004_LeumiFile-MY.dtsx:61789 (insert into Gen_fundmainbase ... Gen_existinfile ...), :61981 (Param_74 <- IsExistsFile), :58963 (Row.IsExistsFile = \"1\"); :92874",
+   "wrongUnits": [
+    {
+     "unit": 2,
+     "problem": "The tech list gives only \"0004 Update gen_fundmain (DTSX:92874)\" for 0004. 0004 also sets the flag when it creates funds: OLE DB Command \"Minhali daily\\Create gen_FundMain\" does INSERT INTO Gen_fundmainbase (... Gen_existinfile ...), with Param_74 bound to IsExistsFile, which script \"Add System Columns\" always sets to \"1\".",
+     "correct": "Writers: 0004 UPDATE Gen_fundmain (DTSX:92874) and INSERT Gen_fundmainbase (Create gen_FundMain, DTSX:61789; Param_74 = IsExistsFile = \"1\", DTSX:58963/61981); 0008 SDK ×5 (DTSX:23784...); 0009 SDK ×5 (DTSX:27026...).",
+     "evidence": "0004_LeumiFile-MY.dtsx:58963, 61789, 61981"
+    }
+   ]
+  },
+  {
+   "id": "L|Package\\Execute SQL Task|detail",
+   "hash": "bf7c11112d83",
+   "verdict": "INCOMPLETE",
+   "detail": "Units [2]-[5] are correct. Unit [1] is correct in substance (NULL dates are excluded, the flag is never reset to 0 on gen_fundmain in supplied packages), but it describes the 0004 writer as \"UPDATE ב-SQL, DTSX:92874\" only.",
+   "evidence": "0004_LeumiFile-MY.dtsx:58963, 61789, 61981, 92874",
+   "wrongUnits": [
+    {
+     "unit": 1,
+     "problem": "It omits the 0004 INSERT into Gen_fundmainbase (Create gen_FundMain), which also sets Gen_existinfile = 1 (IsExistsFile = \"1\") when new funds are created.",
+     "correct": "gen_existinfile מקבל 1 ב-gen_fundmain ב-0004 גם ב-UPDATE (DTSX:92874) וגם ב-INSERT ל-Gen_fundmainbase (Create gen_FundMain, DTSX:61789), וב-0008/0009 בסקריפטי SDK.",
+     "evidence": "0004_LeumiFile-MY.dtsx:61789, 61981, 58963"
+    }
+   ]
+  },
+  {
+   "id": "L|Package\\Execute SQL Task|decisions",
+   "hash": "eadb9207b3ef",
+   "verdict": "CONFIRMED",
+   "detail": "Both decisions match DTSX:15 verbatim; NULL exclusion and the NULL write when no rows match are correct SQL semantics; the flag meaning is stated neutrally.",
+   "evidence": "DTSX:15",
+   "wrongUnits": []
+  },
+  {
+   "id": "L|Package\\Execute SQL Task|open",
+   "hash": "e26de8aed2c6",
+   "verdict": "CONFIRMED",
+   "detail": "[1] grep confirms MaxRevaluationDate appears only in 0034. [2] verified: setters are in 0004 (SQL UPDATE and INSERT), 0008 and 0009 (SDK, entity gen_fundmain), and there is no reset to 0 on gen_fundmain anywhere in source/DailyProcess. [3] and [4] cannot be answered from the files.",
+   "evidence": "0004:61789/92874; 0008:23784,25656,27528,29400,31156; 0009:27026,29375,31452,33373,35606; 0009:189416; 0012:92723,92729",
+   "wrongUnits": []
+  }
+ ]
+}

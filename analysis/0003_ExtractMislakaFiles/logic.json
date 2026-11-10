@@ -1,0 +1,292 @@
+{
+  "package": "0003_ExtractMislakaFiles",
+  "analyst": "ssis-business-logic",
+  "source": {
+    "file": "source/DailyProcess/0003_ExtractMislakaFiles.dtsx",
+    "sha256": "3B710C449A617647EA5C0B5F599BB3204691AB49CC0E6017F9AA5484D856A65F",
+    "lines": 2194
+  },
+  "scopeNote_he": "ניתוח קוד המקור (C#) של שתי משימות הסקריפט; ה-DLL המקומפל לא פוענח. הפריסה משתמשת באסמבלי חיצוני SharpCompress (HintPath C:\\MyProjects\\...\\SharpCompress.dll, DTSX:818-819) – external_unknown. ערכי הנתיבים (SourcePath, DestPath, ArchivePath, ZipFileName) הם 'fromDB' בחבילה (DTSX:11-22) ונטענים בזמן ריצה מ-gen_etlvariable לפי scope 'global' או שם החבילה (System::PackageName, DTSX:1232-1239) – הערכים עצמם לא ידועים. אין קובץ תצורה, אין Event Handlers, אין לוג ואין רשומת תהליך ETL. אושר: אין בחבילה כתיבה ל-CRM – לא ב-SDK ולא ב-SQL. הגישה היחידה למסד CRM ([Psql] → Psql/ALTSHULER_MSCRM) היא SELECT מ-gen_etlvariable. ההתאמות crm-sdk-delete בסקר הן Directory.Delete / File.Delete על הדיסק.",
+  "summary_he": "החבילה פורסת קבצי 7z של המסלקה (השערה: המסלקה הפנסיונית) מתיקיית המקור לתיקיית עבודה – כל קובץ לתת-תיקייה משלו – ומעבירה את קובץ ה-7z לתיקיית ארכיון לפי תאריך. לפני כן היא מוחקת מתיקיות הארכיון והעבודה תתי-תיקיות שנוצרו לפני יותר מ-7 ימים. אין בחבילה כתיבה ל-CRM; היא מכינה קבצים לחבילות אחרות (לא מוכח איזו).",
+  "executionOrder": [
+    {
+      "step": 1,
+      "refId": "Package\\Get Organization Variables",
+      "title_he": "טעינת נתיבי עבודה מ-gen_etlvariable (מסגרת)",
+      "trigger": "start (no incoming constraint)"
+    },
+    {
+      "step": 2,
+      "refId": "Package\\Clear Archive and WorkFolder",
+      "title_he": "ניקוי תיקיות ארכיון ועבודה ישנות מ-7 ימים",
+      "trigger": "after Get Organization Variables · Success (DTSX:2071)"
+    },
+    {
+      "step": 3,
+      "refId": "Package\\Extract Mislaka Files",
+      "title_he": "פריסת קבצי 7z של המסלקה וארכובם",
+      "trigger": "after Clear Archive and WorkFolder · Success (DTSX:2072)"
+    }
+  ],
+  "ignoredAsFramework": [
+    "Package\\Get Organization Variables",
+    "Package\\Get Organization Variables\\Get Etl Variables",
+    "Package\\Get Organization Variables\\Set Variables",
+    "Package\\Clear Archive and WorkFolder"
+  ],
+  "components": [
+    {
+      "refId": "Package\\Extract Mislaka Files",
+      "title_he": "פריסת קבצי המסלקה",
+      "techName": "Extract Mislaka Files (Script Task)",
+      "short_he": "כל קובץ 7z של המסלקה בתיקיית המקור נפרס לתיקיית עבודה משלו, וקובץ ה-7z עובר לארכיון של היום. אין עדכון ל-CRM.",
+      "flow_he": [
+        "חיפוש קבצים בשם <ZipFileName>*.7z בתיקיית המקור ובכל תתי-התיקיות",
+        "אם נמצאו: יצירת תיקיית ארכיון <ArchivePath>yyyyMMdd",
+        "לכל קובץ: פריסה לתיקייה <DestPath><שם הקובץ בלי סיומת>, עם דריסת קבצים קיימים",
+        "העברת קובץ ה-7z לארכיון (קובץ קודם באותו שם נמחק)"
+      ],
+      "short": {
+        "nodes": [
+          {
+            "type": "step",
+            "text": "החבילה מחפשת בתיקיית המקור, כולל תתי-תיקיות, קבצי 7z ששמם מתחיל בקידומת המוגדרת לקבצי המסלקה."
+          },
+          {
+            "type": "decision",
+            "text": "האם נמצאו קבצים כאלה?",
+            "branches": [
+              {
+                "label": "כן",
+                "nodes": [
+                  {
+                    "type": "step",
+                    "text": "כל קובץ נפרס לתיקיית עבודה נפרדת בשם הקובץ, וקבצים קיימים באותו מקום נדרסים."
+                  },
+                  {
+                    "type": "step",
+                    "text": "הקובץ הדחוס עובר לתיקיית ארכיון של היום."
+                  }
+                ]
+              },
+              {
+                "label": "לא",
+                "nodes": [
+                  {
+                    "type": "step",
+                    "text": "לא נעשה דבר."
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "type": "end",
+            "text": "קבצי המסלקה פרוסים בתיקיית העבודה, מוכנים לקליטה בתהליך אחר (השערה). אין שינוי בנתוני CRM."
+          }
+        ]
+      },
+      "detailed": {
+        "nodes": [
+          {
+            "type": "step",
+            "text": "ארבעת הנתיבים והקידומת נטענים בתחילת הריצה מטבלת משתני ה-ETL במסד; בחבילה עצמה מופיע רק הערך 'fromDB'.",
+            "tech": "User::SourcePath, ZipFileName, DestPath, ArchivePath ← gen_etlvariable where gen_scope = 'global' OR gen_scope = ? (System::PackageName)",
+            "evidence": "DTSX:11-22, 1232-1239; ScriptMain.cs:34-37 (DTSX:907-910)"
+          },
+          {
+            "type": "step",
+            "text": "תיקיית הארכיון של היום נבנית כשרשור של נתיב הארכיון ותאריך היום, בלי מפריד נתיב בין השניים.",
+            "tech": "Path.Combine((string)ArchivePath + DateTime.Now.ToString(\"yyyyMMdd\")) – Path.Combine עם ארגומנט אחד",
+            "evidence": "ScriptMain.cs:37 (DTSX:910)"
+          },
+          {
+            "type": "step",
+            "text": "נאספים כל הקבצים בתיקיית המקור ובכל תתי-התיקיות שלה ששמם מתחיל בקידומת ומסתיים ב-7z.",
+            "tech": "Directory.GetFiles(sourcePath, zipFileName + \"*.7z\", SearchOption.AllDirectories)",
+            "evidence": "ScriptMain.cs:39 (DTSX:912)"
+          },
+          {
+            "type": "decision",
+            "text": "האם נמצא לפחות קובץ אחד?",
+            "tech": "if (zipFiles.Length > 0)",
+            "branches": [
+              {
+                "label": "לא",
+                "nodes": [
+                  {
+                    "type": "step",
+                    "text": "המשימה מסתיימת בהצלחה בלי לעשות דבר.",
+                    "evidence": "ScriptMain.cs:40,56 (DTSX:913,929)"
+                  }
+                ]
+              },
+              {
+                "label": "כן",
+                "nodes": [
+                  {
+                    "type": "step",
+                    "text": "נוצרת תיקיית הארכיון של היום.",
+                    "tech": "Directory.CreateDirectory(archivePath)",
+                    "evidence": "ScriptMain.cs:42 (DTSX:915)"
+                  },
+                  {
+                    "type": "step",
+                    "text": "לכל קובץ נוצרת תיקיית עבודה: נתיב העבודה משורשר עם שם הקובץ בלי הסיומת.",
+                    "tech": "extractPath = destPath + Path.GetFileNameWithoutExtension(zipFile); Directory.CreateDirectory",
+                    "evidence": "ScriptMain.cs:46-47 (DTSX:919-920)"
+                  },
+                  {
+                    "type": "step",
+                    "text": "כל הקבצים שבתוך ה-7z נפרסים לתיקיית העבודה עם מבנה התיקיות הפנימי שלהם; קובץ קיים באותו נתיב נדרס.",
+                    "tech": "SevenZipArchive.Open → ExtractAllEntries → WriteEntryToDirectory(ExtractFullPath = true, Overwrite = true), רק entries שאינם תיקיות",
+                    "evidence": "ScriptMain.cs:59-74 (DTSX:932-947)"
+                  },
+                  {
+                    "type": "decision",
+                    "text": "האם בארכיון של היום כבר קיים קובץ באותו שם?",
+                    "tech": "if(File.Exists(archiveFullName))",
+                    "branches": [
+                      {
+                        "label": "כן",
+                        "nodes": [
+                          {
+                            "type": "step",
+                            "text": "הקובץ הישן בארכיון נמחק.",
+                            "tech": "File.Delete(archiveFullName)",
+                            "evidence": "ScriptMain.cs:50-51 (DTSX:923-924)"
+                          }
+                        ]
+                      },
+                      {
+                        "label": "לא",
+                        "nodes": [
+                          {
+                            "type": "step",
+                            "text": "אין צורך במחיקה."
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  {
+                    "type": "step",
+                    "text": "קובץ ה-7z מועבר מתיקיית המקור לארכיון של היום.",
+                    "tech": "File.Move(zipFile, archiveFullName)",
+                    "evidence": "ScriptMain.cs:52 (DTSX:925)"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "type": "step",
+            "text": "אין טיפול בשגיאות: כשל בקובץ כלשהו מכשיל את המשימה ואת החבילה, וקבצים שטופלו לפני הכשל כבר הועברו לארכיון.",
+            "tech": "אין try/catch ב-Main; אין Event Handlers בחבילה",
+            "evidence": "ScriptMain.cs:32-57 (DTSX:905-930)"
+          },
+          {
+            "type": "end",
+            "text": "קבצי המסלקה פרוסים בתיקיית העבודה, כל קובץ בתת-תיקייה משלו, וקבצי ה-7z המקוריים בארכיון לפי תאריך. אין כתיבה ל-CRM."
+          }
+        ]
+      },
+      "detail_he": [
+        {
+          "h": "מקור ואוכלוסייה",
+          "t": "קבצים בשם <ZipFileName>*.7z בתיקייה SourcePath ובכל תתי-התיקיות (ScriptMain.cs:39). הערכים נטענים מ-gen_etlvariable ואינם ידועים מהחבילה. \"מסלקה\" – לפי שם החבילה בלבד (השערה: המסלקה הפנסיונית)."
+        },
+        {
+          "h": "התאמה לרשומות קיימות",
+          "t": "אין התאמה לרשומות CRM. ההתאמה היחידה היא לפי שם קובץ: תיקיית העבודה ושם הקובץ בארכיון נגזרים משם קובץ ה-7z."
+        },
+        {
+          "h": "החלטות",
+          "t": "1) if (zipFiles.Length > 0) – רק אם יש קבצים נוצרת תיקיית ארכיון ומתבצע טיפול. 2) if(File.Exists(archiveFullName)) – קובץ קודם באותו שם בארכיון של היום נמחק לפני ההעברה. 3) entries שהם תיקיות מדולגים (!reader.Entry.IsDirectory)."
+        },
+        {
+          "h": "כתיבה ל-CRM",
+          "t": "אין. הגישה למסד CRM היא קריאה בלבד מ-gen_etlvariable (DTSX:1232). אין בחבילה Script שמשתמש ב-CRM SDK ואין SQL DML."
+        },
+        {
+          "h": "תוצאה עסקית",
+          "t": "הכנת קבצי המסלקה לקליטה: קבצים פרוסים ב-DestPath<שם קובץ>, וקבצי המקור ב-ArchivePath<yyyyMMdd>. הצרכן של הקבצים לא מוכח בחבילה זו."
+        }
+      ],
+      "decisions": [
+        {
+          "where": "Extract Mislaka Files · ScriptMain.cs:39-40",
+          "condition": "Directory.GetFiles(sourcePath, zipFileName + \"*.7z\", SearchOption.AllDirectories); if (zipFiles.Length > 0)",
+          "meaning_he": "יש קבצי מסלקה דחוסים לטיפול.",
+          "outcome_he": "פריסה וארכוב של כל קובץ; אחרת – אין פעולה."
+        },
+        {
+          "where": "Extract Mislaka Files · ScriptMain.cs:50-52",
+          "condition": "if(File.Exists(archiveFullName)) File.Delete(archiveFullName); File.Move(zipFile, archiveFullName);",
+          "meaning_he": "קובץ באותו שם כבר בארכיון של היום.",
+          "outcome_he": "הקובץ הישן נמחק והחדש מחליף אותו."
+        },
+        {
+          "where": "Extract Mislaka Files · ScriptMain.cs:66-71",
+          "condition": "if (!reader.Entry.IsDirectory) reader.WriteEntryToDirectory(extractPath, new ExtractionOptions(){ ExtractFullPath = true, Overwrite = true })",
+          "meaning_he": "כל קובץ בתוך ה-7z נכתב לדיסק עם הנתיב הפנימי שלו.",
+          "outcome_he": "קבצים קיימים באותו נתיב נדרסים."
+        },
+        {
+          "where": "Clear Archive and WorkFolder · ScriptMain.cs:99-109 (מסגרת/ניקוי)",
+          "condition": "DateTime.Now.Subtract(Directory.GetCreationTime(d)).TotalDays > 7",
+          "meaning_he": "תת-תיקייה בארכיון או בתיקיית העבודה שנוצרה לפני יותר מ-7 ימים.",
+          "outcome_he": "נמחקת עם כל תוכנה (Directory.Delete(..., true))."
+        }
+      ],
+      "crmEffects": [],
+      "evidence": [
+        "DTSX:634 Executable Package\\Extract Mislaka Files (Microsoft.ScriptTask); ReadOnlyVariables DTSX:637",
+        "ScriptMain.cs (sha 4abb03c86162, DTSX:874; ScriptMain.cs:N ≈ DTSX:N+873): 34-56, 59-74",
+        "DTSX:25 Executable Package\\Clear Archive and WorkFolder; ScriptMain.cs (sha 1984e2bcbfd1; N ≈ DTSX:N+255): 96-110",
+        "DTSX:11-22 משתנים עם ערך 'fromDB'; DTSX:1232-1239 gen_etlvariable + ParameterMapping System::PackageName",
+        "DTSX:818-819 Reference SharpCompress (HintPath מקומי)",
+        "DTSX:2071-2072 Precedence Constraints",
+        "evidence/0003_ExtractMislakaFiles.json: configurations=[], logProviders=0, אין EventHandlers"
+      ],
+      "openQuestions_he": [
+        "מה הערכים של SourcePath, DestPath, ArchivePath ו-ZipFileName בטבלת gen_etlvariable (scope = ExtractMislakaFiles)? האם DestPath ו-ArchivePath מסתיימים ב-\\ (הקוד משרשר בלי מפריד)?",
+        "איזו חבילה או מערכת קולטת את הקבצים הפרוסים מתיקיית העבודה?",
+        "האם קבצי ה-7z מכילים תתי-תיקיות פנימיות? זה משפיע על סיכון הכשל בשלב הניקוי (ראה ממצאים).",
+        "מהי גרסת SharpCompress שמותקנת בשרת? האסמבלי לא סופק."
+      ]
+    }
+  ],
+  "findings_he": [
+    {
+      "severity": "info",
+      "text": "אושר: אין בחבילה כתיבה ל-CRM. אין רכיב SDK, אין SQL DML; החיבור היחיד למסד CRM משמש ל-SELECT מ-gen_etlvariable. ההתאמות crm-sdk-delete בסקר הן מחיקת קבצים/תיקיות בדיסק.",
+      "evidence": "survey_0003; ScriptMain.cs (Clear):109, ScriptMain.cs (Extract):51; DTSX:1232"
+    },
+    {
+      "severity": "medium",
+      "text": "סיכון כשל בשלב הניקוי שחוסם את הפריסה: הרשימה למחיקה נאספת עם SearchOption.AllDirectories, כך שהיא כוללת גם תת-תיקייה וגם את תתי-התיקיות שלה. אחרי שתיקיית האב נמחקת רקורסיבית, הניסיון למחוק את תת-התיקייה (שכבר אינה קיימת) זורק DirectoryNotFoundException (התנהגות .NET). המשימה נכשלת, ובגלל ה-Success constraint הפריסה לא רצה. זה קורה רק אם יש תתי-תיקיות מקוננות ישנות מ-7 ימים (למשל מפריסה עם ExtractFullPath = true של 7z שמכיל תיקיות) – לא ידוע אם זה המצב בפועל.",
+      "evidence": "Clear ScriptMain.cs:99-110 (DTSX:354-365); DTSX:2072; Extract ScriptMain.cs:69"
+    },
+    {
+      "severity": "medium",
+      "text": "אין טיפול בשגיאות ואין רשומת תהליך ETL או Event Handler: קובץ 7z פגום מכשיל את החבילה באמצע. קבצים שטופלו לפניו כבר בארכיון, והקבצים שאחריו לא נפרסים. אין תיעוד עסקי של הכשל מלבד כשל ה-Job.",
+      "evidence": "Extract ScriptMain.cs:32-57 (DTSX:905-930)"
+    },
+    {
+      "severity": "low",
+      "text": "הנתיבים נבנים בשרשור מחרוזות ולא ב-Path.Combine אמיתי (ArchivePath + yyyyMMdd, DestPath + שם הקובץ). אם הערכים ב-gen_etlvariable לא מסתיימים ב-\\, התיקיות ייווצרו לצד התיקייה המיועדת ולא בתוכה.",
+      "evidence": "Extract ScriptMain.cs:37,46 (DTSX:910,919)"
+    },
+    {
+      "severity": "low",
+      "text": "החיפוש בתיקיית המקור רקורסיבי (AllDirectories). אם תיקיית הארכיון נמצאת בתוך תיקיית המקור (תלוי בערכי הנתיבים, לא ידוע), אז: קובץ 7z מתיקיית ארכיון של יום קודם נפרס שוב ומועבר לתיקיית הארכיון של היום. קובץ 7z שכבר נמצא בתיקיית הארכיון של היום (ריצה שנייה באותו יום) נפרס שוב, ואז הקוד מוחק את הקובץ עצמו (File.Delete, שורה 51) ו-File.Move (שורה 52) זורק חריגה כי הקובץ כבר לא קיים. במקרה כזה העותק בארכיון נמחק, המשימה נכשלת בקובץ הזה, והקבצים שאחריו לא מטופלים.",
+      "evidence": "Extract ScriptMain.cs:37,39,49-52 (DTSX:910,912,922-925)"
+    },
+    {
+      "severity": "info",
+      "text": "הניקוי מוחק מתיקיית העבודה כל תת-תיקייה שנוצרה לפני יותר מ-7 ימים – כלומר הקבצים הפרוסים נשמרים כשבוע בלבד.",
+      "evidence": "Clear ScriptMain.cs:103-109 (DTSX:358-364)"
+    }
+  ]
+}

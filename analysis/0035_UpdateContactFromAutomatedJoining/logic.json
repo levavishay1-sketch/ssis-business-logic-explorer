@@ -1,0 +1,325 @@
+{
+ "package": "0035_UpdateContactFromAutomatedJoining",
+ "analyst": "ssis-business-logic",
+ "source": {
+  "file": "source/DailyProcess/0035_UpdateContactFromAutomatedJoining.dtsx",
+  "sha256": "5D5792761C97AC9510E7C97BAC41BF1D81FA93FF2122514A0A5DFB75B5050F1E",
+  "lines": 2142
+ },
+ "scopeNote_he": "הכתיבה העסקית היחידה היא עדכון contact דרך SDK (IOrganizationService.Update) ברכיב הסקריפט 'Update Contact'. [PSQL] = PSQL/ALTSHULER_MSCRM (DTSX:4) משמש לקריאה בלבד (OLE DB Source). בחבילה אין Package Configuration, אין log provider ואין Event Handlers. ServerName ו-OrganizationName נטענים מ-gen_etlvariable. CRM.Proxy הוא אסמבלי חיצוני שלא נבדק. נותח קוד המקור (C#) בלבד.",
+ "summary_he": "החבילה מעדכנת אנשי קשר (contact) לפי ההסכמות שנתנו בבקשת הצטרפות אוטומטית (gen_automatedjoining). איש הקשר מזוהה לפי מספר הזהות של המבקש. אם בבקשה ניתנה הסכמה לדיוור מהחברה, נקבע donotsendmm=false. אם ניתנה הסכמה לפניות שיווקיות, נקבע gen_quarterstatement=true. השדה gen_notauthorizeforuse נדרס תמיד בערך שנגזר מהבקשה.",
+ "executionOrder": [
+  {
+   "step": 1,
+   "refId": "Package\\Get Organization Variables",
+   "title_he": "טעינת משתני ארגון (מסגרת)",
+   "trigger": "start (no incoming constraint)"
+  },
+  {
+   "step": 2,
+   "refId": "Package\\Update Contact From Joining",
+   "title_he": "עדכון הסכמות איש הקשר מבקשת ההצטרפות",
+   "trigger": "after Get Organization Variables · Success (DTSX:1971)"
+  }
+ ],
+ "ignoredAsFramework": [
+  "Package\\Get Organization Variables"
+ ],
+ "components": [
+  {
+   "refId": "Package\\Update Contact From Joining",
+   "title_he": "עדכון הסכמות איש הקשר מבקשת ההצטרפות",
+   "techName": "Update Contact From Joining",
+   "short_he": "אנשי קשר שנתנו בבקשת הצטרפות הסכמה חדשה לדיוור או לפניות שיווקיות מתעדכנים ב-CRM לפי ההסכמה. בכל עדכון נדרס גם השדה 'לא מורשה לשימוש'.",
+   "flow_he": [
+    "שליפת בקשות הצטרפות עם הסכמה חדשה שעוד לא נרשמה באיש הקשר",
+    "התאמה לאיש קשר לפי מספר זהות",
+    "חישוב הערך של 'לא מורשה לשימוש'",
+    "עדכון איש הקשר ב-CRM"
+   ],
+   "short": {
+    "nodes": [
+     {
+      "type": "step",
+      "text": "נשלפות בקשות הצטרפות שבהן ניתנה הסכמה לדיוור מהחברה או לפניות שיווקיות, כשההסכמה חדשה יותר ממה שרשום באיש הקשר."
+     },
+     {
+      "type": "step",
+      "text": "כל בקשה מותאמת לאיש הקשר עם אותו מספר זהות."
+     },
+     {
+      "type": "decision",
+      "text": "על אילו הסכמות מעידה הבקשה?",
+      "branches": [
+       {
+        "label": "הסכמה לדיוור מהחברה",
+        "nodes": [
+         {
+          "type": "write",
+          "text": "באיש הקשר נקבע donotsendmm=false. לפי שם השדה, המשמעות היא כנראה שמותר לשלוח לו דיוור (השערה)."
+         }
+        ]
+       },
+       {
+        "label": "הסכמה לפניות שיווקיות",
+        "nodes": [
+         {
+          "type": "write",
+          "text": "באיש הקשר נקבע gen_quarterstatement=true. לפי שם השדה, זה כנראה קשור לדוח רבעוני (השערה; המשמעות לא מוכחת)."
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "type": "write",
+      "text": "בכל עדכון נדרס גם שדה 'לא מורשה לשימוש' של איש הקשר בערך שנגזר מהבקשה."
+     },
+     {
+      "type": "end",
+      "text": "ההסכמות של איש הקשר ב-CRM מעודכנות לפי בקשת ההצטרפות."
+     }
+    ]
+   },
+   "detailed": {
+    "nodes": [
+     {
+      "type": "step",
+      "text": "המקור הוא בקשות הצטרפות שמחוברות לאיש קשר עם אותו מספר זהות.",
+      "tech": "Get Automated Joinings DTSX:838-863 · [PSQL] · from gen_automatedjoining join Contact on gen_applicantidentitynumber = Contact.gen_identitynumber · select distinct"
+     },
+     {
+      "type": "decision",
+      "text": "האם הבקשה עומדת באחד מתנאי הבחירה?",
+      "tech": "where gen_joiningstatus in(7,8) and (A) or (B) — לפי קדימות האופרטורים ב-SQL זה (status in(7,8) AND A) OR B",
+      "branches": [
+       {
+        "label": "A: הסכמה לדיוור, והבקשה בסטטוס 7 או 8",
+        "nodes": [
+         {
+          "type": "step",
+          "text": "בבקשה ניתנה הסכמה לדיוור מהחברה, איש הקשר מסומן כרגע donotsendmm שונה מ-0 (לפי שם השדה כנראה 'לא לשלוח'; השערה), והבקשה נוצרה אחרי עדכון ההסכמה האחרון באיש הקשר, או שאין לו עדכון כזה.",
+          "tech": "gen_newcompanyemailagreement = 1 and donotsendmm != 0 and (datediff(second, Contact.gen_emailagreementupdate, CreatedOn) > 0 or Contact.gen_emailagreementupdate is null)"
+         }
+        ]
+       },
+       {
+        "label": "B: הסכמה לפניות שיווקיות, בכל סטטוס",
+        "nodes": [
+         {
+          "type": "step",
+          "text": "בבקשה ניתנה הסכמה לפניות שיווקיות, gen_quarterstatement שונה מ-1, והבקשה נוצרה אחרי עדכון ההסכמה השיווקית האחרון, או שאין עדכון כזה. התנאי לא מוגבל לסטטוס הבקשה.",
+          "tech": "gen_newmarketinginquiriesagreement = 1 and gen_quarterstatement != 1 and (DATEDIFF(second, Contact.gen_marketingagreementupdate, CreatedOn) > 0 or Contact.gen_marketingagreementupdate is null)"
+         }
+        ]
+       },
+       {
+        "label": "אף אחד מהם",
+        "nodes": [
+         {
+          "type": "step",
+          "text": "הבקשה לא נבחרת, ואיש הקשר לא מתעדכן."
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "type": "decision",
+      "text": "איזה ערך ייכתב לשדה 'לא מורשה לשימוש' של איש הקשר?",
+      "tech": "Set field by other DTSX:909 · NotAuthorizedToUseDataSource = ISNULL(gen_notauthorizeforuse) && !ISNULL(gen_datechangeingfromauthorizedtonotautorized) && gen_notauthorizetousedatasource == 1 ? NULL(DT_I4) : gen_notauthorizetousedatasource",
+      "branches": [
+       {
+        "label": "השדה באיש הקשר ריק, יש תאריך שינוי ממורשה ללא מורשה, ובבקשה הערך הוא 1",
+        "nodes": [
+         {
+          "type": "step",
+          "text": "הערך הוא ריק, כך שהשדה באיש הקשר יישאר ריק."
+         }
+        ]
+       },
+       {
+        "label": "כל מקרה אחר",
+        "nodes": [
+         {
+          "type": "step",
+          "text": "הערך נלקח מהבקשה (gen_notauthorizetousedatasource), גם אם הוא ריק."
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "type": "step",
+      "text": "שורה בלי מזהה איש קשר מדולגת.",
+      "tech": "Update Contact main.cs:121-122 (DTSX:943) if (Row.ContactId_IsNull) return"
+     },
+     {
+      "type": "write",
+      "text": "בעדכון איש הקשר תמיד נכתב השדה 'לא מורשה לשימוש': הערך שחושב, או ריק אם הערך ריק.",
+      "tech": "contact · Update · SDK · gen_notauthorizeforuse = OptionSetValue(NotAuthorizedToUseDataSource) or null (main.cs:130-137)"
+     },
+     {
+      "type": "decision",
+      "text": "האם בבקשה ניתנה הסכמה לדיוור מהחברה?",
+      "tech": "!Row.gennewcompanyemailagreement_IsNull && Row.gennewcompanyemailagreement == 1 (main.cs:139)",
+      "branches": [
+       {
+        "label": "כן",
+        "nodes": [
+         {
+          "type": "write",
+          "text": "באיש הקשר נקבע donotsendmm=false. לפי שם השדה, המשמעות היא כנראה שמותר לשלוח לו דיוור (השערה).",
+          "tech": "contact[\"donotsendmm\"] = false (main.cs:141)"
+         }
+        ]
+       },
+       {
+        "label": "לא",
+        "nodes": [
+         {
+          "type": "step",
+          "text": "השדה לא נכלל בעדכון."
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "type": "decision",
+      "text": "האם בבקשה ניתנה הסכמה לפניות שיווקיות?",
+      "tech": "!Row.gennewmarketinginquiriesagreement_IsNull && Row.gennewmarketinginquiriesagreement == 1 (main.cs:144)",
+      "branches": [
+       {
+        "label": "כן",
+        "nodes": [
+         {
+          "type": "write",
+          "text": "באיש הקשר נקבע gen_quarterstatement=true. המשמעות העסקית לא מוכחת; לפי שם השדה זה כנראה דוח רבעוני (השערה).",
+          "tech": "contact[\"gen_quarterstatement\"] = true (main.cs:146)"
+         }
+        ]
+       },
+       {
+        "label": "לא",
+        "nodes": [
+         {
+          "type": "step",
+          "text": "השדה לא נכלל בעדכון."
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "type": "step",
+      "text": "איש הקשר מעודכן בקריאה אחת. אם העדכון נכשל, השגיאה מועברת לפלט שגיאות שלא מחובר לשום דבר, ולכן היא לא נרשמת.",
+      "tech": "service.Update(contact) main.cs:149 · catch → DirectRowToErrors (main.cs:151-155) · Errors output has no path (DTSX:1963-1964)"
+     },
+     {
+      "type": "end",
+      "text": "אנשי הקשר מעודכנים בהסכמות לדיוור ולפניות שיווקיות לפי בקשות ההצטרפות, ושדה 'לא מורשה לשימוש' שלהם מסונכרן לבקשה."
+     }
+    ]
+   },
+   "detail_he": [
+    {
+     "h": "מקור ואוכלוסייה",
+     "t": "gen_automatedjoining מחובר ל-Contact לפי gen_applicantidentitynumber = Contact.gen_identitynumber, עם תנאי WHERE: gen_joiningstatus in(7,8) and (A) or (B). בגלל קדימות האופרטורים, תנאי B (הסכמה שיווקית) נבחר בלי קשר לסטטוס הבקשה."
+    },
+    {
+     "h": "התאמה לרשומות קיימות",
+     "t": "איש הקשר מזוהה לפי מספר זהות. אם כמה אנשי קשר חולקים מספר זהות, כולם מתעדכנים. אם לאיש קשר יש כמה בקשות, הוא עשוי להתעדכן כמה פעמים, בסדר שלא מוגדר."
+    },
+    {
+     "h": "החלטות",
+     "t": "יש שלוש החלטות: בחירת השורות ב-SQL, חישוב 'לא מורשה לשימוש' ב-Derived Column, וההחלטה בסקריפט אילו שדות הסכמה לכלול בעדכון. העמודות UpdateEmailAgreement ו-UpdateMarketingAgreement מחושבות ב-SQL, אבל הסקריפט לא משתמש בהן."
+    },
+    {
+     "h": "כתיבה ל-CRM",
+     "t": "contact · Update · SDK: gen_notauthorizeforuse נכתב תמיד; donotsendmm=false כשיש הסכמה לדיוור; gen_quarterstatement=true כשיש הסכמה שיווקית."
+    },
+    {
+     "h": "תוצאה עסקית",
+     "t": "ההסכמות שניתנו בהצטרפות האוטומטית מועברות לכרטיס הלקוח (איש הקשר)."
+    }
+   ],
+   "decisions": [
+    {
+     "where": "Get Automated Joinings (SQL WHERE)",
+     "condition": "where gen_joiningstatus in(7,8) and (gen_newcompanyemailagreement = 1 and donotsendmm != 0 and (datediff(second, Contact.gen_emailagreementupdate, CreatedOn)>0 or Contact.gen_emailagreementupdate is null)) or (gen_newmarketinginquiriesagreement = 1 and gen_quarterstatement != 1 and (DATEDIFF(second, Contact.gen_marketingagreementupdate, CreatedOn)>0 or Contact.gen_marketingagreementupdate is null))",
+     "meaning_he": "בקשה עם הסכמה חדשה שעוד לא נרשמה באיש הקשר.",
+     "outcome_he": "השורה נבחרת לעדכון. תנאי ההסכמה השיווקית לא מוגבל לסטטוס 7 או 8."
+    },
+    {
+     "where": "Set field by other",
+     "condition": "ISNULL(gen_notauthorizeforuse) && !ISNULL(gen_datechangeingfromauthorizedtonotautorized) && gen_notauthorizetousedatasource == 1 ? NULL(DT_I4) : gen_notauthorizetousedatasource",
+     "meaning_he": "מתי לא להעתיק את 'לא מורשה' מהבקשה.",
+     "outcome_he": "NULL או הערך מהבקשה. הערך נכתב לאיש הקשר בכל מקרה."
+    },
+    {
+     "where": "Update Contact main.cs:139",
+     "condition": "!Row.gennewcompanyemailagreement_IsNull && Row.gennewcompanyemailagreement == 1",
+     "meaning_he": "יש הסכמה לדיוור מהחברה.",
+     "outcome_he": "donotsendmm=false."
+    },
+    {
+     "where": "Update Contact main.cs:144",
+     "condition": "!Row.gennewmarketinginquiriesagreement_IsNull && Row.gennewmarketinginquiriesagreement == 1",
+     "meaning_he": "יש הסכמה לפניות שיווקיות.",
+     "outcome_he": "gen_quarterstatement=true."
+    }
+   ],
+   "crmEffects": [
+    {
+     "entity": "contact",
+     "verb": "Update (gen_notauthorizeforuse תמיד; donotsendmm=false מותנה; gen_quarterstatement=true מותנה)",
+     "mechanism": "SDK",
+     "when_he": "לכל שורה שנבחרה בשאילתה ויש לה ContactId."
+    }
+   ],
+   "evidence": [
+    "DTSX:833 Update Contact From Joining",
+    "DTSX:838-863 Get Automated Joinings (SqlCommand DTSX:843)",
+    "DTSX:909 Set field by other",
+    "DTSX:941 Update Contact · main.cs:118-157 (DTSX:943, sha 89d0f471572f)",
+    "DTSX:1963-1964 paths (Errors output unconnected)",
+    "DTSX:4 [PSQL] = PSQL/ALTSHULER_MSCRM",
+    "DTSX:1971 precedence"
+   ],
+   "openQuestions_he": [
+    "donotsendmm ו-gen_quarterstatement מופיעים ב-WHERE בלי שם טבלה. כנראה הם של Contact (השערה), והחבילה לא מוכיחה זאת.",
+    "משמעות gen_joiningstatus לפי הקבצים שסופקו: בחבילה 0005 הערך gen_automatedjoining.gen_joiningstatus = 7 מסומן בהערת SQL \"-- status send to the bank\" (0005_Customer Account.dtsx:32056). בחבילה 0037 הערך gen_joiningstatus = 8 של gen_automatedjoining מסומן \"--> Finish\" (0037_MeetTheCustomerGemel.dtsx:3232, 4762). ב-0035 העמודה מופיעה בלי שם טבלה (DTSX:857). המשמעות של gen_quarterstatement לא מוכחת בקבצים.",
+    "החבילה לא מעדכנת את gen_emailagreementupdate ו-gen_marketingagreementupdate באיש הקשר, ולא ידוע אם גורם חיצוני (למשל plugin) מעדכן אותם. בהנחה ש-donotsendmm ו-gen_quarterstatement שב-WHERE הם עמודות של Contact (השערה, שאלה 1): עדכון מוצלח כותב donotsendmm = false (כשבבקשה gen_newcompanyemailagreement = 1) ו-gen_quarterstatement = true (כשבבקשה gen_newmarketinginquiriesagreement = 1). אחרי זה התנאים donotsendmm != 0 ו-gen_quarterstatement != 1 לא מתקיימים, והבקשה לא נבחרת שוב. בקשה ישנה תיבחר שוב רק אם (א) העדכון ב-CRM נכשל והערכים לא השתנו, או (ב) בהמשך donotsendmm באיש הקשר חוזר לערך שאינו 0, או gen_quarterstatement חוזר לערך שאינו 1, בזמן ש-gen_emailagreementupdate / gen_marketingagreementupdate עדיין NULL או מוקדמים מ-CreatedOn של הבקשה. במקרה (ב) החבילה כותבת שוב את ההסכמה הישנה (donotsendmm = false / gen_quarterstatement = true) ודורסת את gen_notauthorizeforuse. אם העמודות שייכות ל-gen_automatedjoining, החבילה לא משנה אותן, והבקשות עלולות להיבחר שוב בכל ריצה כל עוד תנאי התאריכים מתקיימים.",
+    "המשמעויות של donotsendmm ('לא לשלוח דיוור') ושל gen_quarterstatement ('דוח רבעוני') מבוססות על שמות השדות בלבד (השערה). בחבילה אין ראיה לתוויות או לערכי ה-OptionSet."
+   ]
+  }
+ ],
+ "findings_he": [
+  {
+   "severity": "high",
+   "text": "יש בעיית קדימות אופרטורים ב-WHERE: 'gen_joiningstatus in(7,8) and (A) or (B)' מתפרש כ-'(status in(7,8) and A) or B'. בקשות עם הסכמה שיווקית חדשה נבחרות בכל סטטוס, גם אם ההצטרפות לא הגיעה לסטטוס 7 או 8, והן מעדכנות את איש הקשר.",
+   "evidence": "Get Automated Joinings SqlCommand DTSX:843-862"
+  },
+  {
+   "severity": "medium",
+   "text": "הסקריפט מתעלם מ-UpdateEmailAgreement ו-UpdateMarketingAgreement, שמחושבים ב-SQL, ובודק רק את דגלי ההסכמה בבקשה. לכן שורה שנבחרה בגלל תנאי השיווק (B) תקבע גם donotsendmm=false אם בבקשה יש gen_newcompanyemailagreement=1, גם כשתנאי התאריך של ההסכמה לדיוור לא מתקיים.",
+   "evidence": "Update Contact main.cs:139-147; SQL columns UpdateEmailAgreement/UpdateMarketingAgreement"
+  },
+  {
+   "severity": "medium",
+   "text": "השדה gen_notauthorizeforuse של איש הקשר נדרס בכל עדכון, גם כשהבקשה לא נבחרה בגלל שינוי בו. כשהערך בבקשה ריק, השדה באיש הקשר מתאפס.",
+   "evidence": "Set field by other DTSX:909; main.cs:130-137"
+  },
+  {
+   "severity": "medium",
+   "text": "כשלי עדכון נבלעים: פלט Errors של Update Contact לא מחובר, ובחבילה אין רישום ETL או log provider.",
+   "evidence": "DTSX:1963-1964; main.cs:151-155"
+  },
+  {
+   "severity": "low",
+   "text": "ההתאמה לאיש הקשר לפי מספר זהות היא join ישיר. אם כמה אנשי קשר חולקים מספר זהות כולם מתעדכנים, ואם יש כמה בקשות לאותו איש קשר הוא מתעדכן כמה פעמים בסדר לא מוגדר.",
+   "evidence": "Get Automated Joinings: join Contact on gen_applicantidentitynumber = Contact.gen_identitynumber"
+  }
+ ]
+}

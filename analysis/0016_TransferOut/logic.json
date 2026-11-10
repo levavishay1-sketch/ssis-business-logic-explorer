@@ -1,0 +1,422 @@
+{
+ "package": "0016_TransferOut",
+ "analyst": "ssis-business-logic",
+ "source": {
+  "file": "source/DailyProcess/0016_TransferOut.dtsx",
+  "sha256": "FE7489856D80B9311DD7BC289CA21C6A1FF23FCBD2365BC9F421A40A74A91A37",
+  "lines": 6052
+ },
+ "scopeNote_he": "ניתוח קוד המקור (C#) בלבד; ה-DLL המקומפל לא פוענח. CRM.Proxy / ExecuteMultipleExtension הם אסמבלי חיצוני (CRM2015.Proxy, לא סופק) – external_unknown. אין קובץ תצורה (configurations ריק). מנהל החיבור [psql] = psql / ALTSHULER_MSCRM משמש לקריאה בלבד; הכתיבה העסקית היחידה (gen_customercare) היא דרך SDK ExecuteMultiple (Supported). אין SQL DML בחבילה. ה-Views Gen_customercare, gen_accountcourses, Gen_ftCurrentYear, Gen_fundtransactiontype לא סופקו. מתוך ארבעת כותבי ה-SDK שזוהו בסקר, רק Close Transfer Out הוא עסקי; Create ETL Process record, ETL Record Finish ו-ETL Warning הם מסגרת. ערכי ה-OptionSet (34, 3) ומשמעותם ב-CRM לא ידועים מעבר לשמות הקבועים בקוד.",
+ "summary_he": "החבילה סוגרת אוטומטית טיפולי לקוח (Gen_customercare) עם Gen_currentstate = 1 (השערה: פתוחים; ככל הנראה בקשות ניוד יוצא) כשבקופה של מסלול החשבון שלהם נקלטו אחרי יצירת הטיפול תנועות שסוגן בקבוצה gen_transgrouptype = 2. בניוד מלא מספיקה תנועה אחת; בניוד חלקי נדרש שסכום התנועות בקבוצה (מסלול × תאריך ערך × נספח ג') יהיה שווה ל-expectedTransactionAmount – סכום המסלול כפול מספר התנועות בקבוצה (ראה ממצא 1). הטיפול מתעדכן ב-CRM למצב 3 (\"FINISHED\") עם סיבה 34 (\"PROPER\"), תאריך שחרור הכספים, תאריך הנפקת נספח ג' וסימון איחור במסירה.",
+ "executionOrder": [
+  {
+   "step": 1,
+   "refId": "Package\\Get Variables From SystemConfigurarion",
+   "title_he": "טעינת משתני ETL (מסגרת)",
+   "trigger": "start (no incoming constraint)"
+  },
+  {
+   "step": 2,
+   "refId": "Package\\Create ETL Process record",
+   "title_he": "רשומת תהליך ETL (מסגרת)",
+   "trigger": "after Get Variables From SystemConfigurarion · Success (DTSX:5476)"
+  },
+  {
+   "step": 3,
+   "refId": "Package\\Close Transfer Out",
+   "title_he": "סגירת טיפולי לקוח במצב 1 (Gen_currentstate = 1) שנקלטו בקופת המסלול שלהם תנועות מקבוצה gen_transgrouptype = 2 אחרי יצירתם – ללא סינון לפי סוג הטיפול (\"ניוד יוצא\" – לפי שם הרכיב בלבד, השערה)",
+   "trigger": "after Create ETL Process record · Success (DTSX:5478)"
+  },
+  {
+   "step": 4,
+   "refId": "Package\\End ETL Process record",
+   "title_he": "סגירת תהליך ETL (מסגרת)",
+   "trigger": "after Close Transfer Out · Success (DTSX:5477)"
+  }
+ ],
+ "ignoredAsFramework": [
+  "Package\\Get Variables From SystemConfigurarion",
+  "Package\\Get Variables From SystemConfigurarion\\Get SystemConfigurations",
+  "Package\\Get Variables From SystemConfigurarion\\Set Variables",
+  "Package\\Create ETL Process record",
+  "Package\\End ETL Process record",
+  "Package\\End ETL Process record\\Get gen_etlprocessid",
+  "Package\\End ETL Process record\\Lookup",
+  "Package\\End ETL Process record\\ETL Record Finish",
+  "Package\\Close Transfer Out\\Union All 1",
+  "Package\\Close Transfer Out\\Set Warning columns",
+  "Package\\Close Transfer Out\\ETL Warning",
+  "LogProvider: SSIS log provider for SQL Server (SSIS_Logs → psrs/SSIS_Logs)"
+ ],
+ "components": [
+  {
+   "refId": "Package\\Close Transfer Out",
+   "title_he": "סגירת טיפולי לקוח במצב 1 (Gen_currentstate = 1) שנקלטו בקופת המסלול שלהם תנועות מקבוצה gen_transgrouptype = 2 אחרי יצירתם – ללא סינון לפי סוג הטיפול (\"ניוד יוצא\" – לפי שם הרכיב בלבד, השערה)",
+   "techName": "Close Transfer Out (Data Flow): OLE DB Source → Is full transfer out → Check number of transactions / Compare sums → Union All → Aggregate → Close Transfer Out (Script)",
+   "short_he": "טיפולי לקוח במצב 1 (השערה: פתוחים) שבקופה שלהם נקלטו תנועות מתאימות אחרי יצירת הטיפול נסגרים ב-CRM במצב 3 (FINISHED), עם תאריך שחרור הכספים וסימון איחור. בניוד חלקי נדרשת גם התאמת סכומים.",
+   "flow_he": [
+    "שליפת טיפולי לקוח במצב 1 + מסלולי החשבון שלהם + תנועות בקופה מקבוצת סוג 2 שנקלטו אחרי פתיחת הטיפול",
+    "ניוד מלא: מספיקה תנועה אחת",
+    "ניוד חלקי: סכום התנועות בקבוצה = סכום המסלול × מספר התנועות בקבוצה (expectedTransactionAmount)",
+    "קיבוץ לפי טיפול, תאריך מסירה ותאריך הנפקת נספח ג' (שורה לכל צירוף; לאותו טיפול עשויים להישלח כמה עדכונים): תאריך ערך מינימלי (Aggregate)",
+    "עדכון הטיפול ב-CRM: מצב 3, סיבה 34, תאריך שחרור, נספח ג', איחור במסירה"
+   ],
+   "short": {
+    "nodes": [
+     {
+      "type": "step",
+      "text": "החבילה בודקת טיפולי לקוח במצב 1 (השערה: פתוחים) ומחפשת בקופה של כל מסלול חשבון בטיפול תנועות מקבוצת סוג 2 שנקלטו אחרי יצירת הטיפול."
+     },
+     {
+      "type": "decision",
+      "text": "האם מדובר בניוד מלא?",
+      "branches": [
+       {
+        "label": "ניוד מלא",
+        "nodes": [
+         {
+          "type": "step",
+          "text": "די בכך שנמצאה תנועה מתאימה אחת כדי לסגור את הטיפול."
+         }
+        ]
+       },
+       {
+        "label": "ניוד חלקי",
+        "nodes": [
+         {
+          "type": "decision",
+          "text": "האם סכום התנועות בקבוצה שווה לסכום המסלול כפול מספר התנועות בקבוצה?",
+          "branches": [
+           {
+            "label": "כן",
+            "nodes": [
+             {
+              "type": "step",
+              "text": "הטיפול מועמד לסגירה."
+             }
+            ]
+           },
+           {
+            "label": "לא",
+            "nodes": [
+             {
+              "type": "step",
+              "text": "הטיפול לא נסגר על סמך קבוצה זו."
+             }
+            ]
+           }
+          ]
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "type": "write",
+      "text": "הטיפול מתעדכן ב-CRM למצב נוכחי 3 (שם הקבוע בקוד: CURRENT_STATE_FINISHED, ומכאן הכינוי \"הסתיים\"; משמעות הערך ב-CRM לא סופקה), עם סיבה קבועה 34 (שם הקבוע בקוד: REJECT_REASON_PROPER), תאריך שחרור הכספים (תאריך הערך המוקדם), תאריך הנפקת נספח ג' וסימון האם המסירה התעכבה."
+     },
+     {
+      "type": "end",
+      "text": "טיפולים במצב 1 שבקופת המסלול שלהם נמצאו תנועות מקבוצת סוג 2 (השערה: הכסף יצא) נסגרים אוטומטית, בלי טיפול ידני."
+     }
+    ]
+   },
+   "detailed": {
+    "nodes": [
+     {
+      "type": "step",
+      "text": "האוכלוסייה: טיפולי לקוח במצב 1, עם מסלולי החשבון שלהם, ותנועות מ-Gen_ftCurrentYear בקופה של המסלול (לפי שם ה-View – תנועות השנה השוטפת; השערה, ה-View לא סופק) שסוג התנועה שלהן שייך לקבוצה 2 ושנקלטו אחרי יצירת הטיפול. אין סינון לפי סוג הטיפול – \"ניוד יוצא\" עולה רק משם החבילה והכינוי Tout.",
+      "tech": "from Gen_customercare Tout join gen_accountcourses ac on Tout.Gen_customercareId = ac.gen_customercare join Gen_ftCurrentYear ft on ac.gen_fundnumber = ft.gen_fundnumber join Gen_fundtransactiontype ftt on ft.gen_transactiontypename = ftt.Gen_fundtransactiontypeId where ftt.gen_transgrouptype = 2 and ft.Gen_EntryDate > Tout.CreatedOn and Tout.Gen_currentstate = 1",
+      "evidence": "DTSX:2119-2137 (OLE DB Source, [psql])"
+     },
+     {
+      "type": "step",
+      "text": "התנועות מקובצות לפי טיפול, מסלול, תאריך ערך ותאריך הנפקת נספח ג'. לכל קבוצה מחושבים סכום התנועות בפועל, \"סכום מצופה\" ומספר התנועות. הסכום המצופה הוא סכום המסלול שנספר פעם אחת לכל תנועה בקבוצה, כלומר סכום המסלול כפול מספר התנועות.",
+      "tech": "sum(ISNULL(ft.gen_transtotalamount,0)) actualTransactionAmount; sum(ISNULL(ac.gen_transactionamount,0)) expectedTransactionAmount; count(ft.Gen_ftCurrentYearId) transferCount; group by Tout.Gen_customercareId, Tout.Gen_isfulltransfer, Tout.Gen_deliverydate, ac.gen_accountcoursesId, ft.gen_valuedate, ft.gen_appendixghissuingdate",
+      "evidence": "DTSX:2125-2127, 2139-2145"
+     },
+     {
+      "type": "decision",
+      "text": "האם הטיפול מסומן כניוד מלא?",
+      "tech": "Is full transfer out: Gen_isfulltransfer ==  TRUE (IsFull) / default (Not full); errorRowDisposition=FailComponent",
+      "evidence": "DTSX:2091-2094; paths DTSX:2417-2418",
+      "branches": [
+       {
+        "label": "ניוד מלא",
+        "nodes": [
+         {
+          "type": "step",
+          "text": "בניוד מלא נבדק רק שנמצאה לפחות תנועה אחת, ואז השורה עוברת לסגירת הטיפול; שורה בלי תנועות נזנחת. בפועל, בגלל החיבור הפנימי לטבלת התנועות, בכל שורה יש לפחות תנועה אחת (בהנחה שמזהה התנועה אינו ריק).",
+          "tech": "Check number of transactions: transferCount > 0 → Has Transactions; Has not thansactions לא מחובר",
+          "evidence": "DTSX:161-164; path DTSX:2416"
+         }
+        ]
+       },
+       {
+        "label": "ניוד חלקי (לא מלא)",
+        "nodes": [
+         {
+          "type": "decision",
+          "text": "האם סכום התנועות בפועל בקבוצה שווה לסכום המסלול כפול מספר התנועות בקבוצה (expectedTransactionAmount)?",
+          "tech": "Compare sums: (((!ISNULL(actualTransactionAmount) && !ISNULL(expectedTransactionAmount)) && (actualTransactionAmount == expectedTransactionAmount)))",
+          "evidence": "DTSX:1286-1289; path DTSX:2418,2420",
+          "branches": [
+           {
+            "label": "כן",
+            "nodes": [
+             {
+              "type": "step",
+              "text": "השורה עוברת לסגירת הטיפול. ההשוואה נעשית לכל קבוצה (מסלול × תאריך ערך × נספח ג') בנפרד, לא לטיפול כולו."
+             }
+            ]
+           },
+           {
+            "label": "לא",
+            "nodes": [
+             {
+              "type": "step",
+              "text": "השורה נזנחת (הפלט Sums Are Not Equal אינו מחובר) והטיפול לא נסגר על סמכה."
+             }
+            ]
+           }
+          ]
+         }
+        ]
+       },
+       {
+        "label": "ערך ריק",
+        "nodes": [
+         {
+          "type": "step",
+          "text": "אם סימון הניוד המלא ריק, הביטוי מחזיר NULL וההגדרה FailComponent מכשילה את כל זרימת הנתונים (התנהגות SSIS)."
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "type": "step",
+      "text": "השורות שעברו מאוחדות ומקובצות לשורה לכל טיפול (ולכל צירוף של תאריך מסירה ותאריך נספח ג'), עם תאריך הערך המוקדם ביותר.",
+      "tech": "Union All → Aggregate: GroupBy Gen_customercareId, Gen_deliverydate, gen_appendixghissuingdate (AggregationType=0); gen_valuedate AggregationType=6 (Minimum לפי תיעוד Microsoft; הערת הקוד: \"min entry date\")",
+      "evidence": "DTSX:88-141 (Aggregate, AggregationType DTSX:117,125,133,141); paths DTSX:2416,2420,2422,2412"
+     },
+     {
+      "type": "step",
+      "text": "תאריך השחרור של הכספים נקבע לתאריך הערך המוקדם, ותאריך הנפקת נספח ג' מועתק – כל אחד רק אם אינו ריק.",
+      "tech": "gen_fundreleasedate = Row.genvaluedate.ToLocalTime(); gen_appendixghissuingdate = Row.genappendixghissuingdate.ToLocalTime()",
+      "evidence": "main.cs:74-75,80-81 (DTSX:382-383,388-389)"
+     },
+     {
+      "type": "decision",
+      "text": "האם חלף לפחות יום שלם בין תאריך המסירה לתאריך הערך?",
+      "tech": "IsDeliveryDelay: DateAndTime.DateDiff(DateInterval.Day, deliveryDate, valuedate) > 0; מחושב רק אם שני התאריכים אינם ריקים (סמנטיקת DateDiff של Microsoft.VisualBasic – ידע כללי על ‎.NET, לא ראיה מהחבילה: נספרים ימים שלמים שחלפו, לא מעבר תאריך קלנדרי; מחושב על הערכים הגולמיים מהמסד)",
+      "evidence": "main.cs:83,140-146 (DTSX:391,448-454)",
+      "branches": [
+       {
+        "label": "כן",
+        "nodes": [
+         {
+          "type": "step",
+          "text": "הטיפול מסומן כ\"איחור במסירה\" (gen_deliverydelay = true)."
+         }
+        ]
+       },
+       {
+        "label": "לא",
+        "nodes": [
+         {
+          "type": "step",
+          "text": "הטיפול מסומן ללא איחור (gen_deliverydelay = false)."
+         }
+        ]
+       },
+       {
+        "label": "אחד התאריכים ריק",
+        "nodes": [
+         {
+          "type": "step",
+          "text": "שדה האיחור לא נשלח בעדכון."
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "type": "write",
+      "text": "הטיפול מתעדכן ב-CRM: מצב נוכחי 3 (שם הקבוע בקוד: CURRENT_STATE_FINISHED), סיבה 34 (שם הקבוע בקוד: REJECT_REASON_PROPER), ותאריכי השחרור, נספח ג' ואיחור המסירה לפי הכללים שלמעלה. העדכונים נשלחים באצוות של 1000, והשארית נשלחת בסוף הקלט.",
+      "tech": "gen_customercare · Update (gen_currentstate = OptionSetValue(3), gen_rejectreason = OptionSetValue(34), gen_fundreleasedate, gen_appendixghissuingdate, gen_deliverydelay) · SDK ExecuteMultipleExtension(RequestType.Update); מזהה דרך המאפיין gen_customercareid; if (myEntities.Count == 1000) ExcecuteBulk(); בסוף: if (myEntities.Count > 0 && Buffer.EndOfRowset()) ExcecuteBulk();",
+      "evidence": "main.cs:33-34,71-85,103-126 (DTSX:341-342,379-393,411-434); main.cs:87-88,134-137 (DTSX:395-396,442-445)"
+     },
+     {
+      "type": "decision",
+      "text": "האם CRM דחה עדכון של טיפול מסוים?",
+      "tech": "resultItem.Fault != null",
+      "evidence": "main.cs:110-118 (DTSX:418-426)",
+      "branches": [
+       {
+        "label": "כן",
+        "nodes": [
+         {
+          "type": "step",
+          "text": "נרשמת אזהרת ETL עם הודעת השגיאה בלבד, בלי מזהה הטיפול.",
+          "tech": "ErrorBuffer.Description = resultItem.Fault.Message → Union All 1 → ETL Warning (מסגרת)"
+         }
+        ]
+       },
+       {
+        "label": "לא",
+        "nodes": [
+         {
+          "type": "step",
+          "text": "הטיפול נסגר."
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "type": "end",
+      "text": "טיפולים במצב 1 שבקופת המסלול שלהם נמצאו תנועות מתאימות מקבוצת סוג 2 (השערה: תנועות יציאה) נסגרים אוטומטית במצב 3 (שם הקבוע בקוד: FINISHED), עם תאריך שחרור הכספים ואינדיקציה לאיחור."
+     }
+    ]
+   },
+   "detail_he": [
+    {
+     "h": "מקור ואוכלוסייה",
+     "t": "שאילתה על מסד CRM ([psql] → psql/ALTSHULER_MSCRM, DTSX:2119-2145): טיפולי לקוח (Gen_customercare) עם Gen_currentstate = 1, מסלולי החשבון שלהם (ac.gen_customercare), ותנועות Gen_ftCurrentYear בקופה של המסלול (ac.gen_fundnumber = ft.gen_fundnumber) מסוג שקבוצתו gen_transgrouptype = 2 ושנקלטו אחרי יצירת הטיפול (ft.Gen_EntryDate > Tout.CreatedOn). אין סינון לסוג הטיפול. משמעות מצב 1 וקבוצה 2 – השערה (פתוח / תנועות ניוד יוצא)."
+    },
+    {
+     "h": "התאמה לרשומות קיימות",
+     "t": "הטיפול מזוהה לפי Gen_customercareId מהשאילתה, ונשלח כמאפיין gen_customercareid (Entity.Id לא מוגדר, main.cs:71-72). אין חיפוש נוסף."
+    },
+    {
+     "h": "החלטות",
+     "t": "1) Gen_isfulltransfer ==  TRUE → ניוד מלא: transferCount > 0. 2) לא מלא: actualTransactionAmount == expectedTransactionAmount (שניהם לא NULL), לכל קבוצת מסלול/תאריך ערך/נספח ג'. 3) שורות שלא עברו נזנחות (פלטים לא מחוברים). 4) gen_isfulltransfer ריק → כשל הרכיב (FailComponent). 5) איחור: DateDiff(DateInterval.Day) בין תאריך המסירה לתאריך הערך > 0, כלומר חלף לפחות יום שלם (ימים שחלפו, לא מעבר תאריך – ידע כללי על ‎.NET)."
+    },
+    {
+     "h": "כתיבה ל-CRM",
+     "t": "Update של gen_customercare דרך SDK (ExecuteMultipleExtension, RequestType.Update) באצוות של 1000: gen_currentstate = 3 (CURRENT_STATE_FINISHED), gen_rejectreason = 34 (REJECT_REASON_PROPER) – ערכים קבועים; gen_fundreleasedate = תאריך הערך המצרפי (אם לא ריק); gen_appendixghissuingdate (אם לא ריק); gen_deliverydelay (אם שני התאריכים קיימים). Supported (דרך Proxy חיצוני שלא נבדק)."
+    },
+    {
+     "h": "תוצאה עסקית",
+     "t": "סגירה אוטומטית של טיפולים במצב 1 שבקופת המסלול שלהם נקלטו אחרי יצירתם תנועות מקבוצה 2 (פירוש 'הכסף יצא' – השערה), כולל רישום מועד שחרור הכספים ואינדיקציה לאיחור לעומת מועד המסירה. ראה ממצאים לגבי חישוב הסכום המצופה ולגבי סגירה על סמך קבוצה אחת בלבד."
+    }
+   ],
+   "decisions": [
+    {
+     "where": "OLE DB Source (DTSX:2135-2137)",
+     "condition": "ftt.gen_transgrouptype = 2 and ft.Gen_EntryDate > Tout.CreatedOn and Tout.Gen_currentstate = 1",
+     "meaning_he": "טיפול במצב 1 עם תנועה מקבוצת סוג 2 שנקלטה אחרי פתיחת הטיפול.",
+     "outcome_he": "נכנס לבדיקת הסגירה."
+    },
+    {
+     "where": "Is full transfer out (DTSX:2094)",
+     "condition": "Gen_isfulltransfer ==  TRUE",
+     "meaning_he": "ניוד מלא.",
+     "outcome_he": "IsFull → Check number of transactions; אחרת Not full → Compare sums; NULL → כשל רכיב (FailComponent, DTSX:2091)."
+    },
+    {
+     "where": "Check number of transactions (DTSX:164)",
+     "condition": "transferCount > 0",
+     "meaning_he": "בניוד מלא נמצאה לפחות תנועה אחת.",
+     "outcome_he": "Has Transactions → Union All → סגירה; אחרת – נזנח."
+    },
+    {
+     "where": "Compare sums (DTSX:1289)",
+     "condition": "(((!ISNULL(actualTransactionAmount) && !ISNULL(expectedTransactionAmount)) && (actualTransactionAmount == expectedTransactionAmount)))",
+     "meaning_he": "בניוד חלקי, סכום התנועות בקבוצה שווה ל-expectedTransactionAmount (סכום המסלול × מספר התנועות בקבוצה).",
+     "outcome_he": "Sums Are Equal → Union All → סגירה; אחרת – נזנח."
+    },
+    {
+     "where": "Aggregate (DTSX:88-141)",
+     "condition": "GroupBy Gen_customercareId, Gen_deliverydate, gen_appendixghissuingdate; gen_valuedate AggregationType=6",
+     "meaning_he": "שורה אחת לכל טיפול (ולכל צירוף תאריכים), עם תאריך הערך המצרפי (Minimum לפי תיעוד Microsoft).",
+     "outcome_he": "קלט לעדכון הטיפול."
+    },
+    {
+     "where": "Close Transfer Out · main.cs:83,140-146",
+     "condition": "DateAndTime.DateDiff(DateInterval.Day, deliveryDate, entryDate) > 0 (entryDate = genvaluedate)",
+     "meaning_he": "בין תאריך המסירה לתאריך הערך חלף לפחות יום שלם (ימים שלמים שחלפו לפי DateDiff – ידע כללי על ‎.NET, לא ראיה מהחבילה).",
+     "outcome_he": "gen_deliverydelay = true; אחרת false; לא נשלח אם אחד התאריכים ריק."
+    }
+   ],
+   "crmEffects": [
+    {
+     "entity": "gen_customercare",
+     "verb": "Update (gen_currentstate = 3, gen_rejectreason = 34, gen_fundreleasedate, gen_appendixghissuingdate, gen_deliverydelay)",
+     "mechanism": "SDK",
+     "when_he": "לכל טיפול (שורה מצרפית) שעבר את תנאי הניוד המלא או התאמת הסכומים; באצוות של 1000 דרך ExecuteMultiple."
+    }
+   ],
+   "evidence": [
+    "DTSX:82 Executable Package\\Close Transfer Out (Microsoft.Pipeline)",
+    "DTSX:2114-2149 OLE DB Source, SqlCommand DTSX:2119-2145, Connection [psql] → psql/ALTSHULER_MSCRM",
+    "DTSX:2081-2094 Is full transfer out; DTSX:151-164 Check number of transactions; DTSX:1275-1289 Compare sums",
+    "DTSX:88-141 Aggregate; DTSX:2246 Union All; paths DTSX:2412-2422",
+    "DTSX:184 Close Transfer Out (ScriptComponent), ReadOnlyVariables DTSX:1237",
+    "main.cs (sha c53e76b472c9; main.cs:N = DTSX:N+308): 33-34, 67-101, 103-126, 128-138, 140-146",
+    "DTSX:2231 WarningTitle \"שגיאה בעדכון ניד נכנס\"",
+    "DTSX:5476-5478 Precedence Constraints"
+   ],
+   "openQuestions_he": [
+    "האם כל טיפול לקוח (Gen_customercare) במצב 1 הוא ניוד יוצא, או שיש סוגי טיפול נוספים? השאילתה לא מסננת לפי סוג.",
+    "מה משמעות gen_transgrouptype = 2 ומצב 1 / מצב 3 / סיבה 34 ב-OptionSets של CRM? הקוד נותן רק את שמות הקבועים CURRENT_STATE_FINISHED ו-REJECT_REASON_PROPER.",
+    "האם החישוב sum(ac.gen_transactionamount) מכוון? הסכום המצופה מוכפל במספר התנועות בקבוצה (ראה ממצאים).",
+    "האם סגירת טיפול חלקי על סמך קבוצה אחת שהסכומים בה תואמים (גם כשבמסלולים אחרים אין התאמה) רצויה?",
+    "האם gen_isfulltransfer יכול להיות ריק בטיפול במצב 1 שיש לו תנועות מתאימות? אם כן, זרימת הנתונים נכשלת (FailComponent)."
+   ]
+  }
+ ],
+ "findings_he": [
+  {
+   "severity": "high",
+   "text": "הסכום המצופה מחושב כ-sum(ISNULL(ac.gen_transactionamount,0)) על שורות החיבור לתנועות. כיוון שכל תנועה בקבוצה משכפלת את שורת המסלול, הסכום המצופה = סכום המסלול × מספר התנועות בקבוצה. בניוד חלקי עם יותר מתנועה אחת באותו תאריך ערך ונספח ג', ההשוואה תצליח רק אם ממוצע התנועות שווה לסכום המסלול – לא אם סכומן שווה לו. לא ידוע אם זו הכוונה.",
+   "evidence": "DTSX:2126, 2131-2132, 2139-2145; Compare sums DTSX:1289"
+  },
+  {
+   "severity": "medium",
+   "text": "בניוד חלקי ההשוואה נעשית לכל קבוצה (מסלול × תאריך ערך × תאריך נספח ג') בנפרד, ואחרי האיחוד הטיפול נסגר אם קבוצה אחת לפחות עברה. טיפול עם כמה מסלולים ייסגר גם אם רק באחד מהם הסכום תואם.",
+   "evidence": "DTSX:2139-2145; Compare sums DTSX:1289; Aggregate DTSX:88-141 (GroupBy Gen_customercareId)"
+  },
+  {
+   "severity": "medium",
+   "text": "אם Gen_isfulltransfer ריק בטיפול כלשהו באוכלוסייה, התנאי Gen_isfulltransfer == TRUE מחזיר NULL. עם errorRowDisposition=FailComponent, SSIS מכשיל את הרכיב ואת כל זרימת הנתונים, ושום טיפול לא נסגר באותה ריצה.",
+   "evidence": "DTSX:2091 (FailComponent), DTSX:2094"
+  },
+  {
+   "severity": "medium",
+   "text": "אין סינון לפי סוג הטיפול: כל Gen_customercare במצב 1 שיש לו מסלול עם תנועה מקבוצה 2 אחרי פתיחתו יוכל להיסגר. אם קיימים טיפולי לקוח שאינם ניוד יוצא, גם הם עלולים להיסגר (תלוי בנתונים – לא ידוע).",
+   "evidence": "DTSX:2130-2137"
+  },
+  {
+   "severity": "medium",
+   "text": "אותו דפוס כשל אצווה כמו ב-0014: ExcecuteBulk נקרא בתוך try של שורה (main.cs:87-88). כשל של אצווה שלמה מסומן רק על השורה הנוכחית, myEntities.Clear() לא מתבצע, התנאי Count == 1000 לא יתקיים שוב, וכל השאר נשלח בבקשה אחת בסוף.",
+   "evidence": "main.cs:85-100,122-125,134-137 (DTSX:393-408,430-433,442-445)"
+  },
+  {
+   "severity": "low",
+   "text": "אם לאותו טיפול יש כמה תאריכי נספח ג' שונים, ה-Aggregate מפיק כמה שורות לאותו טיפול, ונשלחים כמה עדכונים לאותה רשומה עם תאריכים שונים. איזה ערך נשאר – תלוי בסדר הביצוע (לא מוגדר).",
+   "evidence": "Aggregate DTSX:117,141 (GroupBy gen_appendixghissuingdate)"
+  },
+  {
+   "severity": "low",
+   "text": "כשלי עדכון נרשמים כאזהרת ETL עם הודעת השגיאה בלבד, בלי מזהה הטיפול, ותחת הכותרת \"שגיאה בעדכון ניד נכנס\" – למרות שזו חבילת ניוד יוצא (כנראה הועתק).",
+   "evidence": "main.cs:113-117 (DTSX:421-425); DTSX:2231"
+  },
+  {
+   "severity": "info",
+   "text": "הבדיקה transferCount > 0 בענף הניוד המלא מתקיימת תמיד בפועל: החיבור לתנועות הוא INNER JOIN, ולכן בכל קבוצה יש לפחות תנועה אחת (בהנחה ש-Gen_ftCurrentYearId אינו NULL).",
+   "evidence": "DTSX:2127,2132; DTSX:164"
+  },
+  {
+   "severity": "info",
+   "text": "ערך AggregationType=6 על gen_valuedate מפורש כ-Minimum לפי תיעוד Microsoft (לא מתוך החבילה). הערת הקוד \"min entry date\" (main.cs:75) תומכת בזה.",
+   "evidence": "DTSX:133; main.cs:75 (DTSX:383)"
+  },
+  {
+   "severity": "info",
+   "text": "מזהה הטיפול נשלח כמאפיין gen_customercareid ולא דרך Entity.Id. אם ה-Proxy החיצוני או CRM לא מזהים זאת, העדכון ייכשל. לא נבדק – ה-Proxy לא סופק.",
+   "evidence": "main.cs:71-72 (DTSX:379-380)"
+  }
+ ]
+}

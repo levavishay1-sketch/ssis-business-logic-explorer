@@ -1,0 +1,1882 @@
+{
+  "package": "0005_Customer Account",
+  "analyst": "ssis-business-logic",
+  "source": {
+    "file": "source/DailyProcess/0005_Customer Account.dtsx",
+    "sha256": "181B425338EB4A3D69C613224AE1F97F69DEC6CA614BA2398FC5F559D26F5CCD",
+    "lines": 92299
+  },
+  "scopeNote_he": "נותח קוד המקור (C#) של רכיבי הסקריפט בלבד; ה-DLL המקומפל לא פוענח. CRM.Proxy / ExecuteMultipleExtension הם אסמבלי חיצוני (external_unknown). אין קובצי תצורה (configurations ריק). מנהל החיבורים [qsql] = Data Source=psql; Initial Catalog=ALTSHULER_MSCRM (DTSX:4) הוא מסד ה-CRM: ממנו נקראים כל המקורות, ודרכו מתבצעות כתיבות SQL ישירות (Unsupported) לטבלאות Gen_customeraccountBase ו-Gen_fundmainbase ול-gen_transferrequest (שם הישות בלי Base; לפי מבנה CRM המקובל זה view – לא מוצג בקבצים). כתיבות ה-SDK עוברות דרך CrmProxy(ServerName, OrganizationName) (Supported). כל המקורות הם טבלאות CRM ולא טבלאות Staging; החבילה אינה קוראת קבצים.",
+  "summary_he": "החבילה מתחזקת את חשבונות הלקוח (gen_customeraccount) על בסיס הקופות (gen_fundmain) שכבר נמצאות ב-CRM. לכל צירוף של סוג חשבון לקוח ומספר חשבון בנק בקופות המסומנות gen_existinfile = 1 שיש להן מוצר וסוג חשבון לקוח תואמים (העמודה מופיעה בשאילתה בלי שם טבלה; אילו הייתה קיימת ביותר מטבלה אחת השאילתה הייתה נכשלת – לפי המשתמש החבילה רצה בפרודקשן – ול-gen_fundmain יש עמודה כזו, DTSX:68399) נוצר חשבון חדש, או שהחשבון הקיים מתעדכן כשיש הבדל באחד השדות המושווים; קופות המסומנות gen_existinfile = 1 שנמצא להן חשבון תואם ואינן מקושרות אליו מקושרות אליו, ובחשבונות חדשים נקבע סטטוס מייל הצטרפות לסוכן. אחר כך מחושבים בחשבון יתרה ותאריכים מתוך הקופות, מועתקים סעיף 14 ואישור מעסיק, מועתקים לחשבון ולקופות פרטי ייעוץ מבקשות העברה מסוג 5 בסטטוס 8 (בהערות ה-SQL: 'בין מסלולים', 'הסתיים'), וחשבונות בלי מטבע מקבלים שקל חדש. חלק גדול מהכתיבה נעשה ב-SQL ישיר על מסד ה-CRM (Unsupported).",
+  "executionOrder": [
+    {
+      "step": 1,
+      "refId": "Package\\Get Variables From SystemConfigurarion",
+      "title_he": "טעינת משתני ETL (מסגרת)",
+      "trigger": "start (no incoming constraint)"
+    },
+    {
+      "step": 2,
+      "refId": "Package\\Create ETL Process record",
+      "title_he": "רשומת תהליך ETL (מסגרת)",
+      "trigger": "after Get Variables From SystemConfigurarion · Success (DTSX:82412)"
+    },
+    {
+      "step": 3,
+      "refId": "Package\\Get Sytem User Id",
+      "title_he": "איתור משתמש המערכת והארגון (מסגרת)",
+      "trigger": "after Create ETL Process record · Success (DTSX:82422)"
+    },
+    {
+      "step": 4,
+      "refId": "Package\\Create or Update Customer Accounts",
+      "title_he": "יצירה ועדכון של חשבונות לקוח מתוך הקופות",
+      "trigger": "after Get Sytem User Id · Success (DTSX:82423)"
+    },
+    {
+      "step": 5,
+      "refId": "Package\\Write To ETLProcessCounter",
+      "title_he": "מוני ETL (מסגרת)",
+      "trigger": "after Create or Update Customer Accounts · Success (DTSX:82413)"
+    },
+    {
+      "step": 6,
+      "refId": "Package\\Connect Funds to Customer Accounts",
+      "title_he": "קישור קופות לחשבון הלקוח",
+      "trigger": "after Write To ETLProcessCounter · Success (DTSX:82415)"
+    },
+    {
+      "step": 7,
+      "refId": "Package\\Write To ETLProcessCounter 1",
+      "title_he": "מוני ETL (מסגרת)",
+      "trigger": "after Connect Funds to Customer Accounts · Success (DTSX:82420)"
+    },
+    {
+      "step": 8,
+      "refId": "Package\\Set Joining email to Agent",
+      "title_he": "קביעת סטטוס מייל הצטרפות לסוכן",
+      "trigger": "after Write To ETLProcessCounter 1 · Success (DTSX:82416)"
+    },
+    {
+      "step": 9,
+      "refId": "Package\\Write To ETLProcessCounter 2",
+      "title_he": "מוני ETL (מסגרת)",
+      "trigger": "after Set Joining email to Agent · Success (DTSX:82427)"
+    },
+    {
+      "step": 10,
+      "refId": "Package\\Update Aggrigations on Customer Accounts",
+      "title_he": "צבירת יתרה ותאריכים מהקופות לחשבון",
+      "trigger": "after Write To ETLProcessCounter 2 · Success (DTSX:82417)"
+    },
+    {
+      "step": 11,
+      "refId": "Package\\Update Paragraph14 and Employer Confirmation fields",
+      "title_he": "העתקת סעיף 14 ואישור מעסיק מהקופה לחשבון",
+      "trigger": "after Update Aggrigations on Customer Accounts · Success (DTSX:82421)"
+    },
+    {
+      "step": 12,
+      "refId": "Package\\Update Consulting Field  In Customer Account From Transfer Request",
+      "title_he": "פרטי ייעוץ מבקשת העברה לחשבון הלקוח",
+      "trigger": "after Update Paragraph14 and Employer Confirmation fields · Success (DTSX:82424)"
+    },
+    {
+      "step": 13,
+      "refId": "Package\\Write To ETLProcessCounter 3",
+      "title_he": "מוני ETL (מסגרת)",
+      "trigger": "after Update Consulting Field  In Customer Account From Transfer Request · Success (DTSX:82425)"
+    },
+    {
+      "step": 14,
+      "refId": "Package\\Update Consulting Field  In Fund Main From Transfer Request",
+      "title_he": "פרטי ייעוץ מבקשת העברה לקופות",
+      "trigger": "after Write To ETLProcessCounter 3 · Success (DTSX:82418)"
+    },
+    {
+      "step": 15,
+      "refId": "Package\\Write To ETLProcessCounter 4",
+      "title_he": "מוני ETL (מסגרת)",
+      "trigger": "after Update Consulting Field  In Fund Main From Transfer Request · Success (DTSX:82426)"
+    },
+    {
+      "step": 16,
+      "refId": "Package\\Update TransactionCurrencyId And ExchangeRate",
+      "title_he": "מטבע ברירת מחדל לחשבונות",
+      "trigger": "after Write To ETLProcessCounter 4 · Success (DTSX:82419)"
+    },
+    {
+      "step": 17,
+      "refId": "Package\\End ETL Process record",
+      "title_he": "סגירת תהליך ETL (מסגרת)",
+      "trigger": "after Update TransactionCurrencyId And ExchangeRate · Success (DTSX:82414)"
+    },
+    {
+      "step": 18,
+      "refId": "Package.EventHandlers[OnError]\\Error ETL Process record",
+      "title_he": "רישום כשל בתהליך ETL (מסגרת)",
+      "trigger": "OnError event handler (DTSX:82430-82437)"
+    }
+  ],
+  "ignoredAsFramework": [
+    "Package\\Create ETL Process record",
+    "Package\\End ETL Process record",
+    "Package\\Get Sytem User Id",
+    "Package\\Get Variables From SystemConfigurarion",
+    "Package\\Write To ETLProcessCounter",
+    "Package\\Write To ETLProcessCounter 1",
+    "Package\\Write To ETLProcessCounter 2",
+    "Package\\Write To ETLProcessCounter 3",
+    "Package\\Write To ETLProcessCounter 4",
+    "Package.EventHandlers[OnError]",
+    "Package.EventHandlers[OnError]\\Error ETL Process record",
+    "Package\\Connect Funds to Customer Accounts\\Add Column for etl process warning",
+    "Package\\Connect Funds to Customer Accounts\\Add Row Number 1",
+    "Package\\Connect Funds to Customer Accounts\\Component Task Name",
+    "Package\\Connect Funds to Customer Accounts\\insert etl process warning",
+    "Package\\Connect Funds to Customer Accounts\\Multicast",
+    "Package\\Connect Funds to Customer Accounts\\Row Error Count",
+    "Package\\Connect Funds to Customer Accounts\\Row Pipe Count",
+    "Package\\Connect Funds to Customer Accounts\\Row Update Count",
+    "Package\\Connect Funds to Customer Accounts\\Set Error columns",
+    "Package\\Connect Funds to Customer Accounts\\Split Rows For MultiThread 1",
+    "Package\\Connect Funds to Customer Accounts\\Union All Error",
+    "Package\\Connect Funds to Customer Accounts\\Union All Update",
+    "Package\\Create or Update Customer Accounts\\Add Column for etl process warning",
+    "Package\\Create or Update Customer Accounts\\Add Row Number",
+    "Package\\Create or Update Customer Accounts\\Add Row Number 1",
+    "Package\\Create or Update Customer Accounts\\Add Row Number 2",
+    "Package\\Create or Update Customer Accounts\\Component Task Name",
+    "Package\\Create or Update Customer Accounts\\Count Filters",
+    "Package\\Create or Update Customer Accounts\\Create System Columns",
+    "Package\\Create or Update Customer Accounts\\Get Error Description",
+    "Package\\Create or Update Customer Accounts\\insert etl process warning",
+    "Package\\Create or Update Customer Accounts\\Multicast",
+    "Package\\Create or Update Customer Accounts\\Multicast 1",
+    "Package\\Create or Update Customer Accounts\\Multicast 2",
+    "Package\\Create or Update Customer Accounts\\Row Count Update",
+    "Package\\Create or Update Customer Accounts\\Row Error Create Count",
+    "Package\\Create or Update Customer Accounts\\Row Error Update Count",
+    "Package\\Create or Update Customer Accounts\\Row Insert Count",
+    "Package\\Create or Update Customer Accounts\\Row No Nedd To Update Count",
+    "Package\\Create or Update Customer Accounts\\Row Pipe Count",
+    "Package\\Create or Update Customer Accounts\\Row Update Count",
+    "Package\\Create or Update Customer Accounts\\Set Error columns",
+    "Package\\Create or Update Customer Accounts\\Set Error columns 1",
+    "Package\\Create or Update Customer Accounts\\Set Error columns 2",
+    "Package\\Create or Update Customer Accounts\\Split Rows For MultiThread",
+    "Package\\Create or Update Customer Accounts\\Split Rows For MultiThread 1",
+    "Package\\Create or Update Customer Accounts\\Split Rows For MultiThread 2",
+    "Package\\Create or Update Customer Accounts\\Union All",
+    "Package\\Create or Update Customer Accounts\\Union All 1",
+    "Package\\Create or Update Customer Accounts\\Union All Create",
+    "Package\\Create or Update Customer Accounts\\Union All Eror",
+    "Package\\Create or Update Customer Accounts\\Union All Error",
+    "Package\\Create or Update Customer Accounts\\Union All Error Create Customer Account",
+    "Package\\Create or Update Customer Accounts\\Union All Error Update CustomerAccounts",
+    "Package\\Create or Update Customer Accounts\\Union All No Need To Update",
+    "Package\\Create or Update Customer Accounts\\Union All Update",
+    "Package\\Set Joining email to Agent\\Add Column for etl process warning",
+    "Package\\Set Joining email to Agent\\Add Row Number 1",
+    "Package\\Set Joining email to Agent\\Component Task Name",
+    "Package\\Set Joining email to Agent\\insert etl process warning",
+    "Package\\Set Joining email to Agent\\Multicast",
+    "Package\\Set Joining email to Agent\\Row Error Count",
+    "Package\\Set Joining email to Agent\\Row Pipe Count",
+    "Package\\Set Joining email to Agent\\Row Update Count",
+    "Package\\Set Joining email to Agent\\Set Error columns",
+    "Package\\Set Joining email to Agent\\Split Rows For MultiThread 1",
+    "Package\\Set Joining email to Agent\\Union All Error",
+    "Package\\Set Joining email to Agent\\Union All Update",
+    "Package\\Update Consulting Field  In Customer Account From Transfer Request\\Add Column for etl process warning",
+    "Package\\Update Consulting Field  In Customer Account From Transfer Request\\Add Row Number 1",
+    "Package\\Update Consulting Field  In Customer Account From Transfer Request\\Additional Columns",
+    "Package\\Update Consulting Field  In Customer Account From Transfer Request\\Component Task Name",
+    "Package\\Update Consulting Field  In Customer Account From Transfer Request\\Get Error Description",
+    "Package\\Update Consulting Field  In Customer Account From Transfer Request\\insert etl process warning",
+    "Package\\Update Consulting Field  In Customer Account From Transfer Request\\Multicast",
+    "Package\\Update Consulting Field  In Customer Account From Transfer Request\\Multicast 1",
+    "Package\\Update Consulting Field  In Customer Account From Transfer Request\\Multicast 2",
+    "Package\\Update Consulting Field  In Customer Account From Transfer Request\\Multicast 3",
+    "Package\\Update Consulting Field  In Customer Account From Transfer Request\\Multicast 4",
+    "Package\\Update Consulting Field  In Customer Account From Transfer Request\\Multicast 5",
+    "Package\\Update Consulting Field  In Customer Account From Transfer Request\\Row Count Pipe",
+    "Package\\Update Consulting Field  In Customer Account From Transfer Request\\Row Error Count",
+    "Package\\Update Consulting Field  In Customer Account From Transfer Request\\Row Update Count",
+    "Package\\Update Consulting Field  In Customer Account From Transfer Request\\Set Warning columns",
+    "Package\\Update Consulting Field  In Customer Account From Transfer Request\\Set Warning columns TR",
+    "Package\\Update Consulting Field  In Customer Account From Transfer Request\\Split Rows For MultiThread 1",
+    "Package\\Update Consulting Field  In Customer Account From Transfer Request\\TR Row Error Count",
+    "Package\\Update Consulting Field  In Customer Account From Transfer Request\\TR Row Update Count",
+    "Package\\Update Consulting Field  In Customer Account From Transfer Request\\Union All",
+    "Package\\Update Consulting Field  In Customer Account From Transfer Request\\Union All Error",
+    "Package\\Update Consulting Field  In Customer Account From Transfer Request\\Union All Error TransferRequest",
+    "Package\\Update Consulting Field  In Customer Account From Transfer Request\\Union All Update",
+    "Package\\Update Consulting Field  In Customer Account From Transfer Request\\Union All Update TransferRequest",
+    "Package\\Update Consulting Field  In Fund Main From Transfer Request\\Add Column for etl process warning",
+    "Package\\Update Consulting Field  In Fund Main From Transfer Request\\Add Row Number 1",
+    "Package\\Update Consulting Field  In Fund Main From Transfer Request\\Add Row Number 2",
+    "Package\\Update Consulting Field  In Fund Main From Transfer Request\\Additional Columns",
+    "Package\\Update Consulting Field  In Fund Main From Transfer Request\\Component Task Name",
+    "Package\\Update Consulting Field  In Fund Main From Transfer Request\\Get Error Description",
+    "Package\\Update Consulting Field  In Fund Main From Transfer Request\\insert etl process warning",
+    "Package\\Update Consulting Field  In Fund Main From Transfer Request\\Multicast",
+    "Package\\Update Consulting Field  In Fund Main From Transfer Request\\Multicast 1",
+    "Package\\Update Consulting Field  In Fund Main From Transfer Request\\Multicast 2",
+    "Package\\Update Consulting Field  In Fund Main From Transfer Request\\Row Count Pipe",
+    "Package\\Update Consulting Field  In Fund Main From Transfer Request\\Row Count Pipe 2",
+    "Package\\Update Consulting Field  In Fund Main From Transfer Request\\Row Error Count",
+    "Package\\Update Consulting Field  In Fund Main From Transfer Request\\Row Update Count",
+    "Package\\Update Consulting Field  In Fund Main From Transfer Request\\Set Warning columns",
+    "Package\\Update Consulting Field  In Fund Main From Transfer Request\\Set Warning columns TR",
+    "Package\\Update Consulting Field  In Fund Main From Transfer Request\\Split Rows For MultiThread 1",
+    "Package\\Update Consulting Field  In Fund Main From Transfer Request\\Split Rows For MultiThread 2",
+    "Package\\Update Consulting Field  In Fund Main From Transfer Request\\TR Row Error Count",
+    "Package\\Update Consulting Field  In Fund Main From Transfer Request\\TR Row Update Count",
+    "Package\\Update Consulting Field  In Fund Main From Transfer Request\\Union All",
+    "Package\\Update Consulting Field  In Fund Main From Transfer Request\\Union All Error TransferRequest",
+    "Package\\Update Consulting Field  In Fund Main From Transfer Request\\Union All Update TransferRequest",
+    "Package\\Update Consulting Field  In Fund Main From Transfer Request\\Union Error All",
+    "Package\\Update Consulting Field  In Fund Main From Transfer Request\\Union Update All",
+    "LogProvider: SSIS log provider for SQL Server (DTSX:16)"
+  ],
+  "components": [
+    {
+      "refId": "Package (control flow)",
+      "title_he": "זרימת בקרה: שרשרת יומית של תחזוקת חשבונות לקוח",
+      "techName": "Package",
+      "short_he": "שמונה שלבים עסקיים רצים בשרשרת אחת, וכל שלב מתחיל רק אחרי שהקודם הצליח: יצירה ועדכון של חשבונות, קישור קופות, מייל הצטרפות לסוכן, צבירות, סעיף 14, פרטי ייעוץ מבקשות העברה לחשבון, אותם פרטים לקופות, ומטבע.",
+      "flow_he": [
+        "טעינת הגדרות, פתיחת תהליך ETL ואיתור משתמש המערכת (מסגרת).",
+        "Create or Update Customer Accounts → Connect Funds to Customer Accounts → Set Joining email to Agent.",
+        "Update Aggrigations on Customer Accounts → Update Paragraph14 and Employer Confirmation fields (SQL ישיר).",
+        "Update Consulting Field In Customer Account From Transfer Request → Update Consulting Field In Fund Main From Transfer Request.",
+        "Update TransactionCurrencyId And ExchangeRate (SQL ישיר) → סגירת תהליך ETL (מסגרת)."
+      ],
+      "short": {
+        "nodes": [
+          {
+            "type": "step",
+            "text": "נוצרים ומתעדכנים חשבונות הלקוח לפי הקופות שנמצאות ב-CRM."
+          },
+          {
+            "type": "step",
+            "text": "הקופות מקושרות לחשבון הלקוח שלהן, ובחשבונות החדשים נקבע אם אפשר לשלוח לסוכן מייל הצטרפות."
+          },
+          {
+            "type": "step",
+            "text": "בחשבונות מתעדכנים היתרה, התאריכים, סעיף 14 ואישור המעסיק מתוך הקופות."
+          },
+          {
+            "type": "step",
+            "text": "פרטי ייעוץ מבקשות העברה מסוג 5 בסטטוס 8 (בהערות ה-SQL: 'בין מסלולים', 'הסתיים') מועתקים לחשבון הלקוח ולקופות שלו."
+          },
+          {
+            "type": "step",
+            "text": "חשבונות שאין להם מטבע מקבלים שקל חדש."
+          },
+          {
+            "type": "end",
+            "text": "כל שלב רץ רק אם הקודם הצליח, ולכן כשל באחד השלבים עוצר את כל השלבים שאחריו."
+          }
+        ]
+      },
+      "detailed": {
+        "nodes": [
+          {
+            "type": "step",
+            "text": "בתחילת הריצה נטענות הגדרות השרת והארגון, נפתחת רשומת תהליך ETL ומאותר משתמש המערכת שישמש כמעדכן ברשומות (מסגרת).",
+            "tech": "Get Variables From SystemConfigurarion → Create ETL Process record → Get Sytem User Id (DTSX:82412, 82422)"
+          },
+          {
+            "type": "step",
+            "text": "שלב 1: לכל צירוף של סוג חשבון ומספר חשבון בנק בקופות המסומנות gen_existinfile = 1 שיש להן מוצר וסוג חשבון לקוח תואמים נוצר חשבון לקוח, או שהחשבון הקיים מתעדכן כשיש הבדל באחד השדות המושווים.",
+            "tech": "Create or Update Customer Accounts (Pipeline, DTSX:10147) · after Get Sytem User Id Success (DTSX:82423); gen_existinfile מופיעה בשאילתה בלי שם טבלה; אילו הייתה קיימת ביותר מטבלה אחת בשאילתה, השאילתה הייתה נכשלת (לפי המשתמש החבילה רצה בפרודקשן), ול-gen_fundmain יש עמודה כזו (from gen_fundmain … where Gen_existinfile = 1, DTSX:68399), ולכן זו עמודת הקופה"
+          },
+          {
+            "type": "step",
+            "text": "שלב 2: קופות המסומנות gen_existinfile = 1 שנמצא להן חשבון לקוח תואם ואינן מקושרות אליו מקושרות אליו, ופרטי הייעוץ שיש להם ערך בחשבון מועתקים לקופה.",
+            "tech": "Connect Funds to Customer Accounts (DTSX:124) · after Write To ETLProcessCounter Success (DTSX:82415); gen_existinfile מופיעה בשאילתה בלי שם טבלה; אילו הייתה קיימת ביותר מטבלה אחת בשאילתה, השאילתה הייתה נכשלת (לפי המשתמש החבילה רצה בפרודקשן), ול-gen_fundmain יש עמודה כזו (from gen_fundmain … where Gen_existinfile = 1, DTSX:68399), ולכן זו עמודת הקופה"
+          },
+          {
+            "type": "step",
+            "text": "שלב 3: בחשבונות שבהם gen_joiningmailtoagent = 1 (בקוד: AWAITING_EMAIL_SEND) נקבע ערך חדש לשדה: 2 (בקוד: SENDING_JOINING_MAIL) אם יש כתובת מייל והסימון DoNotEMail קיים ושווה false, ואחרת 4 (בקוד: FAILED_JOINING_MAIL). המייל והסימון נלקחים כל אחד בנפרד מאיש הקשר של הסוכן, ואם הערך שם ריק – מחשבון הסוכנות. החבילה עצמה אינה שולחת מייל.",
+            "tech": "Set Joining email to Agent (DTSX:60767; תנאי: !email_IsNull && !donotemail_IsNull && donotemail == ALLOW_EMAIL(false), main.cs:41) · after Write To ETLProcessCounter 1 Success (DTSX:82416)"
+          },
+          {
+            "type": "step",
+            "text": "שלב 4: יתרת החשבון, תאריך תקופת השירות, תאריך פתיחת הקופה ותאריך השחרור מחושבים מהקופות המסומנות Gen_existinfile = 1 ונכתבים לחשבון רק כשהפרש היתרה גדול מ-1 או כשבאחד התאריכים DATEDIFF בשעות גדול מ-12 (DATEDIFF סופר מעברי גבול שעה, לא זמן שחלף).",
+            "tech": "Update Aggrigations on Customer Accounts (ExecuteSQLTask, DTSX:68395) · after Write To ETLProcessCounter 2 Success (DTSX:82417)"
+          },
+          {
+            "type": "step",
+            "text": "שלב 5: סעיף 14 ואישור המעסיק מועתקים לחשבון הלקוח מקופה מקושרת שבה שני השדות אינם ריקים (כשיש כמה קופות כאלה, השאילתה אינה קובעת מאיזו).",
+            "tech": "Update Paragraph14 and Employer Confirmation fields (ExecuteSQLTask, DTSX:79885) · after Update Aggrigations Success (DTSX:82421)"
+          },
+          {
+            "type": "step",
+            "text": "שלב 6: פרטי ייעוץ מבקשות העברה מסוג 5 בסטטוס 8 (בהערות ה-SQL: 'בין מסלולים', 'הסתיים') מועתקים לחשבון הלקוח.",
+            "tech": "Update Consulting Field  In Customer Account From Transfer Request (DTSX:68402) · after Update Paragraph14 Success (DTSX:82424)"
+          },
+          {
+            "type": "step",
+            "text": "שלב 7: אותם פרטי ייעוץ מועתקים לכל הקופות של החשבון.",
+            "tech": "Update Consulting Field  In Fund Main From Transfer Request (DTSX:74043) · after Write To ETLProcessCounter 3 Success (DTSX:82418)"
+          },
+          {
+            "type": "step",
+            "text": "שלב 8: חשבונות לקוח בלי מטבע מקבלים את המטבע 'שקל חדש' ושער 1.",
+            "tech": "Update TransactionCurrencyId And ExchangeRate (ExecuteSQLTask, DTSX:79892) · after Write To ETLProcessCounter 4 Success (DTSX:82419)"
+          },
+          {
+            "type": "decision",
+            "text": "האם השלב הסתיים בהצלחה?",
+            "tech": "כל האילוצים הם Success Constraint עם נכנס יחיד (logicalAnd=true, DTSX:82412-82427); אין אילוצי Failure/Completion",
+            "branches": [
+              {
+                "label": "כן",
+                "nodes": [
+                  {
+                    "type": "step",
+                    "text": "השלב הבא בשרשרת מתחיל, ובסוף נסגר תהליך ה-ETL (מסגרת).",
+                    "tech": "End ETL Process record (DTSX:82414)"
+                  }
+                ]
+              },
+              {
+                "label": "לא",
+                "nodes": [
+                  {
+                    "type": "end",
+                    "text": "השלבים שאחרי השלב שנכשל אינם רצים באותה ריצה. מטפל OnError (מסגרת) מנסה לעדכן את רשומת תהליך ה-ETL ולצרף לה הערה עם תיאור השגיאה, אבל לפי קוד המקור הוא ממיר בהמרה ישירה ל-Guid את המשתנה ETLProcessRecordGuid, שהוא מחרוזת, ולכן לא מוכח בקבצים שהכשל נרשם (ה-DLL המקומפל לא פוענח).",
+                    "tech": "Package.EventHandlers[OnError]\\Error ETL Process record (DTSX:82437); entity.Id = (Guid)Dts.Variables[\"ETLProcessRecordGuid\"].Value (DTSX:82604) לפני crmServiceProxy.Update (82608) ו-Create annotation (82617); המשתנה DataType=8 (String, DTSX:41-42) ומקבל .ToString() (DTSX:9869)"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "type": "end",
+            "text": "בסוף הריצה חשבונות הלקוח, הקופות ובקשות ההעברה מעודכנים לפי הכללים של כל שלב. בקשת העברה מסומנת כ'הועתקה לקופה' גם אם רק חלק מעדכוני הקופות שלה הצליחו (שלב 7)."
+          }
+        ]
+      },
+      "detail_he": [
+        {
+          "h": "מקור ואוכלוסייה",
+          "t": "אין קבצים. כל השלבים קוראים טבלאות CRM דרך [qsql] (psql / ALTSHULER_MSCRM)."
+        },
+        {
+          "h": "החלטות",
+          "t": "שרשרת לינארית של אילוצי Success בלבד; כשל בשלב כלשהו עוצר את כל מה שאחריו."
+        },
+        {
+          "h": "כתיבה ל-CRM",
+          "t": "SDK: gen_customeraccount (יצירה ועדכון), gen_fundmain (קישור וייעוץ). SQL ישיר (Unsupported): Gen_customeraccountBase, Gen_fundmainbase, gen_transferrequest."
+        },
+        {
+          "h": "תוצאה עסקית",
+          "t": "חשבונות לקוח מעודכנים לפי הקופות, קופות מקושרות לחשבון, ופרטי ייעוץ מועתקים מבקשות העברה מסוג 5 בסטטוס 8 (בהערות ה-SQL: 'בין מסלולים', 'הסתיים')."
+        }
+      ],
+      "decisions": [
+        {
+          "where": "Precedence constraints (DTSX:82412-82427)",
+          "condition": "Success (logicalAnd=true, single incoming per task)",
+          "meaning_he": "כל שלב תלוי בהצלחת הקודם",
+          "outcome_he": "כשל עוצר את המשך השרשרת"
+        }
+      ],
+      "crmEffects": [],
+      "evidence": [
+        "DTSX:82412-82427 PrecedenceConstraints",
+        "DTSX:82430-82437 OnError event handler",
+        "survey_0005_Customer Account.txt: Executables / Precedence"
+      ],
+      "openQuestions_he": [
+        "אין אילוץ Failure או Completion; לא ידוע אם יש מנגנון חיצוני (Job) שמריץ מחדש שלבים שנכשלו."
+      ]
+    },
+    {
+      "refId": "Package\\Create or Update Customer Accounts",
+      "title_he": "יצירה ועדכון של חשבונות לקוח מתוך הקופות",
+      "techName": "Create or Update Customer Accounts",
+      "short_he": "לכל צירוף של סוג חשבון לקוח ומספר חשבון בנק בקופות המסומנות gen_existinfile = 1 (gen_existinfile מופיעה בשאילתה בלי שם טבלה; אילו הייתה קיימת ביותר מטבלה אחת בשאילתה, השאילתה הייתה נכשלת (לפי המשתמש החבילה רצה בפרודקשן), ול-gen_fundmain יש עמודה כזו (from gen_fundmain … where Gen_existinfile = 1, DTSX:68399), ולכן זו עמודת הקופה) שיש להן מוצר וסוג חשבון לקוח תואמים נבחרת קופה מייצגת. אם אין עדיין חשבון לקוח, נוצר חשבון חדש (פרטי הייעוץ נלקחים מהצטרפות ממוכנת אם יש). אם יש חשבון, הוא מתעדכן רק כשיש הבדל באחד השדות המושווים (gen_issmallaccount אינו מושווה; gen_productsubcustomeraccount אינו מושווה במסלול ה-SQL): ב-SQL ישיר כשמספר הסוכן לא השתנה, וב-SDK כשהשתנה או חסר.",
+      "flow_he": [
+        "קופות עם gen_existinfile = 1 (העמודה מופיעה בשאילתה בלי שם טבלה; אילו הייתה קיימת ביותר מטבלה אחת השאילתה הייתה נכשלת – לפי המשתמש החבילה רצה בפרודקשן – ול-gen_fundmain יש עמודה כזו, DTSX:68399) שיש להן מוצר וסוג חשבון לקוח תואמים (inner join); קופה אחת לכל בנק + מספר חשבון + סוג מוצר: זו שערך gen_modifiedbybank שלה הוא המאוחר ביותר (ב-0004 השדה מקבל getdate() רק כשקופה קיימת מתעדכנת (UPDATE Gen_fundmain, 0004:92875), והוספת קופה חדשה ב-0004 (insert into Gen_fundmainbase, 0004:61789-61898) אינה כותבת אותו; ב-0008 יצירת קופה כותבת DateTime.Now (entity[\"gen_modifiedbybank\"] = DateTime.Now, 0008:23801); שזה מועד העדכון האחרון מהבנק הוא השערה לפי שם השדה).",
+        "שם החשבון = מזהה סוג מוצר-מספר חשבון; סימון חסימת הפקדות לפי קופה חסומה עם אותו חשבון וסוג.",
+        "איתור חשבון קיים לפי סוג חשבון לקוח + מספר חשבון בנק.",
+        "לא קיים → צירוף ההצטרפות הממוכנת הראשונה שנוצרה לאותו צירוף (תעודת זהות, סוג מסמך, חשבון), אם היא בסטטוס 7 → יצירה ב-SDK, כולל gen_joiningmailtoagent = 1 (בקוד: AWAITING_EMAIL_SEND), אלא אם gen_producttypeid הוא '5050'.",
+        "קיים, מספר סוכן זהה → השוואה (בלי gen_issmallaccount ו-gen_productsubcustomeraccount) → UPDATE ישיר ל-Gen_customeraccountBase (בו gen_productsubcustomeraccount מקבל את p.gen_subproduct של המוצר, ולא את cat.gen_productsubcustomeraccount כמו ביצירה ובעדכון ה-SDK).",
+        "קיים, מספר סוכן שונה או חסר → השוואה (בלי gen_issmallaccount) → עדכון SDK של השדות שהשתנו, ותמיד גם חסימת ההפקדות, ו-gen_mfratedtotal ואינדיקציית מכתב ההטבה כשיש להם ערך."
+      ],
+      "short": {
+        "nodes": [
+          {
+            "type": "step",
+            "text": "נבחרות הקופות המסומנות gen_existinfile = 1 שיש להן מוצר וסוג חשבון לקוח תואמים, וקופה מייצגת אחת לכל בנק, מספר חשבון בנק וסוג מוצר – זו שערך gen_modifiedbybank שלה הוא המאוחר ביותר (ב-0004 השדה מקבל getdate() רק כשקופה קיימת מתעדכנת (UPDATE Gen_fundmain, 0004:92875), והוספת קופה חדשה ב-0004 (insert into Gen_fundmainbase, 0004:61789-61898) אינה כותבת אותו; ב-0008 יצירת קופה כותבת DateTime.Now (entity[\"gen_modifiedbybank\"] = DateTime.Now, 0008:23801); שזה מועד העדכון האחרון מהבנק הוא השערה לפי שם השדה).",
+            "tech": "Get Funds Without Linked Customer Accounts (SQL DTSX:33252-33313): where gen_existinfile = 1 – gen_existinfile מופיעה בשאילתה בלי שם טבלה; אילו הייתה קיימת ביותר מטבלה אחת בשאילתה, השאילתה הייתה נכשלת (לפי המשתמש החבילה רצה בפרודקשן), ול-gen_fundmain יש עמודה כזו (from gen_fundmain … where Gen_existinfile = 1, DTSX:68399), ולכן זו עמודת הקופה; order by f.gen_modifiedbybank desc (DTSX:33255)"
+          },
+          {
+            "type": "step",
+            "text": "לכל קופה נקבע אם החשבון חסום להפקדות: כן, אם קיימת קופה חסומה להפקדה עם אותו מספר חשבון ואותו סוג חשבון."
+          },
+          {
+            "type": "decision",
+            "text": "האם כבר קיים ב-CRM חשבון לקוח עם אותו סוג חשבון ואותו מספר חשבון בנק?",
+            "branches": [
+              {
+                "label": "לא",
+                "nodes": [
+                  {
+                    "type": "write",
+                    "text": "נוצר חשבון לקוח חדש מפרטי הקופה. פרטי הייעוץ נלקחים מהקופה, ונדרסים בערכי הצטרפות ממוכנת תואמת אם נמצאה (רק ההצטרפות הראשונה שנוצרה לאותה תעודת זהות, סוג מסמך ומספר חשבון, ורק אם היא בסטטוס 7). סטטוס מייל ההצטרפות לסוכן בחשבון נקבע ל-1 (בקוד: AWAITING_EMAIL_SEND), חוץ ממזהה סוג מוצר 5050."
+                  }
+                ]
+              },
+              {
+                "label": "כן",
+                "nodes": [
+                  {
+                    "type": "decision",
+                    "text": "האם מספר הסוכן בחשבון זהה למספר הסוכן בקופה?",
+                    "branches": [
+                      {
+                        "label": "כן",
+                        "nodes": [
+                          {
+                            "type": "write",
+                            "text": "אם יש הבדל באחד השדות המושווים בין הקופה לחשבון, כ-40 שדות בחשבון נדרסים בעדכון SQL ישיר על מסד ה-CRM. gen_issmallaccount ו-gen_productsubcustomeraccount נכתבים בעדכון הזה אך אינם מושווים, ולכן הבדל רק בהם אינו גורם לעדכון. בעדכון הזה gen_productsubcustomeraccount מקבל את תת-המוצר מהמוצר (p.gen_subproduct), בעוד שביצירה ובעדכון ה-SDK הוא מקבל את הערך מסוג חשבון הלקוח (cat.gen_productsubcustomeraccount)."
+                          }
+                        ]
+                      },
+                      {
+                        "label": "לא או חסר",
+                        "nodes": [
+                          {
+                            "type": "write",
+                            "text": "אם יש הבדל באחד השדות המושווים (כל השדות חוץ מ-gen_issmallaccount), החשבון מתעדכן דרך ה-SDK: נשלחים השדות שערכם שונה, ובנוסף תמיד חסימת ההפקדות, ו-gen_mfratedtotal ואינדיקציית מכתב ההטבה כשיש להם ערך."
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "type": "end",
+            "text": "לכל צירוף שנקרא יש חשבון לקוח ב-CRM (אם היצירה הצליחה), ושדותיו מתעדכנים מהקופה המייצגת כשיש הבדל באחד השדות המושווים."
+          }
+        ]
+      },
+      "detailed": {
+        "nodes": [
+          {
+            "type": "step",
+            "text": "נקראות הקופות המסומנות gen_existinfile = 1 שיש להן מוצר וסוג חשבון לקוח תואמים; קופה בלי התאמה כזו אינה נקראת. מכל קבוצה של בנק, מספר חשבון בנק וסוג מוצר נבחרת קופה אחת – זו שערך gen_modifiedbybank שלה הוא המאוחר ביותר (ב-0004 השדה מקבל getdate() רק כשקופה קיימת מתעדכנת (UPDATE Gen_fundmain, 0004:92875), והוספת קופה חדשה ב-0004 (insert into Gen_fundmainbase, 0004:61789-61898) אינה כותבת אותו; ב-0008 יצירת קופה כותבת DateTime.Now (entity[\"gen_modifiedbybank\"] = DateTime.Now, 0008:23801); שזה מועד העדכון האחרון מהבנק הוא השערה לפי שם השדה). סוג חשבון הלקוח נגזר מסוג המוצר ומהבנק של הקופה.",
+            "tech": "Get Funds Without Linked Customer Accounts (OLEDBSource, DTSX:33247; SQL DTSX:33252): gen_fundmain f ⋈ product p (productid = gen_fundtypename) ⋈ gen_customeraccounttype cat (cat.gen_id = p.Gen_producttypeid AND cat.gen_bankname = f.gen_bankname) WHERE gen_existinfile = 1; row_number() over (partition by f.gen_bankname, f.gen_bankaccountnumber, p.gen_producttypeid order by f.gen_modifiedbybank desc) = 1. למרות השם, השאילתה אינה מסננת קופות שכבר מקושרות לחשבון. בעלות על עמודות לא מוסמכות: gen_existinfile מופיעה בשאילתה בלי שם טבלה; אילו הייתה קיימת ביותר מטבלה אחת בשאילתה, השאילתה הייתה נכשלת (לפי המשתמש החבילה רצה בפרודקשן), ול-gen_fundmain יש עמודה כזו (from gen_fundmain … where Gen_existinfile = 1, DTSX:68399), ולכן זו עמודת הקופה. באותו נימוק productid שייכת ל-product (p.productid, DTSX:2607) ו-gen_fundtypename ל-gen_fundmain (fm.gen_fundtypename, 0008:5652)."
+          },
+          {
+            "type": "step",
+            "text": "סוג החשבון נקבע מקוד סוג המוצר: 1 או 200001 → 1; 2 או 200000 → 2; 3 או 200002 → 3; אחרת ריק.",
+            "tech": "CASE p.ProductTypeCode ... END AS gen_accounttype (DTSX:33252)"
+          },
+          {
+            "type": "step",
+            "text": "שם החשבון נבנה כ'מזהה סוג מוצר-מספר חשבון בנק' בערכים מספריים, כך שאפסים מובילים במספר החשבון נמחקים. ערך לא מספרי מכשיל את כל השלב.",
+            "tech": "Set gen_name (DerivedColumn, DTSX:34382): (DT_WSTR,4)(DT_I4)gen_producttypeid + \"-\" + (DT_WSTR,12)(DT_I8)gen_bankaccountnumber; errorRowDisposition=FailComponent"
+          },
+          {
+            "type": "decision",
+            "text": "האם קיימת קופה חסומה להפקדה עם אותו מספר חשבון בנק ואותו סוג חשבון לקוח?",
+            "tech": "Fund Is Block To Deposit (Lookup, DTSX:31964-31971): gen_fundmain WHERE gen_IsDepositBlocked = '1'; join on gen_bankaccountnumber + gen_customeraccounttype; NoMatchBehavior=1",
+            "branches": [
+              {
+                "label": "כן",
+                "nodes": [
+                  {
+                    "type": "step",
+                    "text": "החשבון יסומן כחסום להפקדות.",
+                    "tech": "Is Account Blocked For Deposits TRUE (DTSX:33607): gen_isaccountblockedfordeposits = TRUE"
+                  }
+                ]
+              },
+              {
+                "label": "לא",
+                "nodes": [
+                  {
+                    "type": "step",
+                    "text": "החשבון יסומן כלא חסום להפקדות.",
+                    "tech": "Is Account Blocked For Deposits FALSE (DTSX:33580): gen_isaccountblockedfordeposits = FALSE"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "type": "decision",
+            "text": "האם קיים ב-CRM חשבון לקוח עם אותו סוג חשבון לקוח ואותו מספר חשבון בנק?",
+            "tech": "Get Customer Account Guid (Lookup, DTSX:32121-32176): gen_customeraccount; join gen_customeraccounttype + gen_bankaccountnumber (התאמת מחרוזת מדויקת); CacheType=0 (Full); NoMatchBehavior=1 → Lookup No Match Output",
+            "branches": [
+              {
+                "label": "לא – חשבון חדש",
+                "nodes": [
+                  {
+                    "type": "step",
+                    "text": "מחפשים הצטרפות ממוכנת תואמת: אותו מספר חשבון בנק (בלי אפסים מובילים), אותה תעודת זהות, וסוג מסמך (gen_documenttype) שתואם ל-gen_productsubcustomeraccount של סוג חשבון הלקוח אחרי המרה (4→2, 5→3, 2→4, אחרת ללא שינוי). ערכים ריקים (NULL) במפתחות ההתאמה נחשבים שווים, כך שגם ערך ריק בקופה מותאם לערך ריק בהצטרפות. לכל צירוף של תעודת זהות, סוג מסמך ומספר חשבון נלקחת רק ההצטרפות הראשונה שנוצרה (בכל סטטוס), והיא משמשת רק אם הסטטוס שלה 7 (בשאילתה מסומן 'status send to the bank'). אם ההצטרפות הראשונה בסטטוס אחר, לא נלקחת אף הצטרפות לאותו צירוף.",
+                    "tech": "Get Automated Joining (DTSX:32033-32038): gen_automatedjoining, row_number() partition by gen_applicantidentitynumber, gen_documenttype, מספר חשבון בלי אפסים, order by createdon asc (כל הסטטוסים) → where num = 1 AND gen_joiningstatus = 7 (הסינון על הסטטוס אחרי המספור; הערה ב-SQL: status send to the bank). Convert Product Type (DTSX:18124): gen_productsubcustomeraccount 4→2, 5→3, 2→4, אחרת ללא שינוי. Merge Join (DTSX:33700) JoinType=1 (Left Outer) על bankaccountnumberO, ProductTypeFromDerivedColumn↔gen_documenttype, gen_customeridnumber↔gen_applicantidentitynumber (Sort / Sort 1); TreatNullsAsEqual=true (DTSX:33704)"
+                  },
+                  {
+                    "type": "step",
+                    "text": "תאריך הלידה, תאריכי הייעוץ ותאריכי ההצטרפות הממוכנת מומרים לשעון מקומי לפני השליחה ל-CRM.",
+                    "tech": "Dates To Local 1 (DTSX:31041)"
+                  },
+                  {
+                    "type": "write",
+                    "text": "נוצר חשבון לקוח חדש עם פרטי הקופה, ובהם (הרשימה המלאה בפירוט הטכני): מספר חשבון, בנק, סוג חשבון, מוצר, לקוח, סוכן, סוכנות, מעסיק, כתובת, דמי ניהול, עמלות, חשבון קטן וחסימת הפקדות. פרטי הייעוץ (בנק מייעץ, מספר יועץ ותאריכי ייעוץ) נלקחים מהקופה, ונדרסים בערכי ההצטרפות הממוכנת כשהם קיימים; יועץ וסניף יועץ נלקחים רק מההצטרפות הממוכנת. פרטי קיבוץ נכתבים רק כשגם מספר הקיבוץ וגם שמו קיימים. ביצירה gen_selfemployername מקבל את gen_accountname של הקופה (ולא את gen_selfemployername שלה).",
+                    "tech": "Create Customer Account ×5 (DTSX:18169, 20382, 22687, 24902, 27118; קוד זהה, למעט מיקום ההשמה ל-gen_mfratedtotal ב-Create Customer Account 4 – שקול בהתנהגות) main.cs:39-228. שדות שהיצירה כותבת, כל אחד רק כשערך המקור אינו ריק (main.cs:44-228): gen_bankaccountnumber, gen_name, gen_bankname, gen_accounttype, gen_customeraccounttype, gen_producttypeid, gen_productsubcustomeraccount, gen_contactname, gen_customeridnumber, gen_customerdateofbirth, gen_estatetype, gen_accountname, gen_selfemployername (← gen_accountname), gen_brokernumber, gen_agentname, gen_agencyname, gen_coursenumber, gen_employernumber, gen_employername, gen_address1_name, gen_address1_line1, gen_address1_buildingid, gen_address1_postalcode, gen_cityaddress1_city, gen_mfratedtotal, gen_mftemplate, gen_managementfeepercentage, gen_depositmfpercentage, gen_depositmfindicator, gen_accrualmfindicator, gen_depositcommissionstartdate, gen_depositcommissionenddate, gen_commissionstartdate, gen_commissionexpirationdate, gen_letterofbenefitindex, gen_issmallaccount, gen_isaccountblockedfordeposits, gen_lastdepositon (← gen_lastdepositdate), gen_employmentstartedon; gen_consultname, gen_consultnumber, gen_consultingstartdate, gen_consultingenddate (מהקופה, ונדרסים מההצטרפות הממוכנת); gen_bankadvisor, gen_bankbranchadvisor (מההצטרפות הממוכנת בלבד); gen_kibbutzaccount ו-gen_kibbutz (כשמספר הקיבוץ ושמו קיימים), ובתוך אותו תנאי gen_kibbutzpowerofattorney ו-gen_dateofreleaseoffunds; gen_joiningmailtoagent (בשלב הבא); ExecuteMultiple Create במנות של 10 (main.cs:232-235, 254) · gen_customeraccount · Create · SDK"
+                  },
+                  {
+                    "type": "step",
+                    "text": "בחשבון חדש סטטוס מייל ההצטרפות לסוכן נקבע ל-1 (בקוד: AWAITING_EMAIL_SEND), אלא אם מזהה סוג המוצר הוא 5050.",
+                    "tech": "main.cs:19-20, 41-44: if (genproducttypeid_IsNull || genproducttypeid != \"5050\") gen_joiningmailtoagent = OptionSetValue(1) /* AWAITING_EMAIL_SEND */; שם הקבוע: BUDGETARY_PENSION_FUNDS"
+                  }
+                ]
+              },
+              {
+                "label": "כן – חשבון קיים",
+                "nodes": [
+                  {
+                    "type": "decision",
+                    "text": "האם מספר הסוכן בחשבון זהה למספר הסוכן בקופה, ושניהם קיימים?",
+                    "tech": "Conditional Split (DTSX:18090): UnSupported = !ISNULL(gen_brokernumberDB) && !ISNULL(gen_brokernumber) && (DT_WSTR,40)gen_brokernumberDB == (DT_WSTR,40)gen_brokernumber; Supported = Default Output",
+                    "branches": [
+                      {
+                        "label": "כן – הסוכן לא השתנה",
+                        "nodes": [
+                          {
+                            "type": "decision",
+                            "text": "האם יש הבדל באחד השדות המושווים בין הקופה לחשבון?",
+                            "tech": "Compare Filed including Null From DB Before Update (DTSX:12421; main.cs:30-247): NeedToUpdateAll = true כשערך ריק מול ערך מלא, טקסט שונה (ריק = NULL), Guid/int/bool שונה (Equals), תאריך בהפרש של יותר מ-12 שעות, double בהפרש > 0.001. gen_issmallaccount ו-gen_productsubcustomeraccount אינם עמודות קלט של הרכיב ולכן אינם מושווים, אף שה-UPDATE כותב אותם (DTSX:41010, 41013); gen_subproductDB קלט בלי עמודת מקור תואמת. Is Need To Update All (DTSX:33634): NeedToUpdateAll == TRUE",
+                            "branches": [
+                              {
+                                "label": "לא",
+                                "nodes": [
+                                  {
+                                    "type": "step",
+                                    "text": "החשבון לא מתעדכן."
+                                  }
+                                ]
+                              },
+                              {
+                                "label": "כן",
+                                "nodes": [
+                                  {
+                                    "type": "write",
+                                    "text": "כ-40 שדות בחשבון נדרסים בעדכון SQL ישיר בערכי השורה של הקופה המייצגת, גם כשהערך ריק, וכולל gen_issmallaccount ו-gen_productsubcustomeraccount שאינם מושווים. במסלול זה gen_productsubcustomeraccount מקבל את gen_subproduct של המוצר (p.gen_subproduct), בעוד שביצירה ובעדכון ה-SDK הוא מקבל את gen_productsubcustomeraccount של סוג חשבון הלקוח (cat.gen_productsubcustomeraccount), כך שהערך הנכתב תלוי במסלול. המעדכן הוא משתמש המערכת וזמן העדכון הוא עכשיו.",
+                                    "tech": "Update Customer Account 1-5 (OLEDBCommand, DTSX:40979-42287; SQL זהה): update Gen_customeraccountBase set ... ModifiedBy = ?, ModifiedOn = GETUTCDATE() ... where Gen_customeraccountid = ? · gen_customeraccount · Update · SQL (Unsupported); gen_productsubcustomeraccount = ? ← Param_26 ← gen_subproduct ← p.gen_subproduct (DTSX:41060, 41210, 33306); ביצירה וב-SDK: ← cat.gen_productsubcustomeraccount (DTSX:33305; Create DTSX:20336 ← Merge Join; Update CustomerAccounts DTSX:45455 ← Union All 1)"
+                                  }
+                                ]
+                              }
+                            ]
+                          }
+                        ]
+                      },
+                      {
+                        "label": "לא, או שאחד מהם חסר",
+                        "nodes": [
+                          {
+                            "type": "step",
+                            "text": "תאריכי הייעוץ ותאריך הלידה, בקופה ובחשבון, מומרים לשעון מקומי לפני ההשוואה.",
+                            "tech": "Dates To Local (DTSX:30078)"
+                          },
+                          {
+                            "type": "decision",
+                            "text": "האם יש הבדל באחד השדות המושווים בין הקופה לחשבון (gen_issmallaccount אינו מושווה בשלב זה)?",
+                            "tech": "Compare Filed including Null From DB Before Update 1 (DTSX:14893): השוואה מדויקת (Equals) לפי טיפוס; gen_issmallaccount אינו עמודת קלט של הרכיב (gen_productsubcustomeraccount כן); Is Need To Update All 1 (DTSX:33667): NeedToUpdateAll == TRUE",
+                            "branches": [
+                              {
+                                "label": "לא",
+                                "nodes": [
+                                  {
+                                    "type": "step",
+                                    "text": "החשבון לא מתעדכן."
+                                  }
+                                ]
+                              },
+                              {
+                                "label": "כן",
+                                "nodes": [
+                                  {
+                                    "type": "write",
+                                    "text": "החשבון מתעדכן דרך ה-SDK בשדות שערכם שונה מהערך הקיים, כולל gen_issmallaccount כשהוא שונה (אף שהבדל רק בו אינו מעביר את החשבון לשלב זה). ברוב השדות ערך ריק בקופה מנקה את השדה בחשבון, עם יוצאי דופן: gen_lastdepositon ו-gen_employmentstartedon נכתבים רק כשיש להם ערך בקופה, ולכן אף פעם אינם מנוקים; ב-gen_depositmfindicator וב-gen_accrualmfindicator ערך 0 בקופה נכתב כריק (NULL). חסימת ההפקדות נשלחת תמיד (הערך תמיד TRUE או FALSE), ולכן כל חשבון שהגיע לשלב זה נשלח לעדכון. אינדיקציית מכתב ההטבה ו-gen_mfratedtotal נשלחים תמיד כשיש להם ערך.",
+                                    "tech": "Update CustomerAccounts ×5 (DTSX:42614, 45510, 48408, 51304, 54200; קוד זהה) main.cs:40-121 (gen_lastdepositon / gen_employmentstartedon רק כש-!IsNull: main.cs:57-66; indicator 0 → null: main.cs:110-111); Helpers.CheckIfToUpdate2 (Helpers.cs:85-108): תאריכים בהפרש < 12 שעות, decimal < 0.01, double < 0.001 נחשבים שווים; ExecuteMultiple Update · gen_customeraccount · Update · SDK"
+                                  }
+                                ]
+                              }
+                            ]
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "type": "end",
+            "text": "לכל צירוף שנקרא (קופות gen_existinfile = 1 עם מוצר וסוג חשבון לקוח תואמים) יש חשבון לקוח ב-CRM אם היצירה הצליחה, ושדותיו מתעדכנים מהקופה המייצגת כשיש הבדל באחד השדות המושווים.",
+            "tech": "gen_existinfile – gen_existinfile מופיעה בשאילתה בלי שם טבלה; אילו הייתה קיימת ביותר מטבלה אחת בשאילתה, השאילתה הייתה נכשלת (לפי המשתמש החבילה רצה בפרודקשן), ול-gen_fundmain יש עמודה כזו (from gen_fundmain … where Gen_existinfile = 1, DTSX:68399), ולכן זו עמודת הקופה"
+          }
+        ]
+      },
+      "detail_he": [
+        {
+          "h": "מקור ואוכלוסייה",
+          "t": "שאילתה על טבלאות CRM (לא Staging): gen_fundmain ⋈ product ⋈ gen_customeraccounttype, עם gen_existinfile = 1 (gen_existinfile מופיעה בשאילתה בלי שם טבלה; אילו הייתה קיימת ביותר מטבלה אחת בשאילתה, השאילתה הייתה נכשלת (לפי המשתמש החבילה רצה בפרודקשן), ול-gen_fundmain יש עמודה כזו (from gen_fundmain … where Gen_existinfile = 1, DTSX:68399), ולכן זו עמודת הקופה), ושורה אחת לכל בנק + מספר חשבון + סוג מוצר (gen_modifiedbybank האחרון). בחבילות שסופקו gen_fundmain נכתבת, בין היתר, על ידי 0004_LeumiFile-MY (SQL ישיר, כולל gen_existinfile = 1) ועל ידי 0008_LeumiFile-PY ו-0009_LeumiFile-BY (SDK, gen_existinfile = true). מקור נוסף לחשבונות חדשים: gen_automatedjoining – לכל צירוף של תעודת זהות, סוג מסמך ומספר חשבון נלקחת ההצטרפות הראשונה שנוצרה, ורק אם היא בסטטוס 7. אף חבילה מהחבילות שסופקו אינה יוצרת רשומות gen_automatedjoining (external_unknown); 0027_AutomatedJoining מעדכנת את הסטטוס של הצטרפויות בסטטוס 7."
+        },
+        {
+          "h": "התאמה לרשומות קיימות",
+          "t": "חשבון קיים מאותר לפי gen_customeraccounttype + gen_bankaccountnumber (התאמה מדויקת). הצטרפות ממוכנת מותאמת לפי מספר חשבון בלי אפסים מובילים, תעודת זהות, וסוג מסמך (gen_documenttype) מול gen_productsubcustomeraccount של סוג חשבון הלקוח אחרי המרה (4→2, 5→3, 2→4, אחרת ללא שינוי); ערכי NULL במפתחות נחשבים שווים (TreatNullsAsEqual = true)."
+        },
+        {
+          "h": "החלטות",
+          "t": "1) חשבון לא קיים → יצירה; 2) קיים ומספר הסוכן זהה (ושניהם מלאים) → עדכון SQL ישיר של כל השדות אם יש הבדל באחד השדות המושווים (gen_issmallaccount ו-gen_productsubcustomeraccount נכתבים אך אינם מושווים; במסלול זה gen_productsubcustomeraccount מקבל את gen_subproduct של המוצר (p.gen_subproduct), בעוד שביצירה ובעדכון ה-SDK הוא מקבל את gen_productsubcustomeraccount של סוג חשבון הלקוח (cat.gen_productsubcustomeraccount), כך שהערך הנכתב תלוי במסלול); 3) קיים ומספר הסוכן שונה או חסר → עדכון SDK אם יש הבדל באחד השדות המושווים (gen_issmallaccount אינו מושווה בשלב זה): נשלחים השדות שהשתנו, ותמיד גם חסימת ההפקדות, ו-gen_mfratedtotal ואינדיקציית מכתב ההטבה כשיש להם ערך. חסימת הפקדות = קיימת קופה עם gen_IsDepositBlocked = '1' לאותו חשבון וסוג."
+        },
+        {
+          "h": "כתיבה ל-CRM",
+          "t": "gen_customeraccount: Create ב-SDK (ExecuteMultiple); Update ב-SDK; Update ב-SQL ישיר על Gen_customeraccountBase (Unsupported)."
+        },
+        {
+          "h": "תוצאה עסקית",
+          "t": "חשבונות הלקוח נוצרים מהקופה המייצגת (זו שערך gen_modifiedbybank שלה הוא המאוחר ביותר (ב-0004 השדה מקבל getdate() רק כשקופה קיימת מתעדכנת (UPDATE Gen_fundmain, 0004:92875), והוספת קופה חדשה ב-0004 (insert into Gen_fundmainbase, 0004:61789-61898) אינה כותבת אותו; ב-0008 יצירת קופה כותבת DateTime.Now (entity[\"gen_modifiedbybank\"] = DateTime.Now, 0008:23801); שזה מועד העדכון האחרון מהבנק הוא השערה לפי שם השדה)), ומתעדכנים ממנה כשיש הבדל באחד השדות המושווים. בחשבונות חדשים gen_joiningmailtoagent = 1 (בקוד: AWAITING_EMAIL_SEND), חוץ ממוצר 5050, ומקבלים פרטי ייעוץ מההצטרפות הממוכנת כשנמצאה הצטרפות תואמת."
+        }
+      ],
+      "sourceFeed": {
+        "component": "Get Funds Without Linked Customer Accounts (DTSX:33247)",
+        "tables": [
+          "gen_fundmain",
+          "product",
+          "gen_customeraccounttype",
+          "gen_customeraccount (Lookup)",
+          "gen_automatedjoining (Merge Join)"
+        ],
+        "isStaging": false,
+        "upstream_he": "gen_fundmain – בחבילות שסופקו היא נכתבת, בין היתר, על ידי 0004_LeumiFile-MY ב-SQL ישיר (insert into Gen_fundmainbase כולל Gen_existinfile, 0004:61789-61900; UPDATE Gen_fundmain Set gen_existinfile = 1, 0004:92874-92953) ועל ידי 0008_LeumiFile-PY ו-0009_LeumiFile-BY ב-SDK עם gen_existinfile = true (0008:23781-23784; 0009:27019-27026). gen_automatedjoining – אף חבילה מהחבילות שסופקו אינה יוצרת רשומות הצטרפות (המקור external_unknown). 0027_AutomatedJoining קוראת הצטרפויות בסטטוס 7 ומעדכנת את gen_joiningstatus ואת gen_customeraccountid שלהן (0027:984, 1370-1376); לכן, לפי סדר ההרצה (שאינו בקבצים), היא יכולה להוציא הצטרפויות ממקור החבילה הזו."
+      },
+      "decisions": [
+        {
+          "where": "Fund Is Block To Deposit (Lookup, DTSX:31964)",
+          "condition": "match on gen_bankaccountnumber + gen_customeraccounttype in gen_fundmain WHERE gen_IsDepositBlocked = '1'",
+          "meaning_he": "קיימת קופה חסומה להפקדה לאותו חשבון וסוג",
+          "outcome_he": "Match → gen_isaccountblockedfordeposits = TRUE; No Match → FALSE"
+        },
+        {
+          "where": "Get Customer Account Guid (Lookup, DTSX:32121)",
+          "condition": "match on gen_customeraccounttype + gen_bankaccountnumber in gen_customeraccount",
+          "meaning_he": "החשבון כבר קיים",
+          "outcome_he": "Match → מסלול עדכון; No Match → מסלול יצירה"
+        },
+        {
+          "where": "Conditional Split (DTSX:18090)",
+          "condition": "!ISNULL(gen_brokernumberDB) && !ISNULL(gen_brokernumber) && (DT_WSTR,40)gen_brokernumberDB == (DT_WSTR,40)gen_brokernumber",
+          "meaning_he": "מספר הסוכן לא השתנה",
+          "outcome_he": "UnSupported → עדכון SQL ישיר; Default (Supported) → עדכון SDK"
+        },
+        {
+          "where": "Is Need To Update All / Is Need To Update All 1 (DTSX:33634, 33667)",
+          "condition": "NeedToUpdateAll ==  TRUE",
+          "meaning_he": "יש לפחות שדה מושווה אחד שונה (gen_issmallaccount אינו מושווה בשני המסלולים; gen_productsubcustomeraccount אינו מושווה במסלול ה-SQL)",
+          "outcome_he": "Update → כתיבה; dont update → אין כתיבה"
+        },
+        {
+          "where": "Create Customer Account main.cs:41-44",
+          "condition": "Row.genproducttypeid_IsNull || Row.genproducttypeid != \"5050\"",
+          "meaning_he": "המוצר אינו 5050 (BUDGETARY_PENSION_FUNDS)",
+          "outcome_he": "gen_joiningmailtoagent = 1 (AWAITING_EMAIL_SEND)"
+        },
+        {
+          "where": "Create Customer Account main.cs:146-162",
+          "condition": "!Row.genadvisornumber_IsNull / !Row.genstartadvisingdate_IsNull / !Row.genendadvisingdate_IsNull / !Row.genbankadvisors_IsNull",
+          "meaning_he": "קיים ערך בהצטרפות הממוכנת",
+          "outcome_he": "ערך ההצטרפות הממוכנת דורס את ערך הקופה ב-gen_consultnumber / gen_consultingstartdate / gen_consultingenddate / gen_consultname"
+        },
+        {
+          "where": "Create Customer Account main.cs:164-175",
+          "condition": "!Row.genkibutznumber_IsNull && !Row.genkibutzname_IsNull",
+          "meaning_he": "יש פרטי קיבוץ מלאים",
+          "outcome_he": "נכתבים gen_kibbutzaccount, gen_kibbutz, ובהתאם gen_kibbutzpowerofattorney ו-gen_dateofreleaseoffunds"
+        }
+      ],
+      "crmEffects": [
+        {
+          "entity": "gen_customeraccount",
+          "verb": "Create",
+          "mechanism": "SDK",
+          "when_he": "אין חשבון עם אותו gen_customeraccounttype + gen_bankaccountnumber"
+        },
+        {
+          "entity": "gen_customeraccount",
+          "verb": "Update",
+          "mechanism": "SQL",
+          "when_he": "החשבון קיים, מספר הסוכן זהה וקיים שדה מושווה שונה (Unsupported)"
+        },
+        {
+          "entity": "gen_customeraccount",
+          "verb": "Update",
+          "mechanism": "SDK",
+          "when_he": "החשבון קיים, מספר הסוכן שונה או חסר וקיים שדה מושווה שונה (gen_issmallaccount אינו מושווה)"
+        }
+      ],
+      "evidence": [
+        "DTSX:33252 SQL Get Funds Without Linked Customer Accounts",
+        "DTSX:31966-31971 Fund Is Block To Deposit; DTSX:33580, 33607 TRUE/FALSE",
+        "DTSX:32123-32176 Get Customer Account Guid",
+        "DTSX:32038 Get Automated Joining; DTSX:18124 Convert Product Type; DTSX:33700 Merge Join (JoinType=1)",
+        "DTSX:18090 Conditional Split (UnSupported/Supported)",
+        "DTSX:34382 Set gen_name (FailComponent)",
+        "Create Customer Account main.cs (sha a712a54ecaa3):19-20, 41-228, 254",
+        "Update CustomerAccounts main.cs (sha c78d0bf0fa89):40-121; Helpers.cs (sha 8f65473030b4):8-108",
+        "DTSX:40982-42290 Update Customer Account 1-5 SQL",
+        "analysis/0005_Customer Account/dupes.json; cmp לפי קוד מנורמל: Update CustomerAccounts ×5 שונים ברווחים בלבד; Create Customer Account ×5 שונים ברווחים, ו-Create Customer Account 4 גם במיקום ההשמה ל-gen_mfratedtotal (DTSX:27298 מול 18351)"
+      ],
+      "openQuestions_he": [
+        "Create Customer Account כותב ל-gen_selfemployername את gen_accountname של הקופה (main.cs:126-127) ולא את gen_selfemployername; בעדכון ה-SDK נכתב gen_selfemployername. האם זה מכוון?",
+        "ביצירה gen_agentname ו-gen_agencyname נשלחים כ-EntityReference מסוג \"gen_agents\" / \"gen_agencie\" (main.cs:84-88), ובעדכון ה-SDK כ-\"contact\" / \"account\" (main.cs:84-85). השאילתה של Set Joining email to Agent מצרפת אותם ל-Contact ול-Account. איזה סוג נכון? ההשפעה בזמן ריצה לא ידועה.",
+        "מה משמעות הערך 5050 (מזהה סוג מוצר) מבחינה עסקית? שם הקבוע הוא BUDGETARY_PENSION_FUNDS.",
+        "מה הסיבה העסקית לפיצול לפי מספר סוכן (SQL ישיר מול SDK)? (השערה: כדי שתהליכי CRM, כמו פלאגינים, יופעלו רק כשהסוכן משתנה.)"
+      ]
+    },
+    {
+      "refId": "Package\\Connect Funds to Customer Accounts",
+      "title_he": "קישור קופות לחשבון הלקוח והעתקת פרטי ייעוץ לקופה",
+      "techName": "Connect Funds to Customer Accounts",
+      "short_he": "קופות המסומנות gen_existinfile = 1 (gen_existinfile מופיעה בשאילתה בלי שם טבלה; אילו הייתה קיימת ביותר מטבלה אחת בשאילתה, השאילתה הייתה נכשלת (לפי המשתמש החבילה רצה בפרודקשן), ול-gen_fundmain יש עמודה כזו (from gen_fundmain … where Gen_existinfile = 1, DTSX:68399), ולכן זו עמודת הקופה) שאינן מקושרות לחשבון הלקוח המתאים להן, או שמקושרות לחשבון אחר, מקושרות אליו. באותו עדכון מועתקים לקופה פרטי הייעוץ של החשבון, כשהם קיימים ושונים.",
+      "flow_he": [
+        "קופות עם Gen_existinfile = 1 (העמודה מופיעה בשאילתה בלי שם טבלה; אילו הייתה קיימת ביותר מטבלה אחת השאילתה הייתה נכשלת – לפי המשתמש החבילה רצה בפרודקשן – ול-gen_fundmain יש עמודה כזו, DTSX:68399) שהחשבון התואם להן (סוג חשבון + מספר חשבון בנק) אינו החשבון המקושר.",
+        "המרת תאריכי הייעוץ לשעון מקומי.",
+        "עדכון SDK של gen_fundmain: gen_customeraccountname, ושדות ייעוץ שהשתנו."
+      ],
+      "short": {
+        "nodes": [
+          {
+            "type": "step",
+            "text": "נבחרות קופות המסומנות gen_existinfile = 1 שאינן מקושרות לחשבון הלקוח המתאים להן, או שמקושרות לחשבון אחר.",
+            "tech": "Get Funds Without Linked Customer Accounts (SQL DTSX:2588-2613): and Gen_existinfile = 1 (DTSX:2613) – gen_existinfile מופיעה בשאילתה בלי שם טבלה; אילו הייתה קיימת ביותר מטבלה אחת בשאילתה, השאילתה הייתה נכשלת (לפי המשתמש החבילה רצה בפרודקשן), ול-gen_fundmain יש עמודה כזו (from gen_fundmain … where Gen_existinfile = 1, DTSX:68399), ולכן זו עמודת הקופה"
+          },
+          {
+            "type": "step",
+            "text": "החשבון המתאים נקבע לפי סוג החשבון, שנגזר מהמוצר והבנק, ולפי מספר חשבון הבנק."
+          },
+          {
+            "type": "write",
+            "text": "הקופה מקושרת לחשבון הלקוח המתאים."
+          },
+          {
+            "type": "decision",
+            "text": "האם פרטי הייעוץ בחשבון שונים מאלה שבקופה?",
+            "branches": [
+              {
+                "label": "כן",
+                "nodes": [
+                  {
+                    "type": "write",
+                    "text": "פרטי הייעוץ שיש להם ערך בחשבון מועתקים לקופה."
+                  }
+                ]
+              },
+              {
+                "label": "לא",
+                "nodes": [
+                  {
+                    "type": "step",
+                    "text": "פרטי הייעוץ בקופה נשארים כמו שהם."
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "type": "end",
+            "text": "כל קופה המסומנת gen_existinfile = 1 שנמצא לה חשבון לקוח תואם (סוג חשבון לפי המוצר ובנק המוצר, ומספר חשבון בנק זהה) מקושרת אליו, אם העדכון הצליח. קופה בלי חשבון תואם כזה אינה נבחרת ונשארת כפי שהיא.",
+            "tech": "Gen_existinfile – gen_existinfile מופיעה בשאילתה בלי שם טבלה; אילו הייתה קיימת ביותר מטבלה אחת בשאילתה, השאילתה הייתה נכשלת (לפי המשתמש החבילה רצה בפרודקשן), ול-gen_fundmain יש עמודה כזו (from gen_fundmain … where Gen_existinfile = 1, DTSX:68399), ולכן זו עמודת הקופה"
+          }
+        ]
+      },
+      "detailed": {
+        "nodes": [
+          {
+            "type": "step",
+            "text": "נבחרות קופות המסומנות gen_existinfile = 1. לכל קופה מאתרים חשבון לקוח עם אותו סוג חשבון (לפי סוג המוצר והבנק של המוצר) ואותו מספר חשבון בנק.",
+            "tech": "Get Funds Without Linked Customer Accounts (OLEDBSource, DTSX:2583; SQL DTSX:2588): gen_fundmain f ⋈ product p (p.productid = gen_fundtypename) ⋈ gen_customeraccounttype cat (p.Gen_producttypeid = cat.gen_id AND p.gen_bankname = cat.gen_bankname) ⋈ gen_customeraccount ca (cat.gen_customeraccounttypeId = ca.gen_customeraccounttype AND f.Gen_BankAccountNumber = ca.Gen_bankaccountnumber) WHERE Gen_existinfile = 1 (DTSX:2613). בעלות: gen_existinfile מופיעה בשאילתה בלי שם טבלה; אילו הייתה קיימת ביותר מטבלה אחת בשאילתה, השאילתה הייתה נכשלת (לפי המשתמש החבילה רצה בפרודקשן), ול-gen_fundmain יש עמודה כזו (from gen_fundmain … where Gen_existinfile = 1, DTSX:68399), ולכן זו עמודת הקופה."
+          },
+          {
+            "type": "decision",
+            "text": "האם הקופה כבר מקושרת לחשבון הזה?",
+            "tech": "WHERE (f.Gen_customeraccountname is null or f.Gen_customeraccountname <> ca.Gen_customeraccountId)",
+            "branches": [
+              {
+                "label": "כן",
+                "nodes": [
+                  {
+                    "type": "step",
+                    "text": "הקופה אינה נבחרת ואינה מתעדכנת."
+                  }
+                ]
+              },
+              {
+                "label": "לא, או שאינה מקושרת כלל",
+                "nodes": [
+                  {
+                    "type": "step",
+                    "text": "הקופה נבחרת לעדכון."
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "type": "step",
+            "text": "תאריכי הייעוץ, בחשבון ובקופה, מומרים לשעון מקומי.",
+            "tech": "Dates To Local (DTSX:1697): gen_consultingstartdate/enddate, fm_consultingstartdate/enddate"
+          },
+          {
+            "type": "write",
+            "text": "הקופה מקושרת לחשבון הלקוח.",
+            "tech": "Update Customer Account Guid in Fund ×5 (DTSX:3110, 4397, 5773, 7060, 8347; קוד זהה) main.cs:36-40: gen_customeraccountname = EntityReference(gen_customeraccount) · gen_fundmain · Update · SDK"
+          },
+          {
+            "type": "decision",
+            "text": "לכל אחד מפרטי הייעוץ: האם יש לו ערך בחשבון, והוא חסר או שונה בקופה?",
+            "tech": "main.cs:42-65: !Row.genX_IsNull && (Row.fmX_IsNull || Row.genX != Row.fmX)",
+            "branches": [
+              {
+                "label": "כן",
+                "nodes": [
+                  {
+                    "type": "write",
+                    "text": "הערך מהחשבון נכתב לקופה: תאריך התחלת ייעוץ, תאריך סיום ייעוץ, בנק מייעץ, מספר יועץ, יועץ וסניף יועץ.",
+                    "tech": "gen_consultingstartdate, gen_consultingenddate, gen_consultname (account), gen_consultnumber (gen_agentcontract), gen_bankadvisorname (gen_bankadvisor), gen_consultantbankbranch (gen_bankbranch) · gen_fundmain · Update · SDK (באותה בקשה)"
+                  }
+                ]
+              },
+              {
+                "label": "לא",
+                "nodes": [
+                  {
+                    "type": "step",
+                    "text": "השדה בקופה לא משתנה; ערך ריק בחשבון אינו מוחק ערך בקופה."
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "type": "end",
+            "text": "קופות שנבחרו (gen_existinfile = 1, לא מקושרות או מקושרות לחשבון אחר, ונמצא להן חשבון תואם) מקושרות לחשבון ומקבלות ממנו את פרטי הייעוץ שיש להם ערך בחשבון, אם העדכון הצליח. קופות שכבר מקושרות לחשבון הנכון אינן נבחרות, ולכן פרטי הייעוץ שלהן אינם מסונכרנים בשלב זה."
+          }
+        ]
+      },
+      "detail_he": [
+        {
+          "h": "מקור ואוכלוסייה",
+          "t": "שאילתה על טבלאות CRM (לא Staging): gen_fundmain ⋈ product ⋈ gen_customeraccounttype ⋈ gen_customeraccount, קופות עם Gen_existinfile = 1 (gen_existinfile מופיעה בשאילתה בלי שם טבלה; אילו הייתה קיימת ביותר מטבלה אחת בשאילתה, השאילתה הייתה נכשלת (לפי המשתמש החבילה רצה בפרודקשן), ול-gen_fundmain יש עמודה כזו (from gen_fundmain … where Gen_existinfile = 1, DTSX:68399), ולכן זו עמודת הקופה). החשבונות עצמם נוצרים בשלב הקודם באותה חבילה (Create or Update Customer Accounts); בחבילות שסופקו gen_fundmain נכתבת, בין היתר, על ידי 0004_LeumiFile-MY (SQL ישיר, כולל gen_existinfile = 1) ועל ידי 0008_LeumiFile-PY ו-0009_LeumiFile-BY (SDK, gen_existinfile = true)."
+        },
+        {
+          "h": "התאמה לרשומות קיימות",
+          "t": "חשבון מתאים = אותו סוג חשבון (cat.gen_id = p.Gen_producttypeid ו-cat.gen_bankname = p.gen_bankname) ואותו מספר חשבון בנק (השוואה מדויקת)."
+        },
+        {
+          "h": "החלטות",
+          "t": "קופה נבחרת רק אם אינה מקושרת או מקושרת לחשבון אחר. כל שדה ייעוץ נכתב רק אם יש לו ערך בחשבון והוא שונה או חסר בקופה."
+        },
+        {
+          "h": "כתיבה ל-CRM",
+          "t": "gen_fundmain Update ב-SDK (ExecuteMultiple במנות של 10): gen_customeraccountname תמיד, ושדות ייעוץ לפי הצורך."
+        },
+        {
+          "h": "תוצאה עסקית",
+          "t": "קישור הקופות לחשבון הלקוח, כולל קופות חדשות לחשבונות שנוצרו באותה ריצה."
+        }
+      ],
+      "sourceFeed": {
+        "component": "Get Funds Without Linked Customer Accounts (DTSX:2583)",
+        "tables": [
+          "gen_fundmain",
+          "product",
+          "gen_customeraccounttype",
+          "gen_customeraccount"
+        ],
+        "isStaging": false,
+        "upstream_he": "gen_customeraccount – השלב הקודם בחבילה זו (מוכח); gen_fundmain – בחבילות שסופקו היא נכתבת, בין היתר, על ידי 0004_LeumiFile-MY ב-SQL ישיר (insert into Gen_fundmainbase כולל Gen_existinfile, 0004:61789-61900; UPDATE Gen_fundmain Set gen_existinfile = 1, 0004:92874-92953) ועל ידי 0008_LeumiFile-PY ו-0009_LeumiFile-BY ב-SDK עם gen_existinfile = true (0008:23781-23784; 0009:27019-27026)."
+      },
+      "decisions": [
+        {
+          "where": "Get Funds Without Linked Customer Accounts (DTSX:2588)",
+          "condition": "(f.Gen_customeraccountname is null or f.Gen_customeraccountname <> ca.Gen_customeraccountId) and Gen_existinfile = 1",
+          "meaning_he": "קופה המסומנת Gen_existinfile = 1 שאינה מקושרת לחשבון המתאים (gen_existinfile מופיעה בשאילתה בלי שם טבלה; אילו הייתה קיימת ביותר מטבלה אחת בשאילתה, השאילתה הייתה נכשלת (לפי המשתמש החבילה רצה בפרודקשן), ול-gen_fundmain יש עמודה כזו (from gen_fundmain … where Gen_existinfile = 1, DTSX:68399), ולכן זו עמודת הקופה)",
+          "outcome_he": "נבחרת לעדכון"
+        },
+        {
+          "where": "Update Customer Account Guid in Fund main.cs:42-65",
+          "condition": "!Row.genX_IsNull && (Row.fmX_IsNull || Row.genX != Row.fmX)",
+          "meaning_he": "לשדה הייעוץ יש ערך בחשבון והוא שונה בקופה",
+          "outcome_he": "השדה נכתב לקופה"
+        }
+      ],
+      "crmEffects": [
+        {
+          "entity": "gen_fundmain",
+          "verb": "Update",
+          "mechanism": "SDK",
+          "when_he": "לכל קופה שנבחרה: קישור לחשבון, ופרטי ייעוץ שהשתנו"
+        }
+      ],
+      "evidence": [
+        "DTSX:2588 SQL Get Funds Without Linked Customer Accounts",
+        "DTSX:1697 Dates To Local",
+        "Update Customer Account Guid in Fund main.cs (sha 69a70953bd5d):36-71",
+        "dupes.json + cmp: ×5 זהים (הבדלי רווחים בלבד)"
+      ],
+      "openQuestions_he": [
+        "סוג החשבון נקבע כאן לפי הבנק של המוצר (p.gen_bankname), ובשלב היצירה לפי הבנק של הקופה (f.gen_bankname). אם יש קופה שהבנק שלה שונה מהבנק של המוצר, ייתכן שהיא תקושר לחשבון אחר מזה שנוצר עבורה."
+      ]
+    },
+    {
+      "refId": "Package\\Set Joining email to Agent",
+      "title_he": "קביעת סטטוס מייל הצטרפות לסוכן",
+      "techName": "Set Joining email to Agent",
+      "short_he": "חשבונות לקוח שבהם gen_joiningmailtoagent = 1 (בקוד: AWAITING_EMAIL_SEND) מקבלים סטטוס 2 (שם הקבוע בקוד: SENDING_JOINING_MAIL) אם נמצאה כתובת מייל והסימון 'לא לשלוח מייל' מאפשר שליחה, ואחרת סטטוס 4 (בקוד: FAILED_JOINING_MAIL). המייל והסימון נלקחים כל אחד בנפרד מהסוכן, ואם הערך שם ריק – מהסוכנות. החבילה עצמה אינה שולחת מייל.",
+      "flow_he": [
+        "חשבונות עם gen_joiningmailtoagent = 1.",
+        "כתובת מייל והרשאת מייל – כל אחת בנפרד: מאיש הקשר של הסוכן, ואם הערך שם ריק – מהחשבון של הסוכנות.",
+        "יש מייל ומותר לשלוח → 2; אחרת → 4 (עדכון SDK)."
+      ],
+      "short": {
+        "nodes": [
+          {
+            "type": "step",
+            "text": "נבחרים חשבונות הלקוח שבהם סטטוס מייל ההצטרפות לסוכן הוא 1 (בקוד: AWAITING_EMAIL_SEND)."
+          },
+          {
+            "type": "step",
+            "text": "לכל חשבון נלקחים כתובת המייל והסימון 'לא לשלוח מייל', כל אחד בנפרד: מאיש הקשר של הסוכן, ואם הערך שם ריק – מהחשבון של הסוכנות. כך ייתכן שהמייל מגיע מהסוכנות והסימון מהסוכן."
+          },
+          {
+            "type": "decision",
+            "text": "האם יש כתובת מייל ומותר לשלוח אליה?",
+            "branches": [
+              {
+                "label": "כן",
+                "nodes": [
+                  {
+                    "type": "write",
+                    "text": "סטטוס מייל ההצטרפות בחשבון נקבע ל-2 (שם הקבוע בקוד: SENDING_JOINING_MAIL)."
+                  }
+                ]
+              },
+              {
+                "label": "לא",
+                "nodes": [
+                  {
+                    "type": "write",
+                    "text": "סטטוס מייל ההצטרפות בחשבון נקבע ל-4 (שם הקבוע בקוד: FAILED_JOINING_MAIL)."
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "type": "end",
+            "text": "חשבונות שהעדכון שלהם הצליח עוברים מהערך 1 (בקוד: AWAITING_EMAIL_SEND) ל-2 או ל-4. חשבון שעדכון ה-SDK שלו נכשל נשאר ב-1, ולכן ייבחר שוב בריצה הבאה."
+          }
+        ]
+      },
+      "detailed": {
+        "nodes": [
+          {
+            "type": "step",
+            "text": "נבחרים כל חשבונות הלקוח שבהם סטטוס מייל ההצטרפות לסוכן הוא 1 (בקוד: AWAITING_EMAIL_SEND). בקבצים שסופקו הערך 1 נקבע רק ביצירת חשבון בשלב הראשון של חבילה זו, ולכן נבחרים חשבונות שנוצרו בריצה זו וגם חשבונות מריצות קודמות שעדכונם כאן לא הצליח. היחס ביניהם, ואם גורם מחוץ לקבצים קובע גם הוא 1, לא ידוע.",
+            "tech": "Get Customer Accounts to Send Mails (OLEDBSource, DTSX:62349-62354): Gen_customeraccount WHERE gen_joiningmailtoagent = 1"
+          },
+          {
+            "type": "step",
+            "text": "כתובת המייל וההרשאה נלקחות מאיש הקשר של הסוכן, ואם הן ריקות – מהחשבון של הסוכנות.",
+            "tech": "LEFT JOIN Contact c ON ca.Gen_agentname = c.contactid LEFT JOIN Account a ON ca.Gen_agencyname = a.AccountID; isnull(c.EMailAddress1, a.EMailAddress1) email, isnull(c.DoNotEMail, a.DoNotEMail) donotemail"
+          },
+          {
+            "type": "decision",
+            "text": "האם יש כתובת מייל, סימון 'לא לשלוח מייל' קיים, והוא מאפשר שליחה?",
+            "tech": "Update Customer Account 1-5 main.cs:41: !Row.email_IsNull && !Row.donotemail_IsNull && Row.donotemail == ALLOW_EMAIL (false)",
+            "branches": [
+              {
+                "label": "כן",
+                "nodes": [
+                  {
+                    "type": "write",
+                    "text": "סטטוס מייל ההצטרפות לסוכן נקבע ל-2 ('שולח מייל הצטרפות').",
+                    "tech": "gen_joiningmailtoagent = OptionSetValue(2) /* SENDING_JOINING_MAIL */ (main.cs:15, 43) · gen_customeraccount · Update · SDK"
+                  }
+                ]
+              },
+              {
+                "label": "לא",
+                "nodes": [
+                  {
+                    "type": "write",
+                    "text": "סטטוס מייל ההצטרפות לסוכן נקבע ל-4 ('מייל ההצטרפות נכשל'), גם כשהסימון 'לא לשלוח מייל' ריק.",
+                    "tech": "gen_joiningmailtoagent = OptionSetValue(4) /* FAILED_JOINING_MAIL */ (main.cs:16, 47) · gen_customeraccount · Update · SDK"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "type": "step",
+            "text": "העדכונים נשלחים במנות של 10.",
+            "tech": "Update Customer Account ×5 (DTSX:62821, 63930, 65038, 66148, 67256; 1≡3, ו-2, 4, 5 שונים מהן רק בסוגריים מסולסלים וברווחים) ExecuteMultiple Update (main.cs:78)"
+          },
+          {
+            "type": "end",
+            "text": "חשבונות שהיו בערך 1 (בקוד: AWAITING_EMAIL_SEND) מסומנים 2 (בקוד: SENDING_JOINING_MAIL) או 4 (בקוד: FAILED_JOINING_MAIL). חשבון שעדכון ה-SDK שלו נכשל (Fault או חריגה) נשאר ב-1. שליחת המייל עצמה אינה מתבצעת בחבילה (השערה: תהליך ב-CRM מגיב לסטטוס 2)."
+          }
+        ]
+      },
+      "detail_he": [
+        {
+          "h": "מקור ואוכלוסייה",
+          "t": "שאילתה על טבלאות CRM (לא Staging): Gen_customeraccount WHERE gen_joiningmailtoagent = 1, עם Contact (סוכן) ו-Account (סוכנות). הסטטוס 1 נקבע בשלב היצירה בחבילה זו (מוכח: Create Customer Account main.cs:43)."
+        },
+        {
+          "h": "התאמה לרשומות קיימות",
+          "t": "העדכון לפי Gen_customeraccountId מהשאילתה."
+        },
+        {
+          "h": "החלטות",
+          "t": "email לא ריק ו-donotemail לא ריק ו-donotemail == false → 2; אחרת → 4."
+        },
+        {
+          "h": "כתיבה ל-CRM",
+          "t": "gen_customeraccount.gen_joiningmailtoagent – Update ב-SDK."
+        },
+        {
+          "h": "תוצאה עסקית",
+          "t": "סימון לכל חשבון חדש אם אפשר לשלוח לסוכן מייל הצטרפות."
+        }
+      ],
+      "sourceFeed": {
+        "component": "Get Customer Accounts to Send Mails (DTSX:62349)",
+        "tables": [
+          "gen_customeraccount",
+          "contact",
+          "account"
+        ],
+        "isStaging": false,
+        "upstream_he": "gen_joiningmailtoagent = 1 נקבע בשלב Create or Update Customer Accounts בחבילה זו (מוכח)."
+      },
+      "decisions": [
+        {
+          "where": "Update Customer Account main.cs:41-48",
+          "condition": "!Row.email_IsNull && !Row.donotemail_IsNull && Row.donotemail == ALLOW_EMAIL /* false */",
+          "meaning_he": "יש מייל ומותר לשלוח",
+          "outcome_he": "gen_joiningmailtoagent = 2; אחרת 4"
+        }
+      ],
+      "crmEffects": [
+        {
+          "entity": "gen_customeraccount",
+          "verb": "Update",
+          "mechanism": "SDK",
+          "when_he": "לכל חשבון עם gen_joiningmailtoagent = 1 (שדה gen_joiningmailtoagent בלבד)"
+        }
+      ],
+      "evidence": [
+        "DTSX:62354 SQL Get Customer Accounts to Send Mails",
+        "Update Customer Account 1 main.cs (sha f19fbff243f3):15-17, 41-57, 78",
+        "dupes.json: 1≡3, 4≡5; השוואה ידנית: ההבדל בין הגרסאות הוא סוגריים מסביב ל-ExecuteBulk בלבד"
+      ],
+      "openQuestions_he": [
+        "מי שולח את המייל בפועל ומה קורה לחשבון בסטטוס 4? לא מופיע בחבילה."
+      ]
+    },
+    {
+      "refId": "Package\\Update Aggrigations on Customer Accounts",
+      "title_he": "צבירת יתרה ותאריכים מהקופות לחשבון הלקוח",
+      "techName": "Update Aggrigations on Customer Accounts",
+      "short_he": "לכל חשבון לקוח מחושבים מהקופות שלו המסומנות Gen_existinfile = 1: סכום היתרות, תאריך תקופת השירות המוקדם, תאריך פתיחת הקופה המוקדם ותאריך השחרור המוקדם. הערכים נכתבים לחשבון ב-SQL ישיר רק כשהיתרה שונה ביותר מ-1 או שבאחד התאריכים abs(DATEDIFF(HH)) גדול מ-12 (DATEDIFF סופר גבולות שעה שנחצים, לא שעות שחלפו).",
+      "flow_he": [
+        "צבירה מ-gen_fundmain (Gen_existinfile = 1) לפי Gen_customeraccountname.",
+        "השוואה לחשבון: הפרש יתרה > 1, או abs(DATEDIFF(HH)) > 12 באחד התאריכים (גבולות שעה שנחצים).",
+        "UPDATE ישיר ל-Gen_customeraccountBase."
+      ],
+      "short": {
+        "nodes": [
+          {
+            "type": "step",
+            "text": "לכל חשבון לקוח מחושבים מהקופות שלו המסומנות Gen_existinfile = 1 סכום היתרות ושלושה תאריכים: תקופת השירות, פתיחת הקופה והשחרור – המוקדם מכל אחד."
+          },
+          {
+            "type": "decision",
+            "text": "האם היתרה שונה ביותר מ-1, או שבאחד התאריכים DATEDIFF בשעות (מספר גבולות השעה שנחצים) גדול מ-12?",
+            "branches": [
+              {
+                "label": "כן",
+                "nodes": [
+                  {
+                    "type": "write",
+                    "text": "היתרה ושלושת התאריכים נכתבים לחשבון בעדכון SQL ישיר."
+                  }
+                ]
+              },
+              {
+                "label": "לא",
+                "nodes": [
+                  {
+                    "type": "step",
+                    "text": "החשבון לא מתעדכן."
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "type": "end",
+            "text": "יתרת החשבון ותאריכי המפתח שלו מתעדכנים לפי הקופות שלו המסומנות Gen_existinfile = 1. חשבון בלי קופה כזו אינו מתעדכן."
+          }
+        ]
+      },
+      "detailed": {
+        "nodes": [
+          {
+            "type": "step",
+            "text": "לכל חשבון לקוח מסכמים את יתרות הקופות המקושרות אליו והמסומנות Gen_existinfile = 1 (יתרה ריקה נספרת כאפס), ולוקחים את תאריך תקופת השירות, תאריך פתיחת הקופה ותאריך השחרור המוקדמים.",
+            "tech": "Update Aggrigations on Customer Accounts (ExecuteSQLTask, DTSX:68395; SQL DTSX:68399): FROM gen_fundmain WHERE Gen_existinfile = 1 GROUP BY Gen_customeraccountname: sum(isnull(gen_accountbalance,0)), isnull(min(gen_periodofservice),0), isnull(min(gen_fundcreationdate),0), isnull(min(Gen_ReleaseDate),0)"
+          },
+          {
+            "type": "step",
+            "text": "תאריך שלא נמצא באף קופה נשמר כריק.",
+            "tech": "case when agg.X = cast(0 as datetime) then null else agg.X end"
+          },
+          {
+            "type": "step",
+            "text": "חשבון שאין לו אף קופה שמסומנת כקיימת בקובץ אינו נכלל בחישוב, והיתרה והתאריכים שלו נשארים כמו שהיו. קופה שאינה מקושרת לחשבון (שדה החשבון בה ריק) אינה נספרת לאף חשבון.",
+            "tech": "inner join בין gen_customeraccount לצבירה (Gen_existinfile = 1, group by Gen_customeraccountname); NULL = Gen_customeraccountId אינו מתקיים"
+          },
+          {
+            "type": "decision",
+            "text": "האם יש הבדל מהותי בין הנתונים המחושבים לחשבון?",
+            "tech": "WHERE abs(agg.gen_accountbalance - ca.Gen_accountbalance) > 1 OR abs(datediff(HH, agg.gen_periodofservice, isnull(ca.gen_periodofservice,0))) > 12 OR (אותו דבר ל-gen_fundcreationdate ול-gen_endexperiencereleasedate)",
+            "branches": [
+              {
+                "label": "כן",
+                "nodes": [
+                  {
+                    "type": "write",
+                    "text": "בחשבון נכתבים יתרת החשבון, תאריך תקופת השירות, תאריך פתיחת הקופה ותאריך השחרור.",
+                    "tech": "update Gen_customeraccountBase set gen_accountbalance, Gen_periodofservice, Gen_fundcreationdate, gen_endexperiencereleasedate (מ-Gen_ReleaseDate) · gen_customeraccount · Update · SQL (Unsupported); ModifiedOn/ModifiedBy לא מתעדכנים"
+                  }
+                ]
+              },
+              {
+                "label": "לא",
+                "nodes": [
+                  {
+                    "type": "step",
+                    "text": "החשבון לא מתעדכן. כשהיתרה בחשבון ריקה, תנאי היתרה אינו מתקיים, ולכן החשבון מתעדכן רק אם אחד התאריכים שונה.",
+                    "tech": "abs(x - NULL) > 1 מחזיר NULL"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "type": "end",
+            "text": "בחשבונות שיש להם לפחות קופה אחת המסומנת Gen_existinfile = 1, נתוני הצבירה מסונכרנים עם הקופות האלה כשההבדל עובר את הסף. חשבונות בלי קופה כזו אינם מתעדכנים."
+          }
+        ]
+      },
+      "detail_he": [
+        {
+          "h": "מקור ואוכלוסייה",
+          "t": "gen_customeraccount ⋈ צבירה מ-gen_fundmain (Gen_existinfile = 1), טבלאות CRM ולא Staging. הקישור קופה-חשבון נקבע בשלב Connect Funds בחבילה זו. בחבילות שסופקו שורות gen_fundmain נכתבות, בין היתר, על ידי 0004_LeumiFile-MY (SQL ישיר, כולל gen_existinfile = 1) ועל ידי 0008_LeumiFile-PY ו-0009_LeumiFile-BY (SDK, gen_existinfile = true). החיבור הוא inner join, ולכן חשבון בלי קופה עם Gen_existinfile = 1 אינו נכלל ונשאר עם הערכים הקודמים."
+        },
+        {
+          "h": "התאמה לרשומות קיימות",
+          "t": "gen_fundmain.Gen_customeraccountname = ca.Gen_customeraccountId."
+        },
+        {
+          "h": "החלטות",
+          "t": "יתרה בהפרש > 1, או abs(DATEDIFF(HH, ...)) > 12 באחד התאריכים (DATEDIFF סופר גבולות שעה שנחצים, לא זמן שחלף)."
+        },
+        {
+          "h": "כתיבה ל-CRM",
+          "t": "UPDATE ישיר ל-Gen_customeraccountBase (Unsupported), בלי ModifiedOn."
+        },
+        {
+          "h": "תוצאה עסקית",
+          "t": "יתרה מצטברת ותאריכי ותק ופתיחה ברמת חשבון הלקוח."
+        }
+      ],
+      "sourceFeed": {
+        "component": "Execute SQL (DTSX:68399)",
+        "tables": [
+          "gen_customeraccount",
+          "gen_fundmain"
+        ],
+        "isStaging": false,
+        "upstream_he": "gen_fundmain – בחבילות שסופקו היא נכתבת, בין היתר, על ידי 0004_LeumiFile-MY ב-SQL ישיר (insert into Gen_fundmainbase כולל Gen_existinfile, 0004:61789-61900; UPDATE Gen_fundmain Set gen_existinfile = 1, 0004:92874-92953) ועל ידי 0008_LeumiFile-PY ו-0009_LeumiFile-BY ב-SDK עם gen_existinfile = true (0008:23781-23784; 0009:27019-27026)."
+      },
+      "decisions": [
+        {
+          "where": "SQL DTSX:68399",
+          "condition": "abs(agg.gen_accountbalance - ca.Gen_accountbalance) > 1 or abs(datediff(\"HH\",agg.gen_periodofservice ,isnull(ca.gen_periodofservice,0)) )> 12 or abs(datediff(\"HH\",agg.gen_fundcreationdate , isnull(ca.Gen_fundcreationdate,0)))> 12 or abs(datediff(\"HH\",agg.gen_endexperiencereleasedate , isnull(ca.gen_endexperiencereleasedate,0)))> 12",
+          "meaning_he": "יש הבדל מהותי",
+          "outcome_he": "UPDATE של ארבעת השדות"
+        }
+      ],
+      "crmEffects": [
+        {
+          "entity": "gen_customeraccount",
+          "verb": "Update",
+          "mechanism": "SQL",
+          "when_he": "כשיש הבדל ביתרה (>1) או בתאריך (abs(DATEDIFF(HH)) > 12, כלומר יותר מ-12 גבולות שעה שנחצים)"
+        }
+      ],
+      "evidence": [
+        "DTSX:68395-68400 Update Aggrigations on Customer Accounts"
+      ],
+      "openQuestions_he": [
+        "חשבון שהיתרה בו ריקה (NULL) אינו מקבל יתרה מתנאי היתרה. האם זה מכוון?"
+      ]
+    },
+    {
+      "refId": "Package\\Update Paragraph14 and Employer Confirmation fields",
+      "title_he": "העתקת סעיף 14 ואישור מעסיק מהקופה לחשבון",
+      "techName": "Update Paragraph14 and Employer Confirmation fields",
+      "short_he": "בכל חשבון לקוח שיש לו קופה שבה מולאו גם סעיף 14 וגם אישור מעסיק, שני השדות מועתקים מהקופה לחשבון בעדכון SQL ישיר, בכל ריצה ובלי בדיקת שינוי.",
+      "flow_he": [
+        "קופות מקושרות עם gen_paragraph14 ו-gen_employerconfirmation לא ריקים.",
+        "UPDATE ישיר של שני השדות בחשבון."
+      ],
+      "short": {
+        "nodes": [
+          {
+            "type": "step",
+            "text": "נבחרות קופות שמקושרות לחשבון לקוח ושבהן מולאו גם סעיף 14 וגם אישור מעסיק."
+          },
+          {
+            "type": "write",
+            "text": "סעיף 14 ואישור המעסיק מועתקים מהקופה לחשבון הלקוח, בכל ריצה."
+          },
+          {
+            "type": "end",
+            "text": "החשבון משקף את סעיף 14 ואת אישור המעסיק של הקופה."
+          }
+        ]
+      },
+      "detailed": {
+        "nodes": [
+          {
+            "type": "step",
+            "text": "נבחרות כל הקופות שמקושרות לחשבון לקוח ושבהן שני השדות מלאים. אין סינון לפי Gen_existinfile.",
+            "tech": "Update Paragraph14 and Employer Confirmation fields (ExecuteSQLTask, DTSX:79885; SQL DTSX:79889): FROM Gen_fundmain JOIN gen_customeraccountbase AS ca ON Gen_fundmain.Gen_customeraccountname = ca.Gen_customeraccountId WHERE gen_employerconfirmation IS NOT NULL AND gen_paragraph14 IS NOT NULL"
+          },
+          {
+            "type": "decision",
+            "text": "האם בקופה מולאו גם סעיף 14 וגם אישור מעסיק?",
+            "tech": "Gen_fundmain.gen_employerconfirmation is not null and Gen_fundmain.gen_paragraph14 is not null",
+            "branches": [
+              {
+                "label": "כן",
+                "nodes": [
+                  {
+                    "type": "write",
+                    "text": "סעיף 14 ואישור המעסיק בחשבון נדרסים בערכי הקופה, גם אם לא השתנו.",
+                    "tech": "update Gen_customeraccountBase set gen_paragraph14, gen_employerconfirmation · gen_customeraccount · Update · SQL (Unsupported)"
+                  }
+                ]
+              },
+              {
+                "label": "לא",
+                "nodes": [
+                  {
+                    "type": "step",
+                    "text": "החשבון לא מתעדכן מהקופה הזו."
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "type": "step",
+            "text": "כשלחשבון יש כמה קופות כאלה עם ערכים שונים, לא נקבע איזו קופה קובעת.",
+            "tech": "UPDATE ... FROM עם כמה התאמות לשורת יעד אחת – התוצאה אינה דטרמיניסטית"
+          },
+          {
+            "type": "end",
+            "text": "שדות סעיף 14 ואישור המעסיק בחשבון מתעדכנים מהקופה בכל ריצה."
+          }
+        ]
+      },
+      "detail_he": [
+        {
+          "h": "מקור ואוכלוסייה",
+          "t": "Gen_fundmain ⋈ gen_customeraccountbase (טבלאות CRM, לא Staging). בחבילות שסופקו gen_paragraph14 ו-gen_employerconfirmation בקופה נכתבים רק על ידי 0004_LeumiFile-MY, ב-insert וב-UPDATE ב-SQL ישיר (0004:61879-61880, 92935-92936)."
+        },
+        {
+          "h": "החלטות",
+          "t": "שני השדות בקופה לא ריקים."
+        },
+        {
+          "h": "כתיבה ל-CRM",
+          "t": "UPDATE ישיר ל-Gen_customeraccountBase (Unsupported), בלי ModifiedOn ובלי בדיקת שינוי."
+        },
+        {
+          "h": "תוצאה עסקית",
+          "t": "סעיף 14 ואישור המעסיק ברמת החשבון."
+        }
+      ],
+      "sourceFeed": {
+        "component": "Execute SQL (DTSX:79889)",
+        "tables": [
+          "gen_fundmain",
+          "gen_customeraccount"
+        ],
+        "isStaging": false,
+        "upstream_he": "gen_paragraph14 ו-gen_employerconfirmation בקופה – בחבילות שסופקו נכתבים רק על ידי 0004_LeumiFile-MY (insert into Gen_fundmainbase ו-UPDATE Gen_fundmain, 0004:61879-61880, 92935-92936). שורות gen_fundmain נכתבות גם ב-0008_LeumiFile-PY ו-0009_LeumiFile-BY (SDK)."
+      },
+      "decisions": [
+        {
+          "where": "SQL DTSX:79889",
+          "condition": "Gen_fundmain.gen_employerconfirmation is not null and Gen_fundmain.gen_paragraph14 is not null",
+          "meaning_he": "בקופה מולאו שני השדות",
+          "outcome_he": "העתקה לחשבון"
+        }
+      ],
+      "crmEffects": [
+        {
+          "entity": "gen_customeraccount",
+          "verb": "Update",
+          "mechanism": "SQL",
+          "when_he": "בכל ריצה, לכל חשבון שיש לו קופה עם שני השדות מלאים"
+        }
+      ],
+      "evidence": [
+        "DTSX:79885-79891"
+      ],
+      "openQuestions_he": [
+        "איזו קופה צריכה לקבוע כשלחשבון יש כמה קופות עם ערכים שונים?"
+      ]
+    },
+    {
+      "refId": "Package\\Update Consulting Field  In Customer Account From Transfer Request",
+      "title_he": "פרטי ייעוץ מבקשת העברה (סוג 5; 'בין מסלולים' לפי הערת SQL) לחשבון הלקוח",
+      "techName": "Update Consulting Field  In Customer Account From Transfer Request",
+      "short_he": "בקשות העברה מסוג 5 בסטטוס 8 (בהערות ה-SQL: 'בין מסלולים', 'הסתיים'), ושפרטי הייעוץ שלהן עוד לא הועתקו, מעדכנות את פרטי הייעוץ בחשבון הלקוח: לכל שדה, הערך מהבקשה גובר כשהוא קיים. אחרי עדכון החשבון הבקשה מסומנת כ'הועתקה'. הכול ב-SQL ישיר.",
+      "flow_he": [
+        "בקשות העברה מסוג 5 (בהערת SQL: בין מסלולים) בסטטוס 8 (בהערת SQL: הסתיים), שלא הועתקו, עם הבדל בפרטי הייעוץ.",
+        "לכל שדה: ערך הבקשה אם קיים, אחרת הערך הקיים בחשבון.",
+        "UPDATE ישיר לחשבון → UPDATE ישיר לבקשה (gen_dateofcopyingconsultingdetails = עכשיו)."
+      ],
+      "short": {
+        "nodes": [
+          {
+            "type": "step",
+            "text": "נבחרות בקשות העברה מסוג 5 בסטטוס 8 (בהערות ה-SQL: 'בין מסלולים', 'הסתיים'), שפרטי הייעוץ שלהן עוד לא הועתקו ושיש בהן פרט ייעוץ ששונה מהחשבון."
+          },
+          {
+            "type": "step",
+            "text": "לכל פרט ייעוץ: אם יש לו ערך בבקשה – הוא נכתב לחשבון; אחרת נשמר הערך של החשבון."
+          },
+          {
+            "type": "write",
+            "text": "פרטי הייעוץ בחשבון הלקוח מתעדכנים בעדכון SQL ישיר."
+          },
+          {
+            "type": "write",
+            "text": "הבקשה מסומנת בתאריך העתקת פרטי הייעוץ, כדי שלא תטופל שוב."
+          },
+          {
+            "type": "end",
+            "text": "החשבון נושא את פרטי הייעוץ מבקשת העברה שטופלה בריצה. אם לאותו חשבון יש כמה בקשות מתאימות, לא נקבע איזו מהן נכתבת אחרונה."
+          }
+        ]
+      },
+      "detailed": {
+        "nodes": [
+          {
+            "type": "step",
+            "text": "נבחרות בקשות העברה מסוג 5 שסטטוס ההעברה שלהן 8 (בהערות ה-SQL: 'בין מסלולים', 'הסתיים'), ושעוד לא נרשם בהן תאריך העתקת פרטי ייעוץ.",
+            "tech": "Get Transfer Request (OLEDBSource, DTSX:70681; SQL DTSX:70686): gen_transferrequest tr JOIN Gen_customeraccount ca ON tr.gen_customeraccount = ca.Gen_customeraccountId WHERE tr.Gen_transferType = 5 (--בין מסלולים) AND tr.gen_tanferinstatus = 8 (-- הסתיים) AND tr.gen_dateofcopyingconsultingdetails IS NULL"
+          },
+          {
+            "type": "decision",
+            "text": "האם יש לפחות פרט ייעוץ אחד שקיים בבקשה וחסר או שונה בחשבון?",
+            "tech": "(tr.gen_consultbank is not null and (ca.gen_consultname is null or ca.gen_consultname <> tr.gen_consultbank)) or ... לששת השדות: consultbank↔consultname, consultnumber, bankadvisor, consultbankbranch↔bankbranchadvisor, consultingstartdate, consultingenddate",
+            "branches": [
+              {
+                "label": "לא",
+                "nodes": [
+                  {
+                    "type": "step",
+                    "text": "הבקשה אינה נבחרת ואינה מסומנת."
+                  }
+                ]
+              },
+              {
+                "label": "כן",
+                "nodes": [
+                  {
+                    "type": "step",
+                    "text": "לכל אחד מששת הפרטים: אם הערך בבקשה ריק, נשמר הערך הקיים בחשבון; אחרת נלקח הערך מהבקשה.",
+                    "tech": "Transformation To Consulting Fields In Customer Account By Transfer Request (DerivedColumn, DTSX:71222-71265): ca_X = ISNULL(tr_X) ? ca_X : tr_X"
+                  },
+                  {
+                    "type": "write",
+                    "text": "בחשבון הלקוח נכתבים בנק מייעץ, מספר יועץ, יועץ, סניף יועץ ותאריכי תחילת וסיום הייעוץ.",
+                    "tech": "Update Customer Account (Unsupported) 1-5 (OLEDBCommand, DTSX:73349-73676; SQL זהה): update Gen_customeraccountBase set gen_consultname, gen_consultnumber, gen_bankadvisor, gen_bankbranchadvisor, gen_consultingstartdate, gen_consultingenddate where Gen_customeraccountid = ? · gen_customeraccount · Update · SQL (Unsupported)"
+                  },
+                  {
+                    "type": "decision",
+                    "text": "האם עדכון החשבון הצליח?",
+                    "tech": "OLE DB Command Output → Multicast 1-5 → Update TransferRequest 1-5; Error Output → Union All Error",
+                    "branches": [
+                      {
+                        "label": "כן",
+                        "nodes": [
+                          {
+                            "type": "write",
+                            "text": "בבקשה נרשם תאריך העתקת פרטי הייעוץ (עכשיו), והיא לא תיבחר שוב.",
+                            "tech": "Update TransferRequest 1-5 (DTSX:73754-73938; SQL זהה): update gen_transferrequest set gen_dateofcopyingconsultingdetails = GETUTCDATE(), ModifiedOn = GETUTCDATE(), ModifiedBy = ? where gen_transferrequestid = ? · gen_transferrequest · Update · SQL (Unsupported)"
+                          }
+                        ]
+                      },
+                      {
+                        "label": "לא",
+                        "nodes": [
+                          {
+                            "type": "step",
+                            "text": "הכשל נרשם כאזהרת ETL, והבקשה תיבחר שוב בריצה הבאה."
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "type": "step",
+            "text": "אם לאותו חשבון יש כמה בקשות מתאימות, כל בקשה מעדכנת את החשבון בנפרד. אין מיון בשאילתה והשורות מתחלקות ל-5 פקודות מקבילות, ולכן לא נקבע איזו בקשה נכתבת אחרונה.",
+            "tech": "Get Transfer Request ללא ORDER BY (DTSX:70686); Split Rows For MultiThread 1 → Update Customer Account (Unsupported) 1-5"
+          },
+          {
+            "type": "end",
+            "text": "פרטי הייעוץ בחשבון הלקוח מסונכרנים עם בקשת ההעברה (סוג 5, סטטוס 8) שטופלה."
+          }
+        ]
+      },
+      "detail_he": [
+        {
+          "h": "מקור ואוכלוסייה",
+          "t": "gen_transferrequest ⋈ Gen_customeraccount (טבלאות CRM, לא Staging): סוג העברה 5, סטטוס 8, gen_dateofcopyingconsultingdetails ריק, ויש הבדל בפרט ייעוץ אחד לפחות. אף חבילה מהחבילות שסופקו אינה יוצרת בקשות העברה (external_unknown); 0036_TransferRequest רק מעדכנת את gen_tanferinstatus של בקשות בסטטוס 7."
+        },
+        {
+          "h": "התאמה לרשומות קיימות",
+          "t": "tr.gen_customeraccount = ca.Gen_customeraccountId."
+        },
+        {
+          "h": "החלטות",
+          "t": "לכל שדה: ISNULL(tr_X) ? ca_X : tr_X. הבקשה מסומנת רק אחרי שעדכון החשבון הצליח."
+        },
+        {
+          "h": "כתיבה ל-CRM",
+          "t": "UPDATE ישיר ל-Gen_customeraccountBase (6 שדות) ול-gen_transferrequest (gen_dateofcopyingconsultingdetails, ModifiedOn, ModifiedBy). שתיהן Unsupported."
+        },
+        {
+          "h": "תוצאה עסקית",
+          "t": "אחרי בקשת העברה מסוג 5 בסטטוס 8 (בהערות ה-SQL: 'בין מסלולים', 'הסתיים'), פרטי הבנק המייעץ והיועץ בחשבון תואמים את הבקשה."
+        }
+      ],
+      "sourceFeed": {
+        "component": "Get Transfer Request (DTSX:70681)",
+        "tables": [
+          "gen_transferrequest",
+          "gen_customeraccount"
+        ],
+        "isStaging": false,
+        "upstream_he": "gen_transferrequest – אף חבילה מהחבילות שסופקו אינה יוצרת בקשות העברה (המקור external_unknown). 0036_TransferRequest רק מעדכנת את gen_tanferinstatus של בקשות בסטטוס 7 עם gen_SendToBankDate (0036:3584-3586, 3886-3889)."
+      },
+      "decisions": [
+        {
+          "where": "Get Transfer Request (DTSX:70686)",
+          "condition": "tr.Gen_transferType = 5 and tr.gen_tanferinstatus = 8 and tr.gen_dateofcopyingconsultingdetails is null and (one of six consulting fields differs)",
+          "meaning_he": "בקשה מסוג 5 בסטטוס 8 (בהערות ה-SQL: 'בין מסלולים', 'הסתיים') שלא הועתקה",
+          "outcome_he": "נבחרת לעדכון"
+        },
+        {
+          "where": "Transformation To Consulting Fields In Customer Account By Transfer Request (DTSX:71230-71265)",
+          "condition": "ISNULL(tr_consultbank) ? ca_consultbank : tr_consultbank (וכן לשאר חמשת השדות)",
+          "meaning_he": "ערך הבקשה גובר כשהוא קיים",
+          "outcome_he": "הערך שנכתב לחשבון"
+        }
+      ],
+      "crmEffects": [
+        {
+          "entity": "gen_customeraccount",
+          "verb": "Update",
+          "mechanism": "SQL",
+          "when_he": "לכל בקשה שנבחרה"
+        },
+        {
+          "entity": "gen_transferrequest",
+          "verb": "Update",
+          "mechanism": "SQL",
+          "when_he": "אחרי עדכון מוצלח של החשבון"
+        }
+      ],
+      "evidence": [
+        "DTSX:70686 SQL Get Transfer Request",
+        "DTSX:71230-71265 FriendlyExpression",
+        "DTSX:73352-73679 Update Customer Account (Unsupported) 1-5",
+        "DTSX:73757-73941 Update TransferRequest 1-5",
+        "dupes.json: ×5 זהים בכל קבוצה"
+      ],
+      "openQuestions_he": [
+        "הערכים 5 (בין מסלולים) ו-8 (הסתיים) לקוחים מהערות ב-SQL; התוויות עצמן לא אומתו מול מטא-דאטה של CRM."
+      ]
+    },
+    {
+      "refId": "Package\\Update Consulting Field  In Fund Main From Transfer Request",
+      "title_he": "פרטי ייעוץ מבקשת העברה (סוג 5; 'בין מסלולים' לפי הערת SQL) לקופות החשבון",
+      "techName": "Update Consulting Field  In Fund Main From Transfer Request",
+      "short_he": "אותן בקשות העברה (סוג 5, סטטוס 8; בהערות ה-SQL: 'בין מסלולים', 'הסתיים') מעדכנות את פרטי הייעוץ בכל הקופות של חשבון הלקוח, כשהערך מהבקשה גובר אם הוא קיים. אחרי העדכון הבקשה מסומנת כ'הועתקה לקופה', גם אם רק חלק מעדכוני הקופות שלה הצליחו. הכול ב-SQL ישיר.",
+      "flow_he": [
+        "בקשות העברה מסוג 5 בסטטוס 8 שלא הועתקו לקופה, מול כל קופה של החשבון (LEFT JOIN), עם הבדל.",
+        "לכל שדה: ערך הבקשה אם קיים, אחרת הערך הקיים בקופה.",
+        "UPDATE ישיר לכל קופה → קיבוץ לפי בקשה → UPDATE לבקשה (gen_dateofcopyingconsultingdetailstofund)."
+      ],
+      "short": {
+        "nodes": [
+          {
+            "type": "step",
+            "text": "נבחרות בקשות העברה מסוג 5 בסטטוס 8 (בהערות ה-SQL: 'בין מסלולים', 'הסתיים') שפרטי הייעוץ שלהן עוד לא הועתקו לקופות, מול כל אחת מהקופות של חשבון הלקוח."
+          },
+          {
+            "type": "step",
+            "text": "לכל קופה ולכל פרט ייעוץ: אם יש לו ערך בבקשה – הוא נכתב לקופה; אחרת נשמר הערך של הקופה."
+          },
+          {
+            "type": "write",
+            "text": "פרטי הייעוץ בקופות מתעדכנים בעדכון SQL ישיר."
+          },
+          {
+            "type": "write",
+            "text": "כל בקשה מסומנת פעם אחת בתאריך העתקת פרטי הייעוץ לקופה, אם עדכון של לפחות קופה אחת שלה הצליח."
+          },
+          {
+            "type": "end",
+            "text": "קופות החשבון שעדכונן הצליח נושאות את פרטי הייעוץ מבקשת ההעברה. אם עדכון של קופה אחת נכשל ושל קופה אחרת של אותה בקשה הצליח, הבקשה מסומנת בכל זאת, והקופה שנכשלה אינה מעודכנת מבקשה זו בריצות הבאות."
+          }
+        ]
+      },
+      "detailed": {
+        "nodes": [
+          {
+            "type": "step",
+            "text": "נבחרות בקשות העברה מסוג 5 בסטטוס 8 (בהערות ה-SQL: 'בין מסלולים', 'הסתיים'), שעוד לא נרשם בהן תאריך העתקה לקופה, מול כל קופה שמקושרת לחשבון הלקוח של הבקשה.",
+            "tech": "Get TRansfer Request (OLEDBSource, DTSX:77175; SQL DTSX:77180): gen_transferrequest tr LEFT JOIN Gen_fundmain fm ON tr.gen_customeraccount = fm.gen_customeraccountname WHERE tr.Gen_transferType = 5 (--בין מסלולים) AND tr.gen_tanferinstatus = 8 (-- הסתיים) AND gen_dateofcopyingconsultingdetailstofund IS NULL"
+          },
+          {
+            "type": "decision",
+            "text": "האם יש בקופה פרט ייעוץ אחד לפחות שקיים בבקשה וחסר או שונה בקופה?",
+            "tech": "(tr.gen_consultbank is not null and (fm.gen_consultname is null or fm.gen_consultname <> tr.gen_consultbank)) or ... (consultnumber, bankadvisor↔gen_bankadvisorname, consultbankbranch↔gen_consultantbankbranch, consultingstartdate, consultingenddate)",
+            "branches": [
+              {
+                "label": "לא",
+                "nodes": [
+                  {
+                    "type": "step",
+                    "text": "הקופה אינה נבחרת."
+                  }
+                ]
+              },
+              {
+                "label": "כן",
+                "nodes": [
+                  {
+                    "type": "step",
+                    "text": "לכל פרט: ערך הבקשה אם קיים, אחרת הערך הקיים בקופה.",
+                    "tech": "Transformation To Consulting Fields In Fund Main By Transfer Request (DTSX:77740-77783): fm_X = ISNULL(tr_X) ? fm_X : tr_X"
+                  },
+                  {
+                    "type": "write",
+                    "text": "בקופה נכתבים בנק מייעץ, מספר יועץ, יועץ, סניף יועץ ותאריכי הייעוץ.",
+                    "tech": "Update Fund Main 1-5 (OLEDBCommand, DTSX:79190-79514; SQL זהה): update Gen_fundmainbase set gen_consultname, gen_consultnumber, gen_bankadvisorname, gen_consultantbankbranch, gen_consultingstartdate, gen_consultingenddate where Gen_fundmainId = ? · gen_fundmain · Update · SQL (Unsupported)"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "type": "step",
+            "text": "שורות שעודכנו בהצלחה מקובצות לפי בקשה, כך שכל בקשה מטופלת פעם אחת גם כשיש לה כמה קופות. די בשורת קופה אחת שעודכנה בהצלחה כדי שהבקשה תגיע לסימון.",
+            "tech": "Union Update All → Multicast 1 → Aggregate (DTSX:75692): GROUP BY gen_transferrequestid, SystemUserId"
+          },
+          {
+            "type": "write",
+            "text": "בבקשה נרשם תאריך העתקת פרטי הייעוץ לקופה (עכשיו), גם אם עדכון של חלק מהקופות שלה נכשל. קופה שעדכונה נכשל אינה מעודכנת מבקשה זו בריצות הבאות, כי בקשה מסומנת אינה נבחרת שוב.",
+            "tech": "Update TransferRequest 1, 2, 4 / Update TrasferRequest 3 / Update TransfeRequest 5 (DTSX:79595-79779; SQL זהה): update gen_transferrequest set gen_dateofcopyingconsultingdetailstofund = GETUTCDATE(), ModifiedOn = GETUTCDATE(), ModifiedBy = ? where gen_transferrequestid = ? · gen_transferrequest · Update · SQL (Unsupported)"
+          },
+          {
+            "type": "step",
+            "text": "כשלחשבון של הבקשה אין קופות (או שחשבון הבקשה ריק), הבקשה נבחרת רק אם לפחות אחד מששת פרטי הייעוץ בה מלא. אז השורה עוברת עם מזהה קופה ריק: העדכון לא משנה אף קופה, ובכל זאת הבקשה מסומנת כ'הועתקה לקופה'. בקשה שכל ששת הפרטים בה ריקים אינה נבחרת.",
+            "tech": "LEFT JOIN + תנאי fm.X is null; update ... where Gen_fundmainId = NULL משפיע על 0 שורות אבל ה-OLE DB Command Output ממשיך לשלב הסימון; תנאי הבחירה: tr.X is not null and (fm.X is null or fm.X <> tr.X) לאחד מששת השדות"
+          },
+          {
+            "type": "end",
+            "text": "קופות החשבון שעדכונן הצליח נושאות את פרטי הייעוץ של בקשת ההעברה, והבקשה המסומנת לא תטופל שוב."
+          }
+        ]
+      },
+      "detail_he": [
+        {
+          "h": "מקור ואוכלוסייה",
+          "t": "gen_transferrequest LEFT JOIN Gen_fundmain (טבלאות CRM, לא Staging), סוג 5, סטטוס 8, gen_dateofcopyingconsultingdetailstofund ריק (העמודה מופיעה בשאילתה בלי שם טבלה, DTSX:77182, 77204; אילו הייתה קיימת גם ב-Gen_fundmain השאילתה הייתה נכשלת (לפי המשתמש החבילה רצה בפרודקשן), והחבילה מעדכנת עמודה זו ב-gen_transferrequest (update gen_transferrequest set gen_dateofcopyingconsultingdetailstofund = GETUTCDATE(), DTSX:79598-79599), ולכן זו עמודת בקשת ההעברה). אף חבילה מהחבילות שסופקו אינה יוצרת בקשות העברה (external_unknown); 0036_TransferRequest רק מעדכנת את gen_tanferinstatus של בקשות בסטטוס 7."
+        },
+        {
+          "h": "התאמה לרשומות קיימות",
+          "t": "כל הקופות שבהן fm.gen_customeraccountname = tr.gen_customeraccount (LEFT JOIN). בקבצים שסופקו אין קישור מבקשת ההעברה לקופה מסוימת."
+        },
+        {
+          "h": "החלטות",
+          "t": "בחירה לפי הבדל בפרט ייעוץ אחד לפחות; לכל שדה ISNULL(tr_X) ? fm_X : tr_X; בקשה מסומנת אם לפחות שורת קופה אחת שלה עודכנה בלי שגיאה, גם אם שורות קופה אחרות של אותה בקשה נכשלו; הקופות שנכשלו אינן מעודכנות מבקשה זו בריצות הבאות, כי הבקשה המסומנת אינה נבחרת שוב."
+        },
+        {
+          "h": "כתיבה ל-CRM",
+          "t": "UPDATE ישיר ל-Gen_fundmainbase ול-gen_transferrequest (Unsupported)."
+        },
+        {
+          "h": "תוצאה עסקית",
+          "t": "אחרי בקשת העברה מסוג 5 בסטטוס 8 (בהערות ה-SQL: 'בין מסלולים', 'הסתיים'), פרטי הייעוץ נכתבים לקופות החשבון שעדכונן הצליח. כשאין לחשבון קופות, הבקשה מסומנת בלי שעודכנה קופה, בתנאי שלפחות אחד מששת פרטי הייעוץ בבקשה אינו ריק; אחרת היא אינה נבחרת ואינה מסומנת."
+        }
+      ],
+      "sourceFeed": {
+        "component": "Get TRansfer Request (DTSX:77175)",
+        "tables": [
+          "gen_transferrequest",
+          "gen_fundmain"
+        ],
+        "isStaging": false,
+        "upstream_he": "gen_transferrequest – אף חבילה מהחבילות שסופקו אינה יוצרת בקשות העברה (המקור external_unknown). 0036_TransferRequest רק מעדכנת את gen_tanferinstatus של בקשות בסטטוס 7 עם gen_SendToBankDate (0036:3584-3586, 3886-3889). gen_fundmain – בחבילות שסופקו היא נכתבת, בין היתר, על ידי 0004_LeumiFile-MY ב-SQL ישיר (insert into Gen_fundmainbase כולל Gen_existinfile, 0004:61789-61900; UPDATE Gen_fundmain Set gen_existinfile = 1, 0004:92874-92953) ועל ידי 0008_LeumiFile-PY ו-0009_LeumiFile-BY ב-SDK עם gen_existinfile = true (0008:23781-23784; 0009:27019-27026)."
+      },
+      "decisions": [
+        {
+          "where": "Get TRansfer Request (DTSX:77180)",
+          "condition": "tr.Gen_transferType = 5 and tr.gen_tanferinstatus = 8 and gen_dateofcopyingconsultingdetailstofund is null and (one of six consulting fields differs from fm)",
+          "meaning_he": "בקשה מסוג 5 בסטטוס 8 (בהערות ה-SQL: 'בין מסלולים', 'הסתיים') שלא הועתקה לקופה",
+          "outcome_he": "שורה לכל קופה של החשבון"
+        },
+        {
+          "where": "Transformation To Consulting Fields In Fund Main By Transfer Request (DTSX:77748-77783)",
+          "condition": "ISNULL(tr_X) ? fm_X : tr_X",
+          "meaning_he": "ערך הבקשה גובר כשהוא קיים",
+          "outcome_he": "הערך שנכתב לקופה"
+        }
+      ],
+      "crmEffects": [
+        {
+          "entity": "gen_fundmain",
+          "verb": "Update",
+          "mechanism": "SQL",
+          "when_he": "לכל קופה של החשבון שבה יש הבדל"
+        },
+        {
+          "entity": "gen_transferrequest",
+          "verb": "Update",
+          "mechanism": "SQL",
+          "when_he": "פעם אחת לבקשה, כשלפחות עדכון קופה אחד שלה הצליח (גם אם עדכונים אחרים שלה נכשלו)"
+        }
+      ],
+      "evidence": [
+        "DTSX:77180 SQL Get TRansfer Request",
+        "DTSX:77748-77783 FriendlyExpression",
+        "DTSX:75692 Aggregate",
+        "DTSX:79193-79782 Update Fund Main / Update TransferRequest",
+        "dupes.json: Update Fund Main ×5 זהים; Update TransferRequest 1≡2≡3, 4≡5 (SQL זהה בכולם)"
+      ],
+      "openQuestions_he": [
+        "האם נכון לעדכן את כל קופות החשבון ולא רק את קופת היעד של ההעברה?",
+        "בקשה שלחשבון שלה אין קופות, ושיש בה לפחות פרט ייעוץ אחד מלא, מסומנת כ'הועתקה לקופה' בלי שעודכנה קופה. האם זה מכוון?"
+      ]
+    },
+    {
+      "refId": "Package\\Update TransactionCurrencyId And ExchangeRate",
+      "title_he": "מטבע ברירת מחדל לחשבונות לקוח",
+      "techName": "Update TransactionCurrencyId And ExchangeRate",
+      "short_he": "חשבונות לקוח שאין להם מטבע מקבלים את המטבע 'שקל חדש' ושער חליפין 1, בעדכון SQL ישיר.",
+      "flow_he": [
+        "חשבונות עם TransactionCurrencyId ריק.",
+        "UPDATE ישיר: TransactionCurrencyId = 'שקל חדש', ExchangeRate = 1."
+      ],
+      "short": {
+        "nodes": [
+          {
+            "type": "step",
+            "text": "נבחרים חשבונות לקוח שאין להם מטבע."
+          },
+          {
+            "type": "write",
+            "text": "החשבונות מקבלים את המטבע 'שקל חדש' ושער חליפין 1 בעדכון SQL ישיר."
+          },
+          {
+            "type": "end",
+            "text": "לחשבונות שהיו בלי מטבע נקבע המטבע 'שקל חדש' (אם קיים מטבע בשם זה). חשבונות עם מטבע אחר אינם משתנים."
+          }
+        ]
+      },
+      "detailed": {
+        "nodes": [
+          {
+            "type": "step",
+            "text": "נבחרים כל חשבונות הלקוח שהמטבע שלהם ריק.",
+            "tech": "Update TransactionCurrencyId And ExchangeRate (ExecuteSQLTask, DTSX:79892; SQL DTSX:79895): WHERE TransactionCurrencyId IS NULL"
+          },
+          {
+            "type": "step",
+            "text": "המטבע נקבע לפי השם 'שקל חדש', שמוגדר במשתנה של החבילה.",
+            "tech": "(select top 1 TransactionCurrencyid from TransactionCurrency where CurrencyName = ?); ParameterBinding 0 = User::CurrencyName (DTSX:79896) = \"שקל חדש\" (DTSX:29); המשתנה אינו נדרס מ-gen_etlvariable (Set Variables ReadWriteVariables = CrmMinimumDate, OrganizationName, ServerName)"
+          },
+          {
+            "type": "write",
+            "text": "בחשבון נכתבים המטבע ושער החליפין 1.",
+            "tech": "update Gen_customeraccountBase set TransactionCurrencyId = ..., ExchangeRate = 1.00000 · gen_customeraccount · Update · SQL (Unsupported)"
+          },
+          {
+            "type": "step",
+            "text": "אם אין במערכת מטבע בשם הזה, המטבע נשאר ריק אבל שער החליפין נקבע ל-1.",
+            "tech": "תת-שאילתה שמחזירה NULL"
+          },
+          {
+            "type": "step",
+            "text": "השלב רץ אחרון בשרשרת, ולכן מכסה גם את החשבונות שנוצרו באותה ריצה."
+          },
+          {
+            "type": "end",
+            "text": "לחשבונות שהיו בלי מטבע נקבעים המטבע 'שקל חדש' (אם קיים מטבע בשם זה; אחרת המטבע נשאר ריק) ושער 1. חשבונות שכבר היה להם מטבע אינם משתנים."
+          }
+        ]
+      },
+      "detail_he": [
+        {
+          "h": "מקור ואוכלוסייה",
+          "t": "Gen_customeraccountBase עם TransactionCurrencyId ריק; TransactionCurrency לפי CurrencyName. טבלאות CRM, לא Staging."
+        },
+        {
+          "h": "החלטות",
+          "t": "TransactionCurrencyId is null."
+        },
+        {
+          "h": "כתיבה ל-CRM",
+          "t": "UPDATE ישיר (Unsupported): TransactionCurrencyId ו-ExchangeRate = 1.00000 (ערך קבוע מוכח)."
+        },
+        {
+          "h": "תוצאה עסקית",
+          "t": "בחשבונות שהיו בלי מטבע נקבעים TransactionCurrencyId = המטבע ששמו 'שקל חדש' (או NULL אם אין מטבע כזה) ו-ExchangeRate = 1. שהשדות הכספיים של החשבון מוצגים בשקלים – השערה; הקבצים אינם מראים אילו שדות של gen_customeraccount הם מסוג Money."
+        }
+      ],
+      "sourceFeed": {
+        "component": "Execute SQL (DTSX:79895)",
+        "tables": [
+          "gen_customeraccount",
+          "TransactionCurrency"
+        ],
+        "isStaging": false,
+        "upstream_he": "חשבונות שנוצרו בשלב Create or Update Customer Accounts בחבילה זו או בכל מקור אחר."
+      },
+      "decisions": [
+        {
+          "where": "SQL DTSX:79895",
+          "condition": "where TransactionCurrencyId is null",
+          "meaning_he": "לחשבון אין מטבע",
+          "outcome_he": "מטבע = שקל חדש, שער = 1"
+        }
+      ],
+      "crmEffects": [
+        {
+          "entity": "gen_customeraccount",
+          "verb": "Update",
+          "mechanism": "SQL",
+          "when_he": "חשבונות בלי מטבע"
+        }
+      ],
+      "evidence": [
+        "DTSX:79892-79899 (ParameterBinding DTSX:79896)",
+        "DTSX:29 User::CurrencyName",
+        "Set Variables ReadWriteVariables (DTSX:60737)"
+      ],
+      "openQuestions_he": []
+    }
+  ],
+  "findings_he": [
+    {
+      "severity": "high",
+      "text": "חלק גדול מהכתיבה ל-CRM נעשה ב-SQL ישיר על מסד ה-CRM (Unsupported), ובחלק מהמקרים בלי עדכון ModifiedOn (מוצג בקבצים). כתיבה כזו אינה מפעילה פלאגינים ואינה נרשמת ב-Audit (התנהגות פלטפורמת CRM כללית, לא מוצג בקבצים). הכתיבות ב-SQL ישיר: עדכון כל שדות החשבון כשהסוכן לא השתנה (Update Customer Account 1-5), פרטי ייעוץ לחשבון ולקופות, סימון בקשות העברה, צבירות, סעיף 14 ומטבע. עדכוני החשבון והקופה נעשים על טבלאות ה-Base (Gen_customeraccountBase, Gen_fundmainbase); סימון בקשות ההעברה (Update TransferRequest 1-5 בשני שלבי הייעוץ) נעשה ב-update gen_transferrequest, כלומר על שם הישות בלי Base (לפי מבנה CRM המקובל זה view ולא טבלת Base; לא מוצג בקבצים). סך הכול 25 רכיבי OLE DB Command עסקיים (5 קבוצות ×5) ועוד 3 משימות Execute SQL. 5 רכיבי OLE DB Command נוספים הם insert etl process warning (מסגרת).",
+      "evidence": "DTSX:40982-42290, 73352-73941, 79193-79782, 68399, 79889, 79895; [qsql] = psql / ALTSHULER_MSCRM (DTSX:4)"
+    },
+    {
+      "severity": "medium",
+      "text": "הבחירה בין עדכון SDK לעדכון SQL ישיר של חשבון קיים תלויה רק בשאלה אם מספר הסוכן (gen_brokernumber) זהה. כשהסוכן לא השתנה, כ-40 שדות נדרסים ב-SQL, כולל ערכים ריקים, ותהליכי CRM שתלויים בשינוי שדות אחרים לא יופעלו.",
+      "evidence": "Conditional Split (DTSX:18090); Update Customer Account 1-5"
+    },
+    {
+      "severity": "medium",
+      "text": "חוסר עקביות במיפוי בין יצירה לעדכון: ביצירה gen_selfemployername מקבל את gen_accountname של הקופה, ו-gen_agentname / gen_agencyname נשלחים כ-EntityReference מסוג gen_agents / gen_agencie. בעדכון ה-SDK gen_selfemployername מקבל את gen_selfemployername, והסוכן והסוכנות נשלחים כ-contact / account.",
+      "evidence": "Create Customer Account main.cs:84-88, 123-127; Update CustomerAccounts main.cs:84-85, 94"
+    },
+    {
+      "severity": "medium",
+      "text": "שם החשבון נבנה בהמרה של מספר החשבון ושל מזהה סוג המוצר למספרים, עם FailComponent. אם בקופה שנקראת בשלב זה (gen_existinfile = 1 – gen_existinfile מופיעה בשאילתה בלי שם טבלה; אילו הייתה קיימת ביותר מטבלה אחת בשאילתה, השאילתה הייתה נכשלת (לפי המשתמש החבילה רצה בפרודקשן), ול-gen_fundmain יש עמודה כזו (from gen_fundmain … where Gen_existinfile = 1, DTSX:68399), ולכן זו עמודת הקופה; יש לה מוצר וסוג חשבון לקוח תואמים, והיא הקופה שנבחרה לצירוף שלה) מספר החשבון או מזהה סוג המוצר אינו ניתן להמרה למספר, או שהתוצאה ארוכה מהשדה, כל זרימת הנתונים נכשלת, ובגלל אילוצי Success השלבים הבאים בחבילה לא ירוצו. קופה המסומנת gen_existinfile = 1 שאין לה מוצר או סוג חשבון לקוח תואם אינה נקראת ואינה מכשילה דבר.",
+      "evidence": "Set gen_name (DTSX:34382, errorRowDisposition=FailComponent); Precedence DTSX:82413-82427; SQL DTSX:33313 (where gen_existinfile = 1, ללא שם טבלה); DTSX:68399 (from gen_fundmain where Gen_existinfile = 1)"
+    },
+    {
+      "severity": "medium",
+      "text": "צבירת היתרה לחשבון לא מתבצעת כשהיתרה בחשבון ריקה (NULL), כי abs(x - NULL) > 1 אינו מתקיים. במקרה כזה החשבון מתעדכן רק אם באחד התאריכים abs(DATEDIFF(HH, ...)) > 12, כלומר נחצים יותר מ-12 גבולות שעה (DATEDIFF סופר גבולות שעה, לא זמן שחלף).",
+      "evidence": "SQL DTSX:68399 WHERE abs(agg.gen_accountbalance - ca.Gen_accountbalance) > 1 or ..."
+    },
+    {
+      "severity": "low",
+      "text": "סעיף 14 ואישור המעסיק מועתקים בכל ריצה בלי בדיקת שינוי. כשלחשבון יש כמה קופות עם ערכים שונים, לא נקבע איזו קופה קובעת.",
+      "evidence": "SQL DTSX:79889"
+    },
+    {
+      "severity": "low",
+      "text": "אם לחשבון של בקשת העברה אין קופות (או ש-gen_customeraccount של הבקשה ריק), ה-LEFT JOIN מחזיר ערכי קופה ריקים. אז הבקשה נבחרת רק אם לפחות אחד מששת פרטי הייעוץ בה מלא (consultbank, consultnumber, bankadvisor, consultbankbranch, consultingstartdate, consultingenddate). במקרה כזה העדכון לקופה משפיע על 0 שורות, ובכל זאת הבקשה מסומנת כ'פרטי ייעוץ הועתקו לקופה'. בקשה שבה כל ששת הפרטים ריקים אינה נבחרת ואינה מסומנת.",
+      "evidence": "SQL DTSX:77180; Update Fund Main DTSX:79193; Aggregate DTSX:75692"
+    },
+    {
+      "severity": "low",
+      "text": "ב-Dates To Local של מסלול העדכון ב-SDK, התאריך המינימלי של CRM (CrmMinimumDate) נקרא רק ב-PostExecute, אחרי עיבוד השורות. לכן ההחרגה של התאריך המינימלי מהמרת השעון אינה פועלת במסלול הזה. ב-Dates To Local 1 (יצירה) המשתנה נקרא ב-PreExecute.",
+      "evidence": "Dates To Local main.cs:99-104 (DTSX:30078) מול Dates To Local 1 main.cs:86-90 (DTSX:31041)"
+    },
+    {
+      "severity": "low",
+      "text": "סוג חשבון הלקוח נקבע לפי בנק הקופה (f.gen_bankname) ביצירת החשבון, ולפי בנק המוצר (p.gen_bankname) בקישור הקופות. אם הבנקים שונים, קופה עלולה לא להיות מקושרת לחשבון שנוצר עבורה.",
+      "evidence": "SQL DTSX:33252 מול SQL DTSX:2588"
+    },
+    {
+      "severity": "info",
+      "text": "רכיב המקור בשלב היצירה נקרא Get Funds Without Linked Customer Accounts, אבל הוא אינו מסנן לפי קיום חשבון: הוא קורא את הקופות המסומנות gen_existinfile = 1 שיש להן מוצר (productid = gen_fundtypename) וסוג חשבון לקוח תואם (gen_id = מזהה סוג המוצר, ואותו בנק כמו בקופה), קופה אחת לכל בנק, מספר חשבון וסוג מוצר, כולל קופות שכבר מקושרות לחשבון. ההכרעה בין יצירה לעדכון נעשית ב-Lookup. gen_existinfile, productid ו-gen_fundtypename מופיעות בשאילתה (DTSX:33310, 33313) בלי שם טבלה; אילו אחת מהן הייתה קיימת ביותר מטבלה אחת בשאילתה, השאילתה הייתה נכשלת (לפי המשתמש החבילה רצה בפרודקשן). לכן כל אחת מהן שייכת לטבלה שיש לה עמודה כזו: gen_existinfile ל-gen_fundmain (from gen_fundmain … where Gen_existinfile = 1, DTSX:68399), productid ל-product (p.productid, DTSX:2607) ו-gen_fundtypename ל-gen_fundmain (fm.gen_fundtypename בשאילתה על Gen_fundmain fm, 0008:5652).",
+      "evidence": "SQL DTSX:33252; DTSX:33310, 33313 (עמודות ללא שם טבלה); DTSX:68399; DTSX:2607 (p.productid); 0008:5652 (fm.gen_fundtypename)"
+    },
+    {
+      "severity": "info",
+      "text": "רכיבי הריבוי (×5) זהים בכל קבוצה, למעט הבדלי רווחים או סוגריים: Create Customer Account, Update CustomerAccounts, Update Customer Account Guid in Fund, Update Customer Account (Set Joining), Update Customer Account 1-5 (SQL), Update Fund Main, Update TransferRequest. חריג אחד: ב-Create Customer Account 4 ההשמה ל-gen_mfratedtotal נמצאת במקום אחר ברצף ההשמות (אחרי gen_managementfeepercentage ולא אחרי gen_bankaccountnumber). ההשמות בלתי תלויות, ולכן ההתנהגות זהה.",
+      "evidence": "analysis/0005_Customer Account/dupes.json + השוואת קוד מנורמל; DTSX:18351 מול DTSX:27298 (gen_mfratedtotal)"
+    }
+  ]
+}

@@ -1,0 +1,165 @@
+{
+  "verifier": "ssis-verifier",
+  "package": "0014_AccountCourses",
+  "scope": "logic-claims all",
+  "checkedAt": "2026-11-07T13:00:00Z",
+  "checked": 18,
+  "results": [
+    {
+      "id": "L|summary",
+      "hash": "f9c037d0c7bb",
+      "verdict": "WRONG",
+      "detail": "Verified: sync of balance plus 4 flags from Gen_fundmain; only changed fields are sent; flags effectively written only when the course value is NULL (F1). scopeNote is also verified: external CRM2015.Proxy, config file C:\\Generix\\SSISConfigFile.dtsConfig, read-only [CRM] connection, no SQL DML, single business SDK writer. Wrong: unit [1] says the package handles courses linked to 'תהליך פתוח' – incoming transfer, customer care or withdrawal 'במצב 1'. Only the transferin join carries a label ('-- In Progress'). For Gen_customercare and Gen_withdrawal, state 1 has no label in the supplied files, and the claim's own detail [1] and open [2] treat its meaning as השערה. Stating all three as 'open' is unproven.",
+      "evidence": "DTSX:3884-3902 (ti.Gen_CurrentState = 1 --  In Progress; cc/w Gen_currentstate = 1 without comment)",
+      "wrongUnits": [
+        { "unit": 1, "problem": "'open process' asserted for customer care and withdrawal, whose state-1 meaning is unproven.", "correct": "מסלולים שקשורים לניוד נכנס במצב 1 (מסומן בקוד 'In Progress'), או לטיפול לקוח / משיכה במצב 1 (משמעות – השערה: פתוח).", "evidence": "DTSX:3899-3902" }
+      ]
+    },
+    {
+      "id": "L|exec",
+      "hash": "b931a03e7446",
+      "verdict": "CONFIRMED",
+      "detail": "Success constraints, AND, none disabled: 5505 Get Organization Variables → Create ETL; 5506 Create ETL → Update Account courses; 5507 Update Account courses → End ETL. A package-level OnError event handler (DTSX:5510) contains Error ETL Process record (DTSX:5517).",
+      "evidence": "DTSX:5505-5507, 5510, 5517",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|ignored",
+      "hash": "2c103d01311a",
+      "verdict": "CONFIRMED",
+      "detail": "None of these does business work. Get Organization Variables reads gen_etlvariable into ConnStringSrsSsis_Logs/OrganizationName/ServerName. Create ETL creates gen_etlprocess. End ETL: a lookup, then an update of gen_etlprocess statuscode/runtime. Union All / Set Warning columns / ETL Warning create gen_etlprocesswarning. OnError updates gen_etlprocess and creates an annotation on it (error log). The log provider uses SRS.SSIS_Logs with ConnectionString from @[User::ConnStringSrsSsis_Logs].",
+      "evidence": "DTSX:2285, 2319; Create ETL ScriptMain.cs:31-37; ETL Record Finish main.cs:120-129; DTSX:3964, 4012; ETL Warning main.cs:65-76; OnError ScriptMain.cs:36-51; DTSX:9-12, 20",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|finding#1",
+      "hash": "f1b58c8e5a31",
+      "verdict": "CONFIRMED",
+      "detail": "The generated BufferWrapper declares 'public Boolean genisconfiscateDB' and its siblings (DTSX:4495, 4525, 4555, 4615). CheckIfToUpdate2 passes PropertyType.Name ('Boolean'). IsEqual has only case \"bool\" and falls to default: return true. Only the null checks (Helpers.cs:10-12) can return 'different', and the fund side is never null because of ISNULL. The limit (source only, DLL not checked) is stated.",
+      "evidence": "Helpers.cs:8-62,90; DTSX:4480-4655; main.cs:132-135; SQL DTSX:3893-3896",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|finding#2",
+      "hash": "9033ba738e51",
+      "verdict": "CONFIRMED",
+      "detail": "ExcecuteBulk is called inside the row try (main.cs:155-156). ApplicationException (main.cs:199) is caught and the current row goes to CastingError with that message. Clear (main.cs:202) is skipped, '== 10' never fires again, and the final call (main.cs:211-214) is outside try.",
+      "evidence": "main.cs:151-171,174-203,205-215",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|finding#3",
+      "hash": "d2cc9b62db98",
+      "verdict": "CONFIRMED",
+      "detail": "f.Gen_AccountBalance is selected without ISNULL. IsEqual(null, non-null) returns false, so the field is 'different', and main.cs:146 sets entity[\"gen_accountbalance\"] = null when genaccountbalance is NULL.",
+      "evidence": "DTSX:3892; Helpers.cs:11-12; main.cs:146",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|finding#4",
+      "hash": "f8108354591d",
+      "verdict": "CONFIRMED",
+      "detail": "On the Fault path, ErrorBuffer.ErrorText = Fault.Message only. Set Warning columns sets RecordKey = \"\" (title 'שגיאה בעדכון רשומת מסלולי חשבון'), and ETL Warning writes gen_recordkey = RecordKey.",
+      "evidence": "main.cs:190-194; DTSX:3964-3985; ETL Warning main.cs:67",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|finding#5",
+      "hash": "af4ca4699c65",
+      "verdict": "CONFIRMED",
+      "detail": "ac.gen_transactionpercent is selected and is an input column (Double), but main.cs never references gentransactionpercent.",
+      "evidence": "DTSX:3887; BufferWrapper DTSX:4585; main.cs:124-215",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|finding#6",
+      "hash": "58a7ce9d6f8a",
+      "verdict": "CONFIRMED",
+      "detail": "No path starts at Update AccountCourcess.Outputs[DontNeedToUpdate]. Union All Input 3 is dangling=\"true\".",
+      "evidence": "DTSX:5481; DTSX:4094; data-flow path list",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|finding#7",
+      "hash": "6a4d3cb46fc2",
+      "verdict": "CONFIRMED",
+      "detail": "Connection [CRM] ConnectionString is Data Source=Psql;Initial Catalog=ALTSHULER_MSCRM (DTSX:6). Configuration type 1 (XML file) is C:\\Generix\\SSISConfigFile.dtsConfig (DTSX:17), not supplied. The override is worded as possible.",
+      "evidence": "DTSX:6; DTSX:17",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|finding#8",
+      "hash": "622ae4718b11",
+      "verdict": "CONFIRMED",
+      "detail": "The pilot report lists F1-F11. I independently re-checked F1, F2, F3, F4, F9 and F10 against the DTSX (see findings 1-6) and they hold. F5 (HintPaths), F7 (Dictionary.Add), F8 (SSIS log) and F11 (OnError) are framework items. Note: F6 is not named in either list here, though it is covered as finding#7.",
+      "evidence": "reports/0014_AccountCourses_pilot.md:78-88; findings 1-7 above",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Update Account courses|title",
+      "hash": "5a7e2204cffd",
+      "verdict": "WRONG",
+      "detail": "flow_he[2]-[5] are verified (5 fields compared, changed fields only, ExecuteMultiple batches of 10, failures → ETL warnings). short_he and flow_he[1] call the customer-care and withdrawal processes 'פתוחים' / 'תהליך פתוח'. Their state-1 meaning is unproven; only the transferin join has the 'In Progress' comment.",
+      "evidence": "DTSX:3899-3902",
+      "wrongUnits": [
+        { "unit": 2, "problem": "'open' asserted for all three process types.", "correct": "מסלולי חשבון שקשורים לניוד נכנס במצב 1 ('In Progress') או לטיפול לקוח / משיכה במצב 1 (משמעות – השערה) ...", "evidence": "DTSX:3899-3902" },
+        { "unit": 3, "problem": "Same.", "correct": "שליפת מסלולי חשבון המקושרים לניוד נכנס / טיפול לקוח / משיכה במצב 1 (רק לניוד נכנס יש הערה 'In Progress') + ערכי Gen_fundmain", "evidence": "DTSX:3899-3902" }
+      ]
+    },
+    {
+      "id": "L|Package\\Update Account courses|short",
+      "hash": "76f6372a2ae8",
+      "verdict": "WRONG",
+      "detail": "Units [2]-[8] are verified, including the F1 behaviour. Unit [1] says the processes 'שעדיין פתוחים'. That meaning is unproven for customer care and withdrawal (state 1, no label).",
+      "evidence": "DTSX:3899-3902",
+      "wrongUnits": [
+        { "unit": 1, "problem": "Unproven meaning of state 1.", "correct": "מסלולי חשבון שקשורים לניוד נכנס, טיפול לקוח או משיכה במצב 1 (לניוד נכנס – 'In Progress' לפי הערה; לשאר – השערה) ...", "evidence": "DTSX:3899-3902" }
+      ]
+    },
+    {
+      "id": "L|Package\\Update Account courses|detailed",
+      "hash": "4662813a89f0",
+      "verdict": "WRONG",
+      "detail": "Re-derived these and they match: SQL (inner join Gen_fundmain, three left joins with state = 1, OR of non-null IDs), ISNULL only on the flags, Id = genaccountcoursesId, Decimal compare < 0.01, null → write null, the Boolean/default bug, needToUpdate, batch of 10 plus remainder, Fault → warning without ID, and batch-failure behaviour (main.cs:155-156, 202). Wrong: unit [1] says 'לפחות אחד מאלה פתוח במצב 1' for transferin, customer care and withdrawal, and unit [27] says 'בתהליכים פתוחים'. The 'open' meaning is proven only for transferin (comment 'In Progress').",
+      "evidence": "DTSX:3884-3902; main.cs:124-215; Helpers.cs:8-101",
+      "wrongUnits": [
+        { "unit": 1, "problem": "'open' asserted for customer care and withdrawal.", "correct": "מסלולים עם ניוד נכנס במצב 1 (הערה 'In Progress') או טיפול לקוח / משיכה במצב 1 (משמעות – השערה).", "evidence": "DTSX:3899-3902" },
+        { "unit": 27, "problem": "Same unproven meaning in the end state.", "correct": "מסלולי חשבון המקושרים לתהליך במצב 1 מחזיקים יתרה עדכנית מהקופה ...", "evidence": "DTSX:3899-3902" }
+      ]
+    },
+    {
+      "id": "L|Package\\Update Account courses|detail",
+      "hash": "7f1645d19a8a",
+      "verdict": "WRONG",
+      "detail": "Units [1]-[4] are verified; [1] correctly labels the state-1 meaning for customer care and withdrawal as השערה. Unit [5] then states the result for 'מסלולי החשבון בתהליכים פתוחים', asserting the hypothesis as fact.",
+      "evidence": "DTSX:3899-3902",
+      "wrongUnits": [
+        { "unit": 5, "problem": "Hypothesis stated as fact.", "correct": "יתרת מסלולי החשבון המקושרים לניוד נכנס / טיפול לקוח / משיכה במצב 1 מסונכרנת עם הקופה ...", "evidence": "DTSX:3899-3902" }
+      ]
+    },
+    {
+      "id": "L|Package\\Update Account courses|decisions",
+      "hash": "ba46946c6c41",
+      "verdict": "CONFIRMED",
+      "detail": "All five decisions match the SQL and code exactly. The meanings are neutral ('במצב 1').",
+      "evidence": "DTSX:3899-3902; main.cs:132-160,184-194; Helpers.cs:46-47,90",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Update Account courses|crm",
+      "hash": "572deec33c12",
+      "verdict": "CONFIRMED",
+      "detail": "gen_accountcourses Update via ExecuteMultipleExtension(RequestType.Update), batches of 10 plus remainder, changed fields only (balance as Money or null; the four flags).",
+      "evidence": "main.cs:126-160,176",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Update Account courses|open",
+      "hash": "ba5e1146cd6a",
+      "verdict": "CONFIRMED",
+      "detail": "All four questions are genuinely open and grounded in the code. [2] is correct that only transferin has the 'In Progress' comment.",
+      "evidence": "Helpers.cs:50-61; DTSX:3899-3902; main.cs:146; DTSX:3887",
+      "wrongUnits": []
+    }
+  ]
+}

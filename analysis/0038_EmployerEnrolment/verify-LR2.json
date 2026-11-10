@@ -1,0 +1,30 @@
+{
+  "verifier": "ssis-verifier",
+  "package": "0038_EmployerEnrolment",
+  "scope": "logic-claims re-check round 2",
+  "checkedAt": "2026-11-07T18:00:00.000Z",
+  "checked": 1,
+  "results": [
+    {
+      "id": "L|Package\\Send Email|detail",
+      "hash": "d18be77f988a",
+      "verdict": "INCOMPLETE",
+      "detail": "Units 1, 2 and 5 match. [1] Source SQL: gen_currentstate = 1, CreatedOn >= GETDATE()-7, ID match stripping leading zeros and spaces on both sides (SUBSTRING/PATINDEX('%[^0 ]%')), INNER JOIN product on fm.gen_fundtypename, INNER JOIN Account, LEFT JOIN Gen_employers with AccountNumber = Gen_CorporateNumber, deposit date <= fund creation date, product pairs 1-1 / 2-4 / 3-2, Gen_existinfile = 1. [2] matches. [4] email attributes, subject/body text, SendEmail IssueSend=true, TrackingToken '', the gen_etlvariable scope filter, the OrdinalIgnoreCase dictionary, the Add duplicate throw, the PostExecute throw and the Success chain (DTSX:7458-7460, no event handlers) all match. Unit 3 overstates and both units leave out failure behaviour that the code shows. (a) Unit 3 says 'כל צירוף אחר הולך ל-Errors'. gen_selfemployed is read with Buffer.GetBoolean and no _IsNull check (main.cs:119/132; getter DTSX:3942-3947), and the script has no try/catch. If gen_selfemployed is NULL while gen_producttype and gen_fundestateid are not NULL, ColumnIsNullException is thrown (documented SSIS behaviour) and the data flow fails. The row does not go to Errors. (b) Unit 3 says 'ערך אחר לא נשלח' for gen_deposittype. A NULL gen_deposittype also throws. The same happens for a NULL fund number, customer name or EmployerNumber, and for a queue id that is not a GUID (FormatException at main.cs:75-76). The catch then reads ex.InnerException.Message (main.cs:112; DTSX:6443), which is null for these exceptions, so the component and data flow fail. (c) The failure handling of the email step is missing from units 3-4. A non-Soap exception with an InnerException goes to Error -> Adding Error message 1 1 -> ETL Warning 1 2 1 1. A SoapException that is not about 'token' sets ErrorMessage but never calls DirectRowToError (main.cs:105-108), so the row is dropped and nothing is logged. A 'token' error reconnects and reprocesses the whole row (main.cs:196-202), with a component-level Retry < 3 that is never reset. If service.Create succeeded and SendEmail failed, the email already exists, and a retry creates a second email. (d) Unit 4 says 'מזהי התורים (השולח והנמען)' but does not say that the sender is always MaasikimQueueId for both deposit types (SendMailToMaasikim(..., to: Gvia, from: Maasikim) and (..., to: Maasikim, from: Maasikim), DTSX:6420, 6425). These behaviours appear in the package's findings #1, #2, #3, #6 and #8 and in the detailed view [4], [25], [27], [28], but this detail claim's decisions and write units leave them out. Unit 3 also contradicts them ('כל צירוף אחר הולך ל-Errors'). Minor: unit 5 says 'שמעסיקם הפקיד סכום שגוי' without attribution. The only condition is gen_incorrectamount IS NOT NULL. The phrase 'סכום הפקדה שגוי' is the email body's own label (main.cs:191) and should be presented as that.",
+      "evidence": "DTSX:6076-6112 (source SQL), 3658-3682 (Check If To Send Mail main.cs:115-144), 3942-3947 (GetBoolean getter), 6402-6526 (Send Email To Maasikim main.cs:71-202; 6420, 6425, 6432, 6443), 2620-2680, 3283, 20-25, 7458-7460",
+      "wrongUnits": [
+        {
+          "unit": 3,
+          "problem": "'Every other combination goes to Errors' is wrong for a NULL gen_selfemployed: ColumnIsNullException, no try/catch, the data flow fails. 'Other value is not sent' is wrong for a NULL gen_deposittype: the exception plus the null InnerException in the catch make the component fail. Send-step failure routing is missing: Error -> ETL warning, a Soap non-token error is dropped silently, a token error retries the row and may create a duplicate email.",
+          "correct": "Add: gen_selfemployed NULL (with gen_producttype/gen_fundestateid not NULL) throws ColumnIsNullException; there is no try/catch, so the data flow fails. In Send Email To Maasikim, a NULL gen_deposittype, gen_fundnumber, Gen_customername or EmployerNumber, or a queue id that is not a GUID, throws; the catch reads ex.InnerException.Message (null), so the component fails. A non-Soap exception with an InnerException goes to Error -> ETL warning. A SoapException not about 'token' is dropped silently (no DirectRowToError). A 'token' error reconnects and reprocesses the row (Retry < 3 per component, never reset), which can create a second email if Create had already succeeded.",
+          "evidence": "main.cs (Check) 117-141; DTSX:3942-3947; main.cs (Send) 75-76, 86-95, 99-122, 154-156, 196-202"
+        },
+        {
+          "unit": 4,
+          "problem": "The sender queue is not stated (it is always MaasikimQueueId). The partial state is not stated: if Create succeeded and SendEmail failed, an email record remains in CRM without being sent.",
+          "correct": "from = תור MaasikimQueueId בשני המקרים; to = GviaQueueId (סוג הפקדה 1) או MaasikimQueueId (סוג 2). אם service.Create הצליח ו-SendEmail נכשל, רשומת המייל קיימת ב-CRM ולא נשלחה.",
+          "evidence": "DTSX:6420, 6425; main.cs:126-174"
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,100 @@
+{
+  "verifier": "ssis-verifier",
+  "package": "0018_EmployerCare",
+  "scope": "mapping-A.json",
+  "source": {
+    "file": "source/DailyProcess/0018_EmployerCare.dtsx",
+    "sha256": "d6f9eba66cf8a0f5ea167a05eb2e97c324f912e0f3a421045651d73acd049746"
+  },
+  "checked": 13,
+  "results": [
+    {
+      "id": "Update employer care|gen_employercare|UPDATE|gen_currentstate",
+      "verdict": "CONFIRMED",
+      "detail": "Literal new OptionSetValue(3) (comment //Finished) -> fixed value proven. Key entity.Id = Row.Genemployercareid; NULL id skipped. Path chain re-derived: get Gen_employercare (Gen_CurrentState = 2 AND (Gen_depositereason NOT IN (6,7,8,9,11) OR IS NULL), inner joins to gen_customeraccount and Gen_fundmain) -> Lookup 'Get All Transaction' (CacheType 0 full cache, gen_fundmainid = gen_fundnumber, NoMatchBehavior 1, only Match Output connected) -> Aggregate (AggregationType 0 = group by Gen_employercareid) -> script. ExecuteMultipleExtension RequestType.Update, batches of 100. Precedence Constraint 1 (default Success). 'current-year' is the table name gen_ftcurrentyear, not a proven date filter.",
+      "evidence": "DTSX:1923-1929 (main.cs:127-133), SQL DTSX:1425-1432, Lookup DTSX:1364-1384, Aggregate DTSX:580, paths DTSX:2473-2478, precedence DTSX:7926"
+    },
+    {
+      "id": "Update employer care|gen_employercare|UPDATE|gen_modifiedbybank",
+      "verdict": "CONFIRMED",
+      "detail": "DateTime.Now per row (Kind Local, SSIS host clock); not a fixed value. Same population/condition as gen_currentstate.",
+      "evidence": "DTSX:1929 (main.cs:133)"
+    },
+    {
+      "id": "Update CustomerCare|gen_employercare|UPDATE|gen_employeroperationpersonname",
+      "verdict": "CONFIRMED",
+      "detail": "Settled: the logical name \"account\" is a hard-coded string literal in new EntityReference(\"account\", Row.genemployeroperationpersonname); the Guid is a.gen_operationperson (SQL alias) unchanged. The WHERE guarantees a.gen_operationperson IS NOT NULL ('!=' is UNKNOWN for NULL; second branch requires IS NOT NULL). In T-SQL the WHERE cannot see the SELECT alias, so the unqualified gen_employeroperationpersonname resolves to a table column (presumably ec's - unproven). Whether gen_employercare.gen_employeroperationpersonname targets 'account' and whether account.gen_operationperson holds account ids is NOT provable from the DTSX (no CRM metadata supplied) - if not, each row faults; faults go ErrorBuffer -> Union All -> Set Warning columns -> ETL Warning (plumbing). Key = attribute gen_employercareid; NULL id skipped. No state filter. Precedence Constraint 2 (default Success) after Close Gen_employercare.",
+      "evidence": "DTSX:7267-7272 (main.cs:127-132), ErrorBuffer DTSX:7307, SQL DTSX:6772-6779, paths DTSX:7915-7918, precedence DTSX:7927"
+    },
+    {
+      "id": "LOGIC scopeNote_he",
+      "verdict": "CONFIRMED",
+      "detail": "Re-check: now states design-time-only connection string, EnableConfig=True and external config override -> blocked_external_dependency. Matches DTSX.",
+      "evidence": "DTSX:1, 6, 11",
+      "previousVerdict": "INCOMPLETE",
+      "previousDetail": "[CRM] = Psql/ALTSHULER_MSCRM is the design-time connection string only; EnableConfig=True with external C:\\Generix\\SSISConfigFile.dtsConfig (not supplied) may override it at runtime -> external_unknown. Count of 5 data-flow script writers (2 business + ETL Warning x2 + ETL Record Finish) confirmed; script tasks Create/Error ETL Process record also write gen_etlprocess/annotation (plumbing).",
+      "recheckedOn": "2026-11-06"
+    },
+    {
+      "id": "LOGIC summary_he",
+      "verdict": "CONFIRMED",
+      "detail": "Matches both flows; 'Finished' from code comment and 'deposit' labelled השערה. 'מהשנה הנוכחית' is from the table name only.",
+      "evidence": "DTSX:1425-1432, 1364-1368, 6772-6779"
+    },
+    {
+      "id": "LOGIC executionOrder",
+      "verdict": "CONFIRMED",
+      "detail": "Get Organization Variables -> Create ETL -> Close Gen_employercare -> Update operation person -> End ETL; no DTS:Value/Expression (default Success), LogicalAnd=True; no disabled executables.",
+      "evidence": "DTSX:7925-7928"
+    },
+    {
+      "id": "LOGIC components[0]",
+      "verdict": "CONFIRMED",
+      "detail": "Re-check: gen_modifiedbybank meaning now labelled as name-derived השערה (detailed.nodes[5]); every 'current year' mention (short_he, flow_he, short.nodes, detailed.nodes[2]/[7], detail_he[2], decisions[1]) labelled as table-name השערה. Logic unchanged and correct.",
+      "evidence": "DTSX:1929, 1364-1368",
+      "previousVerdict": "INCOMPLETE",
+      "previousDetail": "Population, fan-out per fund, full-cache Lookup, unconnected No Match, group-by Aggregate, literal 3, commented-out ErrorBuffer all re-derived correctly. But detailed.nodes[5] labels gen_modifiedbybank as 'עודכן על ידי הבנק' - a meaning derived from the attribute name, contradicting its own openQuestions_he[4] ('meaning not defined'); and 'תנועה בשנה הנוכחית' is inferred from the table name gen_ftcurrentyear. Both should be marked השערה.",
+      "recheckedOn": "2026-11-06"
+    },
+    {
+      "id": "LOGIC components[1]",
+      "verdict": "CONFIRMED",
+      "detail": "LEFT JOIN turned into inner join by 'ec.gen_employername = accountid'; difference condition; no state filter; hard-coded 'account'; faults to ETL Warning. Re-derived.",
+      "evidence": "DTSX:6772-6779, 7267-7272, 7307, 7915-7918"
+    },
+    {
+      "id": "LOGIC findings_he[0]",
+      "verdict": "CONFIRMED",
+      "detail": "Re-check: now states no link to date, employer (gen_employername not in the match) or specific fund - any group-1, non-'%99%' transaction in any fund of the care's customer account closes it; 'current year' labelled השערה. Matches Lookup SQL/ParameterMap and source SQL.",
+      "evidence": "DTSX:1364-1368, 1384, 1425-1432",
+      "previousVerdict": "INCOMPLETE",
+      "previousDetail": "No date condition confirmed (Lookup SQL has none). Missing: the match is also not tied to the employer (gen_employername) or to a specific fund of the care - any group-1, non-'%99%' transaction in ANY fund of the care's customer account closes it, so the risk is broader than 'transaction preceded the care'. 'Current year' scope comes only from the table name gen_ftcurrentyear (השערה).",
+      "recheckedOn": "2026-11-06"
+    },
+    {
+      "id": "LOGIC findings_he[1]",
+      "verdict": "CONFIRMED",
+      "detail": "ErrorBuffer lines commented out in Update employer care; its Error output is connected to Union All (DTSX:2475) but never receives rows.",
+      "evidence": "DTSX:1963-1964, 2475"
+    },
+    {
+      "id": "LOGIC findings_he[2]",
+      "verdict": "CONFIRMED",
+      "detail": "Hard-coded 'account'; target entity of the lookup unproven; failures logged as ETL warnings.",
+      "evidence": "DTSX:7272, 7307"
+    },
+    {
+      "id": "LOGIC findings_he[3]",
+      "verdict": "CONFIRMED",
+      "detail": "When a.gen_operationperson is NULL neither OR branch is true -> no clearing.",
+      "evidence": "DTSX:6778-6779"
+    },
+    {
+      "id": "LOGIC findings_he[4]",
+      "verdict": "CONFIRMED",
+      "detail": "Constraint 2 orders the sync after the close; sync SQL has no state filter.",
+      "evidence": "DTSX:7927, 6772-6779"
+    }
+  ],
+  "missingWrites": []
+}

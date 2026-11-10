@@ -1,0 +1,3082 @@
+{
+  "package": "0004_LeumiFile-MY",
+  "dataFlows": [
+    "Package\\Foreach Loop Container\\Create Account For Employers",
+    "Package\\Foreach Loop Container\\Create Accounts For Minhali",
+    "Package\\Foreach Loop Container\\Create Contacts For Minhali"
+  ],
+  "analyst": "ssis-field-lineage",
+  "scriptOutputs": [
+    {
+      "component": "Package\\Foreach Loop Container\\Create Contacts For Minhali\\Set MobilePhone End EmailAddress1",
+      "output": "Output 0",
+      "column": "MobilePhone",
+      "from": [
+        {
+          "column": "telephone1",
+          "role": "value"
+        },
+        {
+          "column": "telephone2",
+          "role": "value"
+        }
+      ],
+      "expression": "fnSetMobilePhone(Row) (main.cs:54-86): if telephone1 not NULL: m = telephone1.Replace(\"-\",\"\"); if m.Length == 10 && m.Substring(0,2) == \"05\" → MobilePhone = m (and telephone1 := telephone2, telephone2 := NULL), return. Else if telephone2 not NULL: m = telephone2.Replace(\"-\",\"\"); same test → MobilePhone = m (telephone2 := telephone1, telephone1 := NULL), return. Otherwise MobilePhone = NULL. Output column wstr(10).",
+      "condition": "telephone1 (Phone_1_Number_14) wins when it is a 10-char number starting \"05\"; telephone2 (Phone_2_Number_106) used only otherwise; NULL when neither qualifies",
+      "evidence": "main.cs:37,54-86 (component DTSX line 29829)"
+    },
+    {
+      "component": "Package\\Foreach Loop Container\\Create Contacts For Minhali\\Update fields by mobilephone and email",
+      "output": "Output 0",
+      "column": "isUpdateCustomerPreference",
+      "from": [
+        {
+          "column": "gen_recordsorceDB",
+          "role": "condition"
+        },
+        {
+          "column": "mobilephone",
+          "role": "condition"
+        },
+        {
+          "column": "mobilephoneDB",
+          "role": "condition"
+        },
+        {
+          "column": "emailaddress1",
+          "role": "condition"
+        },
+        {
+          "column": "emailaddress1DB",
+          "role": "condition"
+        }
+      ],
+      "expression": "isUpdateCustomerPreference = (!gen_recordsorceDB_IsNull && gen_recordsorceDB == 1 && ((!mobilephone_IsNull && mobilephone != mobilephoneDB) || (!emailaddress1_IsNull && emailaddress1 != emailaddress1DB))) where mobilephone/emailaddress1 are the 'Update Correct Value' columns (Row.UpdateCorrectValueemailaddress1). Assigned to the row at main.cs:129 BEFORE the 'computed preference == gen_customerpreferenceDB' early return (main.cs:148-151), which only resets the local variable — so the row flag stays TRUE even when the preference is unchanged.",
+      "condition": null,
+      "evidence": "main.cs:123-151 (component DTSX line 34790; raw code DTSX 35048-35074)"
+    },
+    {
+      "component": "Package\\Foreach Loop Container\\Create Account For Employers\\Create Account",
+      "output": "Ok",
+      "column": "CreatedAccountId",
+      "from": [],
+      "expression": "Never assigned: ExcecuteBulk only calls OkBuffer.AddRow() for each successful response → always NULL. Ok output feeds only Derived Column 'Created' → 'Row Insert Count' (no CRM write).",
+      "condition": "one row per successful ExecuteMultiple response item",
+      "evidence": "main.cs:192-221 (OkBuffer.AddRow() main.cs:204)"
+    },
+    {
+      "component": "Package\\Foreach Loop Container\\Create Accounts For Minhali\\Create Account",
+      "output": "Ok",
+      "column": "CreatedAccountID",
+      "from": [],
+      "expression": "Never assigned: ExcecuteBulk calls ResultBuffer.AddRow(); OkBuffer.AddRow() only → always NULL. Ok output feeds only 'Created' → 'Row Insert Count' (no CRM write).",
+      "condition": "one row per successful response item",
+      "evidence": "main.cs:206-236 (OkBuffer.AddRow() main.cs:220)"
+    },
+    {
+      "component": "Package\\Foreach Loop Container\\Create Contacts For Minhali\\Create Contact",
+      "output": "Ok",
+      "column": "CreatedContactID",
+      "from": [],
+      "expression": "Never assigned: ExcecuteBulk calls ResultBuffer.AddRow(); OkBuffer.AddRow() only → always NULL. Ok output feeds only 'Created' → 'Row Insert Count' (no CRM write).",
+      "condition": "one row per successful response item",
+      "evidence": "main.cs:138-168 (OkBuffer.AddRow() main.cs:152)"
+    }
+  ],
+  "crmWrites": [
+    {
+      "component": "Package\\Foreach Loop Container\\Create Account For Employers\\Create Account",
+      "identicalCopies": [],
+      "entity": "account",
+      "verb": "CREATE",
+      "mechanism": "SDK (CRM.Proxy ExecuteMultipleExtension, RequestType.Create, batches of 1000)",
+      "status": "Supported",
+      "recordKey": "new record (CRM-generated id; CreatedAccountId output never filled)",
+      "declaredRowFilters": [
+        {
+          "file": "Minhali Daily Source",
+          "field": "Customer_Id_Number_6",
+          "via": "Package\\Foreach Loop Container\\Create Account For Employers\\remove duplicates account",
+          "why": "first row per accountnumber only: if (accountNumbers.Contains(Row.accountnumber)) Row.DirectRowToDuplicate() (unconnected output) else DirectRowToDefault. accountnumber = Customer_Id_Number_6 trimmed + PadLeft(9,'0') ('Add 0 to short id num'), or Employer_Number_38 when that value is 0 ('merge customer id number and corporate number')",
+          "evidence": "main.cs:111-122 (DTSX 7889); merge DTSX 7592"
+        },
+        {
+          "file": "Minhali Daily Source",
+          "field": "Employer_Number_38",
+          "via": "Package\\Foreach Loop Container\\Create Account For Employers\\remove duplicates account",
+          "why": "part of the de-duplication key: accountnumber := Employer_Number_38 (trimmed, PadLeft 9) when (DT_I8)Customer_Id_Number_6-derived accountnumber == 0; later rows with an already-seen accountnumber are dropped (DirectRowToDuplicate)",
+          "evidence": "main.cs:111-122 (DTSX 7889); merge DTSX 7592"
+        }
+      ],
+      "condition": "Row read from MY_FileData; NOT SUBSTRING(Revaluation_Date_1,1,1) == \"@\" ('Check for last row' else, DTSX 4129); 'Check for employer funds' output מעסיקים-כספי פיצולים: ((Sector_Code_17 == \"0210\" || (DT_I8)Bank_Account_Number_27 == 0)) && (DT_I4)Employer_Type_41 > 0 && (DT_I4)Employer_Agreement_Number_35 > 0 (DTSX 4093; Bank_Account_Number_27 trimmed and zero-padded to 12 by 'Add 0 to short id num'); lookups 'Get fund type name(product)', 'Get bank branch Id', 'Get Employer Number Estate' (NoMatchBehavior 0 + IgnoreFailure) do not filter; first row per accountnumber only ('remove duplicates account' main.cs:111-122, duplicates go to unconnected output); AND no active CRM account (statecode = 0) with accountnumber = accountnumber ('Check if account exists' Lookup No Match Output, DTSX 4162-4218)",
+      "attributes": [
+        {
+          "attribute": "name",
+          "from": [
+            {
+              "column": "name",
+              "role": "value"
+            }
+          ],
+          "expression": "Row.name as is, only if not NULL",
+          "fixedValue": null,
+          "condition": "!Row.name_IsNull",
+          "evidence": "main.cs:130-131",
+          "upstream": "FILE Last_Name_9 (pos 35-74) → MY_FileData.Last_Name_9 → 'Read MY Data From Staging' SELECT Last_Name_9 + FILE First_Name_10 (pos 75-94) → MY_FileData.First_Name_10 → 'Read MY Data From Staging' SELECT First_Name_10 + FILE Employer_Name_39 (pos 313-362) → MY_FileData.Employer_Name_39 → 'Read MY Data From Staging' SELECT Employer_Name_39 → 'Trim String Fields' script (main.cs:28-50: every string column .Trim(), empty string → NULL) [Employers DTSX 9534] → 'Create Additional Columns' NEW name = !ISNULL(Last_Name_9) && Last_Name_9 != \"\" ? TRIM(Last_Name_9) + (!ISNULL(First_Name_10) && TRIM(First_Name_10) != \"\" ? (\" \" + TRIM(First_Name_10)) : \"\") : First_Name_10 (DTSX 5769) → 'merge customer id number and corporate number' REPLACE name = TRIM(name) == \"\" || ISNULL(name) ? Employer_Name_39 : name (DTSX 7586) → if (DT_I8)accountnumber ∈ {0,1,18} ('Check if customer id number' DTSX 4326) 'Set unknwon customer data' REPLACE name = \"לקוח לא ידוע\" (DTSX 9511) → Union All",
+          "additionalFileFields": [
+            {
+              "field": "Employer_Name_39",
+              "role": "value",
+              "via": "'merge customer id number and corporate number' REPLACE name (DTSX 7586) when name empty/NULL"
+            }
+          ]
+        },
+        {
+          "attribute": "gen_essentialaccount",
+          "from": [],
+          "expression": "literal true",
+          "fixedValue": true,
+          "condition": null,
+          "evidence": "main.cs:133",
+          "upstream": null,
+          "additionalFileFields": []
+        },
+        {
+          "attribute": "gen_isoperate",
+          "from": [],
+          "expression": "literal true",
+          "fixedValue": true,
+          "condition": null,
+          "evidence": "main.cs:134",
+          "upstream": null,
+          "additionalFileFields": []
+        },
+        {
+          "attribute": "accountnumber",
+          "from": [
+            {
+              "column": "accountnumber",
+              "role": "value"
+            }
+          ],
+          "expression": "Row.accountnumber as is, only if not NULL",
+          "fixedValue": null,
+          "condition": "!Row.accountnumber_IsNull",
+          "evidence": "main.cs:136-137",
+          "upstream": "FILE Customer_Id_Number_6 (pos 16-24) → MY_FileData.Customer_Id_Number_6 → 'Read MY Data From Staging' SELECT Customer_Id_Number_6 (output alias accountnumber) + FILE Employer_Number_38 (pos 304-312) → MY_FileData.Employer_Number_38 → 'Read MY Data From Staging' SELECT Employer_Number_38 → 'Trim String Fields' script (main.cs:28-50: every string column .Trim(), empty string → NULL) [Employers DTSX 9534] → 'Add 0 to short id num' script (main.cs:33-53, DTSX 3261: NULL/\"\" → \"\", remove \".\", PadLeft(9,'0'); same for Employer_Number_38 (9) and Bank_Account_Number_27 (12)) → 'merge customer id number and corporate number' REPLACE accountnumber = (DT_I8)accountnumber == 0 ? Employer_Number_38 : accountnumber (DTSX 7592) → Union All",
+          "additionalFileFields": [
+            {
+              "field": "Employer_Number_38",
+              "role": "value",
+              "via": "'merge customer id number and corporate number' REPLACE accountnumber (DTSX 7592) when (DT_I8)accountnumber == 0"
+            }
+          ]
+        },
+        {
+          "attribute": "emailaddress1",
+          "from": [
+            {
+              "column": "emailaddress1",
+              "role": "value"
+            }
+          ],
+          "expression": "Row.emailaddress1 as is, only if not NULL",
+          "fixedValue": null,
+          "condition": "!Row.emailaddress1_IsNull",
+          "evidence": "main.cs:138-139",
+          "upstream": "FILE Email_108 (pos 1243-1292) → MY_FileData.Email_108 → 'Read MY Data From Staging' SELECT Email_108 (output alias emailaddress1) → 'Trim String Fields' script (main.cs:28-50: every string column .Trim(), empty string → NULL) [Employers DTSX 9534] → Union All",
+          "additionalFileFields": []
+        },
+        {
+          "attribute": "fax",
+          "from": [
+            {
+              "column": "fax",
+              "role": "value"
+            }
+          ],
+          "expression": "Row.fax as is, only if not NULL",
+          "fixedValue": null,
+          "condition": "!Row.fax_IsNull",
+          "evidence": "main.cs:141-142",
+          "upstream": "FILE Fax_107 (pos 1233-1242) → MY_FileData.Fax_107 → 'Read MY Data From Staging' SELECT Fax_107 (output alias fax) → 'Trim String Fields' script (main.cs:28-50: every string column .Trim(), empty string → NULL) [Employers DTSX 9534] → Union All",
+          "additionalFileFields": []
+        },
+        {
+          "attribute": "telephone1",
+          "from": [
+            {
+              "column": "telephone1",
+              "role": "value"
+            }
+          ],
+          "expression": "Row.telephone1 as is, only if not NULL",
+          "fixedValue": null,
+          "condition": "!Row.telephone1_IsNull",
+          "evidence": "main.cs:144-145",
+          "upstream": "FILE Phone_1_Number_14 (pos 115-124) → MY_FileData.Phone_1_Number_14 → 'Read MY Data From Staging' SELECT Phone_1_Number_14 (output alias telephone1) → 'Trim String Fields' script (main.cs:28-50: every string column .Trim(), empty string → NULL) [Employers DTSX 9534] → Union All",
+          "additionalFileFields": []
+        },
+        {
+          "attribute": "telephone2",
+          "from": [
+            {
+              "column": "telephone2",
+              "role": "value"
+            }
+          ],
+          "expression": "Row.telephone2 as is, only if not NULL",
+          "fixedValue": null,
+          "condition": "!Row.telephone2_IsNull",
+          "evidence": "main.cs:147-148",
+          "upstream": "FILE Phone_2_Number_106 (pos 1223-1232) → MY_FileData.Phone_2_Number_106 → 'Read MY Data From Staging' SELECT Phone_2_Number_106 (output alias telephone2) → 'Trim String Fields' script (main.cs:28-50: every string column .Trim(), empty string → NULL) [Employers DTSX 9534] → Union All",
+          "additionalFileFields": []
+        },
+        {
+          "attribute": "gen_customerdateofbirth",
+          "from": [
+            {
+              "column": "gen_customerdateodbirth",
+              "role": "value"
+            }
+          ],
+          "expression": "DateTime.Parse(Row.gencustomerdateodbirth) (string 'yyyy/MM/dd' from Format Dates); parse exception → row to CastingError output",
+          "fixedValue": null,
+          "condition": "!Row.gencustomerdateodbirth_IsNull",
+          "evidence": "main.cs:150-151",
+          "upstream": "FILE Customer_Date_Of_Birth_11 (pos 95-102) → MY_FileData.Customer_Date_Of_Birth_11 → 'Read MY Data From Staging' SELECT Customer_Date_Of_Birth_11 (output alias gen_customerdateodbirth) → 'Trim String Fields' script (main.cs:28-50: every string column .Trim(), empty string → NULL) [Employers DTSX 9534] → Union All → 'Format Dates' script (main.cs:38-80, DTSX 6584): Trim().Length==8 'yyyyMMdd' → 'yyyy/MM/dd'; Length==6 'yyyyMM' → 'yyyy/MM/01'; other length → NULL; NULL if DateTime.TryParse fails or date < 1900-01-01",
+          "additionalFileFields": []
+        },
+        {
+          "attribute": "gen_returnedmailcount",
+          "from": [
+            {
+              "column": "gen_returnedmailcount",
+              "role": "value"
+            }
+          ],
+          "expression": "Row.genreturnedmailcount (int, already DT_I4) as is",
+          "fixedValue": null,
+          "condition": "!Row.genreturnedmailcount_IsNull",
+          "evidence": "main.cs:153-154",
+          "upstream": "FILE Address_Returned_Mail_Count_105 (pos 1221-1222) → MY_FileData.Address_Returned_Mail_Count_105 → 'Read MY Data From Staging' SELECT Address_Returned_Mail_Count_105 (output alias gen_returnedmailcount_STR_INT) → 'Trim String Fields' script (main.cs:28-50: every string column .Trim(), empty string → NULL) [Employers DTSX 9534] → 'merge customer id number and corporate number' NEW gen_returnedmailcount (i4) = (DT_I4)gen_returnedmailcount_STR_INT (DTSX 7608, FailComponent on cast error) → Union All",
+          "additionalFileFields": []
+        },
+        {
+          "attribute": "address1_name",
+          "from": [],
+          "expression": "literal \"ראשי\" — unconditional (line 156 is indented but the if at line 153 has no braces, so it only governs line 154; raw DTSX 4711-4714)",
+          "fixedValue": "ראשי",
+          "condition": null,
+          "evidence": "main.cs:156",
+          "upstream": null,
+          "additionalFileFields": []
+        },
+        {
+          "attribute": "gen_address1_buildingid",
+          "from": [
+            {
+              "column": "gen_address1_buildingid",
+              "role": "value"
+            }
+          ],
+          "expression": "Row.genaddress1buildingid as is, only if not NULL",
+          "fixedValue": null,
+          "condition": "!Row.genaddress1buildingid_IsNull",
+          "evidence": "main.cs:158-159",
+          "upstream": "FILE Address_Building_Number_99 (pos 1114-1123) → MY_FileData.Address_Building_Number_99 → 'Read MY Data From Staging' SELECT Address_Building_Number_99 (output alias gen_address1_buildingid) + FILE Address_Apartment_Number_101 (pos 1134-1138) → MY_FileData.Address_Apartment_Number_101 → 'Read MY Data From Staging' SELECT Address_Apartment_Number_101 → 'Trim String Fields' script (main.cs:28-50: every string column .Trim(), empty string → NULL) [Employers DTSX 9534] → 'Create Additional Columns' REPLACE gen_address1_buildingid = ISNULL(Address_Apartment_Number_101) || Address_Apartment_Number_101 == \"\" ? TRIM(gen_address1_buildingid) : TRIM(gen_address1_buildingid) + \"/\" + TRIM(Address_Apartment_Number_101) (DTSX 5755; column stays wstr(10), truncation = FailComponent) → Union All",
+          "additionalFileFields": [
+            {
+              "field": "Address_Apartment_Number_101",
+              "role": "value",
+              "via": "'Create Additional Columns' REPLACE gen_address1_buildingid (DTSX 5755)"
+            }
+          ]
+        },
+        {
+          "attribute": "gen_address1_city",
+          "from": [
+            {
+              "column": "gen_address1_city",
+              "role": "value"
+            }
+          ],
+          "expression": "Row.genaddress1city as is, only if not NULL",
+          "fixedValue": null,
+          "condition": "!Row.genaddress1city_IsNull",
+          "evidence": "main.cs:161-162",
+          "upstream": "FILE Address_City_Name_102 (pos 1139-1163) → MY_FileData.Address_City_Name_102 → 'Read MY Data From Staging' SELECT Address_City_Name_102 (output alias gen_address1_city) → 'Trim String Fields' script (main.cs:28-50: every string column .Trim(), empty string → NULL) [Employers DTSX 9534] → Union All",
+          "additionalFileFields": []
+        },
+        {
+          "attribute": "gen_inputsource",
+          "from": [],
+          "expression": "new OptionSetValue(1)",
+          "fixedValue": 1,
+          "condition": null,
+          "evidence": "main.cs:165",
+          "upstream": null,
+          "additionalFileFields": []
+        },
+        {
+          "attribute": "address1_addresstypecode",
+          "from": [],
+          "expression": "new OptionSetValue(1)",
+          "fixedValue": 1,
+          "condition": null,
+          "evidence": "main.cs:166",
+          "upstream": null,
+          "additionalFileFields": []
+        },
+        {
+          "attribute": "address1_postalcode",
+          "from": [
+            {
+              "column": "address1_postalcode",
+              "role": "value"
+            }
+          ],
+          "expression": "Row.address1postalcode as is, only if not NULL",
+          "fixedValue": null,
+          "condition": "!Row.address1postalcode_IsNull",
+          "evidence": "main.cs:168-169",
+          "upstream": "FILE Address_Zip_Code_104 (pos 1214-1220) → MY_FileData.Address_Zip_Code_104 → 'Read MY Data From Staging' SELECT Address_Zip_Code_104 (output alias address1_postalcode) → 'Trim String Fields' script (main.cs:28-50: every string column .Trim(), empty string → NULL) [Employers DTSX 9534] → Union All",
+          "additionalFileFields": []
+        },
+        {
+          "attribute": "address1_line1",
+          "from": [
+            {
+              "column": "address1_line1",
+              "role": "value"
+            }
+          ],
+          "expression": "Row.address1line1 as is, only if not NULL",
+          "fixedValue": null,
+          "condition": "!Row.address1line1_IsNull",
+          "evidence": "main.cs:171-172",
+          "upstream": "FILE Address_Street_98 (pos 1094-1113) → MY_FileData.Address_Street_98 → 'Read MY Data From Staging' SELECT Address_Street_98 + FILE Address_Neighborhood_103 (pos 1164-1213) → MY_FileData.Address_Neighborhood_103 → 'Read MY Data From Staging' SELECT Address_Neighborhood_103 → 'Trim String Fields' script (main.cs:28-50: every string column .Trim(), empty string → NULL) [Employers DTSX 9534] → 'Create Additional Columns' NEW address1_line1 = !ISNULL(Address_Neighborhood_103) && Address_Neighborhood_103 != \"\" ? TRIM(Address_Street_98) + \" \" + TRIM(Address_Neighborhood_103) : TRIM(Address_Street_98) (DTSX 5775) → Union All",
+          "additionalFileFields": []
+        }
+      ],
+      "evidence": "main.cs:125-233 (component DTSX line 4434; Entity(\"account\") at main.cs:127; ExecuteMultipleExtension(..., RequestType.Create, service) main.cs:194)"
+    },
+    {
+      "component": "Package\\Foreach Loop Container\\Create Account For Employers\\Update Account",
+      "identicalCopies": [],
+      "entity": "account",
+      "verb": "UPDATE",
+      "mechanism": "SDK (CRM.Proxy ExecuteMultipleExtension, RequestType.Update, batches of 100)",
+      "status": "Supported",
+      "recordKey": "account.Id = Row.accountid (main.cs:132) — accountid from Lookup 'Check if account exists' (active account whose accountnumber = file accountnumber)",
+      "recordKeyColumns": [
+        "accountid"
+      ],
+      "declaredRowFilters": [
+        {
+          "file": "Minhali Daily Source",
+          "field": "Customer_Id_Number_6",
+          "via": "Package\\Foreach Loop Container\\Create Account For Employers\\remove duplicates account",
+          "why": "first row per accountnumber only: if (accountNumbers.Contains(Row.accountnumber)) Row.DirectRowToDuplicate() (unconnected output) else DirectRowToDefault. accountnumber = Customer_Id_Number_6 trimmed + PadLeft(9,'0') ('Add 0 to short id num'), or Employer_Number_38 when that value is 0 ('merge customer id number and corporate number')",
+          "evidence": "main.cs:111-122 (DTSX 7889); merge DTSX 7592"
+        },
+        {
+          "file": "Minhali Daily Source",
+          "field": "Employer_Number_38",
+          "via": "Package\\Foreach Loop Container\\Create Account For Employers\\remove duplicates account",
+          "why": "part of the de-duplication key: accountnumber := Employer_Number_38 (trimmed, PadLeft 9) when (DT_I8)Customer_Id_Number_6-derived accountnumber == 0; later rows with an already-seen accountnumber are dropped (DirectRowToDuplicate)",
+          "evidence": "main.cs:111-122 (DTSX 7889); merge DTSX 7592"
+        },
+        {
+          "file": "Minhali Daily Source",
+          "field": "Last_Name_9",
+          "via": "Package\\Foreach Loop Container\\Create Account For Employers\\Update Account",
+          "why": "needToUpdate: the row is written only if at least one compared attribute differs from CRM (Extensions.CheckIfToUpdate); Last_Name_9 feeds the compared name; otherwise Row.DirectRowToDontNeedToUpdate() and no update is sent",
+          "evidence": "main.cs:131-221 (DirectRowToDontNeedToUpdate main.cs:221); Extensions.cs:10-67"
+        },
+        {
+          "file": "Minhali Daily Source",
+          "field": "First_Name_10",
+          "via": "Package\\Foreach Loop Container\\Create Account For Employers\\Update Account",
+          "why": "needToUpdate: the row is written only if at least one compared attribute differs from CRM (Extensions.CheckIfToUpdate); First_Name_10 feeds the compared name; otherwise Row.DirectRowToDontNeedToUpdate() and no update is sent",
+          "evidence": "main.cs:131-221 (DirectRowToDontNeedToUpdate main.cs:221); Extensions.cs:10-67"
+        },
+        {
+          "file": "Minhali Daily Source",
+          "field": "Employer_Name_39",
+          "via": "Package\\Foreach Loop Container\\Create Account For Employers\\Update Account",
+          "why": "needToUpdate: the row is written only if at least one compared attribute differs from CRM (Extensions.CheckIfToUpdate); Employer_Name_39 feeds the compared name; otherwise Row.DirectRowToDontNeedToUpdate() and no update is sent",
+          "evidence": "main.cs:131-221 (DirectRowToDontNeedToUpdate main.cs:221); Extensions.cs:10-67"
+        },
+        {
+          "file": "Minhali Daily Source",
+          "field": "Address_City_Name_102",
+          "via": "Package\\Foreach Loop Container\\Create Account For Employers\\Update Account",
+          "why": "needToUpdate: the row is written only if at least one compared attribute differs from CRM (Extensions.CheckIfToUpdate); Address_City_Name_102 feeds the compared gen_address1_city; otherwise Row.DirectRowToDontNeedToUpdate() and no update is sent",
+          "evidence": "main.cs:131-221 (DirectRowToDontNeedToUpdate main.cs:221); Extensions.cs:10-67"
+        },
+        {
+          "file": "Minhali Daily Source",
+          "field": "Address_Building_Number_99",
+          "via": "Package\\Foreach Loop Container\\Create Account For Employers\\Update Account",
+          "why": "needToUpdate: the row is written only if at least one compared attribute differs from CRM (Extensions.CheckIfToUpdate); Address_Building_Number_99 feeds the compared gen_address1_buildingid; otherwise Row.DirectRowToDontNeedToUpdate() and no update is sent",
+          "evidence": "main.cs:131-221 (DirectRowToDontNeedToUpdate main.cs:221); Extensions.cs:10-67"
+        },
+        {
+          "file": "Minhali Daily Source",
+          "field": "Address_Apartment_Number_101",
+          "via": "Package\\Foreach Loop Container\\Create Account For Employers\\Update Account",
+          "why": "needToUpdate: the row is written only if at least one compared attribute differs from CRM (Extensions.CheckIfToUpdate); Address_Apartment_Number_101 feeds the compared gen_address1_buildingid; otherwise Row.DirectRowToDontNeedToUpdate() and no update is sent",
+          "evidence": "main.cs:131-221 (DirectRowToDontNeedToUpdate main.cs:221); Extensions.cs:10-67"
+        },
+        {
+          "file": "Minhali Daily Source",
+          "field": "Address_Returned_Mail_Count_105",
+          "via": "Package\\Foreach Loop Container\\Create Account For Employers\\Update Account",
+          "why": "needToUpdate: the row is written only if at least one compared attribute differs from CRM (Extensions.CheckIfToUpdate); Address_Returned_Mail_Count_105 feeds the compared gen_returnedmailcount; otherwise Row.DirectRowToDontNeedToUpdate() and no update is sent",
+          "evidence": "main.cs:131-221 (DirectRowToDontNeedToUpdate main.cs:221); Extensions.cs:10-67"
+        },
+        {
+          "file": "Minhali Daily Source",
+          "field": "Address_Street_98",
+          "via": "Package\\Foreach Loop Container\\Create Account For Employers\\Update Account",
+          "why": "needToUpdate: the row is written only if at least one compared attribute differs from CRM (Extensions.CheckIfToUpdate); Address_Street_98 feeds the compared address1_line1; otherwise Row.DirectRowToDontNeedToUpdate() and no update is sent",
+          "evidence": "main.cs:131-221 (DirectRowToDontNeedToUpdate main.cs:221); Extensions.cs:10-67"
+        },
+        {
+          "file": "Minhali Daily Source",
+          "field": "Address_Neighborhood_103",
+          "via": "Package\\Foreach Loop Container\\Create Account For Employers\\Update Account",
+          "why": "needToUpdate: the row is written only if at least one compared attribute differs from CRM (Extensions.CheckIfToUpdate); Address_Neighborhood_103 feeds the compared address1_line1; otherwise Row.DirectRowToDontNeedToUpdate() and no update is sent",
+          "evidence": "main.cs:131-221 (DirectRowToDontNeedToUpdate main.cs:221); Extensions.cs:10-67"
+        },
+        {
+          "file": "Minhali Daily Source",
+          "field": "Address_Zip_Code_104",
+          "via": "Package\\Foreach Loop Container\\Create Account For Employers\\Update Account",
+          "why": "needToUpdate: the row is written only if at least one compared attribute differs from CRM (Extensions.CheckIfToUpdate); Address_Zip_Code_104 feeds the compared address1_postalcode; otherwise Row.DirectRowToDontNeedToUpdate() and no update is sent",
+          "evidence": "main.cs:131-221 (DirectRowToDontNeedToUpdate main.cs:221); Extensions.cs:10-67"
+        },
+        {
+          "file": "Minhali Daily Source",
+          "field": "Customer_Date_Of_Birth_11",
+          "via": "Package\\Foreach Loop Container\\Create Account For Employers\\Update Account",
+          "why": "needToUpdate: the row is written only if at least one compared attribute differs from CRM (Extensions.CheckIfToUpdate); Customer_Date_Of_Birth_11 feeds the compared gen_customerdateofbirth; otherwise Row.DirectRowToDontNeedToUpdate() and no update is sent",
+          "evidence": "main.cs:131-221 (DirectRowToDontNeedToUpdate main.cs:221); Extensions.cs:10-67"
+        }
+      ],
+      "condition": "Row read from MY_FileData; NOT SUBSTRING(Revaluation_Date_1,1,1) == \"@\" ('Check for last row' else, DTSX 4129); 'Check for employer funds' output מעסיקים-כספי פיצולים: ((Sector_Code_17 == \"0210\" || (DT_I8)Bank_Account_Number_27 == 0)) && (DT_I4)Employer_Type_41 > 0 && (DT_I4)Employer_Agreement_Number_35 > 0 (DTSX 4093; Bank_Account_Number_27 trimmed and zero-padded to 12 by 'Add 0 to short id num'); lookups 'Get fund type name(product)', 'Get bank branch Id', 'Get Employer Number Estate' (NoMatchBehavior 0 + IgnoreFailure) do not filter; first row per accountnumber only ('remove duplicates account' main.cs:111-122, duplicates go to unconnected output); AND Lookup 'Check if account exists' match (statecode = 0) AND accountsWithFunds != 1 ('Remove accounts with funds' default output 'Account without funds', DTSX 7856; accountsWithFunds = 1 when the account is gen_accountname of a gen_fundmain row with gen_existinfile = 1) AND needToUpdate = at least one compared attribute differs (main.cs:212-221; else row → DontNeedToUpdate)",
+      "attributes": [
+        {
+          "attribute": "gen_modifiedbybank",
+          "from": [],
+          "expression": "DateTime.Now (SSIS host local time) — set on every entity, sent only when needToUpdate",
+          "fixedValue": null,
+          "condition": "needToUpdate",
+          "evidence": "main.cs:133",
+          "upstream": null,
+          "additionalFileFields": []
+        },
+        {
+          "attribute": "name",
+          "from": [
+            {
+              "column": "name",
+              "role": "value"
+            },
+            {
+              "column": "name_db",
+              "role": "condition"
+            }
+          ],
+          "expression": "Row.name as is",
+          "fixedValue": null,
+          "condition": "Extensions.CheckIfToUpdate(ref Row, \"name\", \"namedb\", \"string\") — true when file value ≠ CRM value (both NULL = equal; one NULL = different; case-sensitive String.Equals) (Extensions.cs:10-67) | מקרה קצה (verify-C): כאשר name בצד הקובץ NULL (Last/First/Employer_Name ריקים והלקוח אינו \"לא ידוע\") וב-CRM יש שם — ההשוואה מחזירה \"שונה\", אבל ה-getter שנוצר אוטומטית `return Buffer.GetString(BufferColumnIndexes[10]);` (DTSX 12848-12852) אינו בודק NULL. התנהגות SSIS סטנדרטית (לא נראית ב-DTSX עצמו): קריאה לעמודה NULL זורקת ColumnIsNullException → catch (Exception e) (DTSX 12592) → DirectRowToCastingError. תוצאה: NULL לעולם לא נכתב ל-name, וכל עדכון השורה (כל השדות) נופל לשורת שגיאה.",
+          "evidence": "main.cs:135-139",
+          "upstream": "FILE Last_Name_9 (pos 35-74) → MY_FileData.Last_Name_9 → 'Read MY Data From Staging' SELECT Last_Name_9 + FILE First_Name_10 (pos 75-94) → MY_FileData.First_Name_10 → 'Read MY Data From Staging' SELECT First_Name_10 + FILE Employer_Name_39 (pos 313-362) → MY_FileData.Employer_Name_39 → 'Read MY Data From Staging' SELECT Employer_Name_39 → 'Trim String Fields' script (main.cs:28-50: every string column .Trim(), empty string → NULL) [Employers DTSX 9534] → 'Create Additional Columns' NEW name = !ISNULL(Last_Name_9) && Last_Name_9 != \"\" ? TRIM(Last_Name_9) + (!ISNULL(First_Name_10) && TRIM(First_Name_10) != \"\" ? (\" \" + TRIM(First_Name_10)) : \"\") : First_Name_10 (DTSX 5769) → 'merge customer id number and corporate number' REPLACE name = TRIM(name) == \"\" || ISNULL(name) ? Employer_Name_39 : name (DTSX 7586) → if (DT_I8)accountnumber ∈ {0,1,18} ('Check if customer id number' DTSX 4326) 'Set unknwon customer data' REPLACE name = \"לקוח לא ידוע\" (DTSX 9511) → Union All || name_db: CRM DB values from Lookup 'Check if account exists' (CRM conn, SELECT ... FROM account LEFT JOIN gen_fundmain ... WHERE statecode = 0, key accountnumber_db = accountnumber, DTSX 4164-4215); string *_db columns: 'Set null to empty String fileds' REPLACE x_db == \"\" ? NULL : x_db (DTSX 8812-8860); address1_postalcode_db = isnull(Address1_PostalCode,'0000000')",
+          "additionalFileFields": [
+            {
+              "field": "Employer_Name_39",
+              "role": "value",
+              "via": "'merge customer id number and corporate number' REPLACE name (DTSX 7586)"
+            }
+          ]
+        },
+        {
+          "attribute": "gen_address1_city",
+          "from": [
+            {
+              "column": "gen_address1_city",
+              "role": "value"
+            },
+            {
+              "column": "gen_address1_city_db",
+              "role": "condition"
+            }
+          ],
+          "expression": "Row.genaddress1city as is (NULL written if file value NULL and CRM value not NULL)",
+          "fixedValue": null,
+          "condition": "Extensions.CheckIfToUpdate(ref Row, \"genaddress1city\", \"genaddress1citydb\", \"string\") — true when file value ≠ CRM value (both NULL = equal; one NULL = different; case-sensitive String.Equals) (Extensions.cs:10-67)",
+          "evidence": "main.cs:147-151",
+          "upstream": "FILE Address_City_Name_102 (pos 1139-1163) → MY_FileData.Address_City_Name_102 → 'Read MY Data From Staging' SELECT Address_City_Name_102 (output alias gen_address1_city) → 'Trim String Fields' script (main.cs:28-50: every string column .Trim(), empty string → NULL) [Employers DTSX 9534] → Union All",
+          "additionalFileFields": []
+        },
+        {
+          "attribute": "gen_address1_buildingid",
+          "from": [
+            {
+              "column": "gen_address1_buildingid",
+              "role": "value"
+            },
+            {
+              "column": "gen_address1_buildingid_db",
+              "role": "condition"
+            }
+          ],
+          "expression": "Row.genaddress1buildingid as is (NULL written if file NULL and CRM not NULL)",
+          "fixedValue": null,
+          "condition": "Extensions.CheckIfToUpdate(ref Row, \"genaddress1buildingid\", \"genaddress1buildingiddb\", \"string\") — true when file value ≠ CRM value (both NULL = equal; one NULL = different; case-sensitive String.Equals) (Extensions.cs:10-67)",
+          "evidence": "main.cs:154-158",
+          "upstream": "FILE Address_Building_Number_99 (pos 1114-1123) → MY_FileData.Address_Building_Number_99 → 'Read MY Data From Staging' SELECT Address_Building_Number_99 (output alias gen_address1_buildingid) + FILE Address_Apartment_Number_101 (pos 1134-1138) → MY_FileData.Address_Apartment_Number_101 → 'Read MY Data From Staging' SELECT Address_Apartment_Number_101 → 'Trim String Fields' script (main.cs:28-50: every string column .Trim(), empty string → NULL) [Employers DTSX 9534] → 'Create Additional Columns' REPLACE gen_address1_buildingid = ISNULL(Address_Apartment_Number_101) || Address_Apartment_Number_101 == \"\" ? TRIM(gen_address1_buildingid) : TRIM(gen_address1_buildingid) + \"/\" + TRIM(Address_Apartment_Number_101) (DTSX 5755; column stays wstr(10), truncation = FailComponent) → Union All",
+          "additionalFileFields": [
+            {
+              "field": "Address_Apartment_Number_101",
+              "role": "value",
+              "via": "'Create Additional Columns' REPLACE (DTSX 5755)"
+            }
+          ]
+        },
+        {
+          "attribute": "gen_returnedmailcount",
+          "from": [
+            {
+              "column": "gen_returnedmailcount",
+              "role": "value"
+            },
+            {
+              "column": "gen_returnedmailcount_db",
+              "role": "condition"
+            }
+          ],
+          "expression": "Row.genreturnedmailcount (int) as is",
+          "fixedValue": null,
+          "condition": "Extensions.CheckIfToUpdate(ref Row, \"genreturnedmailcount\", \"genreturnedmailcountdb\", \"int\") — true when file value ≠ CRM value (both NULL = equal; one NULL = different) (Extensions.cs:10-67)",
+          "evidence": "main.cs:160-164",
+          "upstream": "FILE Address_Returned_Mail_Count_105 (pos 1221-1222) → MY_FileData.Address_Returned_Mail_Count_105 → 'Read MY Data From Staging' SELECT Address_Returned_Mail_Count_105 (output alias gen_returnedmailcount_STR_INT) → 'Trim String Fields' script (main.cs:28-50: every string column .Trim(), empty string → NULL) [Employers DTSX 9534] → 'merge customer id number and corporate number' NEW gen_returnedmailcount (i4) = (DT_I4)gen_returnedmailcount_STR_INT (DTSX 7608, FailComponent on cast error) → Union All",
+          "additionalFileFields": []
+        },
+        {
+          "attribute": "address1_line1",
+          "from": [
+            {
+              "column": "address1_line1",
+              "role": "value"
+            },
+            {
+              "column": "address1_line1_db",
+              "role": "condition"
+            }
+          ],
+          "expression": "Row.address1line1 as is",
+          "fixedValue": null,
+          "condition": "Extensions.CheckIfToUpdate(ref Row, \"address1line1\", \"address1line1db\", \"string\") — true when file value ≠ CRM value (both NULL = equal; one NULL = different; case-sensitive String.Equals) (Extensions.cs:10-67)",
+          "evidence": "main.cs:166-170",
+          "upstream": "FILE Address_Street_98 (pos 1094-1113) → MY_FileData.Address_Street_98 → 'Read MY Data From Staging' SELECT Address_Street_98 + FILE Address_Neighborhood_103 (pos 1164-1213) → MY_FileData.Address_Neighborhood_103 → 'Read MY Data From Staging' SELECT Address_Neighborhood_103 → 'Trim String Fields' script (main.cs:28-50: every string column .Trim(), empty string → NULL) [Employers DTSX 9534] → 'Create Additional Columns' NEW address1_line1 = !ISNULL(Address_Neighborhood_103) && Address_Neighborhood_103 != \"\" ? TRIM(Address_Street_98) + \" \" + TRIM(Address_Neighborhood_103) : TRIM(Address_Street_98) (DTSX 5775) → Union All",
+          "additionalFileFields": []
+        },
+        {
+          "attribute": "address1_postalcode",
+          "from": [
+            {
+              "column": "address1_postalcode",
+              "role": "value"
+            },
+            {
+              "column": "address1_postalcode_db",
+              "role": "condition"
+            }
+          ],
+          "expression": "Row.address1postalcode as is; address1_postalcode_db = isnull(Address1_PostalCode,'0000000') in the lookup SQL, so a NULL file zip vs NULL CRM zip compares NULL ≠ '0000000' → update to NULL on every run",
+          "fixedValue": null,
+          "condition": "Extensions.CheckIfToUpdate(ref Row, \"address1postalcode\", \"address1postalcodedb\", \"string\") — true when file value ≠ CRM value (both NULL = equal; one NULL = different; case-sensitive String.Equals) (Extensions.cs:10-67)",
+          "evidence": "main.cs:172-176; lookup SQL DTSX 4173",
+          "upstream": "FILE Address_Zip_Code_104 (pos 1214-1220) → MY_FileData.Address_Zip_Code_104 → 'Read MY Data From Staging' SELECT Address_Zip_Code_104 (output alias address1_postalcode) → 'Trim String Fields' script (main.cs:28-50: every string column .Trim(), empty string → NULL) [Employers DTSX 9534] → Union All",
+          "additionalFileFields": []
+        },
+        {
+          "attribute": "gen_customerdateofbirth",
+          "from": [
+            {
+              "column": "gen_customerdateodbirth",
+              "role": "value"
+            },
+            {
+              "column": "gen_customerdateofbirth_db",
+              "role": "condition"
+            }
+          ],
+          "expression": "if Row.gencustomerdateodbirth not NULL → DateTime.Parse(Row.gencustomerdateodbirth) else NULL (clears CRM value)",
+          "fixedValue": null,
+          "condition": "Extensions.CheckIfToUpdate(ref Row, \"gencustomerdateodbirth\", \"gencustomerdateofbirthdb\", \"DateTime\") — true when file value ≠ CRM value (both NULL = equal; one NULL = different; DateTime: equal when |d1-d2| < 12h) (Extensions.cs:10-67)",
+          "evidence": "main.cs:199-207",
+          "upstream": "FILE Customer_Date_Of_Birth_11 (pos 95-102) → MY_FileData.Customer_Date_Of_Birth_11 → 'Read MY Data From Staging' SELECT Customer_Date_Of_Birth_11 (output alias gen_customerdateodbirth) → 'Trim String Fields' script (main.cs:28-50: every string column .Trim(), empty string → NULL) [Employers DTSX 9534] → Union All → 'Format Dates' script (main.cs:38-80, DTSX 6584): Trim().Length==8 'yyyyMMdd' → 'yyyy/MM/dd'; Length==6 'yyyyMM' → 'yyyy/MM/01'; other length → NULL; NULL if DateTime.TryParse fails or date < 1900-01-01",
+          "additionalFileFields": []
+        }
+      ],
+      "evidence": "main.cs:124-277 + Extensions.cs:10-67 (component DTSX line 12239). Commented out (NOT written): accountnumber main.cs:141-145, fax 179-183, telephone1 185-189, telephone2 192-196. Inputs emailaddress1, fax, telephone1, telephone2, accountnumber, accountnumber_db, gen_inputsource_db, fax_db, telephone1_db, telephone2_db are not used."
+    },
+    {
+      "component": "Package\\Foreach Loop Container\\Create Accounts For Minhali\\Create Account",
+      "identicalCopies": [],
+      "entity": "account",
+      "verb": "CREATE",
+      "mechanism": "SDK (CRM.Proxy ExecuteMultipleExtension, RequestType.Create, batches of 1000)",
+      "status": "Supported",
+      "recordKey": "new record (CRM-generated id; CreatedAccountID output never filled)",
+      "declaredRowFilters": [
+        {
+          "file": "Minhali Daily Source",
+          "field": "Customer_Id_Number_6",
+          "via": "Package\\Foreach Loop Container\\Create Accounts For Minhali\\remove duplicates account",
+          "why": "first row per accountnumber only: If accountnumbers.Contains(Row.accountnumber) Then Row.DirectRowTodeuplicate() (unconnected output) Else Row.DirectRowToOutput0(). accountnumber = Customer_Id_Number_6 trimmed + PadLeft(9,'0'); de-duplication happens before unknown customers get \"000000000\"",
+          "evidence": "main.vb:18-25 (DTSX 19386)"
+        }
+      ],
+      "condition": "Row read from MY_FileData; NOT SUBSTRING(CheckLastRow,1,1) == \"@\" (CheckLastRow = Revaluation_Date_1; 'Check for last row' else, DTSX 15042); 'Check customer type' output חברה-כספי פיצולים-מרכזית פיצויים (EvaluationOrder 1, so row must NOT match order 0 'estate type 210' = Sector_Code_17 == \"0210\" && (DT_I4)Employer_Agreement_Number_35 != 0): ((Gen_CustomerIdType_STR_INT == \"7\" && Sector_Code_17 != \"0210\") || (Sector_Code_17 == \"0210\" && (DT_I4)Employer_Agreement_Number_35 == 0) || Sector_Code_17 == \"0775\") && Row_Level_147 == \"3\" (DTSX 14990; Gen_CustomerIdType_STR_INT = Customer_Id_Type_5); first row per zero-padded accountnumber ('remove duplicates account' main.vb:18-25; dedupe happens BEFORE unknown customers get accountnumber \"000000000\"); AND no CRM account (any statecode — the reference query has no statecode filter, DTSX 15077) with accountnumber = accountnumber ('Check if account exists' No Match Output)",
+      "attributes": [
+        {
+          "attribute": "gen_inputsource",
+          "from": [],
+          "expression": "new OptionSetValue(1)",
+          "fixedValue": 1,
+          "condition": null,
+          "evidence": "main.cs:134",
+          "upstream": null,
+          "additionalFileFields": []
+        },
+        {
+          "attribute": "gen_isoperate",
+          "from": [
+            {
+              "column": "gen_isoperate",
+              "role": "value"
+            }
+          ],
+          "expression": "Row.genisoperate if not NULL; the input is the literal TRUE produced by Derived Column 'Set columns' (DTSX 20315)",
+          "fixedValue": true,
+          "condition": "!Row.genisoperate_IsNull",
+          "evidence": "main.cs:137-138",
+          "upstream": "'Set columns' NEW gen_isoperate = TRUE (DTSX 20315) → Union All 6",
+          "additionalFileFields": []
+        },
+        {
+          "attribute": "emailaddress1",
+          "from": [
+            {
+              "column": "emailaddress1",
+              "role": "value"
+            }
+          ],
+          "expression": "Row.emailaddress1 as is, only if not NULL",
+          "fixedValue": null,
+          "condition": "!Row.emailaddress1_IsNull",
+          "evidence": "main.cs:141-142",
+          "upstream": "FILE Email_108 (pos 1243-1292) → MY_FileData.Email_108 → 'Read MY Data From Staging' SELECT Email_108 (output alias emailaddress1) → 'Trim String Fields' script (main.cs:28-50: every string column .Trim(), empty string → NULL) [Minhali accounts DTSX 21038] → Union All 6",
+          "additionalFileFields": []
+        },
+        {
+          "attribute": "accountnumber",
+          "from": [
+            {
+              "column": "accountnumber",
+              "role": "value"
+            }
+          ],
+          "expression": "Row.accountnumber as is, only if not NULL",
+          "fixedValue": null,
+          "condition": "!Row.accountnumber_IsNull",
+          "evidence": "main.cs:144-145",
+          "upstream": "FILE Customer_Id_Number_6 (pos 16-24) → MY_FileData.Customer_Id_Number_6 → 'Read MY Data From Staging' SELECT Customer_Id_Number_6 (output alias accountnumber) → 'Trim String Fields' script (main.cs:28-50: every string column .Trim(), empty string → NULL) [Minhali accounts DTSX 21038] → 'Add 0 to short id num' script (main.cs:33-54, DTSX 14180: NULL/\"\" → \"\", remove \".\", PadLeft(9,'0')) → if (DT_I8)accountnumber ∈ {0,1,18} 'Set unknwon customer data' REPLACE accountnumber = \"000000000\" (DTSX 21009) → Union All 6",
+          "additionalFileFields": []
+        },
+        {
+          "attribute": "name",
+          "from": [
+            {
+              "column": "name",
+              "role": "value"
+            }
+          ],
+          "expression": "Row.name as is, only if not NULL",
+          "fixedValue": null,
+          "condition": "!Row.name_IsNull",
+          "evidence": "main.cs:147-148",
+          "upstream": "FILE Last_Name_9 (pos 35-74) → MY_FileData.Last_Name_9 → 'Read MY Data From Staging' SELECT Last_Name_9 (output alias lastname) + FILE First_Name_10 (pos 75-94) → MY_FileData.First_Name_10 → 'Read MY Data From Staging' SELECT First_Name_10 (output alias firstname) → 'Trim String Fields' script (main.cs:28-50: every string column .Trim(), empty string → NULL) [Minhali accounts DTSX 21038] → 'Set columns' NEW name = !ISNULL(lastname) && lastname != \"\" ? TRIM(lastname) + (!ISNULL(firstname) && TRIM(firstname) != \"\" ? (\" \" + TRIM(firstname)) : \"\") : firstname (DTSX 20297) → if (DT_I8)accountnumber ∈ {0,1,18} ('Check if customer id number' DTSX 15211) 'Set unknwon customer data' REPLACE name = \"לקוח לא ידוע\" (DTSX 21015) → Union All 6",
+          "additionalFileFields": []
+        },
+        {
+          "attribute": "telephone1",
+          "from": [
+            {
+              "column": "telephone1",
+              "role": "value"
+            }
+          ],
+          "expression": "Row.telephone1 as is, only if not NULL",
+          "fixedValue": null,
+          "condition": "!Row.telephone1_IsNull",
+          "evidence": "main.cs:150-151",
+          "upstream": "FILE Phone_1_Number_14 (pos 115-124) → MY_FileData.Phone_1_Number_14 → 'Read MY Data From Staging' SELECT Phone_1_Number_14 (output alias telephone1) → 'Trim String Fields' script (main.cs:28-50: every string column .Trim(), empty string → NULL) [Minhali accounts DTSX 21038] → Union All 6",
+          "additionalFileFields": []
+        },
+        {
+          "attribute": "telephone2",
+          "from": [
+            {
+              "column": "telephone2",
+              "role": "value"
+            }
+          ],
+          "expression": "Row.telephone2 as is, only if not NULL",
+          "fixedValue": null,
+          "condition": "!Row.telephone2_IsNull",
+          "evidence": "main.cs:153-154",
+          "upstream": "FILE Phone_2_Number_106 (pos 1223-1232) → MY_FileData.Phone_2_Number_106 → 'Read MY Data From Staging' SELECT Phone_2_Number_106 (output alias telephone2) → 'Trim String Fields' script (main.cs:28-50: every string column .Trim(), empty string → NULL) [Minhali accounts DTSX 21038] → Union All 6",
+          "additionalFileFields": []
+        },
+        {
+          "attribute": "fax",
+          "from": [
+            {
+              "column": "fax",
+              "role": "value"
+            }
+          ],
+          "expression": "Row.fax as is, only if not NULL",
+          "fixedValue": null,
+          "condition": "!Row.fax_IsNull",
+          "evidence": "main.cs:156-157",
+          "upstream": "FILE Fax_107 (pos 1233-1242) → MY_FileData.Fax_107 → 'Read MY Data From Staging' SELECT Fax_107 (output alias fax) → 'Trim String Fields' script (main.cs:28-50: every string column .Trim(), empty string → NULL) [Minhali accounts DTSX 21038] → Union All 6",
+          "additionalFileFields": []
+        },
+        {
+          "attribute": "gen_postalcode",
+          "from": [
+            {
+              "column": "Mailbox_78",
+              "role": "value"
+            }
+          ],
+          "expression": "Row.Mailbox78 as is (no trim in this data flow), only if not NULL",
+          "fixedValue": null,
+          "condition": "!Row.Mailbox78_IsNull",
+          "evidence": "main.cs:159-160",
+          "upstream": "FILE Mailbox_78 (pos 661-665) → MY_FileData.Mailbox_78 → 'Read MY Data From Staging' SELECT Mailbox_78 → Union All 6 (NOT an input of 'Trim String Fields' in this data flow → no trim here)",
+          "additionalFileFields": []
+        },
+        {
+          "attribute": "gen_address1_buildingid",
+          "from": [
+            {
+              "column": "gen_address1_buildingid",
+              "role": "value"
+            }
+          ],
+          "expression": "Row.genaddress1buildingid as is, only if not NULL",
+          "fixedValue": null,
+          "condition": "!Row.genaddress1buildingid_IsNull",
+          "evidence": "main.cs:166-167",
+          "upstream": "FILE Address_Building_Number_99 (pos 1114-1123) → MY_FileData.Address_Building_Number_99 → 'Read MY Data From Staging' SELECT Address_Building_Number_99 + FILE Address_Apartment_Number_101 (pos 1134-1138) → MY_FileData.Address_Apartment_Number_101 → 'Read MY Data From Staging' SELECT Address_Apartment_Number_101 → 'Trim String Fields' script (main.cs:28-50: every string column .Trim(), empty string → NULL) [Minhali accounts DTSX 21038] → 'Set columns' NEW gen_address1_buildingid (wstr16) = ISNULL(Address_Apartment_Number_101) || Address_Apartment_Number_101 == \"\" ? TRIM(Address_Building_Number_99) : TRIM(Address_Building_Number_99) + \"/\" + TRIM(Address_Apartment_Number_101) (DTSX 20303) → Union All 6",
+          "additionalFileFields": []
+        },
+        {
+          "attribute": "gen_address1_city",
+          "from": [
+            {
+              "column": "gen_address1_city",
+              "role": "value"
+            }
+          ],
+          "expression": "Row.genaddress1city as is, only if not NULL",
+          "fixedValue": null,
+          "condition": "!Row.genaddress1city_IsNull",
+          "evidence": "main.cs:169-170",
+          "upstream": "FILE Address_City_Name_102 (pos 1139-1163) → MY_FileData.Address_City_Name_102 → 'Read MY Data From Staging' SELECT Address_City_Name_102 (output alias gen_address1_city) → 'Trim String Fields' script (main.cs:28-50: every string column .Trim(), empty string → NULL) [Minhali accounts DTSX 21038] → Union All 6",
+          "additionalFileFields": []
+        },
+        {
+          "attribute": "address1_line1",
+          "from": [
+            {
+              "column": "address1_line1",
+              "role": "value"
+            }
+          ],
+          "expression": "Row.address1line1 as is, only if not NULL",
+          "fixedValue": null,
+          "condition": "!Row.address1line1_IsNull",
+          "evidence": "main.cs:171-172",
+          "upstream": "FILE Address_Street_98 (pos 1094-1113) → MY_FileData.Address_Street_98 → 'Read MY Data From Staging' SELECT Address_Street_98 + FILE Address_Neighborhood_103 (pos 1164-1213) → MY_FileData.Address_Neighborhood_103 → 'Read MY Data From Staging' SELECT Address_Neighborhood_103 → 'Trim String Fields' script (main.cs:28-50: every string column .Trim(), empty string → NULL) [Minhali accounts DTSX 21038] → 'Set columns' NEW address1_line1 = !ISNULL(Address_Neighborhood_103) && Address_Neighborhood_103 != \"\" ? TRIM(Address_Street_98) + \" \" + TRIM(Address_Neighborhood_103) : TRIM(Address_Street_98) (DTSX 20309) → Union All 6",
+          "additionalFileFields": []
+        },
+        {
+          "attribute": "address1_postalcode",
+          "from": [
+            {
+              "column": "address1_postalcode",
+              "role": "value"
+            }
+          ],
+          "expression": "Row.address1postalcode as is, only if not NULL",
+          "fixedValue": null,
+          "condition": "!Row.address1postalcode_IsNull",
+          "evidence": "main.cs:173-174",
+          "upstream": "FILE Address_Zip_Code_104 (pos 1214-1220) → MY_FileData.Address_Zip_Code_104 → 'Read MY Data From Staging' SELECT Address_Zip_Code_104 (output alias address1_postalcode) → 'Trim String Fields' script (main.cs:28-50: every string column .Trim(), empty string → NULL) [Minhali accounts DTSX 21038] → Union All 6",
+          "additionalFileFields": []
+        },
+        {
+          "attribute": "address1_name",
+          "from": [
+            {
+              "column": "address1_name",
+              "role": "value"
+            }
+          ],
+          "expression": "Row.address1name if not NULL; the input is the literal \"ראשי\" from Derived Column 'Set columns' (DTSX 20291)",
+          "fixedValue": "ראשי",
+          "condition": "!Row.address1name_IsNull",
+          "evidence": "main.cs:175-176",
+          "upstream": "'Set columns' NEW address1_name = \"ראשי\" (DTSX 20291) → Union All 6",
+          "additionalFileFields": []
+        },
+        {
+          "attribute": "gen_returnedmailcount",
+          "from": [
+            {
+              "column": "gen_returnedmailcount",
+              "role": "value"
+            }
+          ],
+          "expression": "Int32.Parse(Row.genreturnedmailcount) (string wstr(2) → int; exception → CastingError output)",
+          "fixedValue": null,
+          "condition": "!Row.genreturnedmailcount_IsNull",
+          "evidence": "main.cs:179-180",
+          "upstream": "FILE Address_Returned_Mail_Count_105 (pos 1221-1222) → MY_FileData.Address_Returned_Mail_Count_105 → 'Read MY Data From Staging' SELECT Address_Returned_Mail_Count_105 (output alias gen_returnedmailcount) → 'Trim String Fields' script (main.cs:28-50: every string column .Trim(), empty string → NULL) [Minhali accounts DTSX 21038] → Union All 6 (still wstr(2))",
+          "additionalFileFields": []
+        },
+        {
+          "attribute": "gen_customerdateofbirth",
+          "from": [
+            {
+              "column": "gen_customerdateofbirth",
+              "role": "value"
+            }
+          ],
+          "expression": "DateTime.Parse(Row.gencustomerdateofbirth) ('yyyy/MM/dd' string from Format Dates 1)",
+          "fixedValue": null,
+          "condition": "!Row.gencustomerdateofbirth_IsNull",
+          "evidence": "main.cs:183-184",
+          "upstream": "FILE Customer_Date_Of_Birth_11 (pos 95-102) → MY_FileData.Customer_Date_Of_Birth_11 → 'Read MY Data From Staging' SELECT Customer_Date_Of_Birth_11 (output alias gen_customerdateofbirth) → 'Trim String Fields' script (main.cs:28-50: every string column .Trim(), empty string → NULL) [Minhali accounts DTSX 21038] → Union All 6 → 'Format Dates 1' script (main.cs:33-74, DTSX 18416): Trim().Length==8 'yyyyMMdd' → 'yyyy/MM/dd'; Length==6 'yyyyMM' → 'yyyy/MM/01'; other length → NULL; NULL if DateTime.TryParse fails or date < 1900-01-01",
+          "additionalFileFields": []
+        },
+        {
+          "attribute": "gen_modifiedbybank",
+          "from": [],
+          "expression": "DateTime.Now (SSIS host local time)",
+          "fixedValue": null,
+          "condition": null,
+          "evidence": "main.cs:187",
+          "upstream": null,
+          "additionalFileFields": []
+        }
+      ],
+      "evidence": "main.cs:123-248 (component DTSX line 16121; Entity(\"account\") main.cs:125; RequestType.Create main.cs:208). Input gen_bankcustomeridnumber mapping is commented out (main.cs:162-163) and not an input."
+    },
+    {
+      "component": "Package\\Foreach Loop Container\\Create Accounts For Minhali\\Update Account",
+      "identicalCopies": [],
+      "entity": "account",
+      "verb": "UPDATE",
+      "mechanism": "SQL (UPDATE AccountBase) on connection CRM (catalog altshuler_mscrm)",
+      "status": "Unsupported",
+      "recordKey": "WHERE accountId = ? (Param_7 ← accountid from Lookup 'Check if account exists', DTSX 22708)",
+      "recordKeyColumns": [
+        "accountid"
+      ],
+      "declaredRowFilters": [
+        {
+          "file": "Minhali Daily Source",
+          "field": "Customer_Id_Number_6",
+          "via": "Package\\Foreach Loop Container\\Create Accounts For Minhali\\remove duplicates account",
+          "why": "first row per accountnumber only: If accountnumbers.Contains(Row.accountnumber) Then Row.DirectRowTodeuplicate() (unconnected output) Else Row.DirectRowToOutput0(). accountnumber = Customer_Id_Number_6 trimmed + PadLeft(9,'0'); de-duplication happens before unknown customers get \"000000000\"",
+          "evidence": "main.vb:18-25 (DTSX 19386)"
+        }
+      ],
+      "condition": "Row read from MY_FileData; NOT SUBSTRING(CheckLastRow,1,1) == \"@\" (CheckLastRow = Revaluation_Date_1; 'Check for last row' else, DTSX 15042); 'Check customer type' output חברה-כספי פיצולים-מרכזית פיצויים (EvaluationOrder 1, so row must NOT match order 0 'estate type 210' = Sector_Code_17 == \"0210\" && (DT_I4)Employer_Agreement_Number_35 != 0): ((Gen_CustomerIdType_STR_INT == \"7\" && Sector_Code_17 != \"0210\") || (Sector_Code_17 == \"0210\" && (DT_I4)Employer_Agreement_Number_35 == 0) || Sector_Code_17 == \"0775\") && Row_Level_147 == \"3\" (DTSX 14990; Gen_CustomerIdType_STR_INT = Customer_Id_Type_5); first row per zero-padded accountnumber ('remove duplicates account' main.vb:18-25; dedupe happens BEFORE unknown customers get accountnumber \"000000000\"); AND Lookup 'Check if account exists' match (any statecode) → 'Add Additional Fields' → 'Convert To Date' → executed for EVERY matched row (no change detection)",
+      "attributes": [
+        {
+          "attribute": "gen_inputsource",
+          "from": [],
+          "expression": "literal 1",
+          "fixedValue": 1,
+          "condition": null,
+          "evidence": "DTSX 22697",
+          "upstream": null,
+          "additionalFileFields": []
+        },
+        {
+          "attribute": "gen_isoperate",
+          "from": [],
+          "expression": "literal 1",
+          "fixedValue": 1,
+          "condition": null,
+          "evidence": "DTSX 22698",
+          "upstream": null,
+          "additionalFileFields": []
+        },
+        {
+          "attribute": "name",
+          "from": [
+            {
+              "column": "name",
+              "role": "value"
+            }
+          ],
+          "expression": "Param_0 (1st ?) as is; NULL overwrites",
+          "fixedValue": null,
+          "condition": null,
+          "evidence": "DTSX 22699 (?0 → Param_0, input line 22721)",
+          "upstream": "FILE Last_Name_9 (pos 35-74) → MY_FileData.Last_Name_9 → 'Read MY Data From Staging' SELECT Last_Name_9 (output alias lastname) + FILE First_Name_10 (pos 75-94) → MY_FileData.First_Name_10 → 'Read MY Data From Staging' SELECT First_Name_10 (output alias firstname) → 'Trim String Fields' script (main.cs:28-50: every string column .Trim(), empty string → NULL) [Minhali accounts DTSX 21038] → 'Set columns' NEW name = !ISNULL(lastname) && lastname != \"\" ? TRIM(lastname) + (!ISNULL(firstname) && TRIM(firstname) != \"\" ? (\" \" + TRIM(firstname)) : \"\") : firstname (DTSX 20297) → if (DT_I8)accountnumber ∈ {0,1,18} ('Check if customer id number' DTSX 15211) 'Set unknwon customer data' REPLACE name = \"לקוח לא ידוע\" (DTSX 21015) → Union All 6",
+          "additionalFileFields": []
+        },
+        {
+          "attribute": "gen_address1_buildingid",
+          "from": [
+            {
+              "column": "gen_address1_buildingid",
+              "role": "value"
+            }
+          ],
+          "expression": "Param_1 as is",
+          "fixedValue": null,
+          "condition": null,
+          "evidence": "DTSX 22700 (?1, input 22722)",
+          "upstream": "FILE Address_Building_Number_99 (pos 1114-1123) → MY_FileData.Address_Building_Number_99 → 'Read MY Data From Staging' SELECT Address_Building_Number_99 + FILE Address_Apartment_Number_101 (pos 1134-1138) → MY_FileData.Address_Apartment_Number_101 → 'Read MY Data From Staging' SELECT Address_Apartment_Number_101 → 'Trim String Fields' script (main.cs:28-50: every string column .Trim(), empty string → NULL) [Minhali accounts DTSX 21038] → 'Set columns' NEW gen_address1_buildingid (wstr16) = ISNULL(Address_Apartment_Number_101) || Address_Apartment_Number_101 == \"\" ? TRIM(Address_Building_Number_99) : TRIM(Address_Building_Number_99) + \"/\" + TRIM(Address_Apartment_Number_101) (DTSX 20303) → Union All 6",
+          "additionalFileFields": []
+        },
+        {
+          "attribute": "gen_address1_city",
+          "from": [
+            {
+              "column": "gen_address1_city",
+              "role": "value"
+            }
+          ],
+          "expression": "Param_2 as is",
+          "fixedValue": null,
+          "condition": null,
+          "evidence": "DTSX 22701 (?2, input 22723)",
+          "upstream": "FILE Address_City_Name_102 (pos 1139-1163) → MY_FileData.Address_City_Name_102 → 'Read MY Data From Staging' SELECT Address_City_Name_102 (output alias gen_address1_city) → 'Trim String Fields' script (main.cs:28-50: every string column .Trim(), empty string → NULL) [Minhali accounts DTSX 21038] → Union All 6",
+          "additionalFileFields": []
+        },
+        {
+          "attribute": "gen_returnedmailcount",
+          "from": [
+            {
+              "column": "gen_returnedmailcount",
+              "role": "value"
+            }
+          ],
+          "expression": "Param_3 (param typed i4; input column wstr(2) validated by (DT_I4) cast upstream)",
+          "fixedValue": null,
+          "condition": null,
+          "evidence": "DTSX 22702 (?3, input 22724)",
+          "upstream": "FILE Address_Returned_Mail_Count_105 (pos 1221-1222) → MY_FileData.Address_Returned_Mail_Count_105 → 'Read MY Data From Staging' SELECT Address_Returned_Mail_Count_105 (output alias gen_returnedmailcount) → 'Trim String Fields' script (main.cs:28-50: every string column .Trim(), empty string → NULL) [Minhali accounts DTSX 21038] → Union All 6 → 'Add Additional Fields' REPLACE gen_returnedmailcount = ISNULL(gen_returnedmailcount) ? NULL(DT_I4) : (DT_I4)(gen_returnedmailcount) (DTSX 14946; column stays wstr(2), FailComponent on cast error) → OLE DB param typed i4",
+          "additionalFileFields": []
+        },
+        {
+          "attribute": "gen_customerdateofbirth",
+          "from": [
+            {
+              "column": "gen_customerdateofbirth_DateTime",
+              "role": "value"
+            }
+          ],
+          "expression": "Param_4 = gen_customerdateofbirth_DateTime (DateTime parsed in Convert To Date; NULL when file date missing/invalid → overwrites CRM value with NULL)",
+          "fixedValue": null,
+          "condition": null,
+          "evidence": "DTSX 22703 (?4, input 22725)",
+          "upstream": "'Add Additional Fields' NEW gen_customerdateofbirth_DateTime = NULL(DT_DBDATE) (DTSX 14960) → 'Convert To Date' script (main.cs:115-125, DTSX 15244): if gen_customerdateofbirth not NULL → DateTime.Parse(gen_customerdateofbirth) (exceptions swallowed → stays NULL). gen_customerdateofbirth = FILE Customer_Date_Of_Birth_11 (pos 95-102) → MY_FileData.Customer_Date_Of_Birth_11 → 'Read MY Data From Staging' SELECT Customer_Date_Of_Birth_11 → Trim → 'Format Dates 1' ('yyyyMMdd' → 'yyyy/MM/dd', invalid/<1900 → NULL)",
+          "additionalFileFields": []
+        },
+        {
+          "attribute": "gen_modifiedbybank",
+          "from": [],
+          "expression": "getDate() (SQL server local time)",
+          "fixedValue": null,
+          "condition": null,
+          "evidence": "DTSX 22704",
+          "upstream": null,
+          "additionalFileFields": []
+        },
+        {
+          "attribute": "modifiedon",
+          "from": [],
+          "expression": "GETDATE() (SQL server local time, while CRM stores UTC)",
+          "fixedValue": null,
+          "condition": null,
+          "evidence": "DTSX 22705",
+          "upstream": null,
+          "additionalFileFields": []
+        },
+        {
+          "attribute": "modifiedby",
+          "from": [
+            {
+              "column": "userId",
+              "role": "value"
+            }
+          ],
+          "expression": "Param_5 = userId = (DT_GUID)(\"{\" + @[User::UserId] + \"}\") — package variable, not a file value",
+          "fixedValue": null,
+          "condition": null,
+          "evidence": "DTSX 22706 (?5, input 22726)",
+          "upstream": "'Add Additional Fields' NEW userId = (DT_GUID)(\"{\" + @[User::UserId] + \"}\") (DTSX 14966); User::UserId default '' (DTSX 441), set at runtime by package plumbing",
+          "additionalFileFields": []
+        },
+        {
+          "attribute": "gen_postalcode",
+          "from": [
+            {
+              "column": "Mailbox_78",
+              "role": "value"
+            }
+          ],
+          "expression": "Param_6 as is (no trim in this data flow)",
+          "fixedValue": null,
+          "condition": null,
+          "evidence": "DTSX 22707 (?6, input 22727)",
+          "upstream": "FILE Mailbox_78 (pos 661-665) → MY_FileData.Mailbox_78 → 'Read MY Data From Staging' SELECT Mailbox_78 → Union All 6 (NOT an input of 'Trim String Fields' in this data flow → no trim here)",
+          "additionalFileFields": []
+        }
+      ],
+      "evidence": "OLE DB Command SqlCommand DTSX 22695-22712; 11 ? counted (Param_0..Param_10), bindings via externalMetadataColumnId at DTSX 22721-22731"
+    },
+    {
+      "component": "Package\\Foreach Loop Container\\Create Accounts For Minhali\\Update Account",
+      "identicalCopies": [],
+      "entity": "customeraddress",
+      "verb": "UPDATE",
+      "mechanism": "SQL (UPDATE CustomerAddressBase, 2nd statement of the same OLE DB Command)",
+      "status": "Unsupported",
+      "recordKey": "WHERE ParentId = ? (Param_10 ← customerAddressParentId = accountid) AND AddressNumber = 1 AND ObjectTypeCode = 1 (account address 1), DTSX 22712",
+      "recordKeyColumns": [
+        "customerAddressParentId"
+      ],
+      "declaredRowFilters": [
+        {
+          "file": "Minhali Daily Source",
+          "field": "Customer_Id_Number_6",
+          "via": "Package\\Foreach Loop Container\\Create Accounts For Minhali\\remove duplicates account",
+          "why": "first row per accountnumber only: If accountnumbers.Contains(Row.accountnumber) Then Row.DirectRowTodeuplicate() (unconnected output) Else Row.DirectRowToOutput0(). accountnumber = Customer_Id_Number_6 trimmed + PadLeft(9,'0'); de-duplication happens before unknown customers get \"000000000\"",
+          "evidence": "main.vb:18-25 (DTSX 19386)"
+        }
+      ],
+      "condition": "Row read from MY_FileData; NOT SUBSTRING(CheckLastRow,1,1) == \"@\" (CheckLastRow = Revaluation_Date_1; 'Check for last row' else, DTSX 15042); 'Check customer type' output חברה-כספי פיצולים-מרכזית פיצויים (EvaluationOrder 1, so row must NOT match order 0 'estate type 210' = Sector_Code_17 == \"0210\" && (DT_I4)Employer_Agreement_Number_35 != 0): ((Gen_CustomerIdType_STR_INT == \"7\" && Sector_Code_17 != \"0210\") || (Sector_Code_17 == \"0210\" && (DT_I4)Employer_Agreement_Number_35 == 0) || Sector_Code_17 == \"0775\") && Row_Level_147 == \"3\" (DTSX 14990; Gen_CustomerIdType_STR_INT = Customer_Id_Type_5); first row per zero-padded accountnumber ('remove duplicates account' main.vb:18-25; dedupe happens BEFORE unknown customers get accountnumber \"000000000\"); AND Lookup 'Check if account exists' match (any statecode) → 'Add Additional Fields' → 'Convert To Date' → executed for EVERY matched row (no change detection)",
+      "attributes": [
+        {
+          "attribute": "postalcode",
+          "from": [
+            {
+              "column": "address1_postalcode",
+              "role": "value"
+            }
+          ],
+          "expression": "Param_8 as is",
+          "fixedValue": null,
+          "condition": null,
+          "evidence": "DTSX 22710 (?8, input 22729)",
+          "upstream": "FILE Address_Zip_Code_104 (pos 1214-1220) → MY_FileData.Address_Zip_Code_104 → 'Read MY Data From Staging' SELECT Address_Zip_Code_104 (output alias address1_postalcode) → 'Trim String Fields' script (main.cs:28-50: every string column .Trim(), empty string → NULL) [Minhali accounts DTSX 21038] → Union All 6",
+          "additionalFileFields": []
+        },
+        {
+          "attribute": "line1",
+          "from": [
+            {
+              "column": "address1_line1",
+              "role": "value"
+            }
+          ],
+          "expression": "Param_9 as is",
+          "fixedValue": null,
+          "condition": null,
+          "evidence": "DTSX 22711 (?9, input 22730)",
+          "upstream": "FILE Address_Street_98 (pos 1094-1113) → MY_FileData.Address_Street_98 → 'Read MY Data From Staging' SELECT Address_Street_98 + FILE Address_Neighborhood_103 (pos 1164-1213) → MY_FileData.Address_Neighborhood_103 → 'Read MY Data From Staging' SELECT Address_Neighborhood_103 → 'Trim String Fields' script (main.cs:28-50: every string column .Trim(), empty string → NULL) [Minhali accounts DTSX 21038] → 'Set columns' NEW address1_line1 = !ISNULL(Address_Neighborhood_103) && Address_Neighborhood_103 != \"\" ? TRIM(Address_Street_98) + \" \" + TRIM(Address_Neighborhood_103) : TRIM(Address_Street_98) (DTSX 20309) → Union All 6",
+          "additionalFileFields": []
+        }
+      ],
+      "evidence": "OLE DB Command SqlCommand DTSX 22695-22712"
+    },
+    {
+      "component": "Package\\Foreach Loop Container\\Create Contacts For Minhali\\Create Contact",
+      "identicalCopies": [],
+      "entity": "contact",
+      "verb": "CREATE",
+      "mechanism": "SDK (CRM.Proxy ExecuteMultipleExtension, RequestType.Create, batches of 10)",
+      "status": "Supported",
+      "recordKey": "new record (CRM-generated id; CreatedContactID output never filled)",
+      "declaredRowFilters": [
+        {
+          "file": "Minhali Daily Source",
+          "field": "Customer_Id_Number_6",
+          "via": "Package\\Foreach Loop Container\\Create Contacts For Minhali\\Remove Duplicate",
+          "why": "first row per gen_identitynumber only: if (contacts.Contains(Row.genidentitynumber)) Row.DirectRowToDuplicate() (unconnected output) else DirectRowToOutput0. gen_identitynumber = Customer_Id_Number_6 trimmed, not padded ('Add 0' is a no-op); de-duplication happens before unknown customers get \"000000000\"",
+          "evidence": "main.cs:112-121 (DTSX 28923)"
+        }
+      ],
+      "condition": "Row read from MY_FileData; NOT SUBSTRING(CheckLastRow,1,1) == \"@\" ('Check for last row' else, DTSX 23643); 'Check customer type' DEFAULT output פרטי = none of: 'estate type 210' (Sector_Code_17 == \"0210\" && (DT_I4)Employer_Agreement_Number_35 != 0), company ((Gen_CustomerIdType_STR_INT == \"7\" && Sector_Code_17 != \"0210\") || (Sector_Code_17 == \"0210\" && (DT_I4)Employer_Agreement_Number_35 == 0) || Sector_Code_17 == \"0775\"), 'Other Customer' (ISNULL(Gen_CustomerIdType_STR_INT) || type ∉ {\"1\",\"5\",\"6\"}) (DTSX 23592); 'Is Contact' Row_Level_147 == \"1\" (DTSX 28690); first row per trimmed gen_identitynumber ('Remove Duplicate' main.cs:112-121; dedupe BEFORE unknown customers get \"000000000\"); AND no active CRM contact (statecode = 0) with gen_identitynumber = gen_identitynumber ('Check if contact exists' No Match Output, DTSX 23676-23786)",
+      "attributes": [
+        {
+          "attribute": "gendercode",
+          "from": [
+            {
+              "column": "gendercode",
+              "role": "value"
+            }
+          ],
+          "expression": "new OptionSetValue(Row.gendercode) (1 or 2)",
+          "fixedValue": null,
+          "condition": "!Row.gendercode_IsNull",
+          "evidence": "main.cs:43-44",
+          "upstream": "FILE Gender_Code_8 (pos 34) → MY_FileData.Gender_Code_8 → 'Read MY Data From Staging' SELECT Gender_Code_8 (output alias gendercode_STR_INT) → 'Trim String Fields' script (main.cs:28-50: every string column .Trim(), empty string → NULL) [contacts DTSX 31364] → Union All 6 → 'Custom Fields' NEW gendercode (i4) = gendercode_STR_INT == \"1\" || gendercode_STR_INT == \"2\" ? (DT_I4)gendercode_STR_INT : NULL(DT_I4) (DTSX 26927)",
+          "additionalFileFields": []
+        },
+        {
+          "attribute": "gen_inputsource",
+          "from": [],
+          "expression": "new OptionSetValue(1)",
+          "fixedValue": 1,
+          "condition": null,
+          "evidence": "main.cs:46",
+          "upstream": null,
+          "additionalFileFields": []
+        },
+        {
+          "attribute": "gen_isoperate",
+          "from": [
+            {
+              "column": "gen_isoperate",
+              "role": "value"
+            }
+          ],
+          "expression": "Row.genisoperate; the input is the literal TRUE from 'Custom Fields' (DTSX 26915)",
+          "fixedValue": true,
+          "condition": "!Row.genisoperate_IsNull",
+          "evidence": "main.cs:49-50",
+          "upstream": "'Custom Fields' NEW gen_isoperate = TRUE (DTSX 26915)",
+          "additionalFileFields": []
+        },
+        {
+          "attribute": "gen_leumi",
+          "from": [
+            {
+              "column": "gen_leumi",
+              "role": "value"
+            }
+          ],
+          "expression": "Row.genleumi; the input is the literal TRUE from 'Custom Fields' (DTSX 26921)",
+          "fixedValue": true,
+          "condition": "!Row.genleumi_IsNull",
+          "evidence": "main.cs:51-52",
+          "upstream": "'Custom Fields' NEW gen_leumi = TRUE (DTSX 26921)",
+          "additionalFileFields": []
+        },
+        {
+          "attribute": "emailaddress1",
+          "from": [
+            {
+              "column": "emailaddress1",
+              "role": "value"
+            }
+          ],
+          "expression": "Row.emailaddress1 as is (already NULL if it failed the e-mail regex upstream)",
+          "fixedValue": null,
+          "condition": "!Row.emailaddress1_IsNull",
+          "evidence": "main.cs:55-57",
+          "upstream": "FILE Email_108 (pos 1243-1292) → MY_FileData.Email_108 → 'Read MY Data From Staging' SELECT Email_108 (output alias emailaddress1) → 'Trim String Fields' script (main.cs:28-50: every string column .Trim(), empty string → NULL) [contacts DTSX 31364] → Union All 6 → 'Set MobilePhone End EmailAddress1' readWrite (main.cs:38-41,45-52): set to NULL unless it matches ^(?:[a-z0-9_-]+(?:\\.[a-z0-9_-]+)*|)@([\\w\\-]+)((\\.(\\w){2,3})+)$ (IgnoreCase)",
+          "additionalFileFields": []
+        },
+        {
+          "attribute": "gen_emailaddress1sourcelastupdate",
+          "from": [
+            {
+              "column": "emailaddress1",
+              "role": "condition"
+            }
+          ],
+          "expression": "new OptionSetValue(GamelInterface); GamelInterface = 3 (field initialiser main.cs:18, never reassigned)",
+          "fixedValue": 3,
+          "condition": "!Row.emailaddress1_IsNull",
+          "evidence": "main.cs:18,55-58",
+          "upstream": null,
+          "additionalFileFields": []
+        },
+        {
+          "attribute": "gen_emailaddress1lastupdatedate",
+          "from": [
+            {
+              "column": "emailaddress1",
+              "role": "condition"
+            }
+          ],
+          "expression": "DateTime.Now",
+          "fixedValue": null,
+          "condition": "!Row.emailaddress1_IsNull",
+          "evidence": "main.cs:55-59",
+          "upstream": null,
+          "additionalFileFields": []
+        },
+        {
+          "attribute": "gen_identitynumber",
+          "from": [
+            {
+              "column": "gen_identitynumber",
+              "role": "value"
+            }
+          ],
+          "expression": "Row.genidentitynumber as is (trimmed file value, NOT zero-padded; \"000000000\" for unknown customer)",
+          "fixedValue": null,
+          "condition": "!Row.genidentitynumber_IsNull",
+          "evidence": "main.cs:62-63",
+          "upstream": "FILE Customer_Id_Number_6 (pos 16-24) → MY_FileData.Customer_Id_Number_6 → 'Read MY Data From Staging' SELECT Customer_Id_Number_6 (output alias gen_identitynumber) → 'Trim String Fields' script (main.cs:28-50: every string column .Trim(), empty string → NULL) [contacts DTSX 31364] → 'Add 0' script = NO-OP (whole loop commented out, main.cs:35-49, DTSX 22848) → (if (DT_I8)gen_identitynumber ∈ {0,1,18}: 'Set unknwon customer data' REPLACE = \"000000000\", DTSX 31335) → Union All 6",
+          "additionalFileFields": []
+        },
+        {
+          "attribute": "firstname",
+          "from": [
+            {
+              "column": "firstname",
+              "role": "value"
+            }
+          ],
+          "expression": "Row.firstname as is",
+          "fixedValue": null,
+          "condition": "!Row.firstname_IsNull",
+          "evidence": "main.cs:65-66",
+          "upstream": "FILE First_Name_10 (pos 75-94) → MY_FileData.First_Name_10 → 'Read MY Data From Staging' SELECT First_Name_10 (output alias firstname) → 'Trim String Fields' script (main.cs:28-50: every string column .Trim(), empty string → NULL) [contacts DTSX 31364] → (unknown customer: REPLACE firstname = \"לא ידוע\", DTSX 31329) → Union All 6",
+          "additionalFileFields": []
+        },
+        {
+          "attribute": "lastname",
+          "from": [
+            {
+              "column": "lastname",
+              "role": "value"
+            }
+          ],
+          "expression": "Row.lastname as is",
+          "fixedValue": null,
+          "condition": "!Row.lastname_IsNull",
+          "evidence": "main.cs:68-69",
+          "upstream": "FILE Last_Name_9 (pos 35-74) → MY_FileData.Last_Name_9 → 'Read MY Data From Staging' SELECT Last_Name_9 (output alias lastname) → 'Trim String Fields' script (main.cs:28-50: every string column .Trim(), empty string → NULL) [contacts DTSX 31364] → (unknown customer: REPLACE lastname = \"לקוח\", DTSX 31323) → Union All 6",
+          "additionalFileFields": []
+        },
+        {
+          "attribute": "fullname",
+          "from": [
+            {
+              "column": "fullname",
+              "role": "value"
+            }
+          ],
+          "expression": "Row.fullname as is (explicitly set although CRM normally composes fullname)",
+          "fixedValue": null,
+          "condition": "!Row.fullname_IsNull",
+          "evidence": "main.cs:71-72",
+          "upstream": "lastname/firstname (see those; unknown customer → \"לקוח\"/\"לא ידוע\") → 'Custom Fields' NEW fullname = !ISNULL(lastname) && lastname != \"\" ? TRIM(lastname) + (!ISNULL(firstname) && TRIM(firstname) != \"\" ? (\" \" + TRIM(firstname)) : \"\") : firstname (DTSX 26909)",
+          "additionalFileFields": []
+        },
+        {
+          "attribute": "telephone1",
+          "from": [
+            {
+              "column": "telephone1",
+              "role": "value"
+            }
+          ],
+          "expression": "Row.telephone1 as is (value after mobile/landline swap)",
+          "fixedValue": null,
+          "condition": "!Row.telephone1_IsNull",
+          "evidence": "main.cs:74-75",
+          "upstream": "FILE Phone_1_Number_14 (pos 115-124) → MY_FileData.Phone_1_Number_14 → 'Read MY Data From Staging' SELECT Phone_1_Number_14 (output alias telephone1) + FILE Phone_2_Number_106 (pos 1223-1232) → MY_FileData.Phone_2_Number_106 → 'Read MY Data From Staging' SELECT Phone_2_Number_106 (output alias telephone2) → 'Trim String Fields' script (main.cs:28-50: every string column .Trim(), empty string → NULL) [contacts DTSX 31364] → Union All 6 → 'Set MobilePhone End EmailAddress1' readWrite (main.cs:54-86): if Phone_1 (dashes removed) is 10 chars starting \"05\" → telephone1 := telephone2 (Phone_2); else if Phone_2 is such a mobile → telephone1 := NULL; else unchanged (Phone_1)",
+          "additionalFileFields": [
+            {
+              "field": "Phone_2_Number_106",
+              "role": "value",
+              "via": "'Set MobilePhone End EmailAddress1' readWrite: telephone1 := telephone2 when Phone_1 is a mobile (main.cs:64)"
+            }
+          ]
+        },
+        {
+          "attribute": "telephone2",
+          "from": [
+            {
+              "column": "telephone2",
+              "role": "value"
+            }
+          ],
+          "expression": "Row.telephone2 as is (value after swap)",
+          "fixedValue": null,
+          "condition": "!Row.telephone2_IsNull",
+          "evidence": "main.cs:77-78",
+          "upstream": "FILE Phone_2_Number_106 (pos 1223-1232) → MY_FileData.Phone_2_Number_106 → 'Read MY Data From Staging' SELECT Phone_2_Number_106 (output alias telephone2) + FILE Phone_1_Number_14 (pos 115-124) → MY_FileData.Phone_1_Number_14 → 'Read MY Data From Staging' SELECT Phone_1_Number_14 (output alias telephone1) → 'Trim String Fields' script (main.cs:28-50: every string column .Trim(), empty string → NULL) [contacts DTSX 31364] → Union All 6 → 'Set MobilePhone End EmailAddress1' readWrite (main.cs:54-86): if Phone_1 is a 10-char \"05\" mobile → telephone2 := NULL; else if Phone_2 is such a mobile → telephone2 := telephone1 (Phone_1); else unchanged (Phone_2)",
+          "additionalFileFields": [
+            {
+              "field": "Phone_1_Number_14",
+              "role": "value",
+              "via": "'Set MobilePhone End EmailAddress1' readWrite: telephone2 := telephone1 when Phone_2 is a mobile (main.cs:77)"
+            }
+          ]
+        },
+        {
+          "attribute": "mobilephone",
+          "from": [
+            {
+              "column": "MobilePhone",
+              "role": "value"
+            }
+          ],
+          "expression": "Row.MobilePhone as is",
+          "fixedValue": null,
+          "condition": "!Row.MobilePhone_IsNull",
+          "evidence": "main.cs:80-82",
+          "upstream": "'Set MobilePhone End EmailAddress1' Output 0.MobilePhone (resolved in scriptOutputs) ← Phone_1_Number_14 / Phone_2_Number_106 (trimmed, dashes removed, only a 10-char value starting \"05\")",
+          "additionalFileFields": []
+        },
+        {
+          "attribute": "gen_mobilephonesourcelastupdate",
+          "from": [
+            {
+              "column": "MobilePhone",
+              "role": "condition"
+            }
+          ],
+          "expression": "new OptionSetValue(GamelInterface = 3)",
+          "fixedValue": 3,
+          "condition": "!Row.MobilePhone_IsNull",
+          "evidence": "main.cs:18,80-83",
+          "upstream": null,
+          "additionalFileFields": []
+        },
+        {
+          "attribute": "gen_mobilephonelastupdatedate",
+          "from": [
+            {
+              "column": "MobilePhone",
+              "role": "condition"
+            }
+          ],
+          "expression": "DateTime.Now",
+          "fixedValue": null,
+          "condition": "!Row.MobilePhone_IsNull",
+          "evidence": "main.cs:80-84",
+          "upstream": null,
+          "additionalFileFields": []
+        },
+        {
+          "attribute": "fax",
+          "from": [
+            {
+              "column": "fax",
+              "role": "value"
+            }
+          ],
+          "expression": "Row.fax as is",
+          "fixedValue": null,
+          "condition": "!Row.fax_IsNull",
+          "evidence": "main.cs:88-89",
+          "upstream": "FILE Fax_107 (pos 1233-1242) → MY_FileData.Fax_107 → 'Read MY Data From Staging' SELECT Fax_107 (output alias fax) → 'Trim String Fields' script (main.cs:28-50: every string column .Trim(), empty string → NULL) [contacts DTSX 31364] → Union All 6",
+          "additionalFileFields": []
+        },
+        {
+          "attribute": "gen_bankcustomeridnumber",
+          "from": [
+            {
+              "column": "gen_bankcustomeridnumber",
+              "role": "value"
+            }
+          ],
+          "expression": "Row.genbankcustomeridnumber as is",
+          "fixedValue": null,
+          "condition": "!Row.genbankcustomeridnumber_IsNull",
+          "evidence": "main.cs:91-92",
+          "upstream": "FILE Bank_Customer_Id_Number_75 (pos 633-642) → MY_FileData.Bank_Customer_Id_Number_75 → 'Read MY Data From Staging' SELECT Bank_Customer_Id_Number_75 (output alias gen_bankcustomeridnumber) → 'Trim String Fields' script (main.cs:28-50: every string column .Trim(), empty string → NULL) [contacts DTSX 31364] → Union All 6",
+          "additionalFileFields": []
+        },
+        {
+          "attribute": "gen_address1_buildingid",
+          "from": [
+            {
+              "column": "gen_address1_buildingid",
+              "role": "value"
+            }
+          ],
+          "expression": "Row.genaddress1buildingid as is",
+          "fixedValue": null,
+          "condition": "!Row.genaddress1buildingid_IsNull",
+          "evidence": "main.cs:95-96",
+          "upstream": "FILE Address_Building_Number_99 (pos 1114-1123) → MY_FileData.Address_Building_Number_99 → 'Read MY Data From Staging' SELECT Address_Building_Number_99 (output alias gen_address1_buildingid) + FILE Address_Apartment_Number_101 (pos 1134-1138) → MY_FileData.Address_Apartment_Number_101 → 'Read MY Data From Staging' SELECT Address_Apartment_Number_101 (output alias address1_apartment) → 'Trim String Fields' script (main.cs:28-50: every string column .Trim(), empty string → NULL) [contacts DTSX 31364] → Union All 6 → 'Custom Fields' REPLACE gen_address1_buildingid = LEFT(ISNULL(address1_apartment) || address1_apartment == \"\" ? TRIM(gen_address1_buildingid) : TRIM(gen_address1_buildingid) + \"/\" + TRIM(address1_apartment),10) (DTSX 26896)",
+          "additionalFileFields": [
+            {
+              "field": "Address_Apartment_Number_101",
+              "role": "value",
+              "via": "'Custom Fields' REPLACE gen_address1_buildingid (DTSX 26896)"
+            }
+          ]
+        },
+        {
+          "attribute": "gen_address1_city",
+          "from": [
+            {
+              "column": "Gen_address1_city",
+              "role": "value"
+            }
+          ],
+          "expression": "Row.Genaddress1city as is",
+          "fixedValue": null,
+          "condition": "!Row.Genaddress1city_IsNull",
+          "evidence": "main.cs:98-99",
+          "upstream": "FILE Address_City_Name_102 (pos 1139-1163) → MY_FileData.Address_City_Name_102 → 'Read MY Data From Staging' SELECT Address_City_Name_102 (output alias Gen_address1_city) → 'Trim String Fields' script (main.cs:28-50: every string column .Trim(), empty string → NULL) [contacts DTSX 31364] → Union All 6",
+          "additionalFileFields": []
+        },
+        {
+          "attribute": "address1_line1",
+          "from": [
+            {
+              "column": "address1_line1",
+              "role": "value"
+            }
+          ],
+          "expression": "Row.address1line1 as is",
+          "fixedValue": null,
+          "condition": "!Row.address1line1_IsNull",
+          "evidence": "main.cs:100-101",
+          "upstream": "FILE Address_Street_98 (pos 1094-1113) → MY_FileData.Address_Street_98 → 'Read MY Data From Staging' SELECT Address_Street_98 + FILE Address_Neighborhood_103 (pos 1164-1213) → MY_FileData.Address_Neighborhood_103 → 'Read MY Data From Staging' SELECT Address_Neighborhood_103 → 'Trim String Fields' script (main.cs:28-50: every string column .Trim(), empty string → NULL) [contacts DTSX 31364] → Union All 6 → 'Custom Fields' NEW address1_line1 = !ISNULL(Address_Neighborhood_103) && Address_Neighborhood_103 != \"\" ? TRIM(Address_Street_98) + \" \" + TRIM(Address_Neighborhood_103) : TRIM(Address_Street_98) (DTSX 26933)",
+          "additionalFileFields": []
+        },
+        {
+          "attribute": "address1_postalcode",
+          "from": [
+            {
+              "column": "address1_postalcode",
+              "role": "value"
+            }
+          ],
+          "expression": "Row.address1postalcode as is",
+          "fixedValue": null,
+          "condition": "!Row.address1postalcode_IsNull",
+          "evidence": "main.cs:102-103",
+          "upstream": "FILE Address_Zip_Code_104 (pos 1214-1220) → MY_FileData.Address_Zip_Code_104 → 'Read MY Data From Staging' SELECT Address_Zip_Code_104 (output alias address1_postalcode) → 'Trim String Fields' script (main.cs:28-50: every string column .Trim(), empty string → NULL) [contacts DTSX 31364] → Union All 6",
+          "additionalFileFields": []
+        },
+        {
+          "attribute": "address1_name",
+          "from": [
+            {
+              "column": "address1_name",
+              "role": "value"
+            }
+          ],
+          "expression": "Row.address1name; the input is the literal \"ראשי\" from 'Custom Fields' (DTSX 26939)",
+          "fixedValue": "ראשי",
+          "condition": "!Row.address1name_IsNull",
+          "evidence": "main.cs:104-105",
+          "upstream": "'Custom Fields' NEW address1_name = \"ראשי\" (DTSX 26939)",
+          "additionalFileFields": []
+        },
+        {
+          "attribute": "gen_postalcode",
+          "from": [
+            {
+              "column": "Mailbox_78",
+              "role": "value"
+            }
+          ],
+          "expression": "Row.Mailbox78 as is (no trim in this data flow)",
+          "fixedValue": null,
+          "condition": "!Row.Mailbox78_IsNull",
+          "evidence": "main.cs:106-109",
+          "upstream": "FILE Mailbox_78 (pos 661-665) → MY_FileData.Mailbox_78 → 'Read MY Data From Staging' SELECT Mailbox_78 → Union All 6 (NOT an input of 'Trim String Fields' in this data flow → no trim here)",
+          "additionalFileFields": []
+        },
+        {
+          "attribute": "gen_customerdateofbirth",
+          "from": [
+            {
+              "column": "Gen_Customerdateofbirth",
+              "role": "value"
+            }
+          ],
+          "expression": "DateTime.Parse(Row.GenCustomerdateofbirth) ('yyyy/MM/dd' from Format date)",
+          "fixedValue": null,
+          "condition": "!Row.GenCustomerdateofbirth_IsNull",
+          "evidence": "main.cs:112-113",
+          "upstream": "FILE Customer_Date_Of_Birth_11 (pos 95-102) → MY_FileData.Customer_Date_Of_Birth_11 → 'Read MY Data From Staging' SELECT Customer_Date_Of_Birth_11 (output alias Gen_Customerdateofbirth) → 'Trim String Fields' script (main.cs:28-50: every string column .Trim(), empty string → NULL) [contacts DTSX 31364] → (unknown customer: 'Set unknwon customer data' REPLACE = NULL(DT_WSTR,50), DTSX 31341) → Union All 6 → 'Format date' script (main.cs:33-76, DTSX 27840): Trim().Length==8 'yyyyMMdd' → 'yyyy/MM/dd'; Length==6 'yyyyMM' → 'yyyy/MM/01'; other length → NULL; NULL if DateTime.TryParse fails or date < 1900-01-01",
+          "additionalFileFields": []
+        },
+        {
+          "attribute": "gen_deathdate",
+          "from": [
+            {
+              "column": "Gen_DeathDate",
+              "role": "value"
+            }
+          ],
+          "expression": "DateTime.Parse(Row.GenDeathDate)",
+          "fixedValue": null,
+          "condition": "!Row.GenDeathDate_IsNull",
+          "evidence": "main.cs:114-115",
+          "upstream": "FILE Customer_Death_Date_12 (pos 103-110) → MY_FileData.Customer_Death_Date_12 → 'Read MY Data From Staging' SELECT Customer_Death_Date_12 (output alias Gen_DeathDate) → 'Trim String Fields' script (main.cs:28-50: every string column .Trim(), empty string → NULL) [contacts DTSX 31364] → Union All 6 → 'Format date' script (main.cs:33-76, DTSX 27840): Trim().Length==8 'yyyyMMdd' → 'yyyy/MM/dd'; Length==6 'yyyyMM' → 'yyyy/MM/01'; other length → NULL; NULL if DateTime.TryParse fails or date < 1900-01-01",
+          "additionalFileFields": []
+        },
+        {
+          "attribute": "gen_identitynumberissuingdate",
+          "from": [
+            {
+              "column": "Gen_identityNumberIssuingDate",
+              "role": "value"
+            }
+          ],
+          "expression": "DateTime.Parse(Row.GenidentityNumberIssuingDate)",
+          "fixedValue": null,
+          "condition": "!Row.GenidentityNumberIssuingDate_IsNull",
+          "evidence": "main.cs:116-117",
+          "upstream": "FILE Id_Issuance_Last_Date_111 (pos 1302-1309) → MY_FileData.Id_Issuance_Last_Date_111 → 'Read MY Data From Staging' SELECT Id_Issuance_Last_Date_111 (output alias Gen_identityNumberIssuingDate) → 'Trim String Fields' script (main.cs:28-50: every string column .Trim(), empty string → NULL) [contacts DTSX 31364] → Union All 6 → 'Format date' script (main.cs:33-76, DTSX 27840): Trim().Length==8 'yyyyMMdd' → 'yyyy/MM/dd'; Length==6 'yyyyMM' → 'yyyy/MM/01'; other length → NULL; NULL if DateTime.TryParse fails or date < 1900-01-01",
+          "additionalFileFields": []
+        },
+        {
+          "attribute": "gen_modifiedbybank",
+          "from": [],
+          "expression": "DateTime.Now",
+          "fixedValue": null,
+          "condition": null,
+          "evidence": "main.cs:119",
+          "upstream": null,
+          "additionalFileFields": []
+        }
+      ],
+      "evidence": "main.cs:34-180 (component DTSX line 25111; Entity(\"contact\") main.cs:36; RequestType.Create main.cs:140). Input address1_apartment is not used in the code (only upstream in Custom Fields)."
+    },
+    {
+      "component": "Package\\Foreach Loop Container\\Create Contacts For Minhali\\UPDate contact and CustomerAddress",
+      "identicalCopies": [],
+      "entity": "contact",
+      "verb": "UPDATE",
+      "mechanism": "SQL (UPDATE ContactBase) on connection CRM (catalog altshuler_mscrm)",
+      "status": "Unsupported",
+      "recordKey": "WHERE contactId = ? (Param_38 ← contactid from Lookup 'Check if contact exists'), DTSX 34349",
+      "recordKeyColumns": [
+        "contactid"
+      ],
+      "declaredRowFilters": [
+        {
+          "file": "Minhali Daily Source",
+          "field": "Customer_Id_Number_6",
+          "via": "Package\\Foreach Loop Container\\Create Contacts For Minhali\\Remove Duplicate",
+          "why": "first row per gen_identitynumber only: if (contacts.Contains(Row.genidentitynumber)) Row.DirectRowToDuplicate() (unconnected output) else DirectRowToOutput0. gen_identitynumber = Customer_Id_Number_6 trimmed, not padded ('Add 0' is a no-op); de-duplication happens before unknown customers get \"000000000\"",
+          "evidence": "main.cs:112-121 (DTSX 28923)"
+        }
+      ],
+      "condition": "Row read from MY_FileData; NOT SUBSTRING(CheckLastRow,1,1) == \"@\" ('Check for last row' else, DTSX 23643); 'Check customer type' DEFAULT output פרטי = none of: 'estate type 210' (Sector_Code_17 == \"0210\" && (DT_I4)Employer_Agreement_Number_35 != 0), company ((Gen_CustomerIdType_STR_INT == \"7\" && Sector_Code_17 != \"0210\") || (Sector_Code_17 == \"0210\" && (DT_I4)Employer_Agreement_Number_35 == 0) || Sector_Code_17 == \"0775\"), 'Other Customer' (ISNULL(Gen_CustomerIdType_STR_INT) || type ∉ {\"1\",\"5\",\"6\"}) (DTSX 23592); 'Is Contact' Row_Level_147 == \"1\" (DTSX 28690); first row per trimmed gen_identitynumber ('Remove Duplicate' main.cs:112-121; dedupe BEFORE unknown customers get \"000000000\"); AND Lookup 'Check if contact exists' match (active contact) → Derived Column → Convert To Date Time → Update Correct Value → Update fields by mobilephone and email → executed for EVERY matched row (no change detection)",
+      "attributes": [
+        {
+          "attribute": "gendercode",
+          "from": [
+            {
+              "column": "gendercode",
+              "role": "value"
+            }
+          ],
+          "expression": "Param_0 as is (NULL when file code not 1/2 → overwrites)",
+          "fixedValue": null,
+          "condition": null,
+          "evidence": "DTSX 34280 (?0 → Param_0, input binding DTSX 34369)",
+          "upstream": "FILE Gender_Code_8 (pos 34) → MY_FileData.Gender_Code_8 → 'Read MY Data From Staging' SELECT Gender_Code_8 (output alias gendercode_STR_INT) → 'Trim String Fields' script (main.cs:28-50: every string column .Trim(), empty string → NULL) [contacts DTSX 31364] → Union All 6 → 'Custom Fields' NEW gendercode (i4) = gendercode_STR_INT == \"1\" || gendercode_STR_INT == \"2\" ? (DT_I4)gendercode_STR_INT : NULL(DT_I4) (DTSX 26927)",
+          "additionalFileFields": []
+        },
+        {
+          "attribute": "gen_inputsource",
+          "from": [],
+          "expression": "literal 1",
+          "fixedValue": 1,
+          "condition": null,
+          "evidence": "DTSX 34281",
+          "upstream": null,
+          "additionalFileFields": []
+        },
+        {
+          "attribute": "gen_isoperate",
+          "from": [],
+          "expression": "literal 1",
+          "fixedValue": 1,
+          "condition": null,
+          "evidence": "DTSX 34282",
+          "upstream": null,
+          "additionalFileFields": []
+        },
+        {
+          "attribute": "gen_leumi",
+          "from": [],
+          "expression": "literal 1",
+          "fixedValue": 1,
+          "condition": null,
+          "evidence": "DTSX 34283",
+          "upstream": null,
+          "additionalFileFields": []
+        },
+        {
+          "attribute": "firstname",
+          "from": [
+            {
+              "column": "firstname",
+              "role": "value"
+            }
+          ],
+          "expression": "Param_1 as is",
+          "fixedValue": null,
+          "condition": null,
+          "evidence": "DTSX 34284 (?1 → Param_1, input binding DTSX 34370)",
+          "upstream": "FILE First_Name_10 (pos 75-94) → MY_FileData.First_Name_10 → 'Read MY Data From Staging' SELECT First_Name_10 (output alias firstname) → 'Trim String Fields' script (main.cs:28-50: every string column .Trim(), empty string → NULL) [contacts DTSX 31364] → (unknown customer: REPLACE firstname = \"לא ידוע\", DTSX 31329) → Union All 6",
+          "additionalFileFields": []
+        },
+        {
+          "attribute": "lastname",
+          "from": [
+            {
+              "column": "lastname",
+              "role": "value"
+            }
+          ],
+          "expression": "Param_2 as is",
+          "fixedValue": null,
+          "condition": null,
+          "evidence": "DTSX 34285 (?2 → Param_2, input binding DTSX 34371)",
+          "upstream": "FILE Last_Name_9 (pos 35-74) → MY_FileData.Last_Name_9 → 'Read MY Data From Staging' SELECT Last_Name_9 (output alias lastname) → 'Trim String Fields' script (main.cs:28-50: every string column .Trim(), empty string → NULL) [contacts DTSX 31364] → (unknown customer: REPLACE lastname = \"לקוח\", DTSX 31323) → Union All 6",
+          "additionalFileFields": []
+        },
+        {
+          "attribute": "fullname",
+          "from": [
+            {
+              "column": "fullname",
+              "role": "value"
+            }
+          ],
+          "expression": "Param_3 as is",
+          "fixedValue": null,
+          "condition": null,
+          "evidence": "DTSX 34286 (?3 → Param_3, input binding DTSX 34372)",
+          "upstream": "lastname/firstname (see those; unknown customer → \"לקוח\"/\"לא ידוע\") → 'Custom Fields' NEW fullname = !ISNULL(lastname) && lastname != \"\" ? TRIM(lastname) + (!ISNULL(firstname) && TRIM(firstname) != \"\" ? (\" \" + TRIM(firstname)) : \"\") : firstname (DTSX 26909)",
+          "additionalFileFields": []
+        },
+        {
+          "attribute": "gen_bankcustomeridnumber",
+          "from": [
+            {
+              "column": "gen_bankcustomeridnumber",
+              "role": "value"
+            }
+          ],
+          "expression": "Param_4 as is (NULL overwrites)",
+          "fixedValue": null,
+          "condition": null,
+          "evidence": "DTSX 34287 (?4 → Param_4, input binding DTSX 34400)",
+          "upstream": "FILE Bank_Customer_Id_Number_75 (pos 633-642) → MY_FileData.Bank_Customer_Id_Number_75 → 'Read MY Data From Staging' SELECT Bank_Customer_Id_Number_75 (output alias gen_bankcustomeridnumber) → 'Trim String Fields' script (main.cs:28-50: every string column .Trim(), empty string → NULL) [contacts DTSX 31364] → Union All 6",
+          "additionalFileFields": []
+        },
+        {
+          "attribute": "gen_address1_buildingid",
+          "from": [
+            {
+              "column": "gen_address1_buildingid",
+              "role": "value"
+            }
+          ],
+          "expression": "Param_5 as is",
+          "fixedValue": null,
+          "condition": null,
+          "evidence": "DTSX 34288 (?5 → Param_5, input binding DTSX 34373)",
+          "upstream": "FILE Address_Building_Number_99 (pos 1114-1123) → MY_FileData.Address_Building_Number_99 → 'Read MY Data From Staging' SELECT Address_Building_Number_99 (output alias gen_address1_buildingid) + FILE Address_Apartment_Number_101 (pos 1134-1138) → MY_FileData.Address_Apartment_Number_101 → 'Read MY Data From Staging' SELECT Address_Apartment_Number_101 (output alias address1_apartment) → 'Trim String Fields' script (main.cs:28-50: every string column .Trim(), empty string → NULL) [contacts DTSX 31364] → Union All 6 → 'Custom Fields' REPLACE gen_address1_buildingid = LEFT(ISNULL(address1_apartment) || address1_apartment == \"\" ? TRIM(gen_address1_buildingid) : TRIM(gen_address1_buildingid) + \"/\" + TRIM(address1_apartment),10) (DTSX 26896)",
+          "additionalFileFields": [
+            {
+              "field": "Address_Apartment_Number_101",
+              "role": "value",
+              "via": "'Custom Fields' REPLACE (DTSX 26896)"
+            }
+          ]
+        },
+        {
+          "attribute": "gen_address1_city",
+          "from": [
+            {
+              "column": "Gen_address1_city",
+              "role": "value"
+            }
+          ],
+          "expression": "Param_6 as is",
+          "fixedValue": null,
+          "condition": null,
+          "evidence": "DTSX 34289 (?6 → Param_6, input binding DTSX 34374)",
+          "upstream": "FILE Address_City_Name_102 (pos 1139-1163) → MY_FileData.Address_City_Name_102 → 'Read MY Data From Staging' SELECT Address_City_Name_102 (output alias Gen_address1_city) → 'Trim String Fields' script (main.cs:28-50: every string column .Trim(), empty string → NULL) [contacts DTSX 31364] → Union All 6",
+          "additionalFileFields": []
+        },
+        {
+          "attribute": "gen_customerdateofbirth",
+          "from": [
+            {
+              "column": "Gen_Customerdateofbirth",
+              "role": "value"
+            }
+          ],
+          "expression": "Param_7 = the STRING column Gen_Customerdateofbirth ('yyyy/MM/dd' or NULL) bound to a dbTimeStamp parameter — implicit string→datetime conversion by the provider; the parsed gen_customerdateofbirth_DateTime column is NOT used",
+          "fixedValue": null,
+          "condition": null,
+          "evidence": "DTSX 34290 (?7 → Param_7, input binding DTSX 34375)",
+          "upstream": "FILE Customer_Date_Of_Birth_11 (pos 95-102) → MY_FileData.Customer_Date_Of_Birth_11 → 'Read MY Data From Staging' SELECT Customer_Date_Of_Birth_11 (output alias Gen_Customerdateofbirth) → 'Trim String Fields' script (main.cs:28-50: every string column .Trim(), empty string → NULL) [contacts DTSX 31364] → (unknown customer: 'Set unknwon customer data' REPLACE = NULL(DT_WSTR,50), DTSX 31341) → Union All 6 → 'Format date' script (main.cs:33-76, DTSX 27840): Trim().Length==8 'yyyyMMdd' → 'yyyy/MM/dd'; Length==6 'yyyyMM' → 'yyyy/MM/01'; other length → NULL; NULL if DateTime.TryParse fails or date < 1900-01-01",
+          "additionalFileFields": []
+        },
+        {
+          "attribute": "gen_deathdate",
+          "from": [
+            {
+              "column": "Gen_DeathDate",
+              "role": "value"
+            }
+          ],
+          "expression": "Param_8 = STRING Gen_DeathDate ('yyyy/MM/dd' or NULL) → dbTimeStamp parameter (gen_deathdate_DateTime unused)",
+          "fixedValue": null,
+          "condition": null,
+          "evidence": "DTSX 34291 (?8 → Param_8, input binding DTSX 34376)",
+          "upstream": "FILE Customer_Death_Date_12 (pos 103-110) → MY_FileData.Customer_Death_Date_12 → 'Read MY Data From Staging' SELECT Customer_Death_Date_12 (output alias Gen_DeathDate) → 'Trim String Fields' script (main.cs:28-50: every string column .Trim(), empty string → NULL) [contacts DTSX 31364] → Union All 6 → 'Format date' script (main.cs:33-76, DTSX 27840): Trim().Length==8 'yyyyMMdd' → 'yyyy/MM/dd'; Length==6 'yyyyMM' → 'yyyy/MM/01'; other length → NULL; NULL if DateTime.TryParse fails or date < 1900-01-01",
+          "additionalFileFields": []
+        },
+        {
+          "attribute": "gen_identitynumberissuingdate",
+          "from": [
+            {
+              "column": "Gen_identityNumberIssuingDate",
+              "role": "value"
+            }
+          ],
+          "expression": "Param_9 = STRING Gen_identityNumberIssuingDate → dbTimeStamp parameter (…_DateTime unused)",
+          "fixedValue": null,
+          "condition": null,
+          "evidence": "DTSX 34292 (?9 → Param_9, input binding DTSX 34377)",
+          "upstream": "FILE Id_Issuance_Last_Date_111 (pos 1302-1309) → MY_FileData.Id_Issuance_Last_Date_111 → 'Read MY Data From Staging' SELECT Id_Issuance_Last_Date_111 (output alias Gen_identityNumberIssuingDate) → 'Trim String Fields' script (main.cs:28-50: every string column .Trim(), empty string → NULL) [contacts DTSX 31364] → Union All 6 → 'Format date' script (main.cs:33-76, DTSX 27840): Trim().Length==8 'yyyyMMdd' → 'yyyy/MM/dd'; Length==6 'yyyyMM' → 'yyyy/MM/01'; other length → NULL; NULL if DateTime.TryParse fails or date < 1900-01-01",
+          "additionalFileFields": []
+        },
+        {
+          "attribute": "gen_modifiedbybank",
+          "from": [],
+          "expression": "GETDATE() (SQL server local time)",
+          "fixedValue": null,
+          "condition": null,
+          "evidence": "DTSX 34293",
+          "upstream": null,
+          "additionalFileFields": []
+        },
+        {
+          "attribute": "modifiedon",
+          "from": [],
+          "expression": "GETDATE() (SQL server local time while CRM stores UTC)",
+          "fixedValue": null,
+          "condition": null,
+          "evidence": "DTSX 34294",
+          "upstream": null,
+          "additionalFileFields": []
+        },
+        {
+          "attribute": "modifiedby",
+          "from": [
+            {
+              "column": "userId",
+              "role": "value"
+            }
+          ],
+          "expression": "Param_10 = userId (package variable User::UserId as GUID)",
+          "fixedValue": null,
+          "condition": null,
+          "evidence": "DTSX 34295 (?10 → Param_10, input binding DTSX 34378)",
+          "upstream": "'Derived Column' NEW userId = (DT_GUID)(\"{\" + @[User::UserId] + \"}\") (DTSX 26995); User::UserId default '' (DTSX 441), set at runtime by package plumbing",
+          "additionalFileFields": []
+        },
+        {
+          "attribute": "gen_postalcode",
+          "from": [
+            {
+              "column": "Mailbox_78",
+              "role": "value"
+            }
+          ],
+          "expression": "Param_11 as is (no trim)",
+          "fixedValue": null,
+          "condition": null,
+          "evidence": "DTSX 34296 (?11 → Param_11, input binding DTSX 34379)",
+          "upstream": "FILE Mailbox_78 (pos 661-665) → MY_FileData.Mailbox_78 → 'Read MY Data From Staging' SELECT Mailbox_78 → Union All 6 (NOT an input of 'Trim String Fields' in this data flow → no trim here)",
+          "additionalFileFields": []
+        },
+        {
+          "attribute": "emailaddress1",
+          "from": [
+            {
+              "column": "emailaddress1",
+              "role": "value"
+            }
+          ],
+          "expression": "CASE WHEN gen_recordsorce = 1 AND emailaddress1 IS NULL THEN ?12 ELSE emailaddress1 END; Param_12 = 'Update Correct Value'.emailaddress1 = (gen_recordsorceDB == 1 && ISNULL(emailaddress1DB) && !ISNULL(emailaddress1) ? emailaddress1 : emailaddress1DB) → net: file e-mail written only to contacts with gen_recordsorce = 1 and no e-mail",
+          "fixedValue": null,
+          "condition": "CRM gen_recordsorce = 1 AND CRM emailaddress1 IS NULL (SQL-side)",
+          "evidence": "DTSX 34297-34301 (?12 → Param_12, input 34380); UCV DTSX 34688",
+          "upstream": "'Update Correct Value' NEW emailaddress1 = gen_recordsorceDB == 1 && ISNULL(emailaddress1DB) && !ISNULL(emailaddress1) ? emailaddress1 : emailaddress1DB (DTSX 34688); MobilePhone = 'Set MobilePhone End EmailAddress1' output; emailaddress1 = file Email_108 after trim + regex validation; *DB = Lookup 'Check if contact exists' (CRM contact)",
+          "additionalFileFields": []
+        },
+        {
+          "attribute": "gen_identitynumber",
+          "from": [
+            {
+              "column": "gen_identitynumber",
+              "role": "value"
+            }
+          ],
+          "expression": "CASE WHEN gen_recordsorce = 1 THEN ?13 ELSE gen_identitynumber END (value equals the lookup key, so effectively unchanged)",
+          "fixedValue": null,
+          "condition": "SQL CASE: only when CRM column gen_recordsorce = 1 (DB-side value), else existing value kept",
+          "evidence": "DTSX 34302-34305 (?13, input 34381)",
+          "upstream": "FILE Customer_Id_Number_6 (pos 16-24) → MY_FileData.Customer_Id_Number_6 → 'Read MY Data From Staging' SELECT Customer_Id_Number_6 (output alias gen_identitynumber) → 'Trim String Fields' script (main.cs:28-50: every string column .Trim(), empty string → NULL) [contacts DTSX 31364] → 'Add 0' script = NO-OP (whole loop commented out, main.cs:35-49, DTSX 22848) → (if (DT_I8)gen_identitynumber ∈ {0,1,18}: 'Set unknwon customer data' REPLACE = \"000000000\", DTSX 31335) → Union All 6",
+          "additionalFileFields": []
+        },
+        {
+          "attribute": "telephone1",
+          "from": [
+            {
+              "column": "telephone1",
+              "role": "value"
+            }
+          ],
+          "expression": "CASE WHEN gen_recordsorce = 1 THEN ?14 ELSE telephone1 END (value after swap; NULL overwrites)",
+          "fixedValue": null,
+          "condition": "SQL CASE: only when CRM column gen_recordsorce = 1 (DB-side value), else existing value kept",
+          "evidence": "DTSX 34306-34309 (?14, input 34382)",
+          "upstream": "FILE Phone_1_Number_14 (pos 115-124) → MY_FileData.Phone_1_Number_14 → 'Read MY Data From Staging' SELECT Phone_1_Number_14 (output alias telephone1) + FILE Phone_2_Number_106 (pos 1223-1232) → MY_FileData.Phone_2_Number_106 → 'Read MY Data From Staging' SELECT Phone_2_Number_106 (output alias telephone2) → 'Trim String Fields' script (main.cs:28-50: every string column .Trim(), empty string → NULL) [contacts DTSX 31364] → Union All 6 → 'Set MobilePhone End EmailAddress1' readWrite (main.cs:54-86): if Phone_1 (dashes removed) is 10 chars starting \"05\" → telephone1 := telephone2 (Phone_2); else if Phone_2 is such a mobile → telephone1 := NULL; else unchanged (Phone_1)",
+          "additionalFileFields": [
+            {
+              "field": "Phone_2_Number_106",
+              "role": "value",
+              "via": "'Set MobilePhone End EmailAddress1' swap (main.cs:64)"
+            }
+          ]
+        },
+        {
+          "attribute": "telephone2",
+          "from": [
+            {
+              "column": "telephone2",
+              "role": "value"
+            }
+          ],
+          "expression": "CASE WHEN gen_recordsorce = 1 THEN ?15 ELSE telephone2 END (value after swap)",
+          "fixedValue": null,
+          "condition": "SQL CASE: only when CRM column gen_recordsorce = 1 (DB-side value), else existing value kept",
+          "evidence": "DTSX 34310-34314 (?15, input 34383)",
+          "upstream": "FILE Phone_2_Number_106 (pos 1223-1232) → MY_FileData.Phone_2_Number_106 → 'Read MY Data From Staging' SELECT Phone_2_Number_106 (output alias telephone2) + FILE Phone_1_Number_14 (pos 115-124) → MY_FileData.Phone_1_Number_14 → 'Read MY Data From Staging' SELECT Phone_1_Number_14 (output alias telephone1) → 'Trim String Fields' script (main.cs:28-50: every string column .Trim(), empty string → NULL) [contacts DTSX 31364] → Union All 6 → 'Set MobilePhone End EmailAddress1' readWrite (main.cs:54-86): if Phone_1 is a 10-char \"05\" mobile → telephone2 := NULL; else if Phone_2 is such a mobile → telephone2 := telephone1 (Phone_1); else unchanged (Phone_2)",
+          "additionalFileFields": [
+            {
+              "field": "Phone_1_Number_14",
+              "role": "value",
+              "via": "'Set MobilePhone End EmailAddress1' swap (main.cs:77)"
+            }
+          ]
+        },
+        {
+          "attribute": "mobilephone",
+          "from": [
+            {
+              "column": "mobilephone",
+              "role": "value"
+            }
+          ],
+          "expression": "CASE WHEN gen_recordsorce = 1 AND mobilephone IS NULL THEN ?16 ELSE mobilephone END; Param_16 = 'Update Correct Value'.mobilephone = (gen_recordsorceDB == 1 && ISNULL(mobilephoneDB) && !ISNULL(MobilePhone) ? MobilePhone : mobilephoneDB)",
+          "fixedValue": null,
+          "condition": "CRM gen_recordsorce = 1 AND CRM mobilephone IS NULL (SQL-side)",
+          "evidence": "DTSX 34315-34319 (?16, input 34384); UCV DTSX 34682",
+          "upstream": "'Update Correct Value' NEW mobilephone = gen_recordsorceDB == 1 && ISNULL(mobilephoneDB) && !ISNULL(MobilePhone) ? MobilePhone : mobilephoneDB (DTSX 34682); MobilePhone = 'Set MobilePhone End EmailAddress1' output; emailaddress1 = file Email_108 after trim + regex validation; *DB = Lookup 'Check if contact exists' (CRM contact)",
+          "additionalFileFields": []
+        },
+        {
+          "attribute": "fax",
+          "from": [
+            {
+              "column": "fax",
+              "role": "value"
+            }
+          ],
+          "expression": "CASE WHEN gen_recordsorce = 1 THEN ?17 ELSE fax END",
+          "fixedValue": null,
+          "condition": "SQL CASE: only when CRM column gen_recordsorce = 1 (DB-side value), else existing value kept",
+          "evidence": "DTSX 34320-34324 (?17, input 34385)",
+          "upstream": "FILE Fax_107 (pos 1233-1242) → MY_FileData.Fax_107 → 'Read MY Data From Staging' SELECT Fax_107 (output alias fax) → 'Trim String Fields' script (main.cs:28-50: every string column .Trim(), empty string → NULL) [contacts DTSX 31364] → Union All 6",
+          "additionalFileFields": []
+        },
+        {
+          "attribute": "gen_mobilephonetransmissiondate",
+          "from": [
+            {
+              "column": "gen_mobilephonetransmissiondate",
+              "role": "value"
+            }
+          ],
+          "expression": "Param_18 as is (written unconditionally); input = 'Update Correct Value'.gen_mobilephonetransmissiondate = gen_recordsorceDB == 1 && ISNULL(mobilephoneDB) && !ISNULL(MobilePhone) ? NULL(DT_DBDATE) : gen_mobilephonetransmissiondateDB — i.e. reset/initialised when the file supplies a new mobile for a gen_recordsorce=1 contact without one, otherwise the current CRM value is written back",
+          "fixedValue": null,
+          "condition": null,
+          "evidence": "DTSX 34325 (?18 → Param_18, input binding DTSX 34386); UCV DTSX 34730",
+          "upstream": "'Update Correct Value' NEW gen_mobilephonetransmissiondate = gen_recordsorceDB == 1 && ISNULL(mobilephoneDB) && !ISNULL(MobilePhone) ? NULL(DT_DBDATE) : gen_mobilephonetransmissiondateDB (DTSX 34730); MobilePhone = 'Set MobilePhone End EmailAddress1' output; emailaddress1 = file Email_108 after trim + regex validation; *DB = Lookup 'Check if contact exists' (CRM contact)",
+          "additionalFileFields": []
+        },
+        {
+          "attribute": "gen_mobilephonefilename",
+          "from": [
+            {
+              "column": "gen_mobilephonefilename",
+              "role": "value"
+            }
+          ],
+          "expression": "Param_19 as is (written unconditionally); input = 'Update Correct Value'.gen_mobilephonefilename = gen_recordsorceDB == 1 && ISNULL(mobilephoneDB) && !ISNULL(MobilePhone) ? NULL(DT_WSTR,100) : gen_mobilephonefilenameDB — i.e. reset/initialised when the file supplies a new mobile for a gen_recordsorce=1 contact without one, otherwise the current CRM value is written back",
+          "fixedValue": null,
+          "condition": null,
+          "evidence": "DTSX 34326 (?19 → Param_19, input binding DTSX 34387); UCV DTSX 34742",
+          "upstream": "'Update Correct Value' NEW gen_mobilephonefilename = gen_recordsorceDB == 1 && ISNULL(mobilephoneDB) && !ISNULL(MobilePhone) ? NULL(DT_WSTR,100) : gen_mobilephonefilenameDB (DTSX 34742); MobilePhone = 'Set MobilePhone End EmailAddress1' output; emailaddress1 = file Email_108 after trim + regex validation; *DB = Lookup 'Check if contact exists' (CRM contact)",
+          "additionalFileFields": []
+        },
+        {
+          "attribute": "gen_mobilephonefeedback",
+          "from": [
+            {
+              "column": "gen_mobilephonefeedback",
+              "role": "value"
+            }
+          ],
+          "expression": "Param_20 as is (written unconditionally); input = 'Update Correct Value'.gen_mobilephonefeedback = gen_recordsorceDB == 1 && ISNULL(mobilephoneDB) && !ISNULL(MobilePhone) ? NULL(DT_WSTR,100) : gen_mobilephonefeedbackDB — i.e. reset/initialised when the file supplies a new mobile for a gen_recordsorce=1 contact without one, otherwise the current CRM value is written back",
+          "fixedValue": null,
+          "condition": null,
+          "evidence": "DTSX 34327 (?20 → Param_20, input binding DTSX 34388); UCV DTSX 34754",
+          "upstream": "'Update Correct Value' NEW gen_mobilephonefeedback = gen_recordsorceDB == 1 && ISNULL(mobilephoneDB) && !ISNULL(MobilePhone) ? NULL(DT_WSTR,100) : gen_mobilephonefeedbackDB (DTSX 34754); MobilePhone = 'Set MobilePhone End EmailAddress1' output; emailaddress1 = file Email_108 after trim + regex validation; *DB = Lookup 'Check if contact exists' (CRM contact)",
+          "additionalFileFields": []
+        },
+        {
+          "attribute": "gen_mobilephonetransmissionerror",
+          "from": [
+            {
+              "column": "gen_mobilephonetransmissionerror",
+              "role": "value"
+            }
+          ],
+          "expression": "Param_21 as is (written unconditionally); input = 'Update Correct Value'.gen_mobilephonetransmissionerror = gen_recordsorceDB == 1 && ISNULL(mobilephoneDB) && !ISNULL(MobilePhone) ? NULL(DT_WSTR,100) : gen_mobilephonetransmissionerrorDB — i.e. reset/initialised when the file supplies a new mobile for a gen_recordsorce=1 contact without one, otherwise the current CRM value is written back",
+          "fixedValue": null,
+          "condition": null,
+          "evidence": "DTSX 34328 (?21 → Param_21, input binding DTSX 34389); UCV DTSX 34766",
+          "upstream": "'Update Correct Value' NEW gen_mobilephonetransmissionerror = gen_recordsorceDB == 1 && ISNULL(mobilephoneDB) && !ISNULL(MobilePhone) ? NULL(DT_WSTR,100) : gen_mobilephonetransmissionerrorDB (DTSX 34766); MobilePhone = 'Set MobilePhone End EmailAddress1' output; emailaddress1 = file Email_108 after trim + regex validation; *DB = Lookup 'Check if contact exists' (CRM contact)",
+          "additionalFileFields": []
+        },
+        {
+          "attribute": "gen_emailaddress1transmissiondate",
+          "from": [
+            {
+              "column": "gen_emailaddress1transmissiondate",
+              "role": "value"
+            }
+          ],
+          "expression": "Param_22 as is (written unconditionally); input = 'Update Correct Value'.gen_emailaddress1transmissiondate = gen_recordsorceDB == 1 && ISNULL(emailaddress1DB) && !ISNULL(emailaddress1) ? NULL(DT_DBDATE) : gen_emailaddress1transmissiondateDB — i.e. reset/initialised when the file supplies a new e-mail for a gen_recordsorce=1 contact without one, otherwise the current CRM value is written back",
+          "fixedValue": null,
+          "condition": null,
+          "evidence": "DTSX 34329 (?22 → Param_22, input binding DTSX 34390); UCV DTSX 34736",
+          "upstream": "'Update Correct Value' NEW gen_emailaddress1transmissiondate = gen_recordsorceDB == 1 && ISNULL(emailaddress1DB) && !ISNULL(emailaddress1) ? NULL(DT_DBDATE) : gen_emailaddress1transmissiondateDB (DTSX 34736); MobilePhone = 'Set MobilePhone End EmailAddress1' output; emailaddress1 = file Email_108 after trim + regex validation; *DB = Lookup 'Check if contact exists' (CRM contact)",
+          "additionalFileFields": []
+        },
+        {
+          "attribute": "gen_emailaddress1filename",
+          "from": [
+            {
+              "column": "gen_emailaddressfilename",
+              "role": "value"
+            }
+          ],
+          "expression": "Param_23 as is (written unconditionally); input = 'Update Correct Value'.gen_emailaddressfilename = gen_recordsorceDB == 1 && ISNULL(emailaddress1DB) && !ISNULL(emailaddress1) ? NULL(DT_WSTR,100) : gen_emailaddressfilenameDB — i.e. reset/initialised when the file supplies a new e-mail for a gen_recordsorce=1 contact without one, otherwise the current CRM value is written back",
+          "fixedValue": null,
+          "condition": null,
+          "evidence": "DTSX 34330 (?23 → Param_23, input binding DTSX 34391); UCV DTSX 34748",
+          "upstream": "'Update Correct Value' NEW gen_emailaddressfilename = gen_recordsorceDB == 1 && ISNULL(emailaddress1DB) && !ISNULL(emailaddress1) ? NULL(DT_WSTR,100) : gen_emailaddressfilenameDB (DTSX 34748); MobilePhone = 'Set MobilePhone End EmailAddress1' output; emailaddress1 = file Email_108 after trim + regex validation; *DB = Lookup 'Check if contact exists' (CRM contact)",
+          "additionalFileFields": []
+        },
+        {
+          "attribute": "gen_emailaddress1feedback",
+          "from": [
+            {
+              "column": "gen_emailaddress1feedback",
+              "role": "value"
+            }
+          ],
+          "expression": "Param_24 as is (written unconditionally); input = 'Update Correct Value'.gen_emailaddress1feedback = gen_recordsorceDB == 1 && ISNULL(emailaddress1DB) && !ISNULL(emailaddress1) ? NULL(DT_WSTR,100) : gen_emailaddress1feedbackDB — i.e. reset/initialised when the file supplies a new e-mail for a gen_recordsorce=1 contact without one, otherwise the current CRM value is written back",
+          "fixedValue": null,
+          "condition": null,
+          "evidence": "DTSX 34331 (?24 → Param_24, input binding DTSX 34392); UCV DTSX 34760",
+          "upstream": "'Update Correct Value' NEW gen_emailaddress1feedback = gen_recordsorceDB == 1 && ISNULL(emailaddress1DB) && !ISNULL(emailaddress1) ? NULL(DT_WSTR,100) : gen_emailaddress1feedbackDB (DTSX 34760); MobilePhone = 'Set MobilePhone End EmailAddress1' output; emailaddress1 = file Email_108 after trim + regex validation; *DB = Lookup 'Check if contact exists' (CRM contact)",
+          "additionalFileFields": []
+        },
+        {
+          "attribute": "gen_emailaddress1transmissionerror",
+          "from": [
+            {
+              "column": "gen_emailaddress1transmissionerror",
+              "role": "value"
+            }
+          ],
+          "expression": "Param_25 as is (written unconditionally); input = 'Update Correct Value'.gen_emailaddress1transmissionerror = gen_recordsorceDB == 1 && ISNULL(emailaddress1DB) && !ISNULL(emailaddress1) ? NULL(DT_WSTR,100) : gen_emailaddress1transmissionerrorDB — i.e. reset/initialised when the file supplies a new e-mail for a gen_recordsorce=1 contact without one, otherwise the current CRM value is written back",
+          "fixedValue": null,
+          "condition": null,
+          "evidence": "DTSX 34332 (?25 → Param_25, input binding DTSX 34393); UCV DTSX 34772",
+          "upstream": "'Update Correct Value' NEW gen_emailaddress1transmissionerror = gen_recordsorceDB == 1 && ISNULL(emailaddress1DB) && !ISNULL(emailaddress1) ? NULL(DT_WSTR,100) : gen_emailaddress1transmissionerrorDB (DTSX 34772); MobilePhone = 'Set MobilePhone End EmailAddress1' output; emailaddress1 = file Email_108 after trim + regex validation; *DB = Lookup 'Check if contact exists' (CRM contact)",
+          "additionalFileFields": []
+        },
+        {
+          "attribute": "gen_mobilephonetransmissionstatus",
+          "from": [
+            {
+              "column": "gen_mobilephonetransmissionstatus",
+              "role": "value"
+            }
+          ],
+          "expression": "Param_26 as is (written unconditionally); input = 'Update Correct Value'.gen_mobilephonetransmissionstatus = gen_recordsorceDB == 1 && ISNULL(mobilephoneDB) && !ISNULL(MobilePhone) ? (ISNULL(Gen_bankcustomeridnumberDB) ? 3 : 2) : gen_mobilephonetransmissionstatusDB — i.e. reset/initialised when the file supplies a new mobile for a gen_recordsorce=1 contact without one, otherwise the current CRM value is written back",
+          "fixedValue": null,
+          "condition": null,
+          "evidence": "DTSX 34334 (?26 → Param_26, input binding DTSX 34394); UCV DTSX 34718",
+          "upstream": "'Update Correct Value' NEW gen_mobilephonetransmissionstatus = gen_recordsorceDB == 1 && ISNULL(mobilephoneDB) && !ISNULL(MobilePhone) ? (ISNULL(Gen_bankcustomeridnumberDB) ? 3 : 2) : gen_mobilephonetransmissionstatusDB (DTSX 34718); MobilePhone = 'Set MobilePhone End EmailAddress1' output; emailaddress1 = file Email_108 after trim + regex validation; *DB = Lookup 'Check if contact exists' (CRM contact)",
+          "additionalFileFields": []
+        },
+        {
+          "attribute": "gen_emailaddress1transmissionstatus",
+          "from": [
+            {
+              "column": "gen_emailaddress1transmissionstatus",
+              "role": "value"
+            }
+          ],
+          "expression": "Param_27 as is (written unconditionally); input = 'Update Correct Value'.gen_emailaddress1transmissionstatus = gen_recordsorceDB == 1 && ISNULL(emailaddress1DB) && !ISNULL(emailaddress1) ? (ISNULL(Gen_bankcustomeridnumberDB) ? 3 : 2) : gen_emailaddress1transmissionstatusDB — i.e. reset/initialised when the file supplies a new e-mail for a gen_recordsorce=1 contact without one, otherwise the current CRM value is written back",
+          "fixedValue": null,
+          "condition": null,
+          "evidence": "DTSX 34335 (?27 → Param_27, input binding DTSX 34395); UCV DTSX 34724",
+          "upstream": "'Update Correct Value' NEW gen_emailaddress1transmissionstatus = gen_recordsorceDB == 1 && ISNULL(emailaddress1DB) && !ISNULL(emailaddress1) ? (ISNULL(Gen_bankcustomeridnumberDB) ? 3 : 2) : gen_emailaddress1transmissionstatusDB (DTSX 34724); MobilePhone = 'Set MobilePhone End EmailAddress1' output; emailaddress1 = file Email_108 after trim + regex validation; *DB = Lookup 'Check if contact exists' (CRM contact)",
+          "additionalFileFields": []
+        },
+        {
+          "attribute": "gen_emailaddress1lastupdatedate",
+          "from": [
+            {
+              "column": "gen_emailaddress1lastupdatedate",
+              "role": "value"
+            }
+          ],
+          "expression": "Param_28 as is (written unconditionally); input = 'Update Correct Value'.gen_emailaddress1lastupdatedate = gen_recordsorceDB == 1 && ISNULL(emailaddress1DB) && !ISNULL(emailaddress1) ? GETDATE() : gen_emailaddress1lastupdatedateDB — i.e. reset/initialised when the file supplies a new e-mail for a gen_recordsorce=1 contact without one, otherwise the current CRM value is written back",
+          "fixedValue": null,
+          "condition": null,
+          "evidence": "DTSX 34337 (?28 → Param_28, input binding DTSX 34396); UCV DTSX 34694",
+          "upstream": "'Update Correct Value' NEW gen_emailaddress1lastupdatedate = gen_recordsorceDB == 1 && ISNULL(emailaddress1DB) && !ISNULL(emailaddress1) ? GETDATE() : gen_emailaddress1lastupdatedateDB (DTSX 34694); MobilePhone = 'Set MobilePhone End EmailAddress1' output; emailaddress1 = file Email_108 after trim + regex validation; *DB = Lookup 'Check if contact exists' (CRM contact)",
+          "additionalFileFields": []
+        },
+        {
+          "attribute": "gen_mobilephonelastupdatedate",
+          "from": [
+            {
+              "column": "gen_mobilephonelastupdatedate",
+              "role": "value"
+            }
+          ],
+          "expression": "Param_29 as is (written unconditionally); input = 'Update Correct Value'.gen_mobilephonelastupdatedate = gen_recordsorceDB == 1 && ISNULL(mobilephoneDB) && !ISNULL(MobilePhone) ? GETDATE() : gen_mobilephonelastupdatedateDB — i.e. reset/initialised when the file supplies a new mobile for a gen_recordsorce=1 contact without one, otherwise the current CRM value is written back",
+          "fixedValue": null,
+          "condition": null,
+          "evidence": "DTSX 34338 (?29 → Param_29, input binding DTSX 34398); UCV DTSX 34700",
+          "upstream": "'Update Correct Value' NEW gen_mobilephonelastupdatedate = gen_recordsorceDB == 1 && ISNULL(mobilephoneDB) && !ISNULL(MobilePhone) ? GETDATE() : gen_mobilephonelastupdatedateDB (DTSX 34700); MobilePhone = 'Set MobilePhone End EmailAddress1' output; emailaddress1 = file Email_108 after trim + regex validation; *DB = Lookup 'Check if contact exists' (CRM contact)",
+          "additionalFileFields": []
+        },
+        {
+          "attribute": "gen_emailaddress1sourcelastupdate",
+          "from": [
+            {
+              "column": "gen_emailaddress1sourcelastupdate",
+              "role": "value"
+            }
+          ],
+          "expression": "Param_30 as is (written unconditionally); input = 'Update Correct Value'.gen_emailaddress1sourcelastupdate = gen_recordsorceDB == 1 && ISNULL(emailaddress1DB) && !ISNULL(emailaddress1) ? 3 : gen_emailaddress1sourcelastupdateDB — i.e. reset/initialised when the file supplies a new e-mail for a gen_recordsorce=1 contact without one, otherwise the current CRM value is written back",
+          "fixedValue": null,
+          "condition": null,
+          "evidence": "DTSX 34339 (?30 → Param_30, input binding DTSX 34397); UCV DTSX 34706",
+          "upstream": "'Update Correct Value' NEW gen_emailaddress1sourcelastupdate = gen_recordsorceDB == 1 && ISNULL(emailaddress1DB) && !ISNULL(emailaddress1) ? 3 : gen_emailaddress1sourcelastupdateDB (DTSX 34706); MobilePhone = 'Set MobilePhone End EmailAddress1' output; emailaddress1 = file Email_108 after trim + regex validation; *DB = Lookup 'Check if contact exists' (CRM contact)",
+          "additionalFileFields": []
+        },
+        {
+          "attribute": "gen_mobilephonesourcelastupdate",
+          "from": [
+            {
+              "column": "gen_mobilephonesourcelastupdate",
+              "role": "value"
+            }
+          ],
+          "expression": "Param_31 as is (written unconditionally); input = 'Update Correct Value'.gen_mobilephonesourcelastupdate = gen_recordsorceDB == 1 && ISNULL(mobilephoneDB) && !ISNULL(MobilePhone) ? 3 : gen_mobilephonesourcelastupdateDB — i.e. reset/initialised when the file supplies a new mobile for a gen_recordsorce=1 contact without one, otherwise the current CRM value is written back",
+          "fixedValue": null,
+          "condition": null,
+          "evidence": "DTSX 34340 (?31 → Param_31, input binding DTSX 34399); UCV DTSX 34712",
+          "upstream": "'Update Correct Value' NEW gen_mobilephonesourcelastupdate = gen_recordsorceDB == 1 && ISNULL(mobilephoneDB) && !ISNULL(MobilePhone) ? 3 : gen_mobilephonesourcelastupdateDB (DTSX 34712); MobilePhone = 'Set MobilePhone End EmailAddress1' output; emailaddress1 = file Email_108 after trim + regex validation; *DB = Lookup 'Check if contact exists' (CRM contact)",
+          "additionalFileFields": []
+        },
+        {
+          "attribute": "gen_customerpreference",
+          "from": [
+            {
+              "column": "gen_customerpreferenceDB",
+              "role": "value"
+            }
+          ],
+          "expression": "Param_32 as is (written unconditionally); gen_customerpreferenceDB is the CRM value modified in place by 'Update fields by mobilephone and email': if isUpdateCustomerPreference and new preference ≠ DB: 1 (EMAIL) when e-mail AND mobile valid, 2 (MOBILE_PHONE) when only mobile valid, 3 (ISRAEL_POST) otherwise (main.cs:133-154); else CRM value written back",
+          "fixedValue": null,
+          "condition": null,
+          "evidence": "DTSX 34342 (?32 → Param_32, input binding DTSX 34407)",
+          "upstream": "Lookup 'Check if contact exists' returns gen_customerpreferenceDB (CRM contact) → 'Update fields by mobilephone and email' readWrite may overwrite it (main.cs:123-170; see readWriteModifications)",
+          "additionalFileFields": [
+            {
+              "field": "Email_108",
+              "role": "condition",
+              "via": "e-mail validity/changed decides the new preference (main.cs:125-146)"
+            },
+            {
+              "field": "Phone_1_Number_14",
+              "role": "condition",
+              "via": "mobile (MobilePhone) validity/changed"
+            },
+            {
+              "field": "Phone_2_Number_106",
+              "role": "condition",
+              "via": "mobile (MobilePhone) validity/changed"
+            }
+          ]
+        },
+        {
+          "attribute": "gen_customerpreferencetransmissionstatus",
+          "from": [
+            {
+              "column": "gen_customerpreferencetransmissionstatusDB",
+              "role": "value"
+            }
+          ],
+          "expression": "Param_33 as is (written unconditionally); gen_customerpreferencetransmissionstatusDB is the CRM value modified in place by 'Update fields by mobilephone and email': if preference changed: 2 (WAITING_FOR_SENDING) when file gen_bankcustomeridnumber not NULL else 1 (NOT_REQUIRED) (main.cs:156-163); else CRM value written back",
+          "fixedValue": null,
+          "condition": null,
+          "evidence": "DTSX 34343 (?33 → Param_33, input binding DTSX 34408)",
+          "upstream": "Lookup 'Check if contact exists' returns gen_customerpreferencetransmissionstatusDB (CRM contact) → 'Update fields by mobilephone and email' readWrite may overwrite it (main.cs:123-170; see readWriteModifications)",
+          "additionalFileFields": [
+            {
+              "field": "Email_108",
+              "role": "condition",
+              "via": "e-mail validity/changed decides the new preference (main.cs:125-146)"
+            },
+            {
+              "field": "Phone_1_Number_14",
+              "role": "condition",
+              "via": "mobile (MobilePhone) validity/changed"
+            },
+            {
+              "field": "Phone_2_Number_106",
+              "role": "condition",
+              "via": "mobile (MobilePhone) validity/changed"
+            },
+            {
+              "field": "Bank_Customer_Id_Number_75",
+              "role": "condition",
+              "via": "main.cs:156-163"
+            }
+          ]
+        },
+        {
+          "attribute": "gen_customerpreferencetransmissiondate",
+          "from": [
+            {
+              "column": "gen_customerpreferencetransmissiondateDB",
+              "role": "value"
+            }
+          ],
+          "expression": "Param_34 as is (written unconditionally); gen_customerpreferencetransmissiondateDB is the CRM value modified in place by 'Update fields by mobilephone and email': NULL if preference changed (main.cs:165); else CRM value written back",
+          "fixedValue": null,
+          "condition": null,
+          "evidence": "DTSX 34344 (?34 → Param_34, input binding DTSX 34412)",
+          "upstream": "Lookup 'Check if contact exists' returns gen_customerpreferencetransmissiondateDB (CRM contact) → 'Update fields by mobilephone and email' readWrite may overwrite it (main.cs:123-170; see readWriteModifications)",
+          "additionalFileFields": [
+            {
+              "field": "Email_108",
+              "role": "condition",
+              "via": "e-mail validity/changed decides the new preference (main.cs:125-146)"
+            },
+            {
+              "field": "Phone_1_Number_14",
+              "role": "condition",
+              "via": "mobile (MobilePhone) validity/changed"
+            },
+            {
+              "field": "Phone_2_Number_106",
+              "role": "condition",
+              "via": "mobile (MobilePhone) validity/changed"
+            }
+          ]
+        },
+        {
+          "attribute": "gen_customerpreferencefilename",
+          "from": [
+            {
+              "column": "gen_customerpreferencefilenameDB",
+              "role": "value"
+            }
+          ],
+          "expression": "Param_35 as is (written unconditionally); gen_customerpreferencefilenameDB is the CRM value modified in place by 'Update fields by mobilephone and email': NULL if preference changed (main.cs:166); else CRM value",
+          "fixedValue": null,
+          "condition": null,
+          "evidence": "DTSX 34345 (?35 → Param_35, input binding DTSX 34411)",
+          "upstream": "Lookup 'Check if contact exists' returns gen_customerpreferencefilenameDB (CRM contact) → 'Update fields by mobilephone and email' readWrite may overwrite it (main.cs:123-170; see readWriteModifications)",
+          "additionalFileFields": [
+            {
+              "field": "Email_108",
+              "role": "condition",
+              "via": "e-mail validity/changed decides the new preference (main.cs:125-146)"
+            },
+            {
+              "field": "Phone_1_Number_14",
+              "role": "condition",
+              "via": "mobile (MobilePhone) validity/changed"
+            },
+            {
+              "field": "Phone_2_Number_106",
+              "role": "condition",
+              "via": "mobile (MobilePhone) validity/changed"
+            }
+          ]
+        },
+        {
+          "attribute": "gen_customerpreferencefeedback",
+          "from": [
+            {
+              "column": "gen_customerpreferencefeedbackDB",
+              "role": "value"
+            }
+          ],
+          "expression": "Param_36 as is (written unconditionally); gen_customerpreferencefeedbackDB is the CRM value modified in place by 'Update fields by mobilephone and email': NULL if preference changed (main.cs:167); else CRM value",
+          "fixedValue": null,
+          "condition": null,
+          "evidence": "DTSX 34346 (?36 → Param_36, input binding DTSX 34410)",
+          "upstream": "Lookup 'Check if contact exists' returns gen_customerpreferencefeedbackDB (CRM contact) → 'Update fields by mobilephone and email' readWrite may overwrite it (main.cs:123-170; see readWriteModifications)",
+          "additionalFileFields": [
+            {
+              "field": "Email_108",
+              "role": "condition",
+              "via": "e-mail validity/changed decides the new preference (main.cs:125-146)"
+            },
+            {
+              "field": "Phone_1_Number_14",
+              "role": "condition",
+              "via": "mobile (MobilePhone) validity/changed"
+            },
+            {
+              "field": "Phone_2_Number_106",
+              "role": "condition",
+              "via": "mobile (MobilePhone) validity/changed"
+            }
+          ]
+        },
+        {
+          "attribute": "gen_customerpreferenceerrorreason",
+          "from": [
+            {
+              "column": "gen_customerpreferenceerrorreasonDB",
+              "role": "value"
+            }
+          ],
+          "expression": "Param_37 as is (written unconditionally); gen_customerpreferenceerrorreasonDB is the CRM value modified in place by 'Update fields by mobilephone and email': NULL if preference changed (main.cs:168); else CRM value",
+          "fixedValue": null,
+          "condition": null,
+          "evidence": "DTSX 34347 (?37 → Param_37, input binding DTSX 34409)",
+          "upstream": "Lookup 'Check if contact exists' returns gen_customerpreferenceerrorreasonDB (CRM contact) → 'Update fields by mobilephone and email' readWrite may overwrite it (main.cs:123-170; see readWriteModifications)",
+          "additionalFileFields": [
+            {
+              "field": "Email_108",
+              "role": "condition",
+              "via": "e-mail validity/changed decides the new preference (main.cs:125-146)"
+            },
+            {
+              "field": "Phone_1_Number_14",
+              "role": "condition",
+              "via": "mobile (MobilePhone) validity/changed"
+            },
+            {
+              "field": "Phone_2_Number_106",
+              "role": "condition",
+              "via": "mobile (MobilePhone) validity/changed"
+            }
+          ]
+        }
+      ],
+      "evidence": "OLE DB Command SqlCommand DTSX 34278-34360; 44 ? counted (comments contain no ?), Param_0..Param_43; bindings DTSX 34369-34412"
+    },
+    {
+      "component": "Package\\Foreach Loop Container\\Create Contacts For Minhali\\UPDate contact and CustomerAddress",
+      "identicalCopies": [],
+      "entity": "customeraddress",
+      "verb": "UPDATE",
+      "mechanism": "SQL (UPDATE CustomerAddressBase, 2nd statement of the same OLE DB Command)",
+      "status": "Unsupported",
+      "recordKey": "WHERE ParentId = ? (Param_43 ← customerAddressParentId = contactid) AND AddressNumber = 1 AND ObjectTypeCode = 2 (contact address 1), DTSX 34358-34360",
+      "recordKeyColumns": [
+        "customerAddressParentId"
+      ],
+      "declaredRowFilters": [
+        {
+          "file": "Minhali Daily Source",
+          "field": "Customer_Id_Number_6",
+          "via": "Package\\Foreach Loop Container\\Create Contacts For Minhali\\Remove Duplicate",
+          "why": "first row per gen_identitynumber only: if (contacts.Contains(Row.genidentitynumber)) Row.DirectRowToDuplicate() (unconnected output) else DirectRowToOutput0. gen_identitynumber = Customer_Id_Number_6 trimmed, not padded ('Add 0' is a no-op); de-duplication happens before unknown customers get \"000000000\"",
+          "evidence": "main.cs:112-121 (DTSX 28923)"
+        }
+      ],
+      "condition": "Row read from MY_FileData; NOT SUBSTRING(CheckLastRow,1,1) == \"@\" ('Check for last row' else, DTSX 23643); 'Check customer type' DEFAULT output פרטי = none of: 'estate type 210' (Sector_Code_17 == \"0210\" && (DT_I4)Employer_Agreement_Number_35 != 0), company ((Gen_CustomerIdType_STR_INT == \"7\" && Sector_Code_17 != \"0210\") || (Sector_Code_17 == \"0210\" && (DT_I4)Employer_Agreement_Number_35 == 0) || Sector_Code_17 == \"0775\"), 'Other Customer' (ISNULL(Gen_CustomerIdType_STR_INT) || type ∉ {\"1\",\"5\",\"6\"}) (DTSX 23592); 'Is Contact' Row_Level_147 == \"1\" (DTSX 28690); first row per trimmed gen_identitynumber ('Remove Duplicate' main.cs:112-121; dedupe BEFORE unknown customers get \"000000000\"); AND Lookup 'Check if contact exists' match (active contact) → Derived Column → Convert To Date Time → Update Correct Value → Update fields by mobilephone and email → executed for EVERY matched row (no change detection)",
+      "attributes": [
+        {
+          "attribute": "postalcode",
+          "from": [
+            {
+              "column": "address1_postalcode",
+              "role": "value"
+            }
+          ],
+          "expression": "Param_39 as is",
+          "fixedValue": null,
+          "condition": null,
+          "evidence": "DTSX 34353 (?39 → Param_39, input binding DTSX 34405)",
+          "upstream": "FILE Address_Zip_Code_104 (pos 1214-1220) → MY_FileData.Address_Zip_Code_104 → 'Read MY Data From Staging' SELECT Address_Zip_Code_104 (output alias address1_postalcode) → 'Trim String Fields' script (main.cs:28-50: every string column .Trim(), empty string → NULL) [contacts DTSX 31364] → Union All 6",
+          "additionalFileFields": []
+        },
+        {
+          "attribute": "line1",
+          "from": [
+            {
+              "column": "address1_line1",
+              "role": "value"
+            }
+          ],
+          "expression": "Param_40 as is",
+          "fixedValue": null,
+          "condition": null,
+          "evidence": "DTSX 34354 (?40 → Param_40, input binding DTSX 34404)",
+          "upstream": "FILE Address_Street_98 (pos 1094-1113) → MY_FileData.Address_Street_98 → 'Read MY Data From Staging' SELECT Address_Street_98 + FILE Address_Neighborhood_103 (pos 1164-1213) → MY_FileData.Address_Neighborhood_103 → 'Read MY Data From Staging' SELECT Address_Neighborhood_103 → 'Trim String Fields' script (main.cs:28-50: every string column .Trim(), empty string → NULL) [contacts DTSX 31364] → Union All 6 → 'Custom Fields' NEW address1_line1 = !ISNULL(Address_Neighborhood_103) && Address_Neighborhood_103 != \"\" ? TRIM(Address_Street_98) + \" \" + TRIM(Address_Neighborhood_103) : TRIM(Address_Street_98) (DTSX 26933)",
+          "additionalFileFields": []
+        },
+        {
+          "attribute": "name",
+          "from": [
+            {
+              "column": "address1_name",
+              "role": "value"
+            },
+            {
+              "column": "recordsource",
+              "role": "condition"
+            }
+          ],
+          "expression": "CASE WHEN ?41 = 1 THEN ?42 ELSE name END; Param_42 = address1_name (literal \"ראשי\" from Custom Fields); Param_41 = recordsource which is bound to gendercodeDB (CRM contact.gendercode), not gen_recordsorceDB",
+          "fixedValue": "ראשי",
+          "condition": "recordsource (= CRM contact gendercode) == 1",
+          "evidence": "DTSX 34355-34357 (?41 → Param_41 input 34403, ?42 → Param_42 input 34402); recordsource DTSX 27007-27009",
+          "upstream": "'Custom Fields' NEW address1_name = \"ראשי\" (DTSX 26939) || recordsource: 'Derived Column' NEW recordsource (i4) = gendercodeDB (DTSX 27007-27009) — i.e. CRM contact.gendercode from Lookup 'Check if contact exists', NOT gen_recordsorceDB",
+          "additionalFileFields": []
+        }
+      ],
+      "evidence": "OLE DB Command SqlCommand DTSX 34278-34360"
+    },
+    {
+      "component": "Package\\Foreach Loop Container\\Create Contacts For Minhali\\Create ContactLog",
+      "identicalCopies": [],
+      "entity": "gen_contactlogs",
+      "verb": "CREATE",
+      "mechanism": "SQL (INSERT INTO gen_contactlogsbase) on connection CRM (catalog altshuler_mscrm)",
+      "status": "Unsupported",
+      "recordKey": "new row, gen_contactlogsid = NEWID() (DTSX 26729)",
+      "declaredRowFilters": [
+        {
+          "file": "Minhali Daily Source",
+          "field": "Customer_Id_Number_6",
+          "via": "Package\\Foreach Loop Container\\Create Contacts For Minhali\\Remove Duplicate",
+          "why": "first row per gen_identitynumber only: if (contacts.Contains(Row.genidentitynumber)) Row.DirectRowToDuplicate() (unconnected output) else DirectRowToOutput0. gen_identitynumber = Customer_Id_Number_6 trimmed, not padded ('Add 0' is a no-op); de-duplication happens before unknown customers get \"000000000\"",
+          "evidence": "main.cs:112-121 (DTSX 28923)"
+        }
+      ],
+      "condition": "Row read from MY_FileData; NOT SUBSTRING(CheckLastRow,1,1) == \"@\" ('Check for last row' else, DTSX 23643); 'Check customer type' DEFAULT output פרטי = none of: 'estate type 210' (Sector_Code_17 == \"0210\" && (DT_I4)Employer_Agreement_Number_35 != 0), company ((Gen_CustomerIdType_STR_INT == \"7\" && Sector_Code_17 != \"0210\") || (Sector_Code_17 == \"0210\" && (DT_I4)Employer_Agreement_Number_35 == 0) || Sector_Code_17 == \"0775\"), 'Other Customer' (ISNULL(Gen_CustomerIdType_STR_INT) || type ∉ {\"1\",\"5\",\"6\"}) (DTSX 23592); 'Is Contact' Row_Level_147 == \"1\" (DTSX 28690); first row per trimmed gen_identitynumber ('Remove Duplicate' main.cs:112-121; dedupe BEFORE unknown customers get \"000000000\"); AND Lookup 'Check if contact exists' match (active contact) → Derived Column → Convert To Date Time → Update Correct Value → Update fields by mobilephone and email → executed for EVERY matched row (no change detection); then (after the UPDATE of the same row) 'Conditional Split' output 'create contact log' = isUpdateCustomerPreference (DTSX 24067)",
+      "attributes": [
+        {
+          "attribute": "createdon",
+          "from": [],
+          "expression": "GETUTCDATE()",
+          "fixedValue": null,
+          "condition": null,
+          "evidence": "DTSX 26701 / 26723",
+          "upstream": null,
+          "additionalFileFields": []
+        },
+        {
+          "attribute": "createdby",
+          "from": [
+            {
+              "column": "userId",
+              "role": "value"
+            }
+          ],
+          "expression": "Param_2 = userId (User::UserId as GUID)",
+          "fixedValue": null,
+          "condition": null,
+          "evidence": "DTSX 26702 / 26723 (?2, input 26755)",
+          "upstream": "'Derived Column' NEW userId = (DT_GUID)(\"{\" + @[User::UserId] + \"}\") (DTSX 26995); User::UserId default '' (DTSX 441), set at runtime by package plumbing",
+          "additionalFileFields": []
+        },
+        {
+          "attribute": "modifiedon",
+          "from": [],
+          "expression": "GETUTCDATE()",
+          "fixedValue": null,
+          "condition": null,
+          "evidence": "DTSX 26703 / 26724",
+          "upstream": null,
+          "additionalFileFields": []
+        },
+        {
+          "attribute": "modifiedby",
+          "from": [
+            {
+              "column": "modifiedby",
+              "role": "value"
+            }
+          ],
+          "expression": "Param_3 = modifiedby (User::UserId as GUID)",
+          "fixedValue": null,
+          "condition": null,
+          "evidence": "DTSX 26704 / 26724 (?3, input 26756)",
+          "upstream": "'Derived Column' NEW modifiedby = (DT_GUID)(\"{\" + @[User::UserId] + \"}\") (DTSX 27013)",
+          "additionalFileFields": []
+        },
+        {
+          "attribute": "ownerid",
+          "from": [
+            {
+              "column": "ownerid",
+              "role": "value"
+            }
+          ],
+          "expression": "Param_4 = ownerid (User::UserId as GUID)",
+          "fixedValue": null,
+          "condition": null,
+          "evidence": "DTSX 26705 / 26725 (?4, input 26757)",
+          "upstream": "'Derived Column' NEW ownerid = (DT_GUID)(\"{\" + @[User::UserId] + \"}\") (DTSX 27019)",
+          "additionalFileFields": []
+        },
+        {
+          "attribute": "owneridtype",
+          "from": [
+            {
+              "column": "owneridtype",
+              "role": "value"
+            }
+          ],
+          "expression": "Param_5 = @[User::OwnerIdType]",
+          "fixedValue": null,
+          "condition": null,
+          "evidence": "DTSX 26706 / 26725 (?5, input 26758)",
+          "upstream": "'Derived Column' NEW owneridtype = @[User::OwnerIdType] (DTSX 27025; variable default 0, DTSX 417)",
+          "additionalFileFields": []
+        },
+        {
+          "attribute": "owningbusinessunit",
+          "from": [
+            {
+              "column": "businessUnitId",
+              "role": "value"
+            }
+          ],
+          "expression": "Param_6 = (DT_GUID) User::BusinessUnitIdStr",
+          "fixedValue": null,
+          "condition": null,
+          "evidence": "DTSX 26707 / 26725 (?6, input 26759)",
+          "upstream": "'Derived Column' NEW businessUnitId = (DT_GUID)(\"{\" + @[User::BusinessUnitIdStr] + \"}\") (DTSX 27031; default '' DTSX 354)",
+          "additionalFileFields": []
+        },
+        {
+          "attribute": "statecode",
+          "from": [],
+          "expression": "literal 0",
+          "fixedValue": 0,
+          "condition": null,
+          "evidence": "DTSX 26708 / 26726",
+          "upstream": null,
+          "additionalFileFields": []
+        },
+        {
+          "attribute": "statuscode",
+          "from": [],
+          "expression": "literal 1",
+          "fixedValue": 1,
+          "condition": null,
+          "evidence": "DTSX 26709 / 26726",
+          "upstream": null,
+          "additionalFileFields": []
+        },
+        {
+          "attribute": "gen_processname",
+          "from": [],
+          "expression": "literal 4",
+          "fixedValue": 4,
+          "condition": null,
+          "evidence": "DTSX 26710 / 26727",
+          "upstream": null,
+          "additionalFileFields": []
+        },
+        {
+          "attribute": "gen_contact",
+          "from": [
+            {
+              "column": "contactid",
+              "role": "value"
+            }
+          ],
+          "expression": "Param_7 = contactid (the updated contact)",
+          "fixedValue": null,
+          "condition": null,
+          "evidence": "DTSX 26711 / 26728 (?7, input 26760)",
+          "upstream": "Lookup 'Check if contact exists' returns contactid (CRM contact, statecode = 0, key gen_identitynumber)",
+          "additionalFileFields": []
+        },
+        {
+          "attribute": "gen_contactlogsid",
+          "from": [],
+          "expression": "NEWID()",
+          "fixedValue": null,
+          "condition": null,
+          "evidence": "DTSX 26712 / 26729",
+          "upstream": null,
+          "additionalFileFields": []
+        },
+        {
+          "attribute": "gen_emailaddress1",
+          "from": [
+            {
+              "column": "emailaddress1",
+              "role": "value"
+            }
+          ],
+          "expression": "Param_8 = 'Update Correct Value'.emailaddress1 (file e-mail when it fills an empty gen_recordsorce=1 contact, else CRM value)",
+          "fixedValue": null,
+          "condition": null,
+          "evidence": "DTSX 26713 / 26730 (?8, input 26761)",
+          "upstream": "'Update Correct Value' NEW emailaddress1 = gen_recordsorceDB == 1 && ISNULL(emailaddress1DB) && !ISNULL(emailaddress1) ? emailaddress1 : emailaddress1DB (DTSX 34688); MobilePhone = 'Set MobilePhone End EmailAddress1' output; emailaddress1 = file Email_108 after trim + regex validation; *DB = Lookup 'Check if contact exists' (CRM contact)",
+          "additionalFileFields": []
+        },
+        {
+          "attribute": "gen_oldemailaddress1",
+          "from": [
+            {
+              "column": "emailaddress1DB",
+              "role": "value"
+            }
+          ],
+          "expression": "Param_9 = emailaddress1DB (CRM value before update)",
+          "fixedValue": null,
+          "condition": null,
+          "evidence": "DTSX 26714 / 26730 (?9, input 26762)",
+          "upstream": "CRM DB values from Lookup 'Check if contact exists' (CRM conn, SELECT ... FROM contact WHERE statecode = 0; key gen_identitynumberDB = gen_identitynumber; DTSX 23678-23783)",
+          "additionalFileFields": []
+        },
+        {
+          "attribute": "gen_mobilephone",
+          "from": [
+            {
+              "column": "mobilephone",
+              "role": "value"
+            }
+          ],
+          "expression": "Param_10 = 'Update Correct Value'.mobilephone",
+          "fixedValue": null,
+          "condition": null,
+          "evidence": "DTSX 26715 / 26731 (?10, input 26768)",
+          "upstream": "'Update Correct Value' NEW mobilephone = gen_recordsorceDB == 1 && ISNULL(mobilephoneDB) && !ISNULL(MobilePhone) ? MobilePhone : mobilephoneDB (DTSX 34682); MobilePhone = 'Set MobilePhone End EmailAddress1' output; emailaddress1 = file Email_108 after trim + regex validation; *DB = Lookup 'Check if contact exists' (CRM contact)",
+          "additionalFileFields": []
+        },
+        {
+          "attribute": "gen_oldmobilephone",
+          "from": [
+            {
+              "column": "mobilephoneDB",
+              "role": "value"
+            }
+          ],
+          "expression": "Param_11 = mobilephoneDB (CRM value before update)",
+          "fixedValue": null,
+          "condition": null,
+          "evidence": "DTSX 26716 / 26731 (?11, input 26763)",
+          "upstream": "CRM DB values from Lookup 'Check if contact exists' (CRM conn, SELECT ... FROM contact WHERE statecode = 0; key gen_identitynumberDB = gen_identitynumber; DTSX 23678-23783)",
+          "additionalFileFields": []
+        },
+        {
+          "attribute": "gen_customerpreference",
+          "from": [
+            {
+              "column": "gen_customerpreferenceDB",
+              "role": "value"
+            }
+          ],
+          "expression": "SET @customerpreference = ?0; CASE WHEN @customerpreference = 1 THEN N'דואר אלקטרוני' WHEN 2 THEN N'טלפון נייד' ELSE N'דואר ישראל' END (int → Hebrew text)",
+          "fixedValue": null,
+          "condition": null,
+          "evidence": "DTSX 26697 (?0 → Param_0, input 26753) + 26717 / 26732-26737",
+          "upstream": "Lookup 'Check if contact exists' returns gen_customerpreferenceDB (CRM contact) → 'Update fields by mobilephone and email' readWrite may overwrite it (main.cs:123-170; see readWriteModifications)",
+          "additionalFileFields": []
+        },
+        {
+          "attribute": "gen_customerpreferencetransmissionstatus",
+          "from": [
+            {
+              "column": "gen_customerpreferencetransmissionstatusDB",
+              "role": "value"
+            }
+          ],
+          "expression": "SET @customerpreferencetransmissionstatus = ?1; CASE WHEN 1 THEN N'לא נדרש' WHEN 2 THEN N'ממתין לשליחה' END (no ELSE → NULL for other values)",
+          "fixedValue": null,
+          "condition": null,
+          "evidence": "DTSX 26698 (?1 → Param_1, input 26754) + 26718 / 26738-26742",
+          "upstream": "Lookup 'Check if contact exists' returns gen_customerpreferencetransmissionstatusDB (CRM contact) → 'Update fields by mobilephone and email' readWrite may overwrite it (main.cs:123-170; see readWriteModifications)",
+          "additionalFileFields": []
+        },
+        {
+          "attribute": "gen_customerpreferencetransmissiondate",
+          "from": [
+            {
+              "column": "gen_customerpreferencetransmissiondateDB",
+              "role": "value"
+            }
+          ],
+          "expression": "Param_12 as is",
+          "fixedValue": null,
+          "condition": null,
+          "evidence": "DTSX 26719 / 26743 (?12, input 26767)",
+          "upstream": "Lookup 'Check if contact exists' returns gen_customerpreferencetransmissiondateDB (CRM contact) → 'Update fields by mobilephone and email' readWrite may overwrite it (main.cs:123-170; see readWriteModifications)",
+          "additionalFileFields": []
+        },
+        {
+          "attribute": "gen_customerpreferencefilename",
+          "from": [
+            {
+              "column": "gen_customerpreferencefilenameDB",
+              "role": "value"
+            }
+          ],
+          "expression": "Param_13 as is",
+          "fixedValue": null,
+          "condition": null,
+          "evidence": "DTSX 26720 / 26743 (?13, input 26766)",
+          "upstream": "Lookup 'Check if contact exists' returns gen_customerpreferencefilenameDB (CRM contact) → 'Update fields by mobilephone and email' readWrite may overwrite it (main.cs:123-170; see readWriteModifications)",
+          "additionalFileFields": []
+        },
+        {
+          "attribute": "gen_customerpreferencefeedback",
+          "from": [
+            {
+              "column": "gen_customerpreferencefeedbackDB",
+              "role": "value"
+            }
+          ],
+          "expression": "Param_14 as is",
+          "fixedValue": null,
+          "condition": null,
+          "evidence": "DTSX 26721 / 26743 (?14, input 26765)",
+          "upstream": "Lookup 'Check if contact exists' returns gen_customerpreferencefeedbackDB (CRM contact) → 'Update fields by mobilephone and email' readWrite may overwrite it (main.cs:123-170; see readWriteModifications)",
+          "additionalFileFields": []
+        },
+        {
+          "attribute": "gen_customerpreferenceerrorreason",
+          "from": [
+            {
+              "column": "gen_customerpreferenceerrorreasonDB",
+              "role": "value"
+            }
+          ],
+          "expression": "Param_15 as is",
+          "fixedValue": null,
+          "condition": null,
+          "evidence": "DTSX 26722 / 26743 (?15, input 26764)",
+          "upstream": "Lookup 'Check if contact exists' returns gen_customerpreferenceerrorreasonDB (CRM contact) → 'Update fields by mobilephone and email' readWrite may overwrite it (main.cs:123-170; see readWriteModifications)",
+          "additionalFileFields": []
+        }
+      ],
+      "evidence": "OLE DB Command SqlCommand DTSX 26695-26744; 16 ? counted (Param_0..Param_15; Hebrew literals and comments contain no ?); bindings DTSX 26753-26768"
+    }
+  ],
+  "readWriteModifications": [
+    {
+      "component": "Package\\Foreach Loop Container\\Create Account For Employers\\Trim String Fields",
+      "column": "*",
+      "from": [],
+      "expression": "reflection over every string property of the row: if (!String.IsNullOrEmpty(str)) str = str.Trim(); if (str == \"\") str = null",
+      "condition": null,
+      "evidence": "main.cs:28-50 (DTSX 9534)"
+    },
+    {
+      "component": "Package\\Foreach Loop Container\\Create Account For Employers\\Add 0 to short id num",
+      "column": "*",
+      "from": [],
+      "expression": "FormatField(str, column length): if (String.IsNullOrEmpty(str)) str = \"\"; if (str.Contains(\".\")) str = str.Replace(\".\", \"\"); return str.PadLeft(fieldSize, '0') — lengths: accountnumber 9, Employer_Number_38 9, Bank_Account_Number_27 12 (NULL becomes all zeros)",
+      "condition": null,
+      "evidence": "main.cs:18-53 (DTSX 3261)"
+    },
+    {
+      "component": "Package\\Foreach Loop Container\\Create Account For Employers\\Format Dates",
+      "column": "gen_customerdateodbirth",
+      "from": [],
+      "expression": "FormatYYYYMMDDtoDate: str.Trim().Length == 8 → str.Substring(0,4) + \"/\" + str.Substring(4,2) + \"/\" + str.Substring(6,2); Length == 6 → yyyy + \"/\" + MM + \"/01\"; other length → null; null if !DateTime.TryParse(str) || date < new DateTime(1900,1,1); null/empty input → null",
+      "condition": null,
+      "evidence": "main.cs:38-80 (DTSX 6584)"
+    },
+    {
+      "component": "Package\\Foreach Loop Container\\Create Accounts For Minhali\\Trim String Fields",
+      "column": "*",
+      "from": [],
+      "expression": "reflection over every string property of the row: if (!String.IsNullOrEmpty(str)) str = str.Trim(); if (str == \"\") str = null",
+      "condition": null,
+      "evidence": "main.cs:28-50 (DTSX 21038)"
+    },
+    {
+      "component": "Package\\Foreach Loop Container\\Create Accounts For Minhali\\Add 0 to short id num",
+      "column": "accountnumber",
+      "from": [],
+      "expression": "if (String.IsNullOrEmpty(str)) str = \"\"; remove \".\"; str.PadLeft(9, '0')",
+      "condition": null,
+      "evidence": "main.cs:18-54 (DTSX 14180)"
+    },
+    {
+      "component": "Package\\Foreach Loop Container\\Create Accounts For Minhali\\Format Dates 1",
+      "column": "gen_customerdateofbirth",
+      "from": [],
+      "expression": "FormatYYYYMMDDtoDate: str.Trim().Length == 8 → str.Substring(0,4) + \"/\" + str.Substring(4,2) + \"/\" + str.Substring(6,2); Length == 6 → yyyy + \"/\" + MM + \"/01\"; other length → null; null if !DateTime.TryParse(str) || date < new DateTime(1900,1,1); null/empty input → null",
+      "condition": null,
+      "evidence": "main.cs:33-74 (DTSX 18416)"
+    },
+    {
+      "component": "Package\\Foreach Loop Container\\Create Accounts For Minhali\\Convert To Date",
+      "column": "gen_customerdateofbirth_DateTime",
+      "from": [
+        {
+          "column": "gen_customerdateofbirth",
+          "role": "value"
+        }
+      ],
+      "expression": "Row.gencustomerdateofbirthDateTime = DateTime.Parse(Row.gencustomerdateofbirth); exception swallowed by empty catch → keeps NULL(DT_DBDATE) from Add Additional Fields",
+      "condition": "!Row.gencustomerdateofbirth_IsNull",
+      "evidence": "main.cs:115-125 (DTSX 15244)"
+    },
+    {
+      "component": "Package\\Foreach Loop Container\\Create Contacts For Minhali\\Trim String Fields",
+      "column": "*",
+      "from": [],
+      "expression": "reflection over every string property of the row: if (!String.IsNullOrEmpty(str)) str = str.Trim(); if (str == \"\") str = null",
+      "condition": null,
+      "evidence": "main.cs:28-50 (DTSX 31364)"
+    },
+    {
+      "component": "Package\\Foreach Loop Container\\Create Contacts For Minhali\\Add 0",
+      "column": "gen_identitynumber",
+      "from": [],
+      "expression": "NO-OP: the whole foreach/FormatField call in Input0_ProcessInputRow is commented out → value passes unchanged (not zero-padded)",
+      "condition": null,
+      "evidence": "main.cs:33-50 (DTSX 22848)"
+    },
+    {
+      "component": "Package\\Foreach Loop Container\\Create Contacts For Minhali\\Format date",
+      "column": "*",
+      "from": [],
+      "expression": "FormatYYYYMMDDtoDate: str.Trim().Length == 8 → str.Substring(0,4) + \"/\" + str.Substring(4,2) + \"/\" + str.Substring(6,2); Length == 6 → yyyy + \"/\" + MM + \"/01\"; other length → null; null if !DateTime.TryParse(str) || date < new DateTime(1900,1,1); null/empty input → null (applies to Gen_Customerdateofbirth, Gen_DeathDate, Gen_identityNumberIssuingDate)",
+      "condition": null,
+      "evidence": "main.cs:33-76 (DTSX 27840)"
+    },
+    {
+      "component": "Package\\Foreach Loop Container\\Create Contacts For Minhali\\Set MobilePhone End EmailAddress1",
+      "column": "telephone1",
+      "from": [
+        {
+          "column": "telephone2",
+          "role": "value"
+        }
+      ],
+      "expression": "fnSetMobilePhone: if telephone1 (Replace(\"-\",\"\")) has Length 10 and starts \"05\" → Row.telephone1 = Row.telephone2 (main.cs:58-64); else if telephone2 (Replace(\"-\",\"\")) has Length 10 and starts \"05\" → Row.telephone1 = null (main.cs:71-79); else unchanged",
+      "condition": "telephone1 is a 10-char \"05\" mobile (then takes telephone2), or telephone2 is (then NULL)",
+      "evidence": "main.cs:54-86 (DTSX 29829)"
+    },
+    {
+      "component": "Package\\Foreach Loop Container\\Create Contacts For Minhali\\Set MobilePhone End EmailAddress1",
+      "column": "telephone2",
+      "from": [
+        {
+          "column": "telephone1",
+          "role": "value"
+        }
+      ],
+      "expression": "fnSetMobilePhone: if telephone1 is a 10-char \"05\" mobile → Row.telephone2 = null (main.cs:66); else if telephone2 (Replace(\"-\",\"\")) has Length 10 and starts \"05\" → Row.telephone2 = Row.telephone1 (main.cs:77); else unchanged",
+      "condition": "telephone1 is a mobile (then NULL), or telephone2 is (then takes telephone1)",
+      "evidence": "main.cs:54-86 (DTSX 29829)"
+    },
+    {
+      "component": "Package\\Foreach Loop Container\\Create Contacts For Minhali\\Set MobilePhone End EmailAddress1",
+      "column": "emailaddress1",
+      "from": [],
+      "expression": "if (!ValidEmailAddress(Row.emailaddress1)) Row.emailaddress1 = null; ValidEmailAddress = !IsNullOrEmpty && Regex(@\"^(?:[a-z0-9_-]+(?:\\.[a-z0-9_-]+)*|)@([\\w\\-]+)((\\.(\\w){2,3})+)$\", IgnoreCase).IsMatch",
+      "condition": "e-mail fails the regex",
+      "evidence": "main.cs:38-41,45-52 (DTSX 29829)"
+    },
+    {
+      "component": "Package\\Foreach Loop Container\\Create Contacts For Minhali\\Update fields by mobilephone and email",
+      "column": "gen_customerpreferenceDB",
+      "from": [
+        {
+          "column": "gen_recordsorceDB",
+          "role": "condition"
+        },
+        {
+          "column": "mobilephone",
+          "role": "condition"
+        },
+        {
+          "column": "mobilephoneDB",
+          "role": "condition"
+        },
+        {
+          "column": "emailaddress1",
+          "role": "condition"
+        },
+        {
+          "column": "emailaddress1DB",
+          "role": "condition"
+        }
+      ],
+      "expression": "Row.gencustomerpreferenceDB = EMAIL (1) if isValidEmail(emailaddress1) && isValidMobile(mobilephone); MOBILE_PHONE (2) if isValidMobile(mobilephone); else ISRAEL_POST (3). isValidMobile: trimmed, Length 10 or 11 (11 only with '-' at index 3), after removing '-' Length 10, starts \"05\" and int.TryParse",
+      "condition": "isUpdateCustomerPreference = (!gen_recordsorceDB_IsNull && gen_recordsorceDB == 1 && ((!mobilephone_IsNull && mobilephone != mobilephoneDB) || (!emailaddress1_IsNull && emailaddress1 != emailaddress1DB))) AND computed preference != gen_customerpreferenceDB (else early return, main.cs:148-151); otherwise the CRM value read by the lookup is kept",
+      "evidence": "main.cs:80-82,125-154,172-198 (DTSX 34790)"
+    },
+    {
+      "component": "Package\\Foreach Loop Container\\Create Contacts For Minhali\\Update fields by mobilephone and email",
+      "column": "gen_customerpreferencetransmissionstatusDB",
+      "from": [
+        {
+          "column": "gen_recordsorceDB",
+          "role": "condition"
+        },
+        {
+          "column": "mobilephone",
+          "role": "condition"
+        },
+        {
+          "column": "mobilephoneDB",
+          "role": "condition"
+        },
+        {
+          "column": "emailaddress1",
+          "role": "condition"
+        },
+        {
+          "column": "emailaddress1DB",
+          "role": "condition"
+        },
+        {
+          "column": "gen_customerpreferenceDB",
+          "role": "condition"
+        },
+        {
+          "column": "gen_bankcustomeridnumber",
+          "role": "condition"
+        }
+      ],
+      "expression": "Row.gencustomerpreferencetransmissionstatusDB = WAITING_FOR_SENDING (2) if !Row.genbankcustomeridnumber_IsNull else NOT_REQUIRED (1)",
+      "condition": "isUpdateCustomerPreference = (!gen_recordsorceDB_IsNull && gen_recordsorceDB == 1 && ((!mobilephone_IsNull && mobilephone != mobilephoneDB) || (!emailaddress1_IsNull && emailaddress1 != emailaddress1DB))) AND computed preference != gen_customerpreferenceDB (else early return, main.cs:148-151); otherwise the CRM value read by the lookup is kept",
+      "evidence": "main.cs:84-85,156-163 (DTSX 34790)"
+    },
+    {
+      "component": "Package\\Foreach Loop Container\\Create Contacts For Minhali\\Update fields by mobilephone and email",
+      "column": "gen_customerpreferencetransmissiondateDB",
+      "from": [
+        {
+          "column": "gen_recordsorceDB",
+          "role": "condition"
+        },
+        {
+          "column": "mobilephone",
+          "role": "condition"
+        },
+        {
+          "column": "mobilephoneDB",
+          "role": "condition"
+        },
+        {
+          "column": "emailaddress1",
+          "role": "condition"
+        },
+        {
+          "column": "emailaddress1DB",
+          "role": "condition"
+        },
+        {
+          "column": "gen_customerpreferenceDB",
+          "role": "condition"
+        }
+      ],
+      "expression": "Row.gencustomerpreferencetransmissiondateDB_IsNull = true (set to NULL)",
+      "condition": "isUpdateCustomerPreference = (!gen_recordsorceDB_IsNull && gen_recordsorceDB == 1 && ((!mobilephone_IsNull && mobilephone != mobilephoneDB) || (!emailaddress1_IsNull && emailaddress1 != emailaddress1DB))) AND computed preference != gen_customerpreferenceDB (else early return, main.cs:148-151); otherwise the CRM value read by the lookup is kept",
+      "evidence": "main.cs:165 (DTSX 34790)"
+    },
+    {
+      "component": "Package\\Foreach Loop Container\\Create Contacts For Minhali\\Update fields by mobilephone and email",
+      "column": "gen_customerpreferencefilenameDB",
+      "from": [
+        {
+          "column": "gen_recordsorceDB",
+          "role": "condition"
+        },
+        {
+          "column": "mobilephone",
+          "role": "condition"
+        },
+        {
+          "column": "mobilephoneDB",
+          "role": "condition"
+        },
+        {
+          "column": "emailaddress1",
+          "role": "condition"
+        },
+        {
+          "column": "emailaddress1DB",
+          "role": "condition"
+        },
+        {
+          "column": "gen_customerpreferenceDB",
+          "role": "condition"
+        }
+      ],
+      "expression": "Row.gencustomerpreferencefilenameDB_IsNull = true (set to NULL)",
+      "condition": "isUpdateCustomerPreference = (!gen_recordsorceDB_IsNull && gen_recordsorceDB == 1 && ((!mobilephone_IsNull && mobilephone != mobilephoneDB) || (!emailaddress1_IsNull && emailaddress1 != emailaddress1DB))) AND computed preference != gen_customerpreferenceDB (else early return, main.cs:148-151); otherwise the CRM value read by the lookup is kept",
+      "evidence": "main.cs:166 (DTSX 34790)"
+    },
+    {
+      "component": "Package\\Foreach Loop Container\\Create Contacts For Minhali\\Update fields by mobilephone and email",
+      "column": "gen_customerpreferencefeedbackDB",
+      "from": [
+        {
+          "column": "gen_recordsorceDB",
+          "role": "condition"
+        },
+        {
+          "column": "mobilephone",
+          "role": "condition"
+        },
+        {
+          "column": "mobilephoneDB",
+          "role": "condition"
+        },
+        {
+          "column": "emailaddress1",
+          "role": "condition"
+        },
+        {
+          "column": "emailaddress1DB",
+          "role": "condition"
+        },
+        {
+          "column": "gen_customerpreferenceDB",
+          "role": "condition"
+        }
+      ],
+      "expression": "Row.gencustomerpreferencefeedbackDB_IsNull = true (set to NULL)",
+      "condition": "isUpdateCustomerPreference = (!gen_recordsorceDB_IsNull && gen_recordsorceDB == 1 && ((!mobilephone_IsNull && mobilephone != mobilephoneDB) || (!emailaddress1_IsNull && emailaddress1 != emailaddress1DB))) AND computed preference != gen_customerpreferenceDB (else early return, main.cs:148-151); otherwise the CRM value read by the lookup is kept",
+      "evidence": "main.cs:167 (DTSX 34790)"
+    },
+    {
+      "component": "Package\\Foreach Loop Container\\Create Contacts For Minhali\\Update fields by mobilephone and email",
+      "column": "gen_customerpreferenceerrorreasonDB",
+      "from": [
+        {
+          "column": "gen_recordsorceDB",
+          "role": "condition"
+        },
+        {
+          "column": "mobilephone",
+          "role": "condition"
+        },
+        {
+          "column": "mobilephoneDB",
+          "role": "condition"
+        },
+        {
+          "column": "emailaddress1",
+          "role": "condition"
+        },
+        {
+          "column": "emailaddress1DB",
+          "role": "condition"
+        },
+        {
+          "column": "gen_customerpreferenceDB",
+          "role": "condition"
+        }
+      ],
+      "expression": "Row.gencustomerpreferenceerrorreasonDB_IsNull = true (set to NULL)",
+      "condition": "isUpdateCustomerPreference = (!gen_recordsorceDB_IsNull && gen_recordsorceDB == 1 && ((!mobilephone_IsNull && mobilephone != mobilephoneDB) || (!emailaddress1_IsNull && emailaddress1 != emailaddress1DB))) AND computed preference != gen_customerpreferenceDB (else early return, main.cs:148-151); otherwise the CRM value read by the lookup is kept",
+      "evidence": "main.cs:168 (DTSX 34790)"
+    }
+  ],
+  "lookupBridges": [],
+  "unresolved": [
+    {
+      "where": "all SDK writes (Employers Create/Update Account, Minhali Create Account, Create Contact)",
+      "reason": "blocked_external_dependency: CRM.Proxy (CrmProxy, ExecuteMultipleExtension, RequestType) is an external assembly not supplied. That RequestType.Create/Update issues Create/Update requests, and settings such as ContinueOnError/ReturnResponses, are not provable from the DTSX; only the entity/attribute assignments in main.cs are proven."
+    },
+    {
+      "where": "modifiedby / createdby / ownerid / owneridtype / owningbusinessunit (Minhali Update Account, UPDate contact, Create ContactLog)",
+      "reason": "Values come from package variables User::UserId, User::OwnerIdType, User::BusinessUnitIdStr (defaults '', 0, '' at DTSX 441/417/354) that are set at runtime by package plumbing (not analysed here); actual values unknown."
+    },
+    {
+      "where": "Create Contacts For Minhali / 'Update fields by mobilephone and email' main.cs:126-127 and 'Set MobilePhone End EmailAddress1' main.cs:64,77",
+      "reason": "Code reads columns that can be NULL without an _IsNull guard (e.g. mobilephoneDB/emailaddress1DB, telephone2/telephone1). Whether the generated buffer accessor returns null or throws for a NULL column is SSIS runtime behaviour not provable from the DTSX — outcome for those rows unverified."
+    }
+  ],
+  "notes": [
+    "BUG (likely): in 'UPDate contact and CustomerAddress' CustomerAddressBase.name is set to \"ראשי\" only WHEN ?41 = 1, and Param_41 is input 'recordsource', which 'Derived Column' defines as gendercodeDB (CRM contact.gendercode, DTSX 27007-27009) — not gen_recordsorceDB, which the lookup also returns. So the address name follows the contact's gender code (1), not the record source.",
+    "BUG (likely): 'Update fields by mobilephone and email' writes Row.isUpdateCustomerPreference = true (main.cs:129) before the early return for 'preference unchanged' (main.cs:148-151), which resets only the local variable. Every gen_recordsorce=1 contact whose mobile/e-mail differs from CRM therefore gets a gen_contactlogs row (with the unchanged CRM preference values) even when the preference did not change.",
+    "Contacts 'Add 0' script is a no-op (loop commented out, main.cs:35-49): gen_identitynumber is matched (lookup key) and created with the trimmed file value WITHOUT zero padding, while the account flows pad accountnumber to 9 digits. If the file carries an ID shorter than 9 characters (space-padded), it is looked up/created unpadded; whether CRM stores padded IDs is not visible in the DTSX (risk of non-match → duplicate contact, unverified).",
+    "Unknown customers ((DT_I8)id ∈ {0,1,18}) get accountnumber / gen_identitynumber \"000000000\" AFTER de-duplication (Minhali accounts and contacts), so several file rows can reach the full-cache lookup with the same key in one run and each be created (duplicates). In Employers only the name is replaced (accountnumber keeps the padded value or Employer_Number_38).",
+    "Direct SQL writes (Unsupported): UPDATE AccountBase + CustomerAddressBase (Minhali accounts), UPDATE ContactBase + CustomerAddressBase, INSERT gen_contactlogsbase. They bypass CRM plugins/audit; ModifiedOn/gen_modifiedbybank use GETDATE() (server local time) while the contact-log insert uses GETUTCDATE(). Minhali account and contact UPDATEs run for every matched row with no change detection, and overwrite with NULL when the file value is NULL (name, dates, gendercode, gen_bankcustomeridnumber, buildingid, city, gen_postalcode…).",
+    "UPDate contact binds the STRING date columns (Gen_Customerdateofbirth, Gen_DeathDate, Gen_identityNumberIssuingDate, 'yyyy/MM/dd') to dbTimeStamp parameters Param_7..9 (DTSX 34375-34377). The DateTime columns produced by 'Derived Column' + 'Convert To Date Time' (gen_*_DateTime) are not consumed by any CRM write (dead computation). In the Minhali account UPDATE the parsed gen_customerdateofbirth_DateTime IS used (Param_4).",
+    "Employers 'Update Account': updates of accountnumber, fax, telephone1, telephone2 are commented out (main.cs:141-145,179-196) and emailaddress1 is never updated; CheckIfToUpdate treats file NULL vs CRM value as a change and writes NULL (clears CRM). address1_postalcode_db = isnull(Address1_PostalCode,'0000000') so a NULL file zip on an account with NULL zip is re-updated on every run.",
+    "Employers lookup 'Check if account exists' filters statecode = 0 (inactive account with the same accountnumber → a new account is created), while the Minhali accounts lookup has no statecode filter (inactive account blocks creation and gets the SQL UPDATE).",
+    "Employers 'Create Additional Columns' writes building + \"/\" + apartment back into gen_address1_buildingid wstr(10) with truncation = FailComponent (DTSX 5755): a combined value longer than 10 chars fails the data flow. Contacts use LEFT(...,10); Minhali accounts use a new wstr(16) column.",
+    "Employers Create Account main.cs:153-156: the if (!Row.genreturnedmailcount_IsNull) has no braces, so address1_name = \"ראשי\" (line 156, indented) is unconditional (raw DTSX 4711-4714).",
+    "Mailbox_78 (→ gen_postalcode) is not an input of 'Trim String Fields' in the Minhali accounts and contacts data flows, so it is written exactly as stored in MY_FileData.",
+    "Tool caveats for compose: (1) origins.mjs marks the lookup KEY columns accountnumber (Employers, Minhali) and gen_identitynumber (contacts) as 'replaced-by-lookup', but their CopyFromReferenceColumn is System.Null (DTSX 4231, 15126, 23799) — they are not overwritten; role in the writes is 'value'. (2) origins.mjs does not follow columns referenced inside replace-in-place expressions or readWrite script swaps; the extra file fields are listed per attribute in additionalFileFields (Employer_Name_39 → account.name, Employer_Number_38 → account.accountnumber, Address_Apartment_Number_101 → gen_address1_buildingid, Phone_2_Number_106 → contact.telephone1, Phone_1_Number_14 → contact.telephone2).",
+    "contact.fullname is set explicitly (SDK create and SQL update) from 'lastname firstname'; CRM normally composes fullname itself.",
+    "ContactLog CASE for gen_customerpreferencetransmissionstatus has no ELSE (DTSX 26738-26742) → NULL text when the status value is not 1/2 (possible because of the isUpdateCustomerPreference bug, which can log unchanged CRM values).",
+    "ErrorText outputs (CastingError/Error) of the write scripts only feed ETL Warning (plumbing) and are not mapped. Lookups in these flows read CRM tables (account, contact, product, gen_bankbranch, gen_estatecodeid), not staging tables — no lookupBridges. 'Get fund type name(product)', 'Get bank branch Id', 'Get Employer Number Estate' outputs are not used by any CRM write in Employers."
+  ]
+}

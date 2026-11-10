@@ -1,0 +1,57 @@
+# 0019_StandingOrder.dtsx · 63C5C7487C33DE7314A248C3495D1F042D67D647DEB54F2A0039846942CEC653
+
+## Connection managers
+- [Prod] OLEDB Data Source=psql;Initial Catalog=ALTSHULER_MSCRM;Integrated Security=SSPI;  
+- [SSIS_Logs] OLEDB Data Source=psrs;Initial Catalog=SSIS_Logs;Integrated Security=SSPI;  
+
+## Executables (disabled marked !)
+-   Create ETL Process record | Microsoft.ScriptTask  
+-   End ETL Process record | Microsoft.Pipeline  
+-   Get Organization Variables | Microsoft.Pipeline  
+-   Update Standing Order First Transaction Received | Microsoft.Pipeline  
+
+## Precedence
+- Get Organization Variables -> Create ETL Process record | Success Constraint   
+- Create ETL Process record -> Update Standing Order First Transaction Received | Success Constraint   
+- Update Standing Order First Transaction Received -> End ETL Process record | Success Constraint   
+
+## DataFlow End ETL Process record
+  - ETL Record Finish | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 2 out 0
+  - Get gen_etlprocessid | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 0 out 1
+  - Lookup | Lookup  | conn [Prod]  | in 1 out 1
+     path Lookup.Outputs[Lookup Match Output] => ETL Record Finish.Inputs[Input 0]
+     path Get gen_etlprocessid.Outputs[Output 0] => Lookup.Inputs[Lookup Input]
+
+## DataFlow Get Organization Variables
+  - OLE DB Source | OLEDBSource  | conn [Prod]  | in 0 out 2
+  - Set Organization Variables | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 2 out 0
+     path OLE DB Source.Outputs[OLE DB Source Output] => Set Organization Variables.Inputs[Input 0]
+
+## DataFlow Update Standing Order First Transaction Received
+  - ETL Warning | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 4 out 0
+  - Get StandingOrders With First transaction | OLEDBSource  | conn [Prod]  | in 0 out 1
+  - Set Warning columns | DerivedColumn  | conn   | in 2 out 4
+  - update Standing Order | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 1 out 2
+     path Set Warning columns.Outputs[Derived Column Output] => ETL Warning.Inputs[Input 0]
+     path update Standing Order.Outputs[Error] => Set Warning columns.Inputs[Derived Column Input]
+     path Get StandingOrders With First transaction.Outputs[OLE DB Source Output] => update Standing Order.Inputs[Input 0]
+
+## SQL statements
+- End ETL Process record\Lookup | Microsoft.Lookup.SqlCommand | [Prod] 
+    select p.gen_etlprocessid , case when pw.gen_etlprocessid is null then 0 else 1 end as isWarningExist from gen_etlprocess p left join (select distinct gen_etlprocessId from gen_etlprocesswarning ) as pw on p.gen_etlprocessId = pw.gen_etlprocessId
+- End ETL Process record\Lookup | Microsoft.Lookup.SqlCommandParam | [Prod] 
+    select * from (select p.gen_etlprocessid , case when pw.gen_etlprocessid is null then 0 else 1 end as isWarningExist from gen_etlprocess p left join (select distinct gen_etlprocessId from gen_etlprocesswarning ) as pw on p.gen_etlprocessId = pw.gen_etlprocessId) [refTable] where [refTable].[gen_etlprocessid] = ?
+- Get Organization Variables\OLE DB Source | Microsoft.OLEDBSource.SqlCommand | [Prod] 
+    select gen_key, gen_value from gen_etlvariable WITH (NOLOCK) where (gen_scope = 'global' OR gen_scope = ?)
+- Update Standing Order First Transaction Received\Get StandingOrders With First transaction | Microsoft.OLEDBSource.SqlCommand | [Prod] 
+    select Gen_standingorderId from ( select ROW_NUMBER() over(partition by ft.gen_transtotalamount, so.gen_bankname, so.gen_bankaccountnumber, so.gen_branch order by ft.gen_ActualExecutionDate asc) as RowNum, Gen_standingorderId from Gen_ftCurrentYear ft with(nolock) join Gen_fundmain f with(nolock) on ft.gen_fundnumber = f.Gen_fundmainId join Gen_standingorder so with (nolock) on so.gen_customeracco
+
+## Code write candidates (per owner)
+- Create ETL Process record {"crm-entity":1,"crm-sdk-create":1,"variables-write":1}
+- End ETL Process record\ETL Record Finish {"sql-command":2,"crm-entity":3,"output-buffer":1,"crm-sdk-update":1}
+- End ETL Process record\Get gen_etlprocessid {"sql-command":2,"output-buffer":2}
+- Get Organization Variables\Set Organization Variables {"sql-command":2}
+- Update Standing Order First Transaction Received\ETL Warning {"crm-entity":3,"crm-sdk-create":1}
+- Update Standing Order First Transaction Received\update Standing Order {"sql-command":2,"crm-service":1,"crm-entity":2,"crm-sdk-update":1,"output-buffer":1}
+
+## External refs (non-framework) CRM2015.Proxy

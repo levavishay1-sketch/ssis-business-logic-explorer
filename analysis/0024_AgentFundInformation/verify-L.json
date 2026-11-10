@@ -1,0 +1,295 @@
+{
+ "verifier": "ssis-verifier",
+ "package": "0024_AgentFundInformation",
+ "scope": "logic-claims all",
+ "checkedAt": "2026-11-07T11:34:23.271Z",
+ "checked": 29,
+ "results": [
+  {
+   "id": "L|summary",
+   "hash": "546717081e45",
+   "verdict": "WRONG",
+   "detail": "Unit 1 matches the flow (insert of new 5-key combinations from POA rows with gen_currentstate=1, deceased skipped; then deletes for deceased, no-longer-valid, and agent+agency both NULL). Unit 2: [CRM] DTSID {EC67FF20-…} = Psql/ALTSHULER_MSCRM (DTSX:4-6), EnableConfig=True with config DTSX:17. The count 'כל שלוש הכתיבות העסקיות' is wrong. There are four business writer components in three executables: OLE DB Destination 'Create Allowed Info Fund extensionbase' (INSERT), two OLE DB Commands 'Delete  Row of customer dead' and 'Delete Not Valid Row' (DELETE), and Execute SQL Task (DELETE). finding#1 itself says DELETE in three places.",
+   "evidence": "DTSX:608-626, 2529-2532, 2566-2569, 4477-4481",
+   "wrongUnits": [
+    {
+     "unit": 2,
+     "problem": "Writer count stated as three, and 'DELETE דרך OLE DB Command' as one",
+     "correct": "Four business writers on [CRM]: 1 INSERT (OLE DB Destination) + 2 DELETE OLE DB Commands (identical SQL) + 1 DELETE Execute SQL Task, spread over three executables.",
+     "evidence": "DTSX:608, 2529, 2566, 4477"
+    }
+   ]
+  },
+  {
+   "id": "L|exec",
+   "hash": "4b04ad1fc9e6",
+   "verdict": "CONFIRMED",
+   "detail": "Re-derived from the PrecedenceConstraints: Get Organization Variables (no incoming) → Create ETL Process record (7369) → Get systemuser organisationname and curency (7372) → Create Fund View Table (7368) → Delete Rows (7370) → Execute SQL Task (7371) → End ETL Process record (7373). All are Success (no DTS:Value), LogicalAnd=True, no expressions. The package has no event handlers and no disabled executables.",
+   "evidence": "DTSX:7368-7373",
+   "wrongUnits": []
+  },
+  {
+   "id": "L|ignored",
+   "hash": "f6e9805bb990",
+   "verdict": "WRONG",
+   "detail": "Create ETL Process record (SDK Create gen_etlprocess, DTSX:297), End ETL Process record (SDK Update, DTSX:3019) and the log provider are plumbing. However, two listed items produce data that is written to CRM by the business INSERT, so by the stated rule they are not plumbing. (1) Get systemuser organisationname and curency looks up SystemUser by DomainName = @[User::UserName] and sets SystemUserId/BusinessUnitId (Set system variables main.vb:22-33). These become OwnerId, CreatedBy, ModifiedBy and OwningBusinessUnit of every inserted Gen_allowedinformationforfund row. (2) Create system columns (main.vb:18-36) sets statecode=0, statuscode=1, the new Gen_allowedinformationforfundId and the owner fields, all mapped into the INSERT. Get Organization Variables supplies User::UserName, which selects that owner. The content is described in Create Fund View Table|detailed unit 17, so the fix is the classification, not the description.",
+   "evidence": "DTSX:5388-5402 (Get System user id), 6335/7281 (Set system variables), 684 (Create system columns), destination input mapping DTSX:627-643",
+   "wrongUnits": [
+    {
+     "unit": 3,
+     "problem": "Listed as plumbing, but its SystemUserId/BusinessUnitId reach CRM",
+     "correct": "Owner/CreatedBy/ModifiedBy/OwningBusinessUnit of the inserted permission rows come from this step (SystemUser where DomainName = User::UserName).",
+     "evidence": "DTSX:5390-5402; Create system columns main.vb:18-21; destination OwningUser→OwnerId"
+    },
+    {
+     "unit": 5,
+     "problem": "Listed as plumbing, but its values (statecode 0, statuscode 1, new id, owner) are inserted into CRM",
+     "correct": "Create system columns is part of the business INSERT path.",
+     "evidence": "main.vb:18-36; destination StateCode→statecode, StatusCode→statuscode, AllowedfundinfoID→Gen_allowedinformationforfundId"
+    }
+   ]
+  },
+  {
+   "id": "L|finding#1",
+   "hash": "84838ace81ee",
+   "verdict": "CONFIRMED",
+   "detail": "There is one INSERT into Gen_allowedinformationforfundBase (OLE DB Destination, OpenRowset [dbo].[Gen_allowedinformationforfundBase], AccessMode 0) and DELETEs in three places (2 OLE DB Commands and the Execute SQL Task), all on [CRM] Psql/ALTSHULER_MSCRM. The platform impact is labelled as a hypothesis, and the config caveat is correct.",
+   "evidence": "DTSX:608-616, 2529-2532, 2566-2569, 4481; DTSX:4-6, 17",
+   "wrongUnits": []
+  },
+  {
+   "id": "L|finding#2",
+   "hash": "1c381bfc1149",
+   "verdict": "CONFIRMED",
+   "detail": "Insert-side Lookup keys are Gen_agentname, Gen_agencyname, Gen_contactname, Gen_accountname, Gen_fundname, with no POW_MAIN (DTSX:2161-2185). Delete-side 'Check if valid allow' keys are AGENCY_NAME, AGENT_NAME, FUND_GUID, CONTACT_NAME, POW_MAIN, ACCOUNT_NAME, and only No Match is connected to the delete. Create runs before Delete (DTSX:7370). The inferred one-run gap is stated as a flow conclusion, not data.",
+   "evidence": "DTSX:2137-2197, 2225-2463, 2566-2569, 7370",
+   "wrongUnits": []
+  },
+  {
+   "id": "L|finding#3",
+   "hash": "321548fe22ec",
+   "verdict": "CONFIRMED",
+   "detail": "Neither the source SQL nor the flow filters rows where both AGENT_NAME and AGENCY_NAME are NULL (left joins). Execute SQL Task deletes rows with gen_agencyname is null and gen_agentname is null later in the same run (after Delete Rows). The finding is worded conditionally.",
+   "evidence": "DTSX:1970-2084, 2211-2214, 4481",
+   "wrongUnits": []
+  },
+  {
+   "id": "L|finding#4",
+   "hash": "7ac0aab2124f",
+   "verdict": "CONFIRMED",
+   "detail": "Two commented-out branches ('Agents with contract and no POA' and the parent-contract branch with 'gen_powerofattorneyid is null' and data sharing) are verified. Both active branches INNER JOIN gen_powerofattorney with gen_currentstate = 1.",
+   "evidence": "DTSX:1984-2032, 2045, 2053, 2067, 2077",
+   "wrongUnits": []
+  },
+  {
+   "id": "L|finding#5",
+   "hash": "c812ee34424a",
+   "verdict": "CONFIRMED",
+   "detail": "Both deceased Lookups use 'select ContactId from Contact where gen_customeragename =N'נפטר'' keyed on the contact (CONTACT_NAME / Gen_contactname). The account is not checked.",
+   "evidence": "DTSX:1908-1934, 2665-2679",
+   "wrongUnits": []
+  },
+  {
+   "id": "L|finding#6",
+   "hash": "3b4501cb981c",
+   "verdict": "CONFIRMED",
+   "detail": "There is no UPDATE of Gen_allowedinformationforfund anywhere. gen_agentreceivescommissionnly (IS_COMMISSION_AGENT) is written only on INSERT and is not a key in either Lookup.",
+   "evidence": "DTSX:2149-2185, 2463, destination mapping IS_COMMISSION_AGENT→gen_agentreceivescommissionnly",
+   "wrongUnits": []
+  },
+  {
+   "id": "L|Package\\Create Fund View Table|title",
+   "hash": "e8bdcdb46abf",
+   "verdict": "CONFIRMED",
+   "detail": "Flow verified: source SQL → Lookup (No Match) → filtering customers dead (No Match) → Create system columns → OLE DB Destination. The population filter (Gen_existinfile=1 or year(gen_revaluationdate) >= year(getdate())-3) is described correctly. The meaning of Gen_existinfile stays labelled as a hypothesis, which is acceptable: 0008 sets gen_fundmain.gen_existinfile=true while loading the Leumi file, but no reset for funds was found, so the exact meaning is not fully proven.",
+   "evidence": "DTSX:2049-2053, 2211-2214; 0008_LeumiFile-PY.dtsx:23781-23784",
+   "wrongUnits": []
+  },
+  {
+   "id": "L|Package\\Create Fund View Table|short",
+   "hash": "a6f85ea2bd9c",
+   "verdict": "WRONG",
+   "detail": "Units 1-10 are correct. Unit 11 states an end state this step does not produce. This step only skips new inserts for deceased contacts and for 5-key combinations that already exist. It does not remove existing permissions of deceased customers, existing duplicates, or stale ones. Those are removed by the later Delete Rows and Execute SQL Task steps.",
+   "evidence": "DTSX:2137-2214; Delete Rows DTSX:2529-2569",
+   "wrongUnits": [
+    {
+     "unit": 11,
+     "problem": "'ללא כפילויות וללא לקוחות שנפטרו' presented as the result of this step",
+     "correct": "After this step, all new combinations are added. Pre-existing permissions of deceased customers, or no-longer-valid ones, are still present until Delete Rows runs (Success constraint DTSX:7370).",
+     "evidence": "DTSX:2211-2214, 7370"
+    }
+   ]
+  },
+  {
+   "id": "L|Package\\Create Fund View Table|detailed",
+   "hash": "c5fd850493fd",
+   "verdict": "WRONG",
+   "detail": "Units 1 and 3-19 are verified against the SQL (DTSX:1970-2084), the Lookups (2137-2197 full cache, NoMatch=1, Match unconnected; 1906-1953), the script (main.vb:18-36) and the destination (608-626, AccessMode 0). Unit 2 says the meaning of gen_currentstate = 1 is undefined and labels it השערה ('current'). The supplied files label it: in 0030_PoaAccountUpdateDailyTest, the source 'Handle Active Status - For Cancel\\Get Active Poa' selects Gen_powerofattorney poa where poa.Gen_currentstate = 1 'as ActivePoas', and 'Gen_currentstate = 3 --waiting' ('as WaitingPoas'). 0031 also comments 'gen_currentstate = 1 --active'.",
+   "evidence": "0030_PoaAccountUpdateDailyTest.dtsx:4205-4222, 4338, 5406; 0031_PoaAccountUpdateDaily.dtsx:3327",
+   "wrongUnits": [
+    {
+     "unit": 2,
+     "problem": "Meaning labelled unknown/השערה although supplied files define it",
+     "correct": "gen_powerofattorney.gen_currentstate = 1 = Active POA (3 = Waiting), per the labels/aliases in 0030 'Get Active Poa … as ActivePoas' and the comment '--active' in 0031.",
+     "evidence": "0030:4222, 0030:4338, 0031:3327"
+    }
+   ]
+  },
+  {
+   "id": "L|Package\\Create Fund View Table|detail",
+   "hash": "39e9964ff702",
+   "verdict": "WRONG",
+   "detail": "Units 1-4 are verified (population, 5-key Lookup, deceased Lookup, INSERT into dbo.Gen_allowedinformationforfundBase with statecode 0 / statuscode 1, main.vb:27,30). Unit 5 misstates branch 2. It says permission is also given 'for customers whose agent contract shares data with the parent contract' without the POA requirement. Branch 2 still requires an INNER-joined POA with gen_currentstate = 1 whose agent or agency equals the fund's agent or agency, plus ac1.Gen_isContractDataSharing = 1. The grantee is the parent contract's (ac2) agent/agency.",
+   "evidence": "DTSX:2065-2082",
+   "wrongUnits": [
+    {
+     "unit": 5,
+     "problem": "Branch-2 outcome omits the POA condition",
+     "correct": "Parent-contract (ac2) agents/agencies get a permission row only when the fund's customer account has a POA in state 1 given to the fund's agent or agency, and the fund's agent contract (ac1) has Gen_isContractDataSharing = 1.",
+     "evidence": "DTSX:2067-2082"
+    }
+   ]
+  },
+  {
+   "id": "L|Package\\Create Fund View Table|decisions",
+   "hash": "ef01e8992fbf",
+   "verdict": "CONFIRMED",
+   "detail": "All five conditions match the DTSX: the population WHERE (2049-2053/2073-2077), branch-2 extra conditions (2078-2082), ROW_NUMBER partition/order (1973), the 5-key Lookup with No Match continuing (2137-2197, 2211), and the deceased Lookup with No Match continuing (1906-1953, 2212).",
+   "evidence": "DTSX:1973, 2049-2082, 2137-2214",
+   "wrongUnits": []
+  },
+  {
+   "id": "L|Package\\Create Fund View Table|crm",
+   "hash": "052c4ebb059a",
+   "verdict": "CONFIRMED",
+   "detail": "INSERT into Gen_allowedinformationforfundBase via OLE DB Destination on [CRM] for new 5-key combinations whose contact is not deceased. Unsupported.",
+   "evidence": "DTSX:608-626, 2211-2214",
+   "wrongUnits": []
+  },
+  {
+   "id": "L|Package\\Create Fund View Table|open",
+   "hash": "3008dc159849",
+   "verdict": "WRONG",
+   "detail": "Units 3-5 are truly not answerable from the files. Unit 1: the meaning of gen_currentstate = 1 is defined in the supplied 0030/0031 (Active). Unit 2: the entity of the unqualified Gen_existinfile can be settled. gen_fundmain has the attribute (0008: new Entity(\"gen_fundmain\") … entity[\"gen_existinfile\"] = true; 0034: 'from Gen_fundmain where gen_existinfile = 1'). An unqualified column must be unambiguous across the FROM tables, so in this query it can only bind to gen_fundmain (otherwise the query would not compile).",
+   "evidence": "0030:4222; 0031:3327; 0008_LeumiFile-PY.dtsx:23781-23784; 0034_SetMaxRevaluationDate.dtsx:15; 0005_Customer Account.dtsx:68399",
+   "wrongUnits": [
+    {
+     "unit": 1,
+     "problem": "Answerable from supplied files",
+     "correct": "gen_currentstate = 1 = Active POA (0030 'Get Active Poa … as ActivePoas'; 0031 '--active'; 3 = waiting).",
+     "evidence": "0030:4222, 4338; 0031:3327"
+    },
+    {
+     "unit": 2,
+     "problem": "Answerable from supplied files",
+     "correct": "Gen_existinfile is a gen_fundmain attribute, and the unqualified reference binds to gen_fundmain.",
+     "evidence": "0008:23781-23784; 0034:15"
+    }
+   ]
+  },
+  {
+   "id": "L|Package\\Delete Rows|title",
+   "hash": "40e4e2ebf1d2",
+   "verdict": "CONFIRMED",
+   "detail": "Source reads all of Gen_allowedinformationforfund (no WHERE). Multicast feeds two independent Lookups. Matches in Get customers dead and No Match in Check if valid allow each go to a DELETE by id.",
+   "evidence": "DTSX:2603-2620, 2722-2735, 2663-2679, 2225-2463, 2529-2569",
+   "wrongUnits": []
+  },
+  {
+   "id": "L|Package\\Delete Rows|short",
+   "hash": "30d017dd1233",
+   "verdict": "CONFIRMED",
+   "detail": "Both decisions and their branches match the paths (Get customers dead Match → delete; Check if valid allow No Match → delete). The end state holds, with 'valid' as defined by the 6-key lookup.",
+   "evidence": "DTSX:2225-2735",
+   "wrongUnits": []
+  },
+  {
+   "id": "L|Package\\Delete Rows|detailed",
+   "hash": "dd88f4b77ba0",
+   "verdict": "CONFIRMED",
+   "detail": "Every unit verified. Source SQL DTSX:2608 has no filter. Multicast Output 1 is dangling (2735). Get customers dead has full cache (CacheType 0), NoMatch=1, and only Match connected. Check if valid allow has full cache, NoMatch=1, only No Match connected, and 6 keys. Its active SQL is identical to the Create Fund View Table source after stripping comments (programmatic comparison). Both DELETE commands are 'delete Gen_allowedinformationforfundBase where Gen_allowedinformationforfundid = ?' (identical copies per dupes.json).",
+   "evidence": "DTSX:2225-2463, 2529-2569, 2603-2620, 2663-2679, 2722-2735",
+   "wrongUnits": []
+  },
+  {
+   "id": "L|Package\\Delete Rows|detail",
+   "hash": "697a9d33827f",
+   "verdict": "CONFIRMED",
+   "detail": "Population, the two independent checks, direct DELETE via [CRM], and the hedged double-delete note are all correct. The outcome list matches the 6-key validity definition.",
+   "evidence": "DTSX:2225-2735",
+   "wrongUnits": []
+  },
+  {
+   "id": "L|Package\\Delete Rows|decisions",
+   "hash": "112021b79998",
+   "verdict": "CONFIRMED",
+   "detail": "Both conditions and outcomes match.",
+   "evidence": "DTSX:2665-2679, 2440-2463",
+   "wrongUnits": []
+  },
+  {
+   "id": "L|Package\\Delete Rows|crm",
+   "hash": "8d3d21bee62c",
+   "verdict": "CONFIRMED",
+   "detail": "Two DELETE writers via SQL on Gen_allowedinformationforfundBase with the stated triggers.",
+   "evidence": "DTSX:2529-2532, 2566-2569",
+   "wrongUnits": []
+  },
+  {
+   "id": "L|Package\\Delete Rows|open",
+   "hash": "eae7c59caba3",
+   "verdict": "CONFIRMED",
+   "detail": "Whether a full-cache Lookup matches NULL to NULL is SSIS engine behaviour and is not determinable from the supplied files. It is correctly left open as a hypothesis.",
+   "evidence": "DTSX:2457-2458",
+   "wrongUnits": []
+  },
+  {
+   "id": "L|Package\\Execute SQL Task|title",
+   "hash": "26f5824aabf9",
+   "verdict": "CONFIRMED",
+   "detail": "SqlStatementSource is 'delete from Gen_allowedinformationforfundBase where gen_agencyname is null and gen_agentname is null' on Connection {EC67FF20…} = [CRM].",
+   "evidence": "DTSX:4481",
+   "wrongUnits": []
+  },
+  {
+   "id": "L|Package\\Execute SQL Task|short",
+   "hash": "ab03b39beb73",
+   "verdict": "CONFIRMED",
+   "detail": "Matches the SQL.",
+   "evidence": "DTSX:4481",
+   "wrongUnits": []
+  },
+  {
+   "id": "L|Package\\Execute SQL Task|detailed",
+   "hash": "5869905fce57",
+   "verdict": "CONFIRMED",
+   "detail": "Runs after Delete Rows on Success (7371), which itself runs after Create Fund View Table on Success (7370). There is no other filter. The connection GUID is CRM (DTSX:4).",
+   "evidence": "DTSX:4, 4481, 7370-7371",
+   "wrongUnits": []
+  },
+  {
+   "id": "L|Package\\Execute SQL Task|detail",
+   "hash": "871d4f58006c",
+   "verdict": "CONFIRMED",
+   "detail": "Matches the SQL and the connection.",
+   "evidence": "DTSX:4481",
+   "wrongUnits": []
+  },
+  {
+   "id": "L|Package\\Execute SQL Task|decisions",
+   "hash": "b79eaedebef8",
+   "verdict": "CONFIRMED",
+   "detail": "Condition verified.",
+   "evidence": "DTSX:4481",
+   "wrongUnits": []
+  },
+  {
+   "id": "L|Package\\Execute SQL Task|crm",
+   "hash": "571ddde3c04c",
+   "verdict": "CONFIRMED",
+   "detail": "DELETE via SQL on [CRM]. 'In every run' holds for runs in which the preceding Success chain completes, which the detailed claim states.",
+   "evidence": "DTSX:4481, 7371",
+   "wrongUnits": []
+  }
+ ]
+}

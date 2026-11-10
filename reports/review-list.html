@@ -1,0 +1,222 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>רשימת סקירה – DailyProcess</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Heebo:wght@400;500;600;800&display=swap">
+<style>
+/* Layout: sticky summary bar, left-to-right reading order flipped for RTL; one decision card per finding, grouped by what the reader must do. */
+:root{
+  --bg:#f3f6fb; --surface:#ffffff; --surface-2:#f8fafd; --ink:#0f1e36; --ink-2:#3b4a60; --mut:#6b7a90;
+  --line:#e2e8f1; --line-2:#cfd8e6; --pri:#1d4ed8; --pri-soft:#e6eeff;
+  --bug:#b42318; --bug-bg:#fdeceb; --ok:#127a3c; --ok-bg:#e6f7ed; --chk:#9a5b00; --chk-bg:#fff3de;
+  --hi:#b42318; --med:#b45309; --low:#0b6aa2;
+  --shadow:0 1px 2px rgba(15,30,54,.05),0 4px 14px rgba(15,30,54,.06);
+  --font:"Heebo",Arial,Helvetica,sans-serif; --mono:Consolas,"Courier New",monospace;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#0c1424; --surface:#131d31; --surface-2:#182540; --ink:#e8eef9; --ink-2:#b5c2d8; --mut:#8394ae;
+  --line:#243350; --line-2:#334566; --pri:#7aa2ff; --pri-soft:#1a2c52;
+  --bug:#ff8f85; --bug-bg:#3a1b1d; --ok:#6fdc97; --ok-bg:#15301f; --chk:#f5c06b; --chk-bg:#352a12;
+  --hi:#ff8f85; --med:#f5b36b; --low:#74c4f0; --shadow:0 1px 2px rgba(0,0,0,.4),0 4px 14px rgba(0,0,0,.3); color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0c1424; --surface:#131d31; --surface-2:#182540; --ink:#e8eef9; --ink-2:#b5c2d8; --mut:#8394ae;
+  --line:#243350; --line-2:#334566; --pri:#7aa2ff; --pri-soft:#1a2c52;
+  --bug:#ff8f85; --bug-bg:#3a1b1d; --ok:#6fdc97; --ok-bg:#15301f; --chk:#f5c06b; --chk-bg:#352a12;
+  --hi:#ff8f85; --med:#f5b36b; --low:#74c4f0; --shadow:0 1px 2px rgba(0,0,0,.4),0 4px 14px rgba(0,0,0,.3); color-scheme:dark}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--font);font-size:15px;line-height:1.6;
+  padding-block:0 64px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.wrap{max-width:920px;margin:0 auto}
+header.hero{padding:40px 0 20px}
+.eyebrow{font-size:12.5px;letter-spacing:.08em;color:var(--mut);font-weight:600}
+h1{font-size:clamp(26px,4.5vw,38px);line-height:1.15;margin:6px 0 10px;font-weight:800;letter-spacing:-.01em;text-wrap:balance}
+.lead{color:var(--ink-2);max-width:62ch;margin:0}
+.note{display:inline-flex;gap:8px;align-items:center;margin-top:14px;padding:8px 12px;border-radius:10px;background:var(--pri-soft);color:var(--pri);font-size:13.5px;font-weight:500}
+.bar{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:color-mix(in srgb,var(--bg) 88%,transparent);backdrop-filter:blur(8px);
+  border-bottom:1px solid var(--line);padding:10px 0;margin-bottom:8px}
+.bar .row{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+.prog{flex:1;min-width:160px}
+.prog b{font-weight:600;font-size:13.5px}
+.track{height:6px;border-radius:6px;background:var(--line);margin-top:5px;overflow:hidden}
+.fill{height:100%;width:0;background:var(--pri);transition:width .25s}
+.chips{display:flex;gap:6px;flex-wrap:wrap}
+.chip{font:inherit;font-size:13px;padding:5px 12px;border-radius:999px;border:1px solid var(--line-2);background:var(--surface);color:var(--ink-2);cursor:pointer}
+.chip[aria-pressed="true"]{background:var(--pri);border-color:var(--pri);color:#fff}
+.chip:focus-visible,.seg button:focus-visible,.tool:focus-visible,textarea:focus-visible{outline:2px solid var(--pri);outline-offset:2px}
+.tool{font:inherit;font-size:13px;padding:6px 12px;border-radius:8px;border:1px solid var(--line-2);background:var(--surface);color:var(--ink);cursor:pointer}
+section{margin-top:34px}
+section>h2{font-size:20px;margin:0 0 4px;font-weight:700;display:flex;gap:10px;align-items:baseline;flex-wrap:wrap}
+section>h2 small{font-size:13px;color:var(--mut);font-weight:500}
+section>p.sub{margin:0 0 14px;color:var(--ink-2);font-size:14px;max-width:70ch}
+.list{display:grid;gap:10px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:14px 16px;box-shadow:var(--shadow);display:grid;gap:10px}
+.card[data-d="bug"]{border-inline-start:4px solid var(--bug)}
+.card[data-d="ok"]{border-inline-start:4px solid var(--ok)}
+.card[data-d="chk"]{border-inline-start:4px solid var(--chk)}
+.top{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.id{font-family:var(--mono);direction:ltr;font-size:12.5px;padding:2px 8px;border-radius:6px;background:var(--surface-2);border:1px solid var(--line);color:var(--ink-2)}
+.sev{font-size:12px;font-weight:600;padding:2px 9px;border-radius:999px;border:1px solid currentColor}
+.sev.hi{color:var(--hi)}.sev.med{color:var(--med)}.sev.q{color:var(--low)}
+.t{font-weight:600}
+.body{margin:0;color:var(--ink-2);font-size:14.5px;max-width:78ch}
+.need{margin:0;font-size:13px;color:var(--mut)}
+.need b{color:var(--ink-2);font-weight:600}
+.seg{display:inline-flex;border:1px solid var(--line-2);border-radius:10px;overflow:hidden;width:fit-content;max-width:100%;flex-wrap:wrap}
+.seg button{font:inherit;font-size:13.5px;padding:6px 14px;border:0;background:var(--surface);color:var(--ink-2);cursor:pointer;border-inline-start:1px solid var(--line-2)}
+.seg button:first-child{border-inline-start:0}
+.seg button[aria-pressed="true"][data-v="bug"]{background:var(--bug-bg);color:var(--bug);font-weight:600}
+.seg button[aria-pressed="true"][data-v="ok"]{background:var(--ok-bg);color:var(--ok);font-weight:600}
+.seg button[aria-pressed="true"][data-v="chk"]{background:var(--chk-bg);color:var(--chk);font-weight:600}
+textarea{font:inherit;font-size:13.5px;width:100%;min-height:36px;resize:vertical;border:1px solid var(--line);border-radius:8px;padding:6px 10px;background:var(--surface-2);color:var(--ink)}
+.group{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:14px 16px;box-shadow:var(--shadow)}
+.pk{display:flex;gap:6px;flex-wrap:wrap;margin:8px 0 0}
+.pk .id{background:var(--bug-bg);color:var(--bug);border-color:transparent}
+ul.plain{margin:0;padding-inline-start:20px;display:grid;gap:6px;color:var(--ink-2);font-size:14.5px}
+footer{margin-top:40px;color:var(--mut);font-size:13px;border-top:1px solid var(--line);padding-top:14px}
+[hidden]{display:none!important}
+@media (max-width:560px){.card{padding:12px}.seg button{padding:7px 10px}}
+@media (prefers-reduced-motion:reduce){.fill{transition:none}}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header class="hero">
+  <div class="eyebrow">DAILYPROCESS · 35 חבילות · אימות טכני בלבד</div>
+  <h1>רשימת סקירה: מה דורש את ההחלטה שלך</h1>
+  <p class="lead">לכל פריט בחר "תקלה", "מכוון" או "לבדוק בפרודקשן". כל ההחלטות נשמרות בדפדפן בלבד ולא נשלחות לשום מקום. שום החלטה לא נרשמת בקבצי הניתוח עד שתעביר אותן אליי.</p>
+  <div class="note">מקור: <span class="id">analysis/&lt;חבילה&gt;/logic.json</span> · האינדקס <span class="id">#n</span> מציין את מספר הממצא</div>
+</header>
+
+<div class="bar" role="region" aria-label="סיכום והחלטות">
+  <div class="row">
+    <div class="prog"><b id="pt">0 מתוך 0 הוכרעו</b><div class="track"><div class="fill" id="pf"></div></div></div>
+    <div class="chips" id="chips"></div>
+    <button class="tool" id="copy" type="button">העתק את ההחלטות</button>
+  </div>
+</div>
+
+<main id="main"></main>
+
+<footer>287 ממצאים בסך הכול (גבוהה 29 · בינונית 115 · נמוכה 77 · מידע 66). כאן רק אלה שדורשים החלטה. הרשימה המלאה: <span class="id">reports/_findings_raw.json</span> ובדפדפן החבילות.</footer>
+</div>
+
+<script>
+var S = [
+ {k:'A', t:'שאלות שה-DTSX לא יכול לענות עליהן', n:'צריך לוג ריצה, SSDT או הרצה על השרת', items:[
+  {id:'0012 #0', sev:'q', t:'האם "Delete Beneficiaries" מוחק בפועל?', b:'מוכח: Sort 2 (שורות הקובץ, ExistsInFile = 1 קבוע) מזין Left Input, Sort 1 (CRM) מזין Right, והחיבור הוא Left outer. ב-XML ה-inputs כתובים בסדר Right ואחר כך Left, יחיד מבין 10 רכיבי Merge Join, מה שמרמז על Swap Inputs. אי אפשר להוכיח איזה צד נחשב שמאל.', need:'פתיחה ב-SSDT או Data Viewer'},
+  {id:'0015 TransferIn', sev:'q', t:'Create CP – Joining Only: סיכון לכפילות', b:'אם המקור מחזיר יותר משורה אחת לאותו (TI, קופה), עלולה להיווצר כפילות. השערה בלבד.', need:'נתוני ריצה'},
+  {id:'0015 TransferIn', sev:'q', t:'כשל ב-ExecuteBulk: שליחה חוזרת', b:'ExecuteBulk רץ בתוך ה-try של השורה. אם הוא נכשל, רשימת הישויות לא מתרוקנת ונשלחת שוב.', need:'לוג ריצה'},
+  {id:'0017 #4', sev:'q', t:'האם SQL Server מקבל "! =5" עם רווח?', b:'הידע הכללי על T-SQL לא הוכח מול השרת.', need:'הרצת השאילתה על SQL Server'}
+ ]},
+ {k:'B', t:'כתיבה ישירה ב-SQL למסד ה-CRM (Unsupported)', n:'החלטה אחת לכל הקבוצה', group:true, items:[
+  {id:'17 חבילות', sev:'hi', t:'להשאיר, או לסמן כחוב טכני?', b:'הכתיבה עוקפת Plugins, Workflows, Audit ו-ModifiedOn (ידע פלטפורמה, לא הוכחה מה-DTSX). החיבור [CRM] מצביע בזמן תכנון על Psql / ALTSHULER_MSCRM, וקובץ התצורה שעשוי לדרוס זאת לא סופק.', pk:['0004#0','0005#0','0008#0','0009#0','0012#2','0021#0','0022#0','0023#0','0024#0','0025#0','0028#0','0029#0','0030#0','0031#0','0033#0','0034#0','0039#0'], opts:['חוב טכני','מכוון ומקובל','לבדוק']}
+ ]},
+ {k:'C', t:'ממצאים בחומרה גבוהה בלוגיקה', n:'תקלה או מכוון?', items:[
+  {id:'0009 #1', sev:'hi', t:'Update TransferIn: NULL בסיבת הדחייה', b:'קריאת genrequestrejectreason כשהוא NULL (Buffer.GetInt32) כנראה זורקת ColumnIsNullException, ומנותבת ל-CastingError, כך שרוב העדכונים נכשלים. התנהגות SSIS ידועה, לא הורצה.'},
+  {id:'0012 #1', sev:'hi', t:'cast(Child_Saving_Phone_75 as int)', b:'ערך מעל 2,147,483,647 או לא מספרי מפיל את כל ה-Data Flow. כל האילוצים הם Success בלבד, ולכן גם את כל השלבים שאחריו.'},
+  {id:'0013 #0', sev:'hi', t:'שורות שנדחו אינן מתועדות', b:'שורות שנדחו נעצרות ב-Derived Column בלי המשך. שלושה חיבורי קובץ שנראים מיועדים לשגיאות אינם בשימוש.'},
+  {id:'0014 #0 (F1)', sev:'hi', t:'דגלי הגבלה מתעדכנים רק כשהערך במסלול ריק', b:'ב-IsEqual יש case "bool" אבל הטיפוס הוא "Boolean", ולכן נופלים ל-default: return true. שינוי כן↔לא לא מועבר.'},
+  {id:'0014 #1 (F9)', sev:'hi', t:'כשל אצווה באמצע הקלט', b:'רק השורה הנוכחית מסומנת כשגיאה, האצווה לא מתרוקנת ונשלחת שוב בסוף.'},
+  {id:'0016 #0', sev:'hi', t:'הסכום המצופה מוכפל במספר התנועות', b:'ה-JOIN משכפל את שורת המסלול. לא ידוע אם זו הכוונה.'},
+  {id:'0028 #1', sev:'hi', t:'סינון "אין רג\'קטים" הוא קוד מת', b:'התנאי JoiningStatus != 2, אבל המקור שולף רק = 2. Fund Enrolment נפתח לכל הצטרפות ממוכנת. לא ידוע אם מכוון.'},
+  {id:'0035 #0', sev:'hi', t:'קדימות אופרטורים ב-WHERE', b:'status in(7,8) and (A) or (B) נבחר בכל סטטוס עבור הסכמה שיווקית חדשה.'},
+  {id:'0037 #0', sev:'hi', t:'כלל 180 הימים: סטטוס 8 מול 4', b:'הזרם מסמן 8 והסקריפט בודק רק 4. רשומה ותיקה בלי התאמה יכולה להיסגר כ-3 (FINISH).'},
+  {id:'0038 #0, #1', sev:'hi', t:'NULL מפיל את הרכיב', b:'NULL ב-gen_selfemployed, gen_fundnumber ועוד מפיל את הרכיב ואת ה-Data Flow, ו-End ETL לא רץ.'},
+  {id:'0038 #3', sev:'hi', t:'אותו מייל נשלח שוב בכל ריצה', b:'ההתראה לא מסומנת כנשלחה והחלון הוא 7 ימים. התדירות לא ידועה.'}
+ ]},
+ {k:'D', t:'חומרה בינונית: הכוונה לא ברורה', n:'בדרך כלל השערה על הכוונה, העובדות מוכחות', items:[
+  {id:'0004 #4', sev:'med', t:'תנאי שם הכתובת', b:'מותנה בפרמטר recordsource שמחושב ממין (gendercodeDB) ולא מ-gen_recordsorceDB. "באג העתקה" היא השערה.'},
+  {id:'0004 #22', sev:'med', t:'דריסת ערך ב-NULL מהקובץ', b:'עדכוני SQL ישירים כותבים את ערך הקובץ כמות שהוא, בלי ISNULL ובלי בדיקת שינוי. תואם גם 0034.'},
+  {id:'0004 #19', sev:'med', t:'מעסיק מוחלף בחשבון התאגיד', b:'כשנמצאה רשומת gen_employers, gen_employername מוחלף בחשבון התאגיד שבה.'},
+  {id:'0009 #21', sev:'med', t:'עדכון העברה יוצאת דורס סטטוס תקין', b:'סטטוס 2 נדרס ל-3 או 1, וסטטוס 3 נדרס ל-1.'},
+  {id:'0009 #24', sev:'med', t:'מסמכים לא נוצרים להעברה נכנסת מגוף חיצוני', b:'כשההעברה נוצרה באותה ריצה, עמודות המסמכים ריקות והקוד מדלג.'},
+  {id:'0013 #1', sev:'med', t:'באג העתק-הדבק בעדכון הארץ', b:'שורה 162 בודקת gencity_IsNull במקום gencountry_IsNull.'},
+  {id:'0015 #0', sev:'med', t:'סוגי EntityReference לא עקביים', b:'הסוגים שנשלחים אינם תואמים למזהים שנשלחים.'},
+  {id:'0015 #3', sev:'med', t:'עדכון הבקשה גם כשיצירת הפיצול נכשלה', b:'התאריך בפועל, ריבית הפיגורים וימי הפיגור מתעדכנים לכל שורות המקור.'},
+  {id:'0016 #3', sev:'med', t:'אין סינון לפי סוג טיפול', b:'טיפולי לקוח שאינם ניוד יוצא עלולים להיסגר. תלוי בנתונים.'},
+  {id:'0020 #0', sev:'med', t:'OR מחוץ לסוגריים', b:'כל תיק עם gen_transferoutamountinactual לא ריק נבחר בלי בדיקת מצב ותאריך.'},
+  {id:'0024 #1', sev:'med', t:'הוספה ומחיקה בודקות מספר מפתחות שונה', b:'הוספה בודקת 5 מפתחות, מחיקה 6. החלפת ייפוי כוח ראשי עלולה ליצור חוסר עקביות.'},
+  {id:'0027 #2', sev:'med', t:'כישלון בחישוב תאריך הסף מוסתר', b:'שורה 104 מגדירה Success בכל מקרה, והסימון רץ עם ערך המשתנה הקודם.'},
+  {id:'0030 #1', sev:'med', t:'gen_currentstate לא משתנה', b:'אם אין גורם חיצוני שעושה זאת, אותם ייפויי כוח ייכתבו שוב בכל ריצה. השערה.'},
+  {id:'0037 #1', sev:'med', t:'תקלות ExecuteMultiple לא נרשמות', b:'פלט Error ללא Path ו-CastingError לא מחובר.'},
+  {id:'0003 #1', sev:'med', t:'כשל אפשרי בשלב הניקוי', b:'SearchOption.AllDirectories כולל גם תת-תיקיות שכבר נמחקו עם תיקיית האב.'}
+ ]},
+ {k:'E', t:'מידע שרק אתה יכול לספק', n:'לא ניתן להסיק מה-DTSX', list:[
+  'קובץ התצורה C:\\Generix\\SSISConfigFile.dtsConfig (או תוכנו בלי סיסמאות). משפיע על כל החיבורים והמשתנים.',
+  'Metadata של CRM: תוויות עבריות וטיפוסי שדות.',
+  'כלל הסיווג לתחום (גמל / פנסיה / אחר). השדה domain ריק כרגע.',
+  'Stored procedures, Views ו-Triggers שהחבילות קוראות להם.'
+ ]},
+ {k:'F', t:'חבילות ללא כתיבה עסקית ל-CRM', n:'0002 · 0003 · 0026', items:[
+  {id:'0002 · 0003 · 0026', sev:'q', t:'האם זה תואם את הציפייה?', b:'לא נמצאה בהן כתיבה עסקית ל-CRM.', opts:['תואם','לא תואם','לבדוק']}
+ ]}
+];
+var LBL={bug:'תקלה',ok:'מכוון',chk:'לבדוק בפרודקשן'};
+var SEVL={hi:'גבוהה',med:'בינונית',q:'שאלה פתוחה'};
+var st={}; try{ st=JSON.parse(localStorage.getItem('rl_dec')||'{}'); }catch(e){}
+function save(){ try{ localStorage.setItem('rl_dec',JSON.stringify(st)); }catch(e){} }
+var main=document.getElementById('main'), all=[];
+function el(t,c,x){var e=document.createElement(t); if(c)e.className=c; if(x!=null)e.textContent=x; return e;}
+S.forEach(function(sec){
+  var s=el('section'); s.dataset.k=sec.k;
+  var h=el('h2',null,sec.t); h.appendChild(el('small',null,sec.n)); s.appendChild(h);
+  if(sec.list){
+    var g=el('div','group'), u=el('ul','plain'); sec.list.forEach(function(x){u.appendChild(el('li',null,x));}); g.appendChild(u); s.appendChild(g);
+  } else {
+    var l=el('div','list');
+    sec.items.forEach(function(it,i){
+      var key=sec.k+i, c=el('article','card'); c.dataset.key=key; all.push(key);
+      var top=el('div','top'); top.appendChild(el('span','id',it.id)); top.appendChild(el('span','sev '+it.sev,SEVL[it.sev])); top.appendChild(el('span','t',it.t)); c.appendChild(top);
+      c.appendChild(el('p','body',it.b));
+      if(it.pk){var p=el('div','pk'); it.pk.forEach(function(x){p.appendChild(el('span','id',x));}); c.appendChild(p);}
+      if(it.need){var n=el('p','need'); n.appendChild(el('b',null,'מה נדרש: ')); n.appendChild(document.createTextNode(it.need)); c.appendChild(n);}
+      var seg=el('div','seg'); seg.setAttribute('role','group'); seg.setAttribute('aria-label','החלטה: '+it.t);
+      var vals=['bug','ok','chk'], labs=it.opts||[LBL.bug,LBL.ok,LBL.chk];
+      vals.forEach(function(v,j){var b=el('button',null,labs[j]); b.type='button'; b.dataset.v=v; b.dataset.l=labs[j];
+        b.addEventListener('click',function(){ if(st[key]&&st[key].v===v){delete st[key];} else {st[key]=Object.assign(st[key]||{},{v:v,l:labs[j]});} save(); paint(); });
+        seg.appendChild(b);});
+      c.appendChild(seg);
+      var ta=el('textarea'); ta.id='n_'+key; ta.placeholder='הערה (לא חובה)'; ta.rows=1; ta.setAttribute('aria-label','הערה: '+it.t);
+      ta.addEventListener('input',function(){ st[key]=Object.assign(st[key]||{},{n:ta.value}); save(); });
+      c.appendChild(ta); c._ta=ta; c._it=it;
+      l.appendChild(c);
+    });
+    s.appendChild(l);
+  }
+  main.appendChild(s);
+});
+function paint(){
+  var done=0;
+  document.querySelectorAll('.card').forEach(function(c){
+    var d=st[c.dataset.key]||{}, v=d.v; if(v)done++;
+    c.dataset.d=v||''; if(c._ta&&c._ta.value!==(d.n||'')&&document.activeElement!==c._ta)c._ta.value=d.n||'';
+    c.querySelectorAll('.seg button').forEach(function(b){b.setAttribute('aria-pressed',String(b.dataset.v===v));});
+  });
+  document.getElementById('pt').textContent=done+' מתוך '+all.length+' הוכרעו';
+  document.getElementById('pf').style.width=(all.length?done/all.length*100:0)+'%';
+}
+var chips=document.getElementById('chips'), active='all';
+[['all','הכול']].concat(S.map(function(s){return [s.k,s.k+' · '+s.t.split(' ').slice(0,2).join(' ')];})).forEach(function(p){
+  var b=el('button','chip',p[1]); b.type='button'; b.setAttribute('aria-pressed',String(p[0]==='all'));
+  b.addEventListener('click',function(){ active=p[0]; chips.querySelectorAll('.chip').forEach(function(x){x.setAttribute('aria-pressed','false');}); b.setAttribute('aria-pressed','true');
+    document.querySelectorAll('section').forEach(function(s){s.hidden=!(active==='all'||s.dataset.k===active);}); });
+  chips.appendChild(b);
+});
+document.getElementById('copy').addEventListener('click',function(){
+  var out=[]; document.querySelectorAll('.card').forEach(function(c){
+    var d=st[c.dataset.key]; if(!d||!d.v)return;
+    out.push(c._it.id+' | '+c._it.t+' → '+d.l+(d.n?' | '+d.n:''));
+  });
+  var txt=out.length?out.join('\n'):'עדיין לא הוכרעו פריטים.';
+  var btn=document.getElementById('copy');
+  function done(m){btn.textContent=m; setTimeout(function(){btn.textContent='העתק את ההחלטות';},1800);}
+  if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(txt).then(function(){done('הועתק');},function(){done('סמן והעתק ידנית');});}
+  else done('סמן והעתק ידנית');
+});
+paint();
+</script>
+</body>
+</html>

@@ -1,0 +1,440 @@
+{
+  "verifier": "ssis-verifier",
+  "package": "0012_LeumiFile_CHN_Daily",
+  "scope": "logic-claims --part 2/2",
+  "checkedAt": "2026-11-07T12:00:00Z",
+  "checked": 51,
+  "results": [
+    {
+      "id": "L|Package\\Create and update contactlink|title",
+      "hash": "a18e459bb1ca",
+      "verdict": "WRONG",
+      "detail": "Flow, filters, lookups, writers and the Merge Join dead-end were re-derived and match. But short_he states as fact that the existing parent that gets updated is one 'created from the file'. The code only tests gen_fileorigion == 2. The only proof is that this package's own Create Contact sets gen_fileorigion = OptionSetValue(2) (no other supplied package writes the attribute). No OptionSet label is supplied, and writers outside scope (UI, other systems) are unknown. So 'created from this file' is an unproven meaning and must be labelled השערה or worded as 'מקור קובץ = 2'.",
+      "evidence": "DTSX:30947 (Conditional Split: !ISNULL(gen_fileorigion) && gen_fileorigion == 2); DTSX:31263 Create Contact main.cs:58 contact[\"gen_fileorigion\"] = new OptionSetValue(2)",
+      "wrongUnits": [
+        { "unit": 2, "problem": "'הורה קיים שנוצר מהקובץ מתעדכן' presents the meaning of gen_fileorigion = 2 as fact.", "correct": "הורה קיים עם gen_fileorigion = 2 (הערך שהחבילה עצמה מציבה ביצירת הורה; שהערך פירושו 'נוצר מקובץ זה' – השערה) מתעדכן ב-SQL כשזוהה שינוי.", "evidence": "DTSX:30947; DTSX:31263" }
+      ]
+    },
+    {
+      "id": "L|Package\\Create and update contactlink|short",
+      "hash": "af9cb1eb00ad",
+      "verdict": "WRONG",
+      "detail": "Branch structure is correct: subject 03 + fund 5015, child lookup, parent lookup, update/create, link exists, update/insert, then the Disabled step. Unit [9] states the meaning of gen_fileorigion = 2 ('נוצר בעבר מקובץ זה') as fact; see the title verdict. Unit [11] also omits that Create Contact fails (row goes to the ETL warning, no contact) when Type_20 is empty or non-numeric, because of int.Parse(Row.Type20).",
+      "evidence": "DTSX:30947; DTSX:31263 main.cs:41,58",
+      "wrongUnits": [
+        { "unit": 9, "problem": "Meaning of gen_fileorigion = 2 stated as fact.", "correct": "אם להורה gen_fileorigion = 2 (משמעות 'נוצר מקובץ זה' – השערה; זה הערך שהחבילה מציבה ביצירה) ופרטיו השתנו – פרטיו מתעדכנים.", "evidence": "DTSX:30947; Create Contact main.cs:58" }
+      ]
+    },
+    {
+      "id": "L|Package\\Create and update contactlink|detailed",
+      "hash": "ddc94f2591e0",
+      "verdict": "WRONG",
+      "detail": "Re-derived the whole flow. These match: source mapping (DTSX:40988+), Aggregate (17 GroupBy), Is Valid (03/5015), Add 0 then SUBSTRING(4,10), both lookups (SQL, full cache, NoMatch unconnected), Conditional Split, compare script, Merge Join (JoinType 2, left = Sort with EliminateDuplicates fed by NotNeedToCreate, right = Sort 2 fed by Create Contact Result), and all 4 writers (5 copies each, functionally identical: only the input-column order and one whitespace differ), with correct positional parameters. Problems: (a) [17] presents 'created from this file' as the meaning of gen_fileorigion = 2; (b) [31] omits that Create Contact throws and routes the row to the error output, so no contact is created, when Type_20 is null, empty or non-numeric (int.Parse). It also omits that create sets gen_modifiedbybank = DateTime.Now and the ChildSaving*UpdatedOn dates; (c) [24] omits Gen_modifiedbybank = getutcdate() from the SQL update. Minor: [21] omits that Derived Column 1 also falls back to the CRM value for gen_bankCustomerID and the parent ID when the file value is NULL, and TRIMs them. Data-dependent note: compare befor update has no try/catch and calls int.Parse(Row.Type20) when Type_20 is non-null and the child's identification type is null. If such a value is non-numeric (Type_20 is not trimmed), the script throws and the data flow fails.",
+      "evidence": "DTSX:30947; Create Contact main.cs:41,77,83,92 (DTSX:31081); Update Contact 1 SQL DTSX:50070 (Gen_modifiedbybank = getutcdate()); Derived Column 1 DTSX:40072; compare befor update main.cs:154-157 (DTSX:29674)",
+      "wrongUnits": [
+        { "unit": 17, "problem": "Meaning of gen_fileorigion = 2 stated as fact.", "correct": "האם gen_fileorigion = 2? (הערך שהחבילה מציבה ביצירת הורה; משמעות 'נוצר מקובץ זה' – השערה)", "evidence": "DTSX:30947; main.cs:58 of Create Contact" },
+        { "unit": 31, "problem": "Missing condition and attributes on Create Contact.", "correct": "Creation succeeds only if Type_20 parses as an integer (int.Parse); otherwise the row goes to the Error output and becomes an ETL warning, and no contact is created. Create also sets gen_modifiedbybank = DateTime.Now, plus gen_childsavingphoneupdatedon/gen_childsavingemailupdatedon = DateTime.Now when the phone or email is present.", "evidence": "Create Contact main.cs:41,74-84,92 (DTSX:31081)" },
+        { "unit": 24, "problem": "Update attribute list omits Gen_modifiedbybank.", "correct": "The SQL update also sets Gen_modifiedbybank = getutcdate() (besides ModifiedOn = getutcdate(), ModifiedBy = ?).", "evidence": "DTSX:50070" }
+      ]
+    },
+    {
+      "id": "L|Package\\Create and update contactlink|detail",
+      "hash": "906c51d539c3",
+      "verdict": "CONFIRMED",
+      "detail": "Population (Subject_12 = 03, Fund_Number_4 = 5015 after the Aggregate), matching rules (child: Contact.StatusCode = 1 + Gen_customeraccount.StatusCode = 1 by 9-digit ID + account number; parent: StatusCode = 1 and STATECODE = 0 by 9-digit ID; link: parent + child + customer account, no status filter), writes (contact Update SQL, contact Create SDK, gen_contactlink Update SQL, gen_contactlinkBase Insert SQL) and the conditional wording of the outcome for new parents all verified.",
+      "evidence": "DTSX:40678, 40334, 40517, 40434, 50070, 31081, 50700, 37068; Merge Join DTSX:40712",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Create and update contactlink|decisions",
+      "hash": "8cc4a42076ac",
+      "verdict": "WRONG",
+      "detail": "All 9 conditions match the DTSX and code exactly, including the compare-script OR list and the Type_20 rule, the Check If Contact Is Duplicate routing, and Merge Join JoinType = 2 / 1 key / TreatNullsAsEqual = true. Decision [4] meaning_he 'ההורה נוצר מקובץ זה' is an unproven meaning of gen_fileorigion = 2.",
+      "evidence": "DTSX:30947; Create Contact main.cs:58",
+      "wrongUnits": [
+        { "unit": 4, "problem": "meaning_he asserts the business meaning of code 2.", "correct": "meaning: gen_fileorigion = 2 (הערך שהחבילה מציבה ביצירת הורה; 'נוצר מקובץ זה' – השערה)", "evidence": "DTSX:30947; DTSX:31263" }
+      ]
+    },
+    {
+      "id": "L|Package\\Create and update contactlink|crm",
+      "hash": "b969df2e07c8",
+      "verdict": "INCOMPLETE",
+      "detail": "Entities, verbs and mechanisms are correct (contact Update SQL, contact Create SDK service.Create, gen_contactlink Update SQL, gen_contactlinkBase Insert SQL). Missing: the Create condition that Type_20 must parse as an integer, and gen_modifiedbybank in both the contact update and the create.",
+      "evidence": "Create Contact main.cs:41,92; Update Contact 1 SQL DTSX:50070",
+      "wrongUnits": [
+        { "unit": 0, "problem": "Create Contact has an additional implicit condition, and an attribute is omitted.", "correct": "contact Create happens only when Type_20 is a parseable integer (else the row goes to the error output and becomes an ETL warning). Both Update (Gen_modifiedbybank = getutcdate()) and Create (gen_modifiedbybank = DateTime.Now) also write gen_modifiedbybank.", "evidence": "main.cs:41,92 (DTSX:31081); DTSX:50070" }
+      ]
+    },
+    {
+      "id": "L|Package\\Create and update contactlink|open",
+      "hash": "2a6b5aeb8510",
+      "verdict": "CONFIRMED",
+      "detail": "[1] is_Parent_Exist is a full-cache lookup (CacheType 0) over a query ordered by CreatedOn; which duplicate wins is runtime behaviour, correctly left open. [2] 'חיסכון לכל ילד' is correctly labelled השערה: no label or comment in the supplied files defines fund 5015 or the ChildSaving fields. [3] is labelled data-dependent השערה. The mechanism is consistent with the code: next run the parent exists, both update branches lead to the link lookup, and no link exists, so the link is inserted.",
+      "evidence": "DTSX:40517 (CacheType 0, ORDER BY CreatedOn); Union All inputs 1/3/5 DTSX:45732-46047",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Create and update Beneficiaries|title",
+      "hash": "97e90b9d63b4",
+      "verdict": "WRONG",
+      "detail": "flow_he[2] calls FinanceNumber_11 / Product.Gen_fundfinanceid 'גוף מנהל'. Nothing in 0012 defines it. The supplied files contain a contrary label: 0015_TransferIn.dtsx:42637 has the comment 'CP.gen_fundfinanceid,--מסםר אישור מ\"ה' (an income-tax approval number). The general lookup matches FinanceNumber against Product.Gen_fundfinanceid (Product joined on gen_id = ProductNumber). Everything else (subject 01, percent != 0, ID type 1/empty, ID present, license 1; specific case 9844/9845/9846 or ''/0000 with 5015; duplicate drop; SDK create/update) verified.",
+      "evidence": "DTSX:13035, 13069 (SQL 13071: inner Join Product on gen_id = Product.ProductNumber; where Gen_fundfinanceid = ?); 0015_TransferIn.dtsx:42637",
+      "wrongUnits": [
+        { "unit": 4, "problem": "'גוף מנהל' is an unproven meaning; the only label in the supplied files says gen_fundfinanceid is the income-tax approval number.", "correct": "מקרה ספציפי (FinanceNumber_11 = 9844/9845/9846, או ריק/0000 עם קופה 5015) → חשבון לפי מספר חשבון + Gen_producttypeid; אחרת → לפי מספר חשבון + Product.Gen_fundfinanceid (לפי הערה ב-0015: 'מספר אישור מ\"ה')", "evidence": "DTSX:13035; DTSX:13071; 0015_TransferIn.dtsx:42637" }
+      ]
+    },
+    {
+      "id": "L|Package\\Create and update Beneficiaries|short",
+      "hash": "2c96b3104885",
+      "verdict": "WRONG",
+      "detail": "Unit [1] gives the identification-type filter as 'סוג זיהוי 1'. The split only rejects rows where Account_Owner_Identifiaction_Type_7 is non-null and != \"1\", so an empty value passes. The column is the account owner's identification type, not the beneficiary's. The other units (bank 10 active account, exists → update changed fields only, else create, SDK) are verified.",
+      "evidence": "Is Valid  Beneficiary DTSX:13552 ('Wrong Identity Type': !ISNULL(Account_Owner_Identifiaction_Type_7) && Account_Owner_Identifiaction_Type_7 != \"1\")",
+      "wrongUnits": [
+        { "unit": 1, "problem": "NULL handling of the ID-type filter misstated, and the column owner is not stated.", "correct": "נושא 01, אחוז חלוקה לא ריק ושונה מאפס, ת.ז. מוטב לא ריקה, סוג הזיהוי של בעל החשבון (Account_Owner_Identifiaction_Type_7) = 1 או ריק, סוג רישיון = 1.", "evidence": "DTSX:13552" }
+      ]
+    },
+    {
+      "id": "L|Package\\Create and update Beneficiaries|detailed",
+      "hash": "a7d4913c946b",
+      "verdict": "WRONG",
+      "detail": "Verified: source mapping, split conditions and their order, TRIM / Format Dates / UTC, specific-case expression, Specific lookup (full cache, Gen_producttypeid = fund), General lookup (CacheType 2 = no cache), NoMatch unconnected on both, duplicate check (HashSet of ID + customer-account GUID; Duplicate unconnected), Set Fields (percent / 100, name + ' (' + account name + ')', '' address → NULL), Is Beneficiary Exists (partial cache, no status filter), Create (ExecuteMultiple batches of 10; copies identical except copy 1 lacks ErrorBuffer.genname), and Update (CheckIfToUpdate2: date within 12h on .Date, decimal < 0.01; also always sets gen_modifiedbybank = today and gen_isexsistsonbank = true; 5 identical copies). Wrong: units [1] and [12] call FinanceNumber / Gen_fundfinanceid 'גוף מנהל', which is unproven and contradicted by 0015_TransferIn.dtsx:42637.",
+      "evidence": "DTSX:13658, 13552, 14670, 13035, 13069, 13189, 2370, 13772, 13406; Create beneficiary 1 main.cs:36-122 (DTSX:4476); Update beneficiary 1 main.cs + Helpers.cs; 0015_TransferIn.dtsx:42637",
+      "wrongUnits": [
+        { "unit": 1, "problem": "FinanceNumber_11 labelled 'גוף מנהל' without proof.", "correct": "FinanceNumber_11 (קוד בן 4 תווים; משמעותו העסקית לא מוגדרת בחבילה – הערה ב-0015 מתארת את gen_fundfinanceid התואם כ'מספר אישור מ\"ה')", "evidence": "DTSX:13666; 0015_TransferIn.dtsx:42637" },
+        { "unit": 12, "problem": "'מספר הגוף המנהל של המוצר' – unproven meaning of Product.Gen_fundfinanceid.", "correct": "חשבון הלקוח מאותר לפי מספר חשבון ו-Product.Gen_fundfinanceid = FinanceNumber, כאשר Product.ProductNumber = gen_customeraccounttype.gen_id (חשבונות StateCode 0 בבנק 10).", "evidence": "DTSX:13071-13107; 0015_TransferIn.dtsx:42637" }
+      ]
+    },
+    {
+      "id": "L|Package\\Create and update Beneficiaries|detail",
+      "hash": "4b7bad3b7bb6",
+      "verdict": "WRONG",
+      "detail": "Unit [2] matches the general case 'לפי חשבון + גוף מנהל של המוצר'; the 'גוף מנהל' meaning of Gen_fundfinanceid is unproven and contradicted by the only supplied label. The other units are verified.",
+      "evidence": "DTSX:13071; 0015_TransferIn.dtsx:42637",
+      "wrongUnits": [
+        { "unit": 2, "problem": "Unproven meaning 'גוף מנהל'.", "correct": "אחרת לפי חשבון + Product.Gen_fundfinanceid = FinanceNumber_11 (Product מצורף לפי gen_id = ProductNumber).", "evidence": "DTSX:13071" }
+      ]
+    },
+    {
+      "id": "L|Package\\Create and update Beneficiaries|decisions",
+      "hash": "557d3697cda4",
+      "verdict": "CONFIRMED",
+      "detail": "All 7 conditions match the DTSX and code exactly. Split order, specific-case expression, both lookup WHERE clauses (StateCode 0, Gen_BankNumber 10), duplicate key, beneficiary lookup keys and the CheckIfToUpdate2 logic were all verified. No business meaning is asserted for the codes.",
+      "evidence": "DTSX:13552, 13035, 13189, 13069, 2370 main.cs:58-66, 13406, Update beneficiary 1 main.cs",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Create and update Beneficiaries|crm",
+      "hash": "9655092811fa",
+      "verdict": "CONFIRMED",
+      "detail": "gen_beneficiaries Create via SDK (ExecuteMultiple, RequestType.Create) when no beneficiary with the same ID + account exists. gen_beneficiaries Update via SDK (ExecuteMultiple, RequestType.Update) when at least one compared field changed. Both after a valid row and an active bank-10 account were found.",
+      "evidence": "Create beneficiary main.cs:93-96; Update beneficiary 1 ExcecuteBulk; DTSX:13406",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Create and update Beneficiaries|open",
+      "hash": "32ebb6e12235",
+      "verdict": "CONFIRMED",
+      "detail": "The open question is grounded: Is Beneficiary Exists has no statecode filter, and Update never sets statecode/statuscode. It is correctly posed as a question about intent.",
+      "evidence": "DTSX:13408 (no WHERE); Update beneficiary 1 main.cs",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Delete Beneficiaries|title",
+      "hash": "70cdc2fa7361",
+      "verdict": "CONFIRMED",
+      "detail": "File side: valid-beneficiary split with the same conditions, Trim (''→NULL), 5006→1025, ExistsInFile = 1. CRM side: Gen_beneficiaries statecode = 0 LEFT JOIN account / account type, no bank filter. Merge Join JoinType 1, 3 keys. Paths: Sort 2 (file) → 'Merge Join Left Input', Sort 1 (CRM) → 'Merge Join Right Input'. The <input> XML lists Right before Left, the only one of the 10 Merge Joins in all supplied DTSX files written that way. ISNULL(ExistsInFile) → service.Delete × 5 identical copies. Left/right runtime semantics cannot be settled from the DTSX, and the claim correctly leaves this open.",
+      "evidence": "DTSX:85298, 85144, 86248, 80484, 79661, 84961 (SQL 84966), 85205-85222, 87328/87329, 85012, 80556/81419/82372/83235/84098",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Delete Beneficiaries|short",
+      "hash": "6729f6262489",
+      "verdict": "CONFIRMED",
+      "detail": "Steps and both conditional branches correctly reflect the code. The open question about which input is left is real and properly labelled. 'מכל בנק' is correct: SQL 84966 has no bank filter.",
+      "evidence": "DTSX:84966, 85205-85222, 87328/87329, 85012",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Delete Beneficiaries|detailed",
+      "hash": "97fe2e2ed2bc",
+      "verdict": "CONFIRMED",
+      "detail": "Verified every unit: source columns, split conditions, unconnected reject outputs, 5006→1025, ExistsInFile = 1, CRM query, sort keys (account, ID, fund↔gen_id), JoinType 1, ExistsInFile from left / Gen_beneficiariesid from right, path lines 87328/87329, ISNULL(ExistsInFile), 'beneficiary exists in a file' unconnected, and service.Delete in 5 identical copies. Copy 1's Error output has no path while copies 0/2/3/4 feed Union All Error. Unit [21] is labelled השערה.",
+      "evidence": "DTSX:85303, 85144, 80484, 79661, 84966, 86063, 86127, 85205, 87328/87329, 85012, Delete Beneficiaries 1 main.cs:41",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Delete Beneficiaries|detail",
+      "hash": "ababcccb65ea",
+      "verdict": "CONFIRMED",
+      "detail": "Population, join keys, ISNULL decision, SDK Delete and the explicitly uncertain outcome were verified.",
+      "evidence": "DTSX:84966, 85205, 85012, 80556",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Delete Beneficiaries|decisions",
+      "hash": "30fd1b1499b5",
+      "verdict": "CONFIRMED",
+      "detail": "All four conditions match. The Merge Join description (Left = Sort 2 file / Right = Sort 1 CRM by path names; XML lists Right first) is exact.",
+      "evidence": "DTSX:85144, 80484, 85205-85222, 85012",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Delete Beneficiaries|crm",
+      "hash": "351d2727e3ff",
+      "verdict": "CONFIRMED",
+      "detail": "gen_beneficiaries Delete via SDK service.Delete, conditional on the unresolved left/right input question. Correct.",
+      "evidence": "Delete Beneficiaries main.cs:41 (DTSX:80556 ×5)",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Delete Beneficiaries|open",
+      "hash": "5a88307b69c6",
+      "verdict": "CONFIRMED",
+      "detail": "[1] Legitimately unresolved from the DTSX: names and positions disagree, and no other property decides it. [2] Correct: no bank filter in SQL 84966. [3] Correctly labelled השערה.",
+      "evidence": "DTSX:85205-85222, 87328/87329, 84966",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Update Employee MobilePhone Field CustomerAccount|title",
+      "hash": "349988ad968a",
+      "verdict": "CONFIRMED",
+      "detail": "Subject == \"11\"; Phone_Prefix ← Division_60 and Phone_Number ← Workplace_59 (externalMetadata mapping); both trimmed (''→NULL); full = prefix + number, NULL if either is NULL. Lookup on gen_customeraccount by gen_bankaccountnumber + gen_producttypeid, full cache, no bank/state filter, NoMatch unconnected. UPDATE Gen_customeraccountBase when changed; empty file value clears an existing value.",
+      "evidence": "DTSX:103084, 102194, 103818, 102227 main.cs:117-125, 100854, 101036 main.cs:39-61, 103031",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Update Employee MobilePhone Field CustomerAccount|short",
+      "hash": "4b7ef0b10e1d",
+      "verdict": "CONFIRMED",
+      "detail": "Steps and branches match the code; the write is a direct SQL update of gen_employeemobilephone.",
+      "evidence": "DTSX:102194, 100852, 101036, 100736, 103031",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Update Employee MobilePhone Field CustomerAccount|detailed",
+      "hash": "ad928a43351d",
+      "verdict": "CONFIRMED",
+      "detail": "Verified the order Read → Is Phone → Trim → Merge → Lookup → Aggregate (4 GroupBy) → Is Need To Update → Conditional Split (IsToUpdate == TRUE) → OLE DB Command. Parameter order: phone, Modifiedon (DateTime.Now), account GUID. The update and clear branches match main.cs:42-61.",
+      "evidence": "DTSX:103079, 102194, 102227, 100852, 100673, 101036, 100736, 103028",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Update Employee MobilePhone Field CustomerAccount|detail",
+      "hash": "c525a211925b",
+      "verdict": "CONFIRMED",
+      "detail": "Population, matching (gen_producttypeid = Fund_Number_4, gen_bankaccountnumber = Account_Number_3, no bank/status filter), decision and direct SQL write verified.",
+      "evidence": "DTSX:100854, 101036, 103031",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Update Employee MobilePhone Field CustomerAccount|decisions",
+      "hash": "2e8f3ca7e510",
+      "verdict": "CONFIRMED",
+      "detail": "All four conditions match the code exactly.",
+      "evidence": "DTSX:102194; Merge main.cs:117-125; DTSX:100862; Is Need To Update main.cs:42-61",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Update Employee MobilePhone Field CustomerAccount|crm",
+      "hash": "c51a73c68c5f",
+      "verdict": "CONFIRMED",
+      "detail": "UPDATE Gen_customeraccountBase SET gen_employeemobilephone = ?, modifiedon = ? WHERE Gen_customeraccountid = ? on the CRM connection (PSQL / ALTSHULER_MSCRM). The condition is correct.",
+      "evidence": "DTSX:103031",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Update Employee MobilePhone Field CustomerAccount|open",
+      "hash": "050513b14c16",
+      "verdict": "CONFIRMED",
+      "detail": "The fact is correct: Modifiedon = DateTime.Now (main.cs:49,59), while the other ModifiedOn writes in the package use getutcdate()/UtcNow (DTSX:50081, 50702, 43035, 73078). It is posed as a question.",
+      "evidence": "DTSX:101209/101219; 50081; 50702; 43035; 73078",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Get Last Business Date|title",
+      "hash": "dca3228bb969",
+      "verdict": "CONFIRMED",
+      "detail": "SQL on the CRM connection selects CalendarRule.starttime where trimmed Name is in ('Friday','Saturday','Holiday') into User::NonWorkingDays. The script starts at DateTime.Today - 1 and steps back while the date is found, storing ToUniversalTime(). The result is bound as @lastBusinessDate to 'Update close date where not exist in file' (gen_closedate where gen_existinfile = 0 and gen_closedate is null).",
+      "evidence": "DTSX:89094; ScriptMain.cs:37-64 (DTSX:89103); DTSX:92738-92742",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Get Last Business Date|short",
+      "hash": "e5ea9e87af89",
+      "verdict": "CONFIRMED",
+      "detail": "Verified, as for the title.",
+      "evidence": "DTSX:89094; ScriptMain.cs:41-62",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Get Last Business Date|detailed",
+      "hash": "b4e0ffa70933",
+      "verdict": "CONFIRMED",
+      "detail": "All units match: SQL, yesterday start, string-based DataTable.Select, step back, UTC storage, parameter binding at DTSX:92742. PC 108910 (systemuser → CalendarRule) and 108920 (CalendarRule → script) are Success constraints.",
+      "evidence": "DTSX:89094-89095, ScriptMain.cs:40-62, DTSX:92742, PC 108910/108920",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Get Last Business Date|detail",
+      "hash": "84637fd49391",
+      "verdict": "CONFIRMED",
+      "detail": "No CRM write; it only reads CalendarRule. Verified.",
+      "evidence": "DTSX:89094; ScriptMain.cs",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Get Last Business Date|decisions",
+      "hash": "03ba2208aa3c",
+      "verdict": "CONFIRMED",
+      "detail": "Condition result == null || result.Length <= 0 → chosen; else AddDays(-1). Exact.",
+      "evidence": "ScriptMain.cs:53-61",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Get Last Business Date|open",
+      "hash": "3f923637c11c",
+      "verdict": "CONFIRMED",
+      "detail": "The comparison is dt.Select(\"starttime = '\" + date.ToString() + \"'\"). Its outcome depends on server culture and the stored time component, which cannot be settled from the files. This is correctly open.",
+      "evidence": "ScriptMain.cs:49,61",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Get systemuser organisationname and curency|title",
+      "hash": "77b8cf7b9dd1",
+      "verdict": "CONFIRMED",
+      "detail": "Get Row → Derived Column (lower UserName, lower OrganizationName, currency 'שקל חדש') → SystemUser by LOWER(DomainName) → TransactionCurrency by CurrencyName → OrganizationBase by LOWER(Name) → OwnerBase by SystemUserId → Set system variables (OwnerId = SystemUserId). The variables feed CreatedBy/ModifiedBy/OwnerId/OwningBusinessUnit in the SQL writers. Note, not counted as an error: all four lookups have NoMatchBehavior 0 (fail), so the package stops if any is not found.",
+      "evidence": "DTSX:91543, 92662, 91578, 91640, 91431, 91488, 91695 main.cs:106-132",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Get systemuser organisationname and curency|short",
+      "hash": "863eea065146",
+      "verdict": "CONFIRMED",
+      "detail": "Verified, as for the title.",
+      "evidence": "DTSX:91425-92662",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Get systemuser organisationname and curency|detailed",
+      "hash": "2339909147cc",
+      "verdict": "CONFIRMED",
+      "detail": "Every unit matches. set vanila fields exists in the contactlink, Instruction provision, Warning Notes (2) and Risk flows, and crm user id feeds ModifiedBy in contactlink.",
+      "evidence": "DTSX:91548, 92662, 91580, 91642, 91433, 91490, 91695; set vanila fields DTSX:42793; crm user id DTSX:37590",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Get systemuser organisationname and curency|detail",
+      "hash": "8d278cf2743d",
+      "verdict": "CONFIRMED",
+      "detail": "Matching rules and no-write verified.",
+      "evidence": "DTSX:91580, 91642, 91433, 91490",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Get systemuser organisationname and curency|open",
+      "hash": "7d04837b5696",
+      "verdict": "CONFIRMED",
+      "detail": "User::UserName defaults to 'From DB' (DTSX:215) and is overwritten at runtime by the Get Organization Variables data flow (ReadWriteVariables, DTSX:90095-90099) from a DB source. The value is not in the files, so this is correctly unknown.",
+      "evidence": "DTSX:215-217; DTSX:90095-90099",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Disabled contactlink|title",
+      "hash": "1ad66622587c",
+      "verdict": "CONFIRMED",
+      "detail": "Execute SQL on the CRM connection: Update gen_contactlinkBase set gen_Status = 2 where gen_existsinfile = 0. 'ביטול' matches the task's own name 'Disabled contactlink'.",
+      "evidence": "DTSX:87340/87344",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Disabled contactlink|short",
+      "hash": "1f3540948ad2",
+      "verdict": "WRONG",
+      "detail": "Units [1]-[2] are verified. Unit [3] asserts that the affected links are 'קישורים שהוסרו בבנק'. The population is every link not re-marked in this run, after 'Set contactlink existinfile false' resets all links to 0. That includes links whose rows were in the file but were dropped: child not found, parent update failed, or new parent (as the claim's own detailed [9] says). That absence means removal at the bank is an unproven business meaning. The unit also states 'אינם פעילים' as fact, while the claim's open [1] labels status 2 = inactive as השערה.",
+      "evidence": "DTSX:92720 (update gen_contactlinkBase set gen_existsinfile = 0), DTSX:87344, PC 108927/108929",
+      "wrongUnits": [
+        { "unit": 3, "problem": "Unproven meaning ('removed at the bank') and inconsistent certainty about status 2.", "correct": "כל קישור שלא סומן מחדש 'קיים בקובץ' בריצה זו (כולל קישורים ששורתם נפלה בדרך) מקבל gen_Status = 2 (שם המשימה 'Disabled' מרמז על ביטול; תווית ה-OptionSet לא סופקה).", "evidence": "DTSX:92720; DTSX:87344" }
+      ]
+    },
+    {
+      "id": "L|Package\\Disabled contactlink|detailed",
+      "hash": "158bb81ff488",
+      "verdict": "CONFIRMED",
+      "detail": "PC 108929 (contactlink → Disabled, Success). SQL with no bank/source filter. Re-activation via Update ContactLink (gen_status = 1, Is ContactLink Exists has no status filter). Unit [9] about failed paths is correct: Union All Error 5 and unmatched rows never reach Is ContactLink Exists.",
+      "evidence": "PC DTSX:108929; DTSX:87344; DTSX:50700; DTSX:40436",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Disabled contactlink|detail",
+      "hash": "49d0dac76c4b",
+      "verdict": "CONFIRMED",
+      "detail": "Verified.",
+      "evidence": "DTSX:87344",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Disabled contactlink|decisions",
+      "hash": "f7e6687c3bbb",
+      "verdict": "CONFIRMED",
+      "detail": "where gen_existsinfile = 0 → gen_Status = 2. Exact.",
+      "evidence": "DTSX:87344",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Disabled contactlink|crm",
+      "hash": "dc4aadfd0c9a",
+      "verdict": "CONFIRMED",
+      "detail": "gen_contactlink Update gen_Status = 2 via direct SQL on the CRM DB connection. Verified.",
+      "evidence": "DTSX:87344; connection CRM DTSX:95-97",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Disabled contactlink|open",
+      "hash": "7acb2e00431d",
+      "verdict": "CONFIRMED",
+      "detail": "Correctly labelled השערה: no OptionSet label for gen_status is supplied. The task name 'Disabled contactlink' supports the hypothesis but does not give the OptionSet text.",
+      "evidence": "DTSX:87340",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Set Warning Note existinfile false|title",
+      "hash": "8f683dff7414",
+      "verdict": "CONFIRMED",
+      "detail": "SQL: update gen_warningnotebase set gen_existinfile = 0 where gen_existinfile = 1. Create And Update Warning Notes re-marks gen_existinfile = 1 (updates DTSX:78808ff) or inserts with 1 (DTSX:69430ff). Update close date sets gen_closedate where gen_existinfile = 0 and gen_closedate is null.",
+      "evidence": "DTSX:92729; 78808; 69430-69440; 92738",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Set Warning Note existinfile false|short",
+      "hash": "dd2dd7a17a1a",
+      "verdict": "CONFIRMED",
+      "detail": "Verified.",
+      "evidence": "DTSX:92729; 78808; 92738",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Set Warning Note existinfile false|detailed",
+      "hash": "aa7a318f49a7",
+      "verdict": "CONFIRMED",
+      "detail": "Order: PC 108914 (Step 6 → Set Warning Note, after Update Customer Accounts At Rist → Step 6 via 108911) and 108918 (→ Create And Update Warning Notes). Unconditional SQL with no bank filter. Re-mark/insert with 1. Close only rows still 0 with closedate null, at LastBusinessDate.",
+      "evidence": "PC DTSX:108911, 108914, 108918; DTSX:92729; 92738-92742",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Set Warning Note existinfile false|detail",
+      "hash": "3f6cfa4179a7",
+      "verdict": "CONFIRMED",
+      "detail": "Verified.",
+      "evidence": "DTSX:92729",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Set Warning Note existinfile false|crm",
+      "hash": "1b5164805ca0",
+      "verdict": "CONFIRMED",
+      "detail": "gen_warningnotebase Update gen_existinfile = 0 via direct SQL on the CRM connection, in every run where the file exists (the chain starts at PC 108916, isFileExist == TRUE).",
+      "evidence": "DTSX:92729; PC 108916",
+      "wrongUnits": []
+    }
+  ]
+}

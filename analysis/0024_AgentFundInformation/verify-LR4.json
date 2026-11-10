@@ -1,0 +1,64 @@
+{
+  "verifier": "ssis-verifier",
+  "package": "0024_AgentFundInformation",
+  "scope": "logic-claims re-check round 4",
+  "checkedAt": "2026-11-07",
+  "checked": 5,
+  "source": "source/DailyProcess/0024_AgentFundInformation.dtsx sha256 659C8F355B506D3D1772DC5A1165E80E3574B31C18BBCD1F2E43A836ADF6E2C4",
+  "results": [
+    {
+      "id": "L|summary",
+      "hash": "bb9e38b0f072",
+      "verdict": "CONFIRMED",
+      "detail": "I re-derived every unit. The table label is given as a name, and its meaning is labelled השערה. The package reads the table only in the existence Lookup ('select * from [dbo].[Gen_allowedinformationforfundBase]', DTSX:2139) and in the Delete Rows source ('select ... from Gen_allowedinformationforfund', DTSX:2608-2616). All 19 'allowedinformationforfund' hits under source/ are in 0024. The insert adds 5-key combinations from state-1 POAs through two UNION ALL branches; the branch-2 conditions are the ac1 data-sharing flag plus POA agent = fund agent OR POA agency = fund agency (DTSX:2033-2082). Deceased contacts are skipped (N'נפטר', DTSX:1906-1922). Three delete rules follow. (1) Deceased contacts: Get customers dead Match -> 'Delete  Row of customer dead'. (2) No 6-key match: Check if valid allow on agency, agent, fund, contact, POW_MAIN, account; No Match -> 'Delete Not Valid Row'. Its active SQL is identical to the population query; I checked this with a comment-stripped diff. (3) Agent and agency both NULL: Execute SQL Task, DTSX:4481. Precedence order: Create Fund View Table -> Delete Rows -> Execute SQL Task (DTSX:7370-7371). All business writers use [CRM] {EC67FF20} (direct SQL). The SDK calls are only crmServiceProxy.Create(gen_etlprocess) at DTSX:297 and .Update at DTSX:3019. There are no event handlers and no disabled objects. Two notes, not counted: (a) CrmProxy comes from the unsupplied CRM2015.Proxy.dll (namespace CRM.Proxy.CrmSdk, DTSX:268, 3305), so 'דרך ה-SDK' rests on the wrapper's namespace, not on its implementation; this is ETL framework only. (b) 'שיתוף מידע' and 'חוזה האב' are column-name and SQL-comment labels ('--Agent with parent contracr and POA and data sharing', DTSX:2055); they are not cited.",
+      "evidence": "DTSX:2033-2084, 2137-2149, 1906-1922, 2608-2616, 2475-2505 (Check if valid allow joins), 2532, 2569, 4481, 7368-7373, 297, 3019; grep -ci allowedinformationforfund source/DailyProcess/*.dtsx",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Create Fund View Table|title",
+      "hash": "b4f82b1f4204",
+      "verdict": "CONFIRMED",
+      "detail": "The title is a label. short_he matches the SQL. The fund condition is (Gen_existinfile = 1 OR year(gen_revaluationdate) >= year(getdate())-3) AND gen_powerofattorney.gen_currentstate = 1. That is a lower bound only, so future years are included. Both meanings are labelled השערה. Only new combinations pass (Lookup NoMatchBehavior 1, Match unconnected) and deceased contacts are skipped. flow_he[1-4] match the path order: source -> Lookup(No Match) -> filtering customers dead(No Match) -> Create system columns -> OLE DB Destination (DTSX:2211-2214). Branch 2 is correctly an addition (UNION ALL, DTSX:2054) with both of its conditions, and its agent/agency come from ac2. The insert is direct SQL (AccessMode 0, OpenRowset [dbo].[Gen_allowedinformationforfundBase], [CRM]).",
+      "evidence": "DTSX:2049-2053, 2054, 2068-2082, 2139-2149, 1906-1922, 608-616, 2211-2214",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Create Fund View Table|short",
+      "hash": "948caff515ce",
+      "verdict": "CONFIRMED",
+      "detail": "[1] matches the SQL: the existinfile flag (labelled השערה) OR a revaluation-year lower bound; a state-1 POA on the fund's customer account (join through gen_customeraccount); and branch 2 as an addition with both its conditions (ac1.Gen_isContractDataSharing = 1, and POA agent = fund agent OR POA agency = fund agency). [2]-[4] match the 5-key full-cache Lookup on agent, agency, contact, account and fund, with the Match output unconnected. [6]-[8] match the deceased Lookup on Contact where gen_customeragename = N'נפטר', with Match unconnected. [10] matches the written columns, which include Gen_powerofattorneymainname and gen_agentreceivescommissionnly. [11] is correct: deceased and no-6-key-match rows are deleted only in Delete Rows, which runs next (DTSX:7370). Note, not counted: the per-combination ROW_NUMBER choice of the latest-start POA is not mentioned at this summary level. It is covered in detailed [8].",
+      "evidence": "DTSX:1970-2084, 2137-2149, 1906-1922, 608-626, 7370",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Create Fund View Table|detailed",
+      "hash": "002523a6bb55",
+      "verdict": "WRONG",
+      "detail": "Units [1]-[4] and [6]-[19] are verified: the existinfile flag (השערה) and the year lower bound evaluated on the DB server; the state-1 POA with the 0030 'Get Active Poa' / ActivePoas reference (0030 DTSX:4187, 4222); UNION ALL, with the two commented-out branches at DTSX:1984-2032; the ac1/ac2 joins and the branch-2 conditions; ROW_NUMBER partitioned by FUND_NUMBER, CONTACT, ACCOUNT, AGENT, AGENCY and ordered by POW_START_DATE desc with no tie-breaker; isnull(...,0); the 5-key full-cache Lookup without POW_MAIN, Match unconnected; the deceased Lookup; main.vb:18-36 (OwningUser/CreatedBy/ModifiedBy = SystemUserId, OwningBusinessUnit = BusinessUnitId, StateCode 0, StatusCode 1, Guid.NewGuid, UtcNow); and the INSERT via AccessMode 0 on [CRM]. 'Step 3' = Get systemuser organisationname and curency, by the precedence chain at DTSX:7368-7373. Wrong unit [5]: 'הסוכן והסוכנות נלקחים ישירות מייפוי הכוח'. The written AGENT_NAME is gen_agents.gen_agentsid, found by gen_agents.gen_contactname = gen_powerofattorney.gen_agentname. The written AGENCY_NAME is gen_agencie.gen_agencieid, found by gen_agencie.gen_agencyname = gen_powerofattorney.gen_agencyname. Both are LEFT JOINs (DTSX:2038-2039, 2046-2047). So the POA values are not written directly: they are resolved through the agent and agency records, and if no record matches, NULL is written. The claim's own tech note shows these joins, which contradicts 'ישירות'. Notes, not counted: (a) 'המצב הוא פעיל (statecode 0)' is a CRM convention. It is supported by SQL comments in 0029 ('statecode = 0 -- activ', 0029 DTSX:26989), but not cited. (b) In [7], branch 2 joins gen_agents and gen_agencie on their primary keys (DTSX:2070-2071), so the conditional 'אם כמה רשומות ... תואמות' cannot occur there. It is harmless.",
+      "evidence": "DTSX:2033-2053 (branch 1 SELECT and LEFT JOINs), 2055-2082, 1973, 2084, 2137-2149, 1906-1922, main.vb:18-36 (DTSX:819-855), 608-626",
+      "wrongUnits": [
+        {
+          "unit": "[5] 'הסוכן והסוכנות נלקחים ישירות מייפוי הכוח הנוכחי של הלקוח'",
+          "problem": "Not direct. The written agent and agency are gen_agents.gen_agentsid and gen_agencie.gen_agencieid, resolved by LEFT JOIN on gen_agents.gen_contactname = poa.gen_agentname and gen_agencie.gen_agencyname = poa.gen_agencyname. With no matching record the value is NULL.",
+          "correct": "הסוכן והסוכנות נקבעים לפי ייפוי הכוח הנוכחי של הלקוח: רשומת הסוכן שאיש הקשר שלה (gen_agents.gen_contactname) הוא הסוכן שבייפוי הכוח, ורשומת הסוכנות ששם הסוכנות שלה (gen_agencie.gen_agencyname) הוא הסוכנות שבייפוי הכוח (left join; אם אין רשומה תואמת נכתב ערך ריק). אם כמה רשומות סוכן או סוכנות תואמות לאותו ערך, נוצרת שורה נפרדת לכל אחת.",
+          "evidence": "DTSX:2038-2039, 2046-2047"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Create Fund View Table|detail",
+      "hash": "5eae5cbe29ee",
+      "verdict": "WRONG",
+      "detail": "Units [1], [2], [3] and [5] are verified. [1]: the Gen_existinfile ownership is argued by the ambiguity rule, and 0034 DTSX:15 has 'from Gen_fundmain where gen_existinfile = 1'; the year lower bound; state 1; both branches with their conditions; left joins; the latest POW_START_DATE, nondeterministic on ties. [2]: the 5-key Lookup and the N'נפטר' filter. [5]: the result statement, with the meaning labelled השערה and external_unknown. In [4], the column list is complete against the destination's 16 input columns (DTSX:628-643): agency, agent, contact, account, fund, POW_MAIN, commission flag, the ID, CreatedOn, ModifiedOn, statecode, statuscode, OwnerId, CreatedBy, ModifiedBy, OwningBusinessUnit. DeletionStateCode is unmapped. Literals are statecode 0 (main.vb:30) and statuscode 1 (main.vb:27). Wrong unit in [4]: 'הבעלים (OwnerId), היוצר, המעדכן והיחידה העסקית (OwningBusinessUnit) הם משתמש המערכת שאותר בשלב 3'. OwningBusinessUnit is not the system user. It is Variables.BusinessUnitId (main.vb:18), which is the BusinessUnitId column that 'Get System user id' copies from SystemUser for that user (DTSX:5390, 5432; Set system variables PostExecute). Notes, not counted: (a) in [1], '(1) מייפוי הכוח עצמו' should say that the agent and agency come from the agent and agency records matched to the POA (see the detailed [5] finding). (b) In [1], 'לכל צירוף' does not name the dedupe key. The key is the fund NUMBER (gen_fundnumber), not the fund GUID that is written and looked up. detailed [8] states this correctly.",
+      "evidence": "DTSX:1970-2084, 2137-2149, 1906-1922, 608-643, main.vb:18-36, DTSX:5390-5432 (Get System user id: SELECT DomainName, SystemUserId, BusinessUnitId FROM SystemUser; CopyFromReferenceColumn BusinessUnitId), DTSX:6511 (Set system variables), 0034 DTSX:15",
+      "wrongUnits": [
+        {
+          "unit": "[4] 'הבעלים (OwnerId), היוצר, המעדכן והיחידה העסקית (OwningBusinessUnit) הם משתמש המערכת שאותר בשלב 3'",
+          "problem": "This misstates the value written to OwningBusinessUnit. It is the business unit of the located user (SystemUser.BusinessUnitId via Variables.BusinessUnitId), not the user.",
+          "correct": "הבעלים (OwnerId), היוצר והמעדכן הם משתמש המערכת שאותר בשלב 3 לפי DomainName = User::UserName, והיחידה העסקית (OwningBusinessUnit) היא היחידה העסקית של אותו משתמש (SystemUser.BusinessUnitId) (Get System user id; Create system columns main.vb:18-21).",
+          "evidence": "main.vb:18 '.OwningBusinessUnit = CType(Variables.BusinessUnitId, Guid)'; DTSX:5390 'SELECT DomainName, SystemUserId, BusinessUnitId FROM SystemUser'; Set system variables '.BusinessUnitId = BusinessUnitId'"
+        }
+      ]
+    }
+  ]
+}

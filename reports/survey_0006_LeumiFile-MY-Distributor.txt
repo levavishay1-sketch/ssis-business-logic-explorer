@@ -1,0 +1,122 @@
+# 0006_LeumiFile-MY-Distributor.dtsx · 7F06AF01A9BDEA0577CBFB469B65C45DB31CC4C52A6A3842ED2382C7FED4CC2E
+
+## Connection managers
+- [Minhali Daily Source] FLATFILE FromDB EXPR ConnectionString=@[User::FullFileName] FLAT RaggedRight cp1255 cols=304
+- [Psql] OLEDB Data Source=Psql;Initial Catalog=ALTSHULER_MSCRM;Integrated Security=SSPI;  
+- [SSIS_Logs] OLEDB Data Source=Psrs;Initial Catalog=SSIS_Logs;Integrated Security=SSPI;  
+
+## Executables (disabled marked !)
+-   Foreach Loop Container | STOCK:FOREACHLOOP | FOREACH Microsoft.ForEachADOEnumerator ["User::FileName#0","User::FullFileName#1"] 
+-   Foreach Loop Container\Create ETL Process record With File Name | Microsoft.ScriptTask  
+-   Foreach Loop Container\End ETL Process record | Microsoft.Pipeline  
+-   Foreach Loop Container\Update Details from employer CustomerAccount | Microsoft.Pipeline  
+-   Foreach Loop Container\Write Errors to ETLProcessCounter - Step 1 | Microsoft.ScriptTask  
+-   Foreach Loop Container.EventHandlers[OnError] | EventHandler  
+-   Foreach Loop Container.EventHandlers[OnError]\Error ETL Process record | Microsoft.ScriptTask  
+-   Foreach Loop Container 1 | STOCK:FOREACHLOOP | FOREACH Microsoft.ForEachADOEnumerator ["User::FileName#0","User::FullFileName#1"] 
+-   Foreach Loop Container 1\Move file To Archive | Microsoft.FileSystemTask  
+-   Get Organization Variables | Microsoft.Pipeline  
+-   Set Files | Microsoft.ScriptTask  
+
+## Precedence
+- Foreach Loop Container -> Foreach Loop Container 1 | Success Constraint   
+- Get Organization Variables -> Set Files | Success Constraint   
+- Set Files -> Foreach Loop Container | Success ExpressionAndConstraint @[User::isFileExist]  
+- Foreach Loop Container\Create ETL Process record With File Name -> Foreach Loop Container\Update Details from employer CustomerAccount | Success Constraint   
+- Foreach Loop Container\Update Details from employer CustomerAccount -> Foreach Loop Container\Write Errors to ETLProcessCounter - Step 1 | Success Constraint   
+- Foreach Loop Container\Write Errors to ETLProcessCounter - Step 1 -> Foreach Loop Container\End ETL Process record | Success Constraint   
+
+## DataFlow Foreach Loop Container\End ETL Process record
+  - ETL Record Finish | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 2 out 0
+  - Get gen_etlprocessid | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 0 out 1
+  - Lookup | Lookup  | conn [Psql]  | in 1 out 1
+     path Lookup.Outputs[Lookup Match Output] => ETL Record Finish.Inputs[Input 0]
+     path Get gen_etlprocessid.Outputs[Output 0] => Lookup.Inputs[Lookup Input]
+
+## DataFlow Foreach Loop Container\Update Details from employer CustomerAccount
+  - Aggregate | Aggregate  | conn   | in 14 out 14
+  - Check CustomerAccount Exist | Lookup  | conn [Psql]  | in 2 out 6
+  - Convert indication fields to boolean | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 2 out 2
+  - Convert StopPaymentsReason And CompensationEligibility to Int | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 2 out 4
+  - Count Error Rows | RowCount  | conn   | in 0 out 0
+  - Count No Exist CA Rows | RowCount  | conn   | in 0 out 0
+  - Count No Need To Update Rows | RowCount  | conn   | in 0 out 0
+  - Count Pipe Rows | RowCount  | conn   | in 0 out 0
+  - Count Update Rows | RowCount  | conn   | in 0 out 0
+  - Dates Format | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 3 out 0
+  - ETL Warning | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 5 out 0
+  - ETL Warning 1 | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 4 out 0
+  - Get fund type name(product) | Lookup  | conn [Psql]  | in 1 out 1
+  - Get Source Account | Lookup  | conn [Psql]  | in 1 out 1
+  - Multicast | Multicast  | conn   | in 0 out 0
+  - no need to update | DerivedColumn  | conn   | in 0 out 0
+  - Read minhali data | FlatFileSource  | conn [Minhali Daily Source]  | in 0 out 10
+  - Set Task Name Variable | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 0 out 0
+  - Set Warning columns | DerivedColumn  | conn   | in 2 out 4
+  - Set Warning columns 1 | DerivedColumn  | conn   | in 1 out 4
+  - Trim String Fields | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 3 out 0
+  - Update Details from employer Fields CustomerAccount | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 15 out 1
+  - Updated | DerivedColumn  | conn   | in 0 out 0
+     path Aggregate.Outputs[Aggregate Output 1] => Trim String Fields.Inputs[Input 0]
+     path Set Warning columns 1.Outputs[Derived Column Output] => ETL Warning 1.Inputs[Input 0]
+     path Updated.Outputs[Derived Column Output] => Count Update Rows.Inputs[Row Count Input 1]
+     path no need to update.Outputs[Derived Column Output] => Count No Need To Update Rows.Inputs[Row Count Input 1]
+     path Set Warning columns.Outputs[Derived Column Output] => ETL Warning.Inputs[Input 0]
+     path Update Details from employer Fields CustomerAccount.Outputs[DoNotNeedToUpdate] => no need to update.Inputs[Derived Column Input]
+     path Update Details from employer Fields CustomerAccount.Outputs[Error] => Set Warning columns.Inputs[Derived Column Input]
+     path Read minhali data.Outputs[Flat File Source Output] => Set Task Name Variable.Inputs[Input 0]
+     path Get Source Account.Outputs[Lookup Match Output] => Update Details from employer Fields CustomerAccount.Inputs[Input 0]
+     path Check CustomerAccount Exist.Outputs[Lookup Match Output] => Aggregate.Inputs[Aggregate Input 1]
+     path Get fund type name(product).Outputs[Lookup Match Output] => Check CustomerAccount Exist.Inputs[Lookup Input]
+     path Check CustomerAccount Exist.Outputs[Lookup No Match Output] => Set Warning columns 1.Inputs[Derived Column Input]
+     path Multicast.Outputs[Multicast Output 1] => Count Pipe Rows.Inputs[Row Count Input 1]
+     path Multicast.Outputs[Multicast Output 3] => Get fund type name(product).Inputs[Lookup Input]
+     path Convert StopPaymentsReason And CompensationEligibility to Int.Outputs[Output 0] => Convert indication fields to boolean.Inputs[Input 0]
+     path Dates Format.Outputs[Output 0] => Convert StopPaymentsReason And CompensationEligibility to Int.Inputs[Input 0]
+     path Convert indication fields to boolean.Outputs[Output 0] => Get Source Account.Inputs[Lookup Input]
+     path ETL Warning.Outputs[Output 0] => Count Error Rows.Inputs[Row Count Input 1]
+     path Set Task Name Variable.Outputs[Output 0] => Multicast.Inputs[Multicast Input 1]
+     path ETL Warning 1.Outputs[Output 0] => Count No Exist CA Rows.Inputs[Row Count Input 1]
+     path Trim String Fields.Outputs[Output 0] => Dates Format.Inputs[Input 0]
+     path Update Details from employer Fields CustomerAccount.Outputs[Updated] => Updated.Inputs[Derived Column Input]
+
+## DataFlow Get Organization Variables
+  - Get Etl Variables | OLEDBSource  | conn [Psql]  | in 0 out 2
+  - Set Variables | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 2 out 0
+     path Get Etl Variables.Outputs[OLE DB Source Output] => Set Variables.Inputs[Input 0]
+
+## SQL statements
+- Foreach Loop Container\End ETL Process record\Lookup | Microsoft.Lookup.SqlCommand | [Psql] 
+    select p.gen_etlprocessid , case when pw.gen_etlprocessid is null then 0 else 1 end as isWarningExist from gen_etlprocess p left join (select distinct gen_etlprocessId from gen_etlprocesswarning ) as pw on p.gen_etlprocessId = pw.gen_etlprocessId
+- Foreach Loop Container\End ETL Process record\Lookup | Microsoft.Lookup.SqlCommandParam | [Psql] 
+    select * from (select p.gen_etlprocessid , case when pw.gen_etlprocessid is null then 0 else 1 end as isWarningExist from gen_etlprocess p left join (select distinct gen_etlprocessId from gen_etlprocesswarning ) as pw on p.gen_etlprocessId = pw.gen_etlprocessId) [refTable] where [refTable].[gen_etlprocessid] = ?
+- Foreach Loop Container\Update Details from employer CustomerAccount\Check CustomerAccount Exist | Microsoft.Lookup.SqlCommand | [Psql] 
+    select gen_customeraccountid, gen_customeraccount.gen_bankaccountnumber, gen_fundmain.gen_fundtypename, gen_compensationeligibility, DATEADD(hour,3, gen_stoppaymentsreportdate) as gen_stoppaymentsreportdate , gen_stoppaymentsreason, DATEADD(hour,3, gen_endemploymentdate) as gen_endemploymentdate, gen_sourceaccount from gen_customeraccount with (nolock) inner join gen_fundmain with (nolock) on gen_
+- Foreach Loop Container\Update Details from employer CustomerAccount\Check CustomerAccount Exist | Microsoft.Lookup.SqlCommandParam | [Psql] 
+    select * from (select gen_customeraccountid, gen_customeraccount.gen_bankaccountnumber, gen_fundmain.gen_fundtypename, gen_compensationeligibility, DATEADD(hour,3, gen_stoppaymentsreportdate) as gen_stoppaymentsreportdate , gen_stoppaymentsreason, DATEADD(hour,3, gen_endemploymentdate) as gen_endemploymentdate, gen_sourceaccount from gen_customeraccount with (nolock) inner join gen_fundmain with (
+- Foreach Loop Container\Update Details from employer CustomerAccount\Get fund type name(product) | Microsoft.Lookup.SqlCommand | [Psql] 
+    SELECT ProductId, ProductNumber FROM product with (nolock) join gen_banks with (nolock) on product.gen_bankname = gen_banksid where gen_banks.Gen_BankNumber = '10'
+- Foreach Loop Container\Update Details from employer CustomerAccount\Get fund type name(product) | Microsoft.Lookup.SqlCommandParam | [Psql] 
+    select * from (SELECT ProductId, ProductNumber FROM product with (nolock) join gen_banks with (nolock) on product.gen_bankname = gen_banksid where gen_banks.Gen_BankNumber = '10') [refTable] where [refTable].[ProductNumber] = ?
+- Foreach Loop Container\Update Details from employer CustomerAccount\Get Source Account | Microsoft.Lookup.SqlCommand | [Psql] 
+    select Gen_customeraccountId, right('000000000000'+Gen_bankaccountnumber, 12) Gen_bankaccountnumber from Gen_customeraccount
+- Foreach Loop Container\Update Details from employer CustomerAccount\Get Source Account | Microsoft.Lookup.SqlCommandParam | [Psql] 
+    select * from (select Gen_customeraccountId, right('000000000000'+Gen_bankaccountnumber, 12) Gen_bankaccountnumber from Gen_customeraccount) [refTable] where [refTable].[Gen_bankaccountnumber] = ?
+- Get Organization Variables\Get Etl Variables | Microsoft.OLEDBSource.SqlCommand | [Psql] 
+    select gen_key, gen_value from gen_etlvariable where (gen_scope = 'global' OR gen_scope = ?)
+
+## Code write candidates (per owner)
+- Foreach Loop Container\Create ETL Process record With File Name {"variables-write":2,"sql-command":1,"crm-entity":1,"crm-sdk-create":1}
+- Foreach Loop Container\End ETL Process record\ETL Record Finish {"sql-command":2,"crm-entity":3,"output-buffer":1,"crm-sdk-update":1}
+- Foreach Loop Container\End ETL Process record\Get gen_etlprocessid {"sql-command":2,"output-buffer":2}
+- Foreach Loop Container\Update Details from employer CustomerAccount\Convert indication fields to boolean {"sql-command":2,"output-buffer":6}
+- Foreach Loop Container\Update Details from employer CustomerAccount\Convert StopPaymentsReason And CompensationEligibility to Int {"sql-command":2,"output-buffer":5}
+- Foreach Loop Container\Update Details from employer CustomerAccount\ETL Warning {"crm-entity":3,"crm-sdk-create":1}
+- Foreach Loop Container\Update Details from employer CustomerAccount\ETL Warning 1 {"crm-entity":3,"crm-sdk-create":1}
+- Foreach Loop Container\Update Details from employer CustomerAccount\Update Details from employer Fields CustomerAccount {"crm-service":1,"sql-command":2,"crm-entity":4,"output-buffer":4,"crm-sdk-update":1}
+- Foreach Loop Container\Write Errors to ETLProcessCounter - Step 1 {"crm-entity":2,"crm-sdk-create":1,"variables-write":12}
+- Foreach Loop Container.EventHandlers[OnError]\Error ETL Process record {"crm-entity":4,"crm-sdk-update":1,"crm-sdk-create":1}
+- Get Organization Variables\Set Variables {"sql-command":2}
+- Set Files {"variables-write":3,"crm-sdk-create":1}
+
+## External refs (non-framework) CRM2015.Proxy

@@ -1,0 +1,3541 @@
+{
+ "package": "0004_LeumiFile-MY",
+ "analyst": "ssis-business-logic",
+ "source": {
+  "file": "source/DailyProcess/0004_LeumiFile-MY.dtsx",
+  "sha256": "E22BEC283D4ED4A103C1F51FD283DBC70CF958E2E932AB903F7BEE1CAC24B10C",
+  "lines": 111642
+ },
+ "scopeNote_he": "ניתוח קוד המקור (C#/VB) של רכיבי הסקריפט בלבד; ה-DLL המקומפל לא פוענח. CRM.Proxy / ExecuteMultipleExtension הם אסמבלי חיצוני (external_unknown). חיבור CRM = psql / ALTSHULER_MSCRM (מחרוזת החיבור במנהל החיבורים CRM); זהו היעד של כל פקודות ה-SQL הישירות שמסומנות Unsupported.",
+ "summary_he": "החבילה קולטת קובץ יומי מסוג MY (Minhali) של הבנק שמספרו 10 (שם החבילה: LeumiFile) מתיקייה מוגדרת, טוענת כל קובץ לטבלת Staging ‏MY_FileData, ומעדכנת לפיו את ה-CRM בשרשרת: חשבונות למעסיקים, רשומות מעסיק (gen_employers), אנשי קשר ללקוחות פרטיים, חשבונות לתאגידים/כספי פיצולים, קיבוצים, ולבסוף יצירה/עדכון של רשומות הקופה (gen_fundmain) כולל דמי ניהול מתבנית לפי יתרה מצטברת, דמי ניהול מהפקדה, חסימת הפקדות, מסלול השקעה וסוכן. אחרי כל עדכון או יצירה של קופה מסומן באיש הקשר שלה gen_loaneligibilitycalculationrequired = 1, וכשסוכן הקופה הוחלף מתעדכן gen_agentappointmentdate גם בשאר הקופות עם אותו gen_customeraccountname (שניהם ב-SQL ישיר). בתחילת הריצה נשלפים משתמש המערכת (systemuser ש-domainname שלו מסתיים ב-crmadmin), היחידה העסקית שלו, סוג הבעלים ומטבע העסקה; ערכים אלו נכתבים לקופות חדשות כבעלים, יוצר, מעדכן, יחידה עסקית ומטבע. מזהה משתמש המערכת נכתב גם כ-ModifiedBy בעדכוני ה-SQL של אנשי קשר (ContactBase) ושל חשבונות (AccountBase ב-Create Accounts For Minhali ו-Account בקישור הקיבוץ), וכ-CreatedBy/ModifiedBy ביומן gen_contactlogs. עדכוני ה-SQL של הקופות (Update gen_fundmain ו-Update gen_agentappointmentdate) אינם כותבים ModifiedBy, ולכן משתמש המערכת מגיע לקופות רק ביצירתן. חלק מהכתיבה ל-CRM נעשית דרך SDK (ExecuteMultiple לחשבונות, אנשי קשר ומעסיקים; IOrganizationService.Create בודד לכל רשומת gen_kibutz) וחלק ב-SQL ישיר על טבלאות מסד ה-CRM (Unsupported).",
+ "executionOrder": [
+  {
+   "step": 1,
+   "refId": "Package\\Get Organization Variables",
+   "title_he": "טעינת משתני ETL (מסגרת)",
+   "trigger": "start (no incoming constraint)"
+  },
+  {
+   "step": 2,
+   "refId": "Package\\Get Sytem User Id",
+   "title_he": "שליפת משתמש מערכת, יחידה עסקית, סוג בעלים ומטבע (נכתבים לרשומות CRM)",
+   "trigger": "after Get Organization Variables · Success (DTSX:101966)"
+  },
+  {
+   "step": 3,
+   "refId": "Package\\Get closer dates from CalendarRule table",
+   "title_he": "שליפת ימים לא-עסקיים מ-CalendarRule",
+   "trigger": "after Get Sytem User Id · Success (DTSX:101967)"
+  },
+  {
+   "step": 4,
+   "refId": "Package\\Set Files",
+   "title_he": "איתור קבצי MY בתיקייה",
+   "trigger": "after Get closer dates from CalendarRule table · Success (DTSX:101968)"
+  },
+  {
+   "step": 5,
+   "refId": "Package\\Foreach Loop Container",
+   "title_he": "לולאה על כל קובץ שנמצא",
+   "trigger": "after Set Files · Success AND expression @[User::isFileExist] (ExpressionAndConstraint, DTSX:101969)"
+  },
+  {
+   "step": 6,
+   "refId": "Package\\Foreach Loop Container\\Truncate MY_FileData From Staging",
+   "title_he": "ריקון Staging (מסגרת)",
+   "trigger": "first in loop (no incoming constraint)"
+  },
+  {
+   "step": 7,
+   "refId": "Package\\Foreach Loop Container\\Write MY File To Staging",
+   "title_he": "טעינת הקובץ ל-Staging",
+   "trigger": "after Truncate MY_FileData From Staging · Success (DTSX:98838)"
+  },
+  {
+   "step": 8,
+   "refId": "Package\\Foreach Loop Container\\Create ETL Process record With File Name",
+   "title_he": "רשומת תהליך ETL (מסגרת)",
+   "trigger": "after Write MY File To Staging · Success (DTSX:98837)"
+  },
+  {
+   "step": 9,
+   "refId": "Package\\Foreach Loop Container\\Create Account For Employers",
+   "title_he": "חשבונות למעסיקים",
+   "trigger": "after Create ETL Process record With File Name · Success (DTSX:98831)"
+  },
+  {
+   "step": 10,
+   "refId": "Package\\Foreach Loop Container\\Create Employers",
+   "title_he": "רשומות מעסיק",
+   "trigger": "after Create Account For Employers → Write Errors Step 1 (מסגרת) · Success (DTSX:98832, 98843)"
+  },
+  {
+   "step": 11,
+   "refId": "Package\\Foreach Loop Container\\Create Contacts For Minhali",
+   "title_he": "אנשי קשר ללקוחות פרטיים",
+   "trigger": "after Create Employers → Write Errors Step 2 (מסגרת) · Success (DTSX:98839, 98844)"
+  },
+  {
+   "step": 12,
+   "refId": "Package\\Foreach Loop Container\\Create Accounts For Minhali",
+   "title_he": "חשבונות לתאגידים/כספי פיצולים",
+   "trigger": "after Create Contacts For Minhali → Write Errors Step 3 (מסגרת) · Success (DTSX:98840, 98845)"
+  },
+  {
+   "step": 13,
+   "refId": "Package\\Foreach Loop Container\\Create Kibutz",
+   "title_he": "קיבוצים",
+   "trigger": "after Create Accounts For Minhali → Write Errors Step 4 (מסגרת) · Success (DTSX:98841, 98842)"
+  },
+  {
+   "step": 14,
+   "refId": "Package\\Foreach Loop Container\\Truncate table AggregateFunds",
+   "title_he": "ריקון טבלת עבודה AggregateFunds (מסגרת)",
+   "trigger": "after Create Kibutz · Success (DTSX:98834)"
+  },
+  {
+   "step": 15,
+   "refId": "Package\\Foreach Loop Container\\Aggregate Account Balance",
+   "title_he": "צבירת יתרות לפי חשבון וסוג מוצר",
+   "trigger": "after Truncate table AggregateFunds · Success (DTSX:98836)"
+  },
+  {
+   "step": 16,
+   "refId": "Package\\Foreach Loop Container\\Minhali daily",
+   "title_he": "יצירה/עדכון קופות (gen_fundmain)",
+   "trigger": "after Aggregate Account Balance · Success (DTSX:98835)"
+  },
+  {
+   "step": 17,
+   "refId": "Package\\Foreach Loop Container\\End ETL Process record",
+   "title_he": "סגירת תהליך ETL (מסגרת)",
+   "trigger": "after Minhali daily → Write Errors Step 5 · Success (DTSX:98846, 98833)"
+  },
+  {
+   "step": 18,
+   "refId": "Package\\Foreach Loop Container 1",
+   "title_he": "העברת קבצים לארכיון — מושבת (DISABLED)",
+   "trigger": "after Foreach Loop Container · Success (DTSX:101965); executable disabled → not executed"
+  }
+ ],
+ "ignoredAsFramework": [
+  "Package\\Get Organization Variables",
+  "Package\\Foreach Loop Container\\Truncate MY_FileData From Staging",
+  "Package\\Foreach Loop Container\\Truncate table AggregateFunds",
+  "Package\\Foreach Loop Container\\Create ETL Process record With File Name",
+  "Package\\Foreach Loop Container\\Write Errors to ETLProcessCounter - Step 1",
+  "Package\\Foreach Loop Container\\Write Errors to ETLProcessCounter - Step 2",
+  "Package\\Foreach Loop Container\\Write Errors to ETLProcessCounter - Step 3",
+  "Package\\Foreach Loop Container\\Write Errors to ETLProcessCounter - Step 4",
+  "Package\\Foreach Loop Container\\Write Errors to ETLProcessCounter - Step 5",
+  "Package\\Foreach Loop Container\\End ETL Process record",
+  "Package\\Foreach Loop Container.EventHandlers[OnError]\\Error ETL Process record",
+  "Package\\Foreach Loop Container 1\\Move file To Archive (DISABLED)",
+  "LogProvider SRS.SSIS_Logs",
+  "Package\\Foreach Loop Container\\Aggregate Account Balance\\Count Pipe Rows",
+  "Package\\Foreach Loop Container\\Aggregate Account Balance\\Set Task Name Variable",
+  "Package\\Foreach Loop Container\\Create Account For Employers\\Count Error Rows 1",
+  "Package\\Foreach Loop Container\\Create Account For Employers\\Count Filtered Rows",
+  "Package\\Foreach Loop Container\\Create Account For Employers\\Count Pipe Rows",
+  "Package\\Foreach Loop Container\\Create Account For Employers\\Count Update Rows",
+  "Package\\Foreach Loop Container\\Create Account For Employers\\Counter No Need To Update",
+  "Package\\Foreach Loop Container\\Create Account For Employers\\Created",
+  "Package\\Foreach Loop Container\\Create Account For Employers\\ETL Warning",
+  "Package\\Foreach Loop Container\\Create Account For Employers\\no need to update",
+  "Package\\Foreach Loop Container\\Create Account For Employers\\Row Insert Count",
+  "Package\\Foreach Loop Container\\Create Account For Employers\\Set CastingError columns",
+  "Package\\Foreach Loop Container\\Create Account For Employers\\Set CastingError columns 1",
+  "Package\\Foreach Loop Container\\Create Account For Employers\\Set Error columns",
+  "Package\\Foreach Loop Container\\Create Account For Employers\\Set Error columns 1",
+  "Package\\Foreach Loop Container\\Create Account For Employers\\Set Task Name Variable",
+  "Package\\Foreach Loop Container\\Create Account For Employers\\Union All 1",
+  "Package\\Foreach Loop Container\\Create Account For Employers\\Union All 2",
+  "Package\\Foreach Loop Container\\Create Account For Employers\\Updated",
+  "Package\\Foreach Loop Container\\Create Accounts For Minhali\\Count Error Rows 1",
+  "Package\\Foreach Loop Container\\Create Accounts For Minhali\\Count Filtered Rows",
+  "Package\\Foreach Loop Container\\Create Accounts For Minhali\\Count Pipe Rows",
+  "Package\\Foreach Loop Container\\Create Accounts For Minhali\\Count Update Rows",
+  "Package\\Foreach Loop Container\\Create Accounts For Minhali\\Created",
+  "Package\\Foreach Loop Container\\Create Accounts For Minhali\\Derived Column",
+  "Package\\Foreach Loop Container\\Create Accounts For Minhali\\ETL Warning",
+  "Package\\Foreach Loop Container\\Create Accounts For Minhali\\Row Insert Count",
+  "Package\\Foreach Loop Container\\Create Accounts For Minhali\\Set CastingError columns",
+  "Package\\Foreach Loop Container\\Create Accounts For Minhali\\Set Error columns",
+  "Package\\Foreach Loop Container\\Create Accounts For Minhali\\Set Task Name Variable",
+  "Package\\Foreach Loop Container\\Create Accounts For Minhali\\Union All Errors 1",
+  "Package\\Foreach Loop Container\\Create Contacts For Minhali\\Count Error Rows 1",
+  "Package\\Foreach Loop Container\\Create Contacts For Minhali\\Count Filtered Rows",
+  "Package\\Foreach Loop Container\\Create Contacts For Minhali\\Count Pipe Rows",
+  "Package\\Foreach Loop Container\\Create Contacts For Minhali\\Count Update Rows",
+  "Package\\Foreach Loop Container\\Create Contacts For Minhali\\Created",
+  "Package\\Foreach Loop Container\\Create Contacts For Minhali\\Derived Column 1",
+  "Package\\Foreach Loop Container\\Create Contacts For Minhali\\ETL Warning",
+  "Package\\Foreach Loop Container\\Create Contacts For Minhali\\Row Insert Count",
+  "Package\\Foreach Loop Container\\Create Contacts For Minhali\\Set CastingError columns",
+  "Package\\Foreach Loop Container\\Create Contacts For Minhali\\Set Error columns",
+  "Package\\Foreach Loop Container\\Create Contacts For Minhali\\Set Task Name Variable",
+  "Package\\Foreach Loop Container\\Create Contacts For Minhali\\Union All",
+  "Package\\Foreach Loop Container\\Create Contacts For Minhali\\Union All Errors 1",
+  "Package\\Foreach Loop Container\\Create Employers\\Count Error Rows 1",
+  "Package\\Foreach Loop Container\\Create Employers\\Count Filtered Rows",
+  "Package\\Foreach Loop Container\\Create Employers\\Count Pipe Rows",
+  "Package\\Foreach Loop Container\\Create Employers\\Count Update Rows",
+  "Package\\Foreach Loop Container\\Create Employers\\Created",
+  "Package\\Foreach Loop Container\\Create Employers\\ETL Warning",
+  "Package\\Foreach Loop Container\\Create Employers\\no Need To Update",
+  "Package\\Foreach Loop Container\\Create Employers\\Row Insert Count",
+  "Package\\Foreach Loop Container\\Create Employers\\Set CastingError columns",
+  "Package\\Foreach Loop Container\\Create Employers\\Set CastingError columns 1",
+  "Package\\Foreach Loop Container\\Create Employers\\Set Error columns",
+  "Package\\Foreach Loop Container\\Create Employers\\Set Error columns 1",
+  "Package\\Foreach Loop Container\\Create Employers\\Set Task Name Variable",
+  "Package\\Foreach Loop Container\\Create Employers\\Union All 1",
+  "Package\\Foreach Loop Container\\Create Employers\\UpdatedColumns",
+  "Package\\Foreach Loop Container\\Minhali daily\\Count Filtered Rows",
+  "Package\\Foreach Loop Container\\Minhali daily\\Count Pipe Rows",
+  "Package\\Foreach Loop Container\\Minhali daily\\Count Update Rows",
+  "Package\\Foreach Loop Container\\Minhali daily\\ETL Warning 1",
+  "Package\\Foreach Loop Container\\Minhali daily\\ETL Warning 1 1",
+  "Package\\Foreach Loop Container\\Minhali daily\\ETL Warning 1 2",
+  "Package\\Foreach Loop Container\\Minhali daily\\Row Insert Count",
+  "Package\\Foreach Loop Container\\Minhali daily\\Set Task Name Variable",
+  "Package\\Foreach Loop Container\\Minhali daily\\Set Warning columns 1",
+  "Package\\Foreach Loop Container\\Minhali daily\\Set Warning columns 1 1",
+  "Package\\Foreach Loop Container\\Minhali daily\\Set Warning columns 1 2"
+ ],
+ "components": [
+  {
+   "refId": "Package (control flow)",
+   "title_he": "זרימת בקרה: איתור קבצים, לוח ימים לא-עסקיים ולולאת קבצים",
+   "techName": "Get closer dates from CalendarRule table / Set Files / Foreach Loop Container",
+   "short_he": "החבילה מאתרת בתיקייה את כל הקבצים שבשמם מופיע FileName; רק אם נמצא לפחות קובץ אחד רצה לולאה שמעבדת כל קובץ בנפרד (מהישן לחדש). רשימת ימי שישי/שבת/חג מ-CalendarRule נשמרת לשימוש בחישוב ימי עסקים ב-Minhali daily.",
+   "flow_he": [
+    "הגדרות ריצה (FileName, DailyFilePath, DailyFileArchive, ServerName, OrganizationName) נקראות מ-gen_etlvariable בהיקף global / LeumiFile-MY (מסגרת).",
+    "Get closer dates from CalendarRule table: כל starttime של כללי לוח שנה בשם Friday/Saturday/Holiday נשמר כרשומות במשתנה NonWorkingDays.",
+    "Set Files: חיפוש קבצים בתבנית *FileName* בתיקייה DailyFilePath. אם נמצאו — isFileExist=true, נוצרת תיקיית ארכיון DailyFileArchive\\yyyy.MM.dd, ונבנית טבלת קבצים (FileName, FullFileName) ממוינת לפי LastWriteTime בסדר עולה.",
+    "Foreach Loop Container (ADO enumerator על User::FilesArray) רץ רק אם isFileExist=true; לכל קובץ: Staging → חשבונות מעסיקים → מעסיקים → אנשי קשר → חשבונות → קיבוצים → צבירת יתרות → קופות.",
+    "העברת הקבצים לארכיון (Foreach Loop Container 1 / Move file To Archive) מושבתת ולכן לא מתבצעת."
+   ],
+   "detail_he": [
+    {
+     "h": "מקור ואוכלוסייה",
+     "t": "קבצים בתיקייה DailyFilePath ששמם מכיל את ערך FileName מ-gen_etlvariable. כל קובץ שנמצא מעובד בנפרד באיטרציה של הלולאה; FileName מקבל באיטרציה את שם הקובץ בפועל (מיפוי Foreach index 0)."
+    },
+    {
+     "h": "החלטות",
+     "t": "שער isFileExist: אם לא נמצא אף קובץ, הלולאה לא רצה כלל (המשתנה נשאר בערך ברירת המחדל 0). סדר העיבוד: עולה לפי זמן שינוי אחרון — למרות שההערה בקוד אומרת \"desc ... to get the latest one\", כל הקבצים התואמים מעובדים, מהישן לחדש."
+    },
+    {
+     "h": "CalendarRule",
+     "t": "השאילתה: select starttime FROM CalendarRule where LTRIM(RTRIM(ISNULL(CalendarRule.Name,''))) in ('Friday','Saturday','Holiday') ORDER BY starttime DESC; התוצאה (Rowset) נקשרת ל-User::NonWorkingDays. הצרכן היחיד: הסקריפט Fields From File Or DB ב-Minhali daily (ReadOnlyVariables=User::FileName,User::NonWorkingDays), שם היא משמשת לספירת ימי עסקים (בדיקת \"יותר מ-7 ימי עסקים\")."
+    },
+    {
+     "h": "כתיבה ל-CRM",
+     "t": "אין כתיבה עסקית בשלב זה (רשומות gen_etlprocess הן מסגרת)."
+    },
+    {
+     "h": "תוצאה עסקית",
+     "t": "כל קובץ MY שנמצא נקלט במלואו; קבצים אינם מועברים לארכיון ע\"י החבילה (הרכיב מושבת)."
+    }
+   ],
+   "decisions": [
+    {
+     "where": "Precedence Set Files → Foreach Loop Container",
+     "condition": "@[User::isFileExist] (EvalOp=ExpressionAndConstraint, Value=Success)",
+     "meaning_he": "קיים לפחות קובץ אחד מתאים",
+     "outcome_he": "הלולאה רצה; אחרת החבילה מסתיימת ללא עיבוד"
+    },
+    {
+     "where": "Set Files ScriptMain.cs:56",
+     "condition": "if (files.Length > 0)",
+     "meaning_he": "נמצאו קבצים בתבנית \"*\" + FileName + \"*\"",
+     "outcome_he": "isFileExist=true, יצירת תיקיית ארכיון יומית, מילוי FilesArray"
+    },
+    {
+     "where": "Set Files ScriptMain.cs:64",
+     "condition": "Array.Sort(files, (f1, f2) => f1.LastWriteTime.CompareTo(f2.LastWriteTime));",
+     "meaning_he": "מיון עולה לפי זמן שינוי",
+     "outcome_he": "הקבצים מעובדים מהישן לחדש"
+    },
+    {
+     "where": "Package\\Get closer dates from CalendarRule table",
+     "condition": "LTRIM(RTRIM(ISNULL(CalendarRule.Name,''))) in ('Friday','Saturday','Holiday')",
+     "meaning_he": "ימים לא-עסקיים",
+     "outcome_he": "נשמרים ב-NonWorkingDays לשימוש בבדיקת 7 ימי עסקים"
+    }
+   ],
+   "crmEffects": [
+    {
+     "entity": "calendarrule",
+     "verb": "read",
+     "mechanism": "SQL (SELECT)",
+     "when_he": "פעם אחת בתחילת הריצה"
+    }
+   ],
+   "evidence": [
+    "DTSX:101969 precedence Set Files→Foreach (ExpressionAndConstraint @[User::isFileExist])",
+    "DTSX:99383-99388 Get closer dates from CalendarRule table (SqlStatementSource, ResultBinding → User::NonWorkingDays)",
+    "DTSX:101439 Set Files; code ScriptMain.cs @DTSX:101589 lines 48-79",
+    "DTSX:527-530 Foreach Loop Container (ForEachADOEnumerator, VarName=User::FilesArray); mappings DTSX:99357-99358",
+    "DTSX:99361, 99370 Foreach Loop Container 1 / Move file To Archive — disabled",
+    "DTSX:100222 Set Variables ReadWriteVariables=User::DailyFileArchive,User::DailyFilePath,User::FileName,User::OrganizationName,User::ServerName",
+    "DTSX:66697 Fields From File Or DB ReadOnlyVariables=User::FileName,User::NonWorkingDays"
+   ],
+   "openQuestions_he": [
+    "מכיוון שהעברה לארכיון מושבתת — האם תהליך חיצוני מוחק/מעביר את הקבצים? אחרת אותו קובץ עלול להיקלט שוב בריצה הבאה (השערה; לא ניתן להוכיח מהחבילה).",
+    "ערכי gen_etlvariable (FileName, DailyFilePath) אינם בחבילה — לא ידוע."
+   ],
+   "short": {
+    "nodes": [
+     {
+      "type": "step",
+      "text": "בתחילת הריצה נשלפת מלוח השנה של ה-CRM רשימת ימי שישי, שבת וחגים, לצורך חישוב ימי עסקים בהמשך."
+     },
+     {
+      "type": "step",
+      "text": "המערכת מחפשת בתיקיית הקליטה את קבצי ה-MY היומיים לפי שם הקובץ המוגדר."
+     },
+     {
+      "type": "decision",
+      "text": "האם נמצא לפחות קובץ אחד?",
+      "branches": [
+       {
+        "label": "כן",
+        "nodes": [
+         {
+          "type": "step",
+          "text": "כל קובץ שנמצא נקלט בנפרד, מהישן לחדש, בשרשרת קבועה: מעסיקים, אנשי קשר, חשבונות, קיבוצים, צבירת יתרות ולבסוף הקופות."
+         }
+        ]
+       },
+       {
+        "label": "לא",
+        "nodes": [
+         {
+          "type": "end",
+          "text": "הריצה מסתיימת ללא קליטה וללא שינוי ב-CRM."
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "type": "end",
+      "text": "כל קבצי ה-MY שנמצאו נקלטו; התהליך אינו מעביר אותם לארכיון."
+     }
+    ]
+   },
+   "detailed": {
+    "nodes": [
+     {
+      "type": "step",
+      "text": "הגדרות הריצה — שם הקובץ, תיקיית הקליטה, תיקיית הארכיון ושרת ה-CRM — נטענות מטבלת ההגדרות של ה-CRM.",
+      "tech": "Get Organization Variables (מסגרת): gen_etlvariable where gen_scope = 'global' OR 'LeumiFile-MY' → User::FileName, DailyFilePath, DailyFileArchive, ServerName, OrganizationName",
+      "evidence": "DTSX:100222"
+     },
+     {
+      "type": "step",
+      "text": "נשלפים מה-CRM משתמש המערכת (המשתמש שה-domainname שלו מסתיים ב-crmadmin), היחידה העסקית שלו, סוג הבעלים שלו ומזהה המטבע ששמו \"שקל חדש\". ערכים אלה נכתבים בהמשך ל-CRM: כבעלים, יוצר, מעדכן, יחידה עסקית ומטבע של קופות חדשות; כ-ModifiedBy בעדכוני ה-SQL של אנשי קשר, של חשבונות (Create Accounts For Minhali) ושל קישור הקיבוץ לחשבון; וביומן gen_contactlogs – משתמש המערכת כ-CreatedBy, ModifiedBy ו-OwnerId, וסוג הבעלים והיחידה העסקית כ-OwnerIdType ו-OwningBusinessUnit.",
+      "tech": "Get Sytem User Id: select systemuserid, BusinessUnitId from systemuser where lower(domainname) LIKE '%crmadmin' → Lookups OwnerBase (OwnerId = systemuserid → OwnerIdType), TransactionCurrency (CurrencyName = \"שקל חדש\" → TransactionCurrencyId), OrganizationBase → Set Varibales PostExecute → User::UserId, User::SystemUserId, User::BusinessUnitId, User::BusinessUnitIdStr, User::OwnerIdType, User::TransactionCurrencyId; precedence Get Organization Variables → Get Sytem User Id → Get closer dates (Success)",
+      "evidence": "DTSX:100252-100465 (Get User Id 1 SQL DTSX:100430-100433; Get Owner Type DTSX:100315; Get Transaction Currency id DTSX:100370; System User Domain Name DTSX:101395-101407); Set Varibales ReadWriteVariables DTSX:101367, main.cs:105-140; precedence DTSX:101966-101967"
+     },
+     {
+      "type": "step",
+      "text": "נשלפים מלוח השנה של ה-CRM כל המועדים המסומנים כשישי, שבת או חג, ונשמרים לחישוב ימי עסקים בשלב הקופות.",
+      "tech": "Get closer dates from CalendarRule table: select starttime FROM CalendarRule where LTRIM(RTRIM(ISNULL(CalendarRule.Name,''))) in ('Friday','Saturday','Holiday') → User::NonWorkingDays (Rowset)",
+      "evidence": "DTSX:99383-99388"
+     },
+     {
+      "type": "step",
+      "text": "המערכת מחפשת בתיקיית הקליטה את כל הקבצים ששמם מכיל את שם הקובץ המוגדר.",
+      "tech": "Set Files: new DirectoryInfo(DailyFilePath).GetFiles(\"*\" + FileName + \"*\")",
+      "evidence": "Set Files ScriptMain.cs:48-54 @DTSX:101589"
+     },
+     {
+      "type": "decision",
+      "text": "האם נמצא לפחות קובץ אחד?",
+      "tech": "files.Length > 0 → isFileExist = true; precedence Set Files → Foreach: Success AND @[User::isFileExist]",
+      "branches": [
+       {
+        "label": "כן",
+        "nodes": [
+         {
+          "type": "step",
+          "text": "נוצרת תיקיית ארכיון בשם תאריך היום, ונבנית רשימת הקבצים ממוינת לפי זמן השינוי האחרון מהישן לחדש.",
+          "tech": "DailyFileArchive\\yyyy.MM.dd; Array.Sort(... f1.LastWriteTime.CompareTo(f2.LastWriteTime)) — ascending, although the code comment says \"desc\"",
+          "evidence": "Set Files ScriptMain.cs:58-76"
+         },
+         {
+          "type": "step",
+          "text": "לכל קובץ ברשימה מורצת שרשרת הקליטה המלאה, קובץ אחר קובץ.",
+          "tech": "Foreach Loop Container (ForEachADOEnumerator on User::FilesArray → User::FileName, User::FullFileName)",
+          "evidence": "DTSX:527-530, 99357-99358"
+         }
+        ]
+       },
+       {
+        "label": "לא",
+        "nodes": [
+         {
+          "type": "end",
+          "text": "הריצה מסתיימת ללא קליטה וללא שינוי ב-CRM."
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "type": "step",
+      "text": "בכל קובץ, תוכן הקובץ נטען תחילה לטבלת ביניים.",
+      "tech": "Truncate MY_FileData From Staging → Write MY File To Staging",
+      "evidence": "DTSX:98838"
+     },
+     {
+      "type": "step",
+      "text": "לאחר מכן נוצרים או מתעדכנים חשבונות למעסיקים, ואחריהם רשומות המעסיקים.",
+      "tech": "Create Account For Employers → Write Errors Step 1 (מסגרת) → Create Employers",
+      "evidence": "DTSX:98831, 98832, 98843"
+     },
+     {
+      "type": "step",
+      "text": "לאחר מכן נוצרים או מתעדכנים אנשי קשר ללקוחות פרטיים, ואחריהם חשבונות לתאגידים ולכספי פיצולים.",
+      "tech": "Create Contacts For Minhali → Step 3 → Create Accounts For Minhali",
+      "evidence": "DTSX:98839, 98844, 98840, 98845"
+     },
+     {
+      "type": "step",
+      "text": "לאחר מכן נוצרים קיבוצים חדשים ומקושרים לחשבונות שלהם.",
+      "tech": "Step 4 → Create Kibutz",
+      "evidence": "DTSX:98841, 98842"
+     },
+     {
+      "type": "step",
+      "text": "לבסוף מחושבת יתרה מצטברת לכל חשבון בנק וסוג מוצר, ואחר כך נוצרות ומתעדכנות הקופות. היתרה המצטברת משמשת רק לבחירת מדרגת דמי הניהול מהתבנית; ההחלטה אם ליצור או לעדכן קופה נקבעת לפי איתור הקופה ב-CRM.",
+      "tech": "Create Kibutz → Truncate table AggregateFunds → Aggregate Account Balance → Minhali daily",
+      "evidence": "DTSX:98834, 98836, 98835"
+     },
+     {
+      "type": "step",
+      "text": "כל שלב מתחיל רק אם השלב שלפניו הסתיים בהצלחה, ולכן כשל בשלב מוקדם עוצר את המשך הקליטה של אותו קובץ.",
+      "tech": "all inner precedence constraints: Success Constraint",
+      "evidence": "DTSX:98831-98846"
+     },
+     {
+      "type": "step",
+      "text": "העברת הקבצים לארכיון קיימת בתהליך אך מושבתת, ולכן הקבצים נשארים בתיקיית הקליטה.",
+      "tech": "Foreach Loop Container 1 / Move file To Archive — DTS:Disabled",
+      "evidence": "DTSX:99361, 99370"
+     },
+     {
+      "type": "end",
+      "text": "כל קבצי ה-MY שנמצאו נקלטו לפי הסדר; אם קובץ שכבר נקלט יוסר מהתיקייה תלוי בתהליך חיצוני שאינו בחבילה (השערה)."
+     }
+    ]
+   }
+  },
+  {
+   "refId": "Package\\Foreach Loop Container\\Write MY File To Staging",
+   "title_he": "טעינת קובץ MY ל-Staging",
+   "techName": "Write MY File To Staging",
+   "short_he": "קובץ ה-MY (ragged-right, קידוד 1255, 303 עמודות, ללא כותרת) נטען לטבלה dbo.MY_FileData ב-GENERIX_STAGING (psrs) ללא שינוי ערכים; 302 עמודות נטענות, והעמודה Filler87 אינה ממופה.",
+   "flow_he": [
+    "Read minhali data (FlatFileSource, ConnectionString=@[User::FullFileName]) → Insert To MY_FileData (OLE DB Destination, fast load)"
+   ],
+   "detail_he": [
+    {
+     "h": "תוצאה עסקית",
+     "t": "כל שורות הקובץ (כולל שורות שמתחילות ב-@, שבשלבים הבאים מנותבות לפלט בשם Last row) זמינות לזרימות הבאות; אין כתיבה ל-CRM."
+    }
+   ],
+   "decisions": [],
+   "crmEffects": [],
+   "evidence": [
+    "DTSX:96032 data flow; DTSX:96037-96045 Insert To MY_FileData (OpenRowset [dbo].[MY_FileData], AccessMode=3); connection Minhali Daily Source: RaggedRight, cp1255, 303 columns, expression ConnectionString=@[User::FullFileName]"
+   ],
+   "openQuestions_he": [],
+   "short": {
+    "nodes": [
+     {
+      "type": "step",
+      "text": "קובץ ה-MY נקרא כמו שהוא, על כל שדותיו."
+     },
+     {
+      "type": "step",
+      "text": "כל שורות הקובץ נשמרות בטבלת ביניים לשימוש השלבים הבאים."
+     },
+     {
+      "type": "end",
+      "text": "הנתונים מוכנים לעיבוד; בשלב זה אין שינוי ב-CRM."
+     }
+    ]
+   },
+   "detailed": {
+    "nodes": [
+     {
+      "type": "step",
+      "text": "טבלת הביניים מרוקנת לפני הטעינה, כך שהיא מכילה רק את הקובץ הנוכחי.",
+      "tech": "Truncate MY_FileData From Staging (מסגרת)",
+      "evidence": "DTSX:93610"
+     },
+     {
+      "type": "step",
+      "text": "הקובץ נקרא כקובץ ברוחב שדות קבוע בקידוד עברית, ללא שורת כותרת.",
+      "tech": "Minhali Daily Source: RaggedRight, cp1255, 303 columns, ConnectionString = @[User::FullFileName]"
+     },
+     {
+      "type": "step",
+      "text": "302 מתוך 303 השדות של הקובץ נטענים ללא סינון וללא כללים עסקיים; השדה Filler87 נקרא מהקובץ אך אינו ממופה לטבלה.",
+      "tech": "Read minhali data (FlatFileSource, 303 output columns) → Insert To MY_FileData (OLE DB Destination, fast load, 302 input columns; Filler87 not mapped)",
+      "evidence": "DTSX:96037-96045"
+     },
+     {
+      "type": "step",
+      "text": "גם השורות שמתחילות ב-@ נטענות לטבלה. בכל אחד מהשלבים הבאים הן מנותבות לפלט בשם Last row שאינו מחובר, ולכן אינן מעובדות.",
+      "tech": "first character of Revaluation_Date_1 (CheckLastRow in some flows) == \"@\" → output \"Last row\" (\"Last Row\" in Create Kibutz), unconnected, in each later data flow (DTSX:615, 4139, 15052, 23653, 37010, 48440, 59970); no file states what these rows mean"
+     },
+     {
+      "type": "step",
+      "text": "היעד הוא טבלת ביניים בשרת ה-Staging ולא ה-CRM.",
+      "tech": "GENERIX_STAGING.dbo.MY_FileData (connection PSRS_GENERIX_STAGING = psrs)"
+     },
+     {
+      "type": "end",
+      "text": "טבלת הביניים מכילה את תוכן הקובץ הנוכחי בלבד, מוכן לשלבי הקליטה."
+     }
+    ]
+   }
+  },
+  {
+   "refId": "Package\\Foreach Loop Container\\Create Account For Employers",
+   "title_he": "חשבונות (Account) למעסיקים — כספי פיצולים",
+   "techName": "Create Account For Employers",
+   "short_he": "לשורות שמזוהות כ\"מעסיקים-כספי פיצולים\" נוצר/מתעדכן חשבון Account לפי מספר החשבון (ת\"ז/ח\"פ הלקוח, ואם הוא 0 — מספר המעסיק). חשבון שב-CRM יש לפחות קופה אחת (gen_fundmain, בכל statecode) עם gen_existinfile = 1 ו-gen_accountname = החשבון, כפי שהן בזמן שלב זה, אינו מתעדכן.",
+   "flow_he": [
+    "Trim לכל שדות הטקסט (\"\" → NULL); השמטת שורות שמתחילות ב-@ (פלט בשם Last row); התנאי: Revaluation_Date_1 מתחיל ב-\"@\".",
+    "Lookups למוצר / סניף / מעמד מעסיק — IgnoreFailure ותוצאותיהם אינן נכתבות ל-CRM (ללא השפעה עסקית).",
+    "ריפוד באפסים מובילים (והסרת \".\") ל-accountnumber (Customer_Id_Number_6), Employer_Number_38, Bank_Account_Number_27.",
+    "סינון אוכלוסייה \"מעסיקים-כספי פיצולים\"; שאר השורות (יציאת \"פרטי\") נזרקות.",
+    "בניית שם (שם משפחה + \" \" + שם פרטי), כתובת (רחוב + שכונה), מס' בניין/דירה.",
+    "accountnumber=0 → Employer_Number_38; שם ריק → Employer_Name_39.",
+    "לקוח לא מזוהה (accountnumber ∈ {0,1,18}) → name = \"לקוח לא ידוע\" (ממשיך לעיבוד).",
+    "ביטול כפילויות לפי accountnumber (הראשון נשמר); פירמוט תאריכים yyyyMMdd → yyyy/MM/dd.",
+    "Lookup לחשבון פעיל לפי accountnumber + דגל accountsWithFunds.",
+    "לא נמצא → יצירת Account (SDK). נמצא ויש לו ב-CRM קופה עם gen_existinfile = 1 (בכל statecode) → ללא עדכון. נמצא וללא קופה כזו → השוואה שדה-שדה ועדכון רק של מה שהשתנה (SDK)."
+   ],
+   "detail_he": [
+    {
+     "h": "מקור ואוכלוסייה",
+     "t": "dbo.MY_FileData; רק שורות שעונות על התנאי ((Sector_Code_17 == \"0210\" || Bank_Account_Number_27 == 0) && Employer_Type_41 > 0 && Employer_Agreement_Number_35 > 0)."
+    },
+    {
+     "h": "התאמה לרשומות קיימות",
+     "t": "account פעיל (statecode = 0) לפי accountnumber = accountnumber מהקובץ (אחרי ריפוד/החלפה). ה-Lookup מחזיר גם accountsWithFunds = 1 אם קיימת gen_fundmain עם gen_existinfile = 1 ו-gen_accountname = החשבון."
+    },
+    {
+     "h": "החלטות",
+     "t": "לא נמצא → יצירה. נמצא + accountsWithFunds == 1 → אין עדכון (נספר כ\"לא נדרש עדכון\"). נמצא + accountsWithFunds == 0 (אין קופה כזו) → עדכון רק אם אחד השדות name, gen_address1_city, gen_address1_buildingid, gen_returnedmailcount, address1_line1, address1_postalcode, gen_customerdateofbirth שונה מה-DB (תאריך: הפרש ≥ 12 שעות; מיקוד ריק ב-DB נקרא כ-'0000000' (DTSX:4173), ולכן מיקוד ריק בקובץ מול מיקוד ריק ב-DB נחשב שונה – ואז, אם קריאת ערך חסר זורקת חריגה (לפי התנהגות SSIS המתועדת, לא מוצג בקבצים), החשבון אינו מתעדכן, ואם היא מחזירה null נשלח עדכון עם מיקוד ריק ו-gen_modifiedbybank); אחרת DontNeedToUpdate. עדכון fax/telephone1/telephone2/accountnumber מנוטרל בהערות בקוד."
+    },
+    {
+     "h": "כתיבה ל-CRM",
+     "t": "Create account דרך ExecuteMultiple (מנות של 1000): name, accountnumber, emailaddress1, fax, telephone1/2, gen_customerdateofbirth, gen_returnedmailcount, gen_address1_buildingid, gen_address1_city, address1_line1, address1_postalcode + קבועים gen_essentialaccount=true, gen_isoperate=true, gen_inputsource=1, address1_addresstypecode=1, address1_name=\"ראשי\". Update account דרך ExecuteMultiple (מנות של 100) לשדות שהשתנו + gen_modifiedbybank=DateTime.Now."
+    },
+    {
+     "h": "תוצאה עסקית",
+     "t": "לכל מעסיק בכספי פיצולים בקובץ קיים חשבון ב-CRM. חשבון קיים מתעדכן מהקובץ (רק בשדות שהשתנו), אלא אם בזמן שלב זה יש ב-CRM לפחות gen_fundmain אחת (בכל statecode) עם gen_existinfile = 1 ו-gen_accountname = החשבון; הבדיקה היא מול ה-CRM, לא מול הקופות שבקובץ הנוכחי."
+    }
+   ],
+   "decisions": [
+    {
+     "where": "Check for last row",
+     "condition": "SUBSTRING(Revaluation_Date_1,1,1) == \"@\"",
+     "meaning_he": "שורות שמתחילות ב-@ (פלט בשם Last row)",
+     "outcome_he": "יציאת Last row לא מחוברת → השורה נזרקת"
+    },
+    {
+     "where": "Check for employer funds",
+     "condition": "((Sector_Code_17 == \"0210\" || (DT_I8)Bank_Account_Number_27 == 0)) && (DT_I4)Employer_Type_41 > 0 && (DT_I4)Employer_Agreement_Number_35 > 0",
+     "meaning_he": "מעסיקים-כספי פיצולים",
+     "outcome_he": "ממשיך; ברירת המחדל \"פרטי\" לא מחוברת → נזרקת"
+    },
+    {
+     "where": "merge customer id number and corporate number",
+     "condition": "accountnumber = (DT_I8)accountnumber == 0 ? Employer_Number_38 : accountnumber ; name = TRIM(name) == \"\" || ISNULL(name) ? Employer_Name_39 : name",
+     "meaning_he": "כשאין ת\"ז לקוח — מספר המעסיק משמש כמספר החשבון; כשאין שם — שם המעסיק",
+     "outcome_he": "מפתח ההתאמה והשם שנכתבים ל-Account"
+    },
+    {
+     "where": "Check if customer id number",
+     "condition": "(((DT_I8)accountnumber) == 0) || (((DT_I8)accountnumber) == 1) || (((DT_I8)accountnumber) == 18)",
+     "meaning_he": "לקוח לא מזוהה",
+     "outcome_he": "Set unknwon customer data: name = \"לקוח לא ידוע\" (מספר החשבון לא מוחלף); ממשיך לאיחוד"
+    },
+    {
+     "where": "remove duplicates account main.cs:113",
+     "condition": "if (accountNumbers.Contains(Row.accountnumber)) Row.DirectRowToDuplicate();",
+     "meaning_he": "כפילות מספר חשבון בקובץ",
+     "outcome_he": "רק המופע הראשון נשמר; יציאת Duplicate לא מחוברת"
+    },
+    {
+     "where": "Check if account exists (Lookup, NoMatchBehavior=1)",
+     "condition": "account.accountnumber = accountnumber AND statecode = 0",
+     "meaning_he": "קיים חשבון פעיל",
+     "outcome_he": "Match → בדיקת קופות; No Match → Create Account"
+    },
+    {
+     "where": "Remove accounts with funds",
+     "condition": "accountsWithFunds == 1",
+     "meaning_he": "לחשבון יש gen_fundmain עם gen_existinfile = 1",
+     "outcome_he": "\"Account has funds\" → ללא עדכון; \"Account without funds\" → Update Account"
+    },
+    {
+     "where": "Update Account main.cs:135-221 + Extensions.cs:10-67",
+     "condition": "Extensions.CheckIfToUpdate(ref Row, \"<file>\", \"<db>\", type) — string: String.Equals; int: ==; DateTime: Math.Abs((d1 - d2).TotalHours) < 12; null≠value",
+     "meaning_he": "\"אין צורך בעדכון\" כשאין שום הבדל",
+     "outcome_he": "needToUpdate=false → Row.DirectRowToDontNeedToUpdate()"
+    }
+   ],
+   "crmEffects": [
+    {
+     "entity": "account",
+     "verb": "create",
+     "mechanism": "SDK (ExecuteMultiple Create)",
+     "when_he": "מספר החשבון לא נמצא בין החשבונות הפעילים"
+    },
+    {
+     "entity": "account",
+     "verb": "update",
+     "mechanism": "SDK (ExecuteMultiple Update)",
+     "when_he": "חשבון פעיל נמצא, אין gen_fundmain (בכל statecode) עם gen_existinfile = 1 שמצביעה עליו (accountsWithFunds = 0), ולפחות שדה אחד מהשדות הנבדקים שונה"
+    }
+   ],
+   "evidence": [
+    "DTSX:3255 data flow",
+    "DTSX:4129-4147 Check for last row (Last row unconnected)",
+    "DTSX:4093-4114 Check for employer funds (פרטי default unconnected)",
+    "DTSX:7372-7570 Lookups Get bank branch Id / Get Employer Number Estate / Get fund type name(product): NoMatchBehavior=0 + Lookup Match Output errorRowDisposition=\"IgnoreFailure\" (DTSX:7417, 7484, 7555); outputs not consumed by any writer",
+    "DTSX:3261 Add 0 to short id num main.cs:47-53 (PadLeft with \"0\", remove \".\")",
+    "DTSX:5747-5775 Create Additional Columns; DTSX:7582-7608 merge customer id number and corporate number",
+    "DTSX:4326-4344 Check if customer id number; DTSX:9507-9511 Set unknwon customer data",
+    "DTSX:7889 remove duplicates account main.cs:111-122 @DTSX:7891",
+    "DTSX:4162-4218 Check if account exists (SqlCommand incl. accountsWithFunds, NoMatchBehavior=1)",
+    "DTSX:7856-7874 Remove accounts with funds",
+    "DTSX:4434 Create Account main.cs:125-221 @DTSX:4436",
+    "DTSX:12239 Update Account main.cs:124-277 @DTSX:12241; Extensions.cs"
+   ],
+   "openQuestions_he": [
+    "מדוע חשבון שיש לו קופות (gen_existinfile=1) לא מתעדכן מזרימת המעסיקים? השערה: חשבונות אלו מתוחזקים ע\"י Create Accounts For Minhali.",
+    "משמעות הקודים Sector_Code_17=\"0210\" ו-Employer_Type_41 — לא ידוע מהחבילה."
+   ],
+   "short": {
+    "nodes": [
+     {
+      "type": "step",
+      "text": "מתוך הקובץ נבחרות רק שורות של מעסיקים בכספי פיצולים."
+     },
+     {
+      "type": "step",
+      "text": "לכל מעסיק נקבע מספר חשבון — מספר הזיהוי של הלקוח, ואם הוא חסר מספר המעסיק — ולקוח ללא זיהוי מקבל את השם \"לקוח לא ידוע\"."
+     },
+     {
+      "type": "decision",
+      "text": "האם קיים כבר ב-CRM חשבון פעיל עם מספר זה?",
+      "branches": [
+       {
+        "label": "לא",
+        "nodes": [
+         {
+          "type": "write",
+          "text": "נוצר חשבון חדש עם שם, מספר חשבון, פרטי קשר וכתובת."
+         }
+        ]
+       },
+       {
+        "label": "כן, ויש לו ב-CRM קופה המסומנת \"קיימת בקובץ\"",
+        "nodes": [
+         {
+          "type": "step",
+          "text": "החשבון אינו מתעדכן."
+         }
+        ]
+       },
+       {
+        "label": "כן, ואין לו קופה כזו",
+        "nodes": [
+         {
+          "type": "write",
+          "text": "מתעדכנים רק השדות שהשתנו: שם, כתובת, דואר חוזר ותאריך לידה."
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "type": "end",
+      "text": "לכל מעסיק בכספי פיצולים קיים חשבון ב-CRM."
+     }
+    ]
+   },
+   "detailed": {
+    "nodes": [
+     {
+      "type": "step",
+      "text": "השורות נקראות מטבלת הביניים, רווחים מיותרים מוסרים ושדה ריק נחשב חסר.",
+      "tech": "Read MY Data From Staging → Trim String Fields (\"\" → NULL)"
+     },
+     {
+      "type": "decision",
+      "text": "האם השורה מתחילה ב-@ (פלט בשם Last row)?",
+      "tech": "SUBSTRING(Revaluation_Date_1,1,1) == \"@\"  (Check for last row; output \"Last row\" unconnected)",
+      "branches": [
+       {
+        "label": "כן",
+        "nodes": [
+         {
+          "type": "step",
+          "text": "השורה מושמטת ואינה מעובדת."
+         }
+        ]
+       },
+       {
+        "label": "לא",
+        "nodes": [
+         {
+          "type": "step",
+          "text": "השורה ממשיכה לעיבוד."
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "type": "step",
+      "text": "מוצר, סניף בנק ומעמד מעסיק נשלפים מה-CRM, אך התוצאות אינן נכתבות ואינן מסננות שורות.",
+      "tech": "Get fund type name(product) / Get bank branch Id / Get Employer Number Estate: NoMatchBehavior=0 + errorRowDisposition=\"IgnoreFailure\"; outputs not consumed by any writer",
+      "evidence": "DTSX:7417, 7484, 7555"
+     },
+     {
+      "type": "step",
+      "text": "מספר הזיהוי, מספר המעסיק ומספר חשבון הבנק מרופדים באפסים מובילים לאורך קבוע. אם קריאת ערך חסר זורקת חריגה (לפי התנהגות SSIS המתועדת, לא מוצג בקבצים), ערך חסר באחד השדות האלה מכשיל את הרכיב והזרימה נעצרת; אם היא מחזירה null, ערך חסר הופך למחרוזת אפסים.",
+      "tech": "Add 0 to short id num: PadLeft(fieldSize,'0'), \".\" removed (accountnumber, Employer_Number_38, Bank_Account_Number_27)",
+      "evidence": "main.cs:47-53 @DTSX:3263"
+     },
+     {
+      "type": "decision",
+      "text": "האם השורה שייכת למעסיקים בכספי פיצולים?",
+      "tech": "Check for employer funds: ((Sector_Code_17 == \"0210\" || (DT_I8)Bank_Account_Number_27 == 0)) && (DT_I4)Employer_Type_41 > 0 && (DT_I4)Employer_Agreement_Number_35 > 0",
+      "branches": [
+       {
+        "label": "מעסיקים-כספי פיצולים",
+        "nodes": [
+         {
+          "type": "step",
+          "text": "השורה ממשיכה לעיבוד."
+         }
+        ]
+       },
+       {
+        "label": "פרטי",
+        "nodes": [
+         {
+          "type": "step",
+          "text": "השורה אינה מטופלת בשלב זה.",
+          "tech": "default output \"פרטי\" unconnected"
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "type": "step",
+      "text": "נבנים שם החשבון משם המשפחה והשם הפרטי, שורת הכתובת מרחוב ושכונה, ומספר הבניין יחד עם הדירה.",
+      "tech": "Create Additional Columns: name, address1_line1; gen_address1_buildingid = building + \"/\" + apartment (wstr(10), truncation = FailComponent)",
+      "evidence": "DTSX:5747-5775"
+     },
+     {
+      "type": "step",
+      "text": "אם אין ללקוח מספר זיהוי, מספר המעסיק משמש כמספר החשבון; אם אין שם, שם המעסיק משמש כשם החשבון.",
+      "tech": "accountnumber = (DT_I8)accountnumber == 0 ? Employer_Number_38 : accountnumber ; name = TRIM(name) == \"\" || ISNULL(name) ? Employer_Name_39 : name",
+      "evidence": "DTSX:7586-7592"
+     },
+     {
+      "type": "decision",
+      "text": "האם הלקוח אינו מזוהה?",
+      "tech": "Check if customer id number: (DT_I8)accountnumber ∈ {0, 1, 18}",
+      "branches": [
+       {
+        "label": "לקוח לא מזוהה",
+        "nodes": [
+         {
+          "type": "step",
+          "text": "שם החשבון נקבע ל\"לקוח לא ידוע\", ומספר החשבון נשאר כפי שהוא.",
+          "tech": "Set unknwon customer data: name = \"לקוח לא ידוע\"",
+          "evidence": "DTSX:9511"
+         }
+        ]
+       },
+       {
+        "label": "מזוהה",
+        "nodes": [
+         {
+          "type": "step",
+          "text": "השם שחושב נשאר."
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "type": "step",
+      "text": "מספר חשבון שמופיע כמה פעמים בקובץ מטופל פעם אחת בלבד, לפי המופע הראשון.",
+      "tech": "remove duplicates account (HashSet on accountnumber; Duplicate output unconnected)",
+      "evidence": "main.cs:111-122 @DTSX:7891"
+     },
+     {
+      "type": "step",
+      "text": "תאריכים מומרים לתאריך תקין; תאריך לא תקין או לפני 1900 נחשב חסר. אם קריאת ערך חסר זורקת חריגה (לפי התנהגות SSIS המתועדת, לא מוצג בקבצים), תאריך חסר מכשיל את הרכיב והזרימה נעצרת; אם היא מחזירה null, התאריך נשאר חסר.",
+      "tech": "Format Dates: yyyyMMdd → yyyy/MM/dd, yyyyMM → yyyy/MM/01"
+     },
+     {
+      "type": "decision",
+      "text": "האם קיים ב-CRM חשבון פעיל עם אותו מספר חשבון?",
+      "tech": "Check if account exists: account WHERE statecode = 0 AND accountnumber = accountnumber (NoMatchBehavior=1)",
+      "branches": [
+       {
+        "label": "לא קיים",
+        "nodes": [
+         {
+          "type": "write",
+          "text": "נוצר חשבון חדש עם שם, מספר חשבון, דוא\"ל, טלפונים, פקס, תאריך לידה, מספר דברי דואר חוזרים וכתובת ראשית, ומסומן כחשבון חיוני ופעיל, עם gen_inputsource = 1.",
+          "tech": "account · create · SDK (ExecuteMultiple, batches of 1000); gen_essentialaccount=true, gen_isoperate=true, gen_inputsource=1, address1_addresstypecode=1, address1_name=\"ראשי\""
+         }
+        ]
+       },
+       {
+        "label": "קיים",
+        "nodes": [
+         {
+          "type": "decision",
+          "text": "האם ב-CRM יש לחשבון לפחות קופה אחת (בכל סטטוס) עם gen_existinfile = 1, כפי שהקופות עומדות ב-CRM בזמן שלב זה?",
+          "tech": "accountsWithFunds == 1 (gen_fundmain with gen_existinfile = 1 and gen_accountname = accountid)",
+          "branches": [
+           {
+            "label": "יש קופות",
+            "nodes": [
+             {
+              "type": "step",
+              "text": "החשבון אינו מתעדכן מזרימת המעסיקים.",
+              "tech": "\"Account has funds\" → no-update counter"
+             }
+            ]
+           },
+           {
+            "label": "אין קופות",
+            "nodes": [
+             {
+              "type": "decision",
+              "text": "האם אחד השדות בקובץ שונה מהערך שב-CRM?",
+              "tech": "Extensions.CheckIfToUpdate on name, gen_address1_city, gen_address1_buildingid, gen_returnedmailcount, address1_line1, address1_postalcode, gen_customerdateofbirth (dates: ≥ 12h difference; NULL vs value = change); address1_postalcode_db = isnull(Address1_PostalCode,'0000000') (DTSX:4173) – so an empty file zip against an empty CRM zip counts as a change",
+              "branches": [
+               {
+                "label": "כן",
+                "nodes": [
+                 {
+                  "type": "write",
+                  "text": "מתעדכנים רק השדות שהשתנו ותאריך העדכון מהבנק. תאריך לידה ריק בקובץ מוחק במפורש את הערך הקיים. בשאר השדות הקוד מעתיק את ערך הקובץ בלי לבדוק אם הוא ריק. לכן כשהערך בקובץ ריק וב-CRM יש ערך: אם קריאת ערך חסר זורקת חריגה (לפי התנהגות SSIS המתועדת, לא מוצג בקבצים), השורה עוברת לאזהרת קליטה והחשבון אינו מתעדכן כלל; אם היא מחזירה null, השדה ב-CRM מתרוקן. כך גם במיקוד כשהוא ריק גם בקובץ וגם ב-CRM: מיקוד ריק ב-CRM נקרא כ-\"0000000\" ולכן נחשב שונה, והתוצאה תלויה באותה התנהגות – החשבון אינו מתעדכן, או שנשלח עדכון עם מיקוד ריק ותאריך העדכון מהבנק גם אם אף ערך אחר לא השתנה. פקס, טלפונים ומספר החשבון אינם מתעדכנים.",
+                  "tech": "account · update · SDK (ExecuteMultiple, batches of 100); gen_modifiedbybank = DateTime.Now; gen_customerdateofbirth: else = null (main.cs:201-204); other fields: account[...] = Row.<col> without _IsNull check (main.cs:135-176); catch → CastingError (main.cs:224-233); fax/telephone1/telephone2/accountnumber commented out"
+                 }
+                ]
+               },
+               {
+                "label": "לא",
+                "nodes": [
+                 {
+                  "type": "step",
+                  "text": "אין צורך בעדכון והחשבון נשאר כמו שהוא.",
+                  "tech": "DirectRowToDontNeedToUpdate"
+                 }
+                ]
+               }
+              ]
+             }
+            ]
+           }
+          ]
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "type": "end",
+      "text": "לכל מעסיק בכספי פיצולים קיים חשבון ב-CRM. חשבון קיים שבזמן שלב זה יש לו ב-CRM לפחות קופה אחת (בכל סטטוס) עם gen_existinfile = 1 נשאר ללא שינוי. הבדיקה נעשית מול ה-CRM לפני שלב הקופות של אותו קובץ ואינה בודקת את הקופות שבקובץ הנוכחי, ולכן חשבון שקופתו מופיעה בקובץ לראשונה (ואין לו קופה כזו ב-CRM) מתעדכן כאשר אחד השדות הנבדקים השתנה."
+     }
+    ]
+   }
+  },
+  {
+   "refId": "Package\\Foreach Loop Container\\Create Employers",
+   "title_he": "רשומות מעסיק (gen_employers)",
+   "techName": "Create Employers",
+   "short_he": "לכל מעסיק בכספי פיצולים נוצרת/מתעדכנת רשומת gen_employers לפי מספר הסכם מעסיק + מוצר, בתנאי שהמוצר והחשבון התאגידי קיימים ב-CRM.",
+   "flow_he": [
+    "Trim; השמטת שורות שמתחילות ב-@ (פלט בשם Last row); סינון \"מעסיקים-כספי פיצולים\" (אותו תנאי כמו בחשבונות המעסיקים).",
+    "Lookup מוצר לפי Fund_Type_Number_21 (בנק 10) — לא נמצא → השורה נזרקת.",
+    "ריפוד באפסים: Customer_Id_Number_6, gen_bankaccountnumber, gen_employernumber, Employer_Number_38.",
+    "Lookups (IgnoreFailure): סניף בנק, מעמד מעסיק (Employer_Agreement_Segment_176), קוד מעמד קופה (Sector_Code_17).",
+    "Gen_CorporateNumber = Customer_Id_Number_6, ואם 0 — Employer_Number_38.",
+    "ביטול כפילויות לפי מספר מעסיק + מוצר (פעמיים).",
+    "חשבון תאגידי פעיל לפי Gen_CorporateNumber חייב להימצא — אחרת השורה נזרקת.",
+    "Lookup מעסיק קיים לפי (gen_employernumber, gen_fundtypename) בבנק 10 → עדכון; לא קיים → יצירה (SDK)."
+   ],
+   "detail_he": [
+    {
+     "h": "מקור ואוכלוסייה",
+     "t": "MY_FileData, אחרי השמטת שורות שמתחילות ב-@ (SUBSTRING(Revaluation_Date_1,1,1) == \"@\"; יציאת Last row לא מחוברת). שורות \"מעסיקים-כספי פיצולים\": ((Sector_Code_17 == \"0210\" || gen_bankaccountnumber == 0) && Employer_Type_41 > 0 && gen_employernumber > 0), כאשר gen_bankaccountnumber=Bank_Account_Number_27 ו-gen_employernumber=Employer_Agreement_Number_35. כפילויות של gen_employernumber + המוצר (gen_fundtypename) מושמטות ונשמר המופע הראשון (remove duplicates corporate number לפני בדיקת החשבון התאגידי ו-remove duplicate employer אחריה, באותו מפתח; יציאות Duplicate לא מחוברות)."
+    },
+    {
+     "h": "התאמה לרשומות קיימות",
+     "t": "gen_employers פעיל בבנק 10 לפי Gen_EmployerNumber = Employer_Agreement_Number_35 וגם gen_fundtypename = ProductId (המוצר שנמצא לפי Fund_Type_Number_21). חשבון תאגידי: account פעיל לפי accountnumber = Gen_CorporateNumber."
+    },
+    {
+     "h": "החלטות",
+     "t": "שורה שמתחילה ב-@ → נזרקת. מוצר לא נמצא → נזרק. כפילות מעסיק + מוצר → נזרקת (המופע הראשון נשמר). חשבון תאגידי לא נמצא → נזרק (יציאת No Match לא מחוברת). מעסיק לא קיים → Create; קיים → Update רק לשדות שהשתנו; אם אין שינוי → DontNeedToUpdate."
+    },
+    {
+     "h": "כתיבה ל-CRM",
+     "t": "Create gen_employers (ExecuteMultiple, מנות 1000): gen_existinfile=true, gen_inputsource=1, gen_bankid=\"10\", gen_modifiedbybank=Now, שם, מס' מעסיק, מס' תאגיד, טלפון, פקס, כתובת, פעיל/לא, מספר עובדים פעילים (gen_activecustomernumber מ-Employer_Agreement_Active_Employees_Number_43, כשאינו NULL), תאריכי הקמה והפקדה אחרונה, והפניות ל-gen_banks, gen_estatecodeid (פעמיים: gen_employernumberestate ו-gen_estatecodetype), account (gen_corporatename — רק כאשר gen_activecustomernumber, כלומר Employer_Agreement_Active_Employees_Number_43, אינו NULL), product, gen_bankbranch (כשנמצא). Update gen_employers (ExecuteMultiple): gen_existinfile=true אם היה false/NULL, ושדות שהשתנו: gen_employername, gen_corporatenumber, gen_address1_telephone1, gen_activecustomernumber, gen_employernumberestate, gen_corporatename, gen_branchname, gen_isactiveemplyer, gen_creationdate; gen_modifiedbybank=Now רק כשיש עדכון."
+    },
+    {
+     "h": "תוצאה עסקית",
+     "t": "נוצרות רשומות מעסיק חדשות. ברשומות קיימות נכתבים רק השדות הנבדקים שהשתנו (מתוך תשעה), gen_existinfile=true אם היה false או NULL, ו-gen_modifiedbybank=Now בכל עדכון שנשלח; שאר השדות של מעסיק קיים אינם מתעדכנים, ומעסיקים שאינם בקובץ אינם משתנים (gen_existinfile אינו מאופס כאן)."
+    }
+   ],
+   "decisions": [
+    {
+     "where": "Check for last row",
+     "condition": "SUBSTRING(Revaluation_Date_1,1,1) == \"@\"",
+     "meaning_he": "שורות שמתחילות ב-@ (פלט בשם Last row)",
+     "outcome_he": "נזרקת"
+    },
+    {
+     "where": "Check for employer funds 1",
+     "condition": "((Sector_Code_17 == \"0210\" || (DT_I8)gen_bankaccountnumber == 0)) && (DT_I4)Employer_Type_41 > 0 && (DT_I4)gen_employernumber > 0",
+     "meaning_he": "מעסיקים-כספי פיצולים",
+     "outcome_he": "ממשיך; \"פרטי\" (ברירת מחדל) לא מחובר → נזרק"
+    },
+    {
+     "where": "Get fund type name(product) (NoMatchBehavior=1)",
+     "condition": "product.Gen_ProductTypeId = Fund_Type_Number_21 AND Gen_ProductTypeId = productnumber AND gen_banknumber = 10",
+     "meaning_he": "המוצר קיים",
+     "outcome_he": "No Match → Derived Column שיציאתו לא מחוברת → נזרק"
+    },
+    {
+     "where": "merge customer id number and corporate number",
+     "condition": "Gen_CorporateNumber = (DT_I8)Customer_Id_Number_6 == 0 ? Employer_Number_38 : Customer_Id_Number_6",
+     "meaning_he": "מספר התאגיד",
+     "outcome_he": "מפתח לחשבון התאגידי ונכתב ל-gen_corporatenumber"
+    },
+    {
+     "where": "remove duplicates corporate number main.cs:113 / remove duplicate employer main.cs:117",
+     "condition": "key = genemployernumber + genfundtypename (שני הרכיבים)",
+     "meaning_he": "כפילות מעסיק+מוצר",
+     "outcome_he": "רק הראשון נשמר (למרות שם הרכיב, המפתח אינו מספר התאגיד)"
+    },
+    {
+     "where": "Check if account exists (NoMatchBehavior=1)",
+     "condition": "account.accountnumber = Gen_CorporateNumber AND statecode = 0",
+     "meaning_he": "חשבון התאגיד קיים",
+     "outcome_he": "No Match לא מחובר → נזרק; Match → gen_corporatename = accountid"
+    },
+    {
+     "where": "Check if employer number exists (NoMatchBehavior=1)",
+     "condition": "Gen_EmployerNumber = gen_employernumber AND gen_fundtypename = gen_fundtypename AND StateCode = 0 AND Gen_BankNumber = '10'",
+     "meaning_he": "המעסיק קיים",
+     "outcome_he": "Match → Update Employer; No Match → Create Employer"
+    },
+    {
+     "where": "set bank id value",
+     "condition": "gen_address1_line1 = ISNULL(Address_Street_98) && Address_Street_98 != \"\" ? Address_Street_98 + \" \" + Address_Neighborhood_103 : Address_Neighborhood_103",
+     "meaning_he": "כתובת המעסיק",
+     "outcome_he": "כשהרחוב לא NULL → רק השכונה; כשהרחוב NULL → התנאי NULL והתוצאה NULL. הרחוב לעולם לא נכלל (ראה ממצא)"
+    },
+    {
+     "where": "Create Employer main.cs:181",
+     "condition": "if (!Row.genactivecustomernumber_IsNull) employer[\"gen_corporatename\"] = new EntityReference(\"account\", Row.gencorporatename);",
+     "meaning_he": "קישור לחשבון התאגיד",
+     "outcome_he": "נכתב רק כשמספר העובדים הפעילים אינו NULL"
+    },
+    {
+     "where": "Update Employer main.cs:136",
+     "condition": "if (Row.genexistinfiledb_IsNull || Row.genexistinfiledb == false) employer[\"gen_existinfile\"] = true;",
+     "meaning_he": "סימון \"קיים בקובץ\"",
+     "outcome_he": "מצריך עדכון"
+    },
+    {
+     "where": "Update Employer + Helpers.cs CheckIfToUpdate",
+     "condition": "string: String.Equals; Guid: Guid.Equals; bool: \"1\"/\"true\"; DateTime: <12 שעות",
+     "meaning_he": "\"אין צורך בעדכון\"",
+     "outcome_he": "DontNeedToUpdate כשאין הבדל"
+    }
+   ],
+   "crmEffects": [
+    {
+     "entity": "gen_employers",
+     "verb": "create",
+     "mechanism": "SDK (ExecuteMultiple Create)",
+     "when_he": "מעסיק+מוצר לא קיים, מוצר וחשבון תאגידי נמצאו"
+    },
+    {
+     "entity": "gen_employers",
+     "verb": "update",
+     "mechanism": "SDK (ExecuteMultiple Update)",
+     "when_he": "מעסיק+מוצר קיים ולפחות שדה אחד שונה / gen_existinfile לא true"
+    }
+   ],
+   "evidence": [
+    "DTSX:36086 data flow",
+    "DTSX:36964-36985 Check for employer funds 1; DTSX:37000-37018 Check for last row",
+    "DTSX:40767-40834 Get fund type name(product) NoMatchBehavior=1 → Derived Column (DTSX:38951, output unconnected)",
+    "DTSX:40613, 40678, 40745 Lookup Match Output errorRowDisposition=\"IgnoreFailure\" (bank branch, employer number estate, fund estate code)",
+    "DTSX:40846-40859 merge customer id number and corporate number",
+    "remove duplicates corporate number main.cs:111-123 @DTSX:41832; remove duplicate employer main.cs:115-124 @DTSX:41102",
+    "DTSX:37033-37086 Check if account exists; DTSX:37098-37236 Check if employer number exists",
+    "DTSX:42575-42594 set bank id value (gen_bankidNumber=\"10\", gen_address1_line1)",
+    "DTSX:37308 Create Employer main.cs:124-221 @DTSX:37310",
+    "DTSX:45271 Update Employer main.cs:124-239 @DTSX:45273; Helpers.cs",
+    "DTSX:42804-42808 Set inputsource for update employers (result not used by Update Employer code)"
+   ],
+   "openQuestions_he": [
+    "Get fund estate code (Sector_Code_17 → gen_estatetypename) מחושב ומועבר ל-Create Employer אך לא נכתב לשום שדה; gen_estatecodetype נכתב מאותו ערך כמו gen_employernumberestate. האם זו כוונה?",
+    "Set inputsource for update employers מחשב gen_inputsourcedb (1/4/5) אך Update Employer אינו כותב gen_inputsource — האם חסר עדכון?"
+   ],
+   "short": {
+    "nodes": [
+     {
+      "type": "step",
+      "text": "נבחרות שורות המעסיקים בכספי פיצולים שהמוצר שלהן קיים ב-CRM."
+     },
+     {
+      "type": "decision",
+      "text": "האם קיים ב-CRM חשבון פעיל לתאגיד של המעסיק?",
+      "branches": [
+       {
+        "label": "לא",
+        "nodes": [
+         {
+          "type": "step",
+          "text": "המעסיק אינו נקלט."
+         }
+        ]
+       },
+       {
+        "label": "כן",
+        "nodes": [
+         {
+          "type": "step",
+          "text": "המעסיק ממשיך לבדיקה הבאה."
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "type": "decision",
+      "text": "האם רשומת המעסיק כבר קיימת עבור אותו מוצר?",
+      "branches": [
+       {
+        "label": "לא",
+        "nodes": [
+         {
+          "type": "write",
+          "text": "נוצרת רשומת מעסיק חדשה, מקושרת למוצר, לסניף אם נמצא, ולחשבון התאגיד רק כאשר בקובץ יש מספר עובדים פעילים."
+         }
+        ]
+       },
+       {
+        "label": "כן",
+        "nodes": [
+         {
+          "type": "write",
+          "text": "מתעדכנים רק תשעה שדות שנבדקים מול ה-CRM כשהם שונים: שם, מספר תאגיד, טלפון, מספר עובדים פעילים, מעמד, חשבון תאגיד, סניף, סטטוס פעילות ותאריך הקמה; הרשומה מסומנת כקיימת בקובץ אם לא סומנה, ונרשם תאריך העדכון מהבנק. פקס, כתובת, תאריך הפקדה אחרונה, מוצר ובנק אינם מתעדכנים."
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "type": "end",
+      "text": "נוצרות רשומות מעסיק חדשות, ורשומות קיימות מקבלות רק את השדות הנבדקים שהשתנו, את סימון הקיום בקובץ כשחסר, ואת תאריך העדכון מהבנק. מעסיקים שאינם בקובץ אינם משתנים, ושורות בלי מוצר או בלי חשבון תאגיד אינן נקלטות."
+     }
+    ]
+   },
+   "detailed": {
+    "nodes": [
+     {
+      "type": "step",
+      "text": "השורות נקראות מטבלת הביניים ורווחים מיותרים מוסרים.",
+      "tech": "Read MY Data From Staging → Trim String Fields"
+     },
+     {
+      "type": "decision",
+      "text": "האם השורה מתחילה ב-@ (פלט בשם Last row)?",
+      "tech": "SUBSTRING(Revaluation_Date_1,1,1) == \"@\"  (Check for last row; output \"Last row\" unconnected)",
+      "branches": [
+       {
+        "label": "כן",
+        "nodes": [
+         {
+          "type": "step",
+          "text": "השורה מושמטת ואינה מעובדת."
+         }
+        ]
+       },
+       {
+        "label": "לא",
+        "nodes": [
+         {
+          "type": "step",
+          "text": "השורה ממשיכה לעיבוד."
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "type": "decision",
+      "text": "האם השורה שייכת למעסיקים בכספי פיצולים?",
+      "tech": "Check for employer funds 1: ((Sector_Code_17 == \"0210\" || (DT_I8)gen_bankaccountnumber == 0)) && (DT_I4)Employer_Type_41 > 0 && (DT_I4)gen_employernumber > 0",
+      "branches": [
+       {
+        "label": "מעסיקים-כספי פיצולים",
+        "nodes": [
+         {
+          "type": "step",
+          "text": "השורה ממשיכה לעיבוד."
+         }
+        ]
+       },
+       {
+        "label": "פרטי",
+        "nodes": [
+         {
+          "type": "step",
+          "text": "השורה אינה מטופלת בשלב זה.",
+          "tech": "default output unconnected"
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "type": "decision",
+      "text": "האם המוצר של הקופה קיים ב-CRM?",
+      "tech": "Get fund type name(product): product.Gen_ProductTypeId = Fund_Type_Number_21 AND Gen_ProductTypeId = productnumber AND gen_banknumber = 10 (NoMatchBehavior=1)",
+      "branches": [
+       {
+        "label": "לא",
+        "nodes": [
+         {
+          "type": "step",
+          "text": "השורה מושמטת בשקט, ללא אזהרה.",
+          "tech": "No Match → Derived Column whose output is unconnected"
+         }
+        ]
+       },
+       {
+        "label": "כן",
+        "nodes": [
+         {
+          "type": "step",
+          "text": "המוצר והבנק שלו נשמרים לקישור."
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "type": "step",
+      "text": "מספר הזיהוי, מספר חשבון הבנק, מספר ההסכם ומספר המעסיק מרופדים באפסים מובילים.",
+      "tech": "Add 0 to short id num"
+     },
+     {
+      "type": "step",
+      "text": "נשלפים סניף הבנק, מעמד המעסיק וקוד מעמד הקופה; כשאין התאמה הערך נשאר ריק והשורה ממשיכה.",
+      "tech": "Get bank branch Id / Get Employer Number Estate / Get fund estate code — IgnoreFailure; gen_estatetypename is never written",
+      "evidence": "DTSX:40613, 40678, 40745"
+     },
+     {
+      "type": "step",
+      "text": "מספר התאגיד נקבע כמספר הזיהוי של הלקוח, ואם הוא 0 — כמספר המעסיק.",
+      "tech": "Gen_CorporateNumber = (DT_I8)Customer_Id_Number_6 == 0 ? Employer_Number_38 : Customer_Id_Number_6",
+      "evidence": "DTSX:40859"
+     },
+     {
+      "type": "step",
+      "text": "כפילויות של אותו מעסיק עם אותו מוצר מוסרות, והמופע הראשון נשמר.",
+      "tech": "remove duplicates corporate number + remove duplicate employer (both key = gen_employernumber + gen_fundtypename)"
+     },
+     {
+      "type": "decision",
+      "text": "האם קיים ב-CRM חשבון פעיל עם מספר התאגיד?",
+      "tech": "Check if account exists: account WHERE statecode = 0 AND accountnumber = Gen_CorporateNumber (NoMatchBehavior=1)",
+      "branches": [
+       {
+        "label": "לא",
+        "nodes": [
+         {
+          "type": "step",
+          "text": "המעסיק מושמט בשקט, ללא אזהרה.",
+          "tech": "No Match output unconnected"
+         }
+        ]
+       },
+       {
+        "label": "כן",
+        "nodes": [
+         {
+          "type": "step",
+          "text": "החשבון נשמר כחשבון התאגיד של המעסיק.",
+          "tech": "gen_corporatename = accountid"
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "type": "step",
+      "text": "תאריך הקמת ההסכם ותאריך ההפקדה האחרונה מומרים לתאריך תקין.",
+      "tech": "Format Dates"
+     },
+     {
+      "type": "decision",
+      "text": "האם קיימת רשומת מעסיק פעילה עם אותו מספר הסכם ואותו מוצר?",
+      "tech": "Check if employer number exists: Gen_employers WHERE StateCode = 0 AND Gen_BankNumber = '10' AND Gen_EmployerNumber = gen_employernumber AND gen_fundtypename = gen_fundtypename",
+      "branches": [
+       {
+        "label": "לא קיימת",
+        "nodes": [
+         {
+          "type": "step",
+          "text": "שורת הכתובת של המעסיק נבנית כך שהיא כוללת רק את השכונה, ואם הרחוב חסר היא ריקה; הרחוב אינו נכתב לעולם (ראה ממצא).",
+          "tech": "set bank id value: ISNULL(Address_Street_98) && Address_Street_98 != \"\" ? street + \" \" + neighborhood : Address_Neighborhood_103",
+          "evidence": "DTSX:42594"
+         },
+         {
+          "type": "write",
+          "text": "נוצרת רשומת מעסיק חדשה עם שם, מספרי מעסיק ותאגיד, טלפון, פקס, כתובת, סטטוס פעילות, מספר עובדים פעילים, תאריכי הקמה והפקדה אחרונה, וקישורים לבנק, למעמד, למוצר ולסניף (כשנמצא); היא מסומנת כקיימת בקובץ, עם gen_inputsource = 1 ותאריך העדכון מהבנק (gen_modifiedbybank) = הזמן הנוכחי.",
+          "tech": "gen_employers · create · SDK (ExecuteMultiple, batches of 1000); gen_existinfile=true, gen_inputsource=1, gen_bankid=\"10\", gen_modifiedbybank=DateTime.Now (main.cs:200)"
+         },
+         {
+          "type": "step",
+          "text": "הקישור לחשבון התאגיד נכתב רק כאשר בקובץ מופיע מספר עובדים פעילים.",
+          "tech": "if (!Row.genactivecustomernumber_IsNull) employer[\"gen_corporatename\"] = ...",
+          "evidence": "Create Employer main.cs:181 @DTSX:37310"
+         }
+        ]
+       },
+       {
+        "label": "קיימת",
+        "nodes": [
+         {
+          "type": "decision",
+          "text": "האם יש שינוי לעומת ה-CRM, או שהרשומה עדיין לא סומנה כקיימת בקובץ?",
+          "tech": "Helpers.CheckIfToUpdate on gen_employername, gen_corporatenumber, gen_address1_telephone1, gen_activecustomernumber, gen_employernumberestate, gen_corporatename, gen_branchname, gen_isactiveemplyer, gen_creationdate; or gen_existinfile NULL/false",
+          "branches": [
+           {
+            "label": "כן",
+            "nodes": [
+             {
+              "type": "write",
+              "text": "מתעדכנים רק השדות שהשתנו, הרשומה מסומנת כקיימת בקובץ ונרשם תאריך עדכון מהבנק. מקור הקליטה אינו מתעדכן. בשדות הטקסט שם, מספר תאגיד, טלפון ומספר עובדים פעילים הקוד מעתיק את ערך הקובץ בלי לבדוק אם הוא ריק. לכן כשהערך בקובץ ריק וב-CRM יש ערך: אם קריאת ערך חסר זורקת חריגה (לפי התנהגות SSIS המתועדת, לא מוצג בקבצים), השורה עוברת לאזהרת קליטה והמעסיק כולו אינו מתעדכן, כולל סימון הקיום בקובץ; אם היא מחזירה null, השדה ב-CRM מתרוקן.",
+              "tech": "gen_employers · update · SDK (ExecuteMultiple); gen_modifiedbybank = DateTime.Now; string fields assigned without _IsNull check: main.cs:144 (gen_employername), 151 (gen_corporatenumber), 158 (gen_address1_telephone1), 165 (gen_activecustomernumber); catch → CastingError (main.cs:229-238)"
+             },
+             {
+              "type": "step",
+              "text": "סטטוס הפעילות: בהשוואה, ערך הקובץ נחשב true רק אם הוא \"1\". אם הוא שונה מה-CRM ובקובץ יש ערך, ההמרה Convert.ToBoolean של ערך הקובץ (טקסט בן תו אחד) נכשלת תמיד (לפי התנהגות .NET המתועדת היא מקבלת רק True/False), השורה עוברת לאזהרת קליטה והמעסיק כולו אינו מתעדכן. אם בקובץ אין ערך וב-CRM יש ערך: אם קריאת ערך חסר זורקת חריגה (לפי התנהגות SSIS המתועדת, לא מוצג בקבצים), התוצאה זהה; אם היא מחזירה null, ההמרה מחזירה false והמעסיק מתעדכן עם סטטוס פעילות false.",
+              "tech": "Update Employer main.cs:200-203 Convert.ToBoolean(Row.genisactiveemplyer), input wstr(1) (DTSX:47019); Helpers.cs:46-55 bool compare (\"1\"/\"true\"); exception → CastingError (main.cs:229-238); Convert.ToBoolean((string)null) = false"
+             }
+            ]
+           },
+           {
+            "label": "לא",
+            "nodes": [
+             {
+              "type": "step",
+              "text": "אין צורך בעדכון והרשומה נשארת כמו שהיא.",
+              "tech": "DirectRowToDontNeedToUpdate"
+             }
+            ]
+           }
+          ]
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "type": "end",
+      "text": "נוצרות רשומות מעסיק חדשות. ברשומה קיימת נשלח עדכון רק כשאחד מתשעת השדות הנבדקים השתנה או שהרשומה אינה מסומנת כקיימת בקובץ (NULL או false). העדכון כותב את השדות הנבדקים שהשתנו, את סימון הקיום בקובץ (כשהיה NULL או false) ואת תאריך העדכון מהבנק; פקס, כתובת, תאריך הפקדה אחרונה, מוצר, בנק ומקור הקליטה אינם מתעדכנים. ביצירה, הקישור לחשבון התאגיד נכתב רק כשבקובץ יש מספר עובדים פעילים, והקישור לסניף רק אם הסניף נמצא. מעסיקים שאינם בקובץ אינם משתנים, ומעסיקים בלי מוצר או בלי חשבון תאגיד אינם נקלטים."
+     }
+    ]
+   }
+  },
+  {
+   "refId": "Package\\Foreach Loop Container\\Create Contacts For Minhali",
+   "title_he": "אנשי קשר (Contact) ללקוחות פרטיים",
+   "techName": "Create Contacts For Minhali",
+   "short_he": "לקוחות פרטיים (רמת שורה 1) נוצרים כ-Contact או מתעדכנים לפי ת\"ז. ביצירה נייד ודוא\"ל נכתבים כשהם קיימים בקובץ; בעדכון הם נכתבים רק כאשר gen_recordsorce = 1 והשדה ב-CRM ריק. רשומת יומן gen_contactlogs נכתבת כאשר gen_recordsorce = 1 והנייד או הדוא\"ל (אחרי ההשלמה) שונים מה-CRM, גם אם ערוץ הדיוור המחושב זהה לקיים. נתיב היומן מותנה: הוא קורה רק כשהנייד או הדוא\"ל הושלמו מהקובץ (הערך ב-CRM ריק), וההשוואה קוראת את ערך ה-CRM הריק בלי בדיקה. אם קריאת ערך חסר זורקת חריגה (לפי התנהגות SSIS המתועדת, לא מוצג בקבצים), הרכיב נכשל והזרימה נעצרת; אם היא מחזירה null, היומן נרשם כמתואר.",
+   "flow_he": [
+    "Trim; השמטת שורות שמתחילות ב-@ (פלט בשם Last row); התנאי: CheckLastRow מתחיל ב-\"@\".",
+    "סיווג לקוח: רק יציאת \"פרטי\" (ברירת מחדל) ממשיכה, ורק כש-Row_Level_147 == \"1\".",
+    "\"Add 0\" — גוף הסקריפט בהערות, ללא השפעה. ביטול כפילויות לפי gen_identitynumber.",
+    "לקוח לא מזוהה (ת\"ז ∈ {0,1,18}) → שם משפחה \"לקוח\", שם פרטי \"לא ידוע\", ת\"ז \"000000000\", ללא תאריך לידה.",
+    "פירמוט תאריכים; שדות מחושבים: fullname, gen_isoperate=TRUE, gen_leumi=TRUE, gendercode (1/2 בלבד), address1_line1, address1_name=\"ראשי\", בניין/דירה (עד 10 תווים).",
+    "זיהוי נייד: טלפון שאחרי הסרת \"-\" אורכו 10 תווים ומתחיל ב-\"05\", ללא בדיקה שהתווים ספרות (telephone1 ואז telephone2), עובר ל-MobilePhone והטלפונים מוזזים; דוא\"ל לא תקין לפי Regex → NULL.",
+    "Lookup איש קשר פעיל לפי gen_identitynumber.",
+    "לא נמצא → Create Contact (SDK, מנות של 10).",
+    "נמצא → חישוב ערכי נייד/דוא\"ל מתוקנים, העדפת ערוץ, UPDATE ישיר ל-ContactBase ול-CustomerAddressBase, ואם isUpdateCustomerPreference = true (gen_recordsorce = 1 והנייד או הדוא\"ל שונים מה-CRM) → INSERT ל-gen_contactlogsbase, גם כשההעדפה המחושבת זהה לקיימת. נתיב ההעדפה והיומן מותנה בהתנהגות קריאת ערך ה-CRM הריק בהשוואה (ראה החלטות)."
+   ],
+   "detail_he": [
+    {
+     "h": "מקור ואוכלוסייה",
+     "t": "שורות שלא נתפסו בתנאי \"estate type 210\", \"חברה-כספי פיצולים-מרכזית פיצויים\" או \"Other Customer\" (סדר הערכה 0→2) — כלומר סוג ת\"ז 1/5/6 שאינם תאגיד/פיצולים — וגם Row_Level_147 == \"1\"."
+    },
+    {
+     "h": "התאמה לרשומות קיימות",
+     "t": "contact עם statecode = 0 לפי gen_identitynumber (ללא סינון gen_leumi)."
+    },
+    {
+     "h": "החלטות",
+     "t": "יצירה מול עדכון לפי ה-Lookup; בעדכון אין השוואה — כל איש קשר שנמצא מתעדכן ב-SQL. ב-UPDATE: emailaddress1/mobilephone נכתבים רק אם gen_recordsorce = 1 וגם השדה ב-DB ריק; gen_identitynumber/telephone1/telephone2/fax רק אם gen_recordsorce = 1. העדפת ערוץ: דוא\"ל תקין+נייד תקין → 1 (דואר אלקטרוני); רק נייד → 2 (טלפון נייד); אחרת → 3 (דואר ישראל); סטטוס שידור = 2 \"ממתין לשליחה\" אם יש gen_bankcustomeridnumber, אחרת 1 \"לא נדרש\"."
+    },
+    {
+     "h": "כתיבה ל-CRM",
+     "t": "Create contact (SDK): gendercode, gen_inputsource=1, gen_isoperate, gen_leumi, emailaddress1 (+gen_emailaddress1sourcelastupdate=3, gen_emailaddress1lastupdatedate=Now), gen_identitynumber, שמות, טלפונים, mobilephone (+source=3, תאריך), fax, gen_bankcustomeridnumber, כתובת, gen_postalcode=Mailbox_78, תאריכי לידה/פטירה/הנפקת ת\"ז, gen_modifiedbybank=Now. Update ב-SQL ישיר: ContactBase (gendercode, gen_inputsource=1, gen_isoperate=1, gen_leumi=1, שמות, gen_bankcustomeridnumber, כתובת, תאריכים, gen_modifiedbybank/ModifiedOn=GETDATE(), ModifiedBy, gen_postalcode, שדות נייד/דוא\"ל/העדפה) ו-CustomerAddressBase (postalcode, line1, ו-name רק כאשר הפרמטר recordsource = 1). INSERT ל-gen_contactlogsbase עם gen_processname=4."
+    },
+    {
+     "h": "תוצאה עסקית",
+     "t": "כל לקוח פרטי בקובץ קיים כאיש קשר פעיל המסומן gen_leumi=1 ו-gen_isoperate=1; פרטי ההתקשרות נשלטים ע\"י הקובץ רק כאשר מקור הרשומה (gen_recordsorce) הוא 1."
+    }
+   ],
+   "decisions": [
+    {
+     "where": "Check for last row",
+     "condition": "SUBSTRING(CheckLastRow,1,1) == \"@\"",
+     "meaning_he": "שורות שמתחילות ב-@ (פלט בשם Last row)",
+     "outcome_he": "נזרקת"
+    },
+    {
+     "where": "Check customer type (order 0)",
+     "condition": "(Sector_Code_17 == \"0210\" && (DT_I4)Employer_Agreement_Number_35 != 0)",
+     "meaning_he": "estate type 210 (שם היציאה; משמעות הקוד 0210 אינה מוגדרת בקבצים)",
+     "outcome_he": "יציאה לא מחוברת → נזרק"
+    },
+    {
+     "where": "Check customer type (order 1)",
+     "condition": "(Gen_CustomerIdType_STR_INT == \"7\" && Sector_Code_17 != \"0210\") || (Sector_Code_17 == \"0210\" && (DT_I4)Employer_Agreement_Number_35 == 0) || Sector_Code_17 == \"0775\"",
+     "meaning_he": "חברה-כספי פיצולים-מרכזית פיצויים",
+     "outcome_he": "לא מחובר כאן → נזרק. מטופל ב-Create Accounts For Minhali רק כש-Row_Level_147 == \"3\"; ברמה אחרת אינו מטופל באף אחד משני השלבים"
+    },
+    {
+     "where": "Check customer type (order 2)",
+     "condition": "ISNULL(Gen_CustomerIdType_STR_INT) || (Gen_CustomerIdType_STR_INT != \"1\" && Gen_CustomerIdType_STR_INT != \"5\" && Gen_CustomerIdType_STR_INT != \"6\")",
+     "meaning_he": "Other Customer",
+     "outcome_he": "לא מחובר → נזרק"
+    },
+    {
+     "where": "Check customer type (default)",
+     "condition": "פרטי",
+     "meaning_he": "לקוח פרטי",
+     "outcome_he": "→ Is Contact"
+    },
+    {
+     "where": "Is Contact",
+     "condition": "Row_Level_147 == \"1\"",
+     "meaning_he": "רמת שורה 1",
+     "outcome_he": "IsContact ממשיך; ברירת מחדל לא מחוברת → נזרק"
+    },
+    {
+     "where": "Remove Duplicate main.cs:114",
+     "condition": "if (contacts.Contains(Row.genidentitynumber)) Row.DirectRowToDuplicate();",
+     "meaning_he": "ת\"ז כפולה בקובץ",
+     "outcome_he": "רק הראשון נשמר"
+    },
+    {
+     "where": "Check if customer id number",
+     "condition": "(((DT_I8)gen_identitynumber) == 0) || (((DT_I8)gen_identitynumber) == 1) || (((DT_I8)gen_identitynumber) == 18)",
+     "meaning_he": "לקוח לא מזוהה",
+     "outcome_he": "lastname=\"לקוח\", firstname=\"לא ידוע\", gen_identitynumber=\"000000000\", Gen_Customerdateofbirth=NULL"
+    },
+    {
+     "where": "Set MobilePhone End EmailAddress1 main.cs:54-86",
+     "condition": "MobilePhone.Length == 10 && MobilePhone.Substring(0, 2) == \"05\" (telephone1 ואז telephone2, אחרי הסרת \"-\")",
+     "meaning_he": "זיהוי טלפון נייד",
+     "outcome_he": "הנייד ל-MobilePhone; הטלפון האחר עובר ל-telephone1/telephone2 בהתאם"
+    },
+    {
+     "where": "Set MobilePhone End EmailAddress1 main.cs:38-49",
+     "condition": "^(?:[a-z0-9_-]+(?:\\.[a-z0-9_-]+)*|)@([\\w\\-]+)((\\.(\\w){2,3})+)$",
+     "meaning_he": "דוא\"ל תקין",
+     "outcome_he": "לא תקין → emailaddress1 = NULL"
+    },
+    {
+     "where": "Check if contact exists (NoMatchBehavior=1)",
+     "condition": "contact.gen_identitynumber = gen_identitynumber AND statecode = 0",
+     "meaning_he": "איש קשר קיים",
+     "outcome_he": "Match → עדכון SQL; No Match → Create Contact"
+    },
+    {
+     "where": "Update Correct Value",
+     "condition": "mobilephone = gen_recordsorceDB == 1 && ISNULL(mobilephoneDB) && !ISNULL(MobilePhone) ? MobilePhone : mobilephoneDB ; emailaddress1 = gen_recordsorceDB == 1 && ISNULL(emailaddress1DB) && !ISNULL(emailaddress1) ? emailaddress1 : emailaddress1DB ; ...transmissionstatus = (same) ? (ISNULL(Gen_bankcustomeridnumberDB) ? 3 : 2) : DB ; ...sourcelastupdate = (same) ? 3 : DB",
+     "meaning_he": "השלמת נייד/דוא\"ל מהקובץ רק כשהמקור 1 והשדה ריק",
+     "outcome_he": "כשמשלימים: תאריך עדכון=GETDATE(), מקור=3, סטטוס שידור 3/2, איפוס תאריך/קובץ/משוב/שגיאת שידור"
+    },
+    {
+     "where": "Update fields by mobilephone and email main.cs:125-169",
+     "condition": "isUpdateCustomerPreference = (!genrecordsorceDB_IsNull && genrecordsorceDB == 1 && ((!mobilephone_IsNull && mobilephone != mobilephoneDB) || (!UpdateCorrectValueemailaddress1_IsNull && UpdateCorrectValueemailaddress1 != emailaddress1DB)))",
+     "meaning_he": "הנייד או הדוא\"ל (אחרי ההשלמה) שונים מה-CRM; בפועל רק כשהשדה הושלם מהקובץ כי ב-CRM הוא ריק",
+     "outcome_he": "ההשוואה קוראת את ערך ה-CRM הריק בלי בדיקה (הסקריפט ללא try/catch): אם קריאת ערך חסר זורקת חריגה (לפי התנהגות SSIS המתועדת, לא מוצג בקבצים), הרכיב נכשל והזרימה נעצרת; אם היא מחזירה null, מחושבת העדפה 1/2/3. אם היא שווה לערך ב-DB — אין שינוי, אך הדגל בשורה כבר true (ראה ממצא); אחרת gen_customerpreference מתעדכן, סטטוס השידור 2/1, ותאריך השידור, שם הקובץ, המשוב וסיבת השגיאה של השידור מאופסים ל-NULL ונכתבים בעדכון"
+    },
+    {
+     "where": "Conditional Split",
+     "condition": "isUpdateCustomerPreference / !isUpdateCustomerPreference",
+     "meaning_he": "יש לרשום יומן העדפה",
+     "outcome_he": "create contact log → INSERT gen_contactlogsbase"
+    },
+    {
+     "where": "Derived Column (recordsource) + UPDate contact and CustomerAddress",
+     "condition": "recordsource = gendercodeDB ; name = case when ? = 1 then ? else name end  (Param_41=recordsource, Param_42=address1_name)",
+     "meaning_he": "עדכון שם הכתובת \"ראשי\"",
+     "outcome_he": "מתבצע כאשר gendercode ב-DB = 1 (ולא לפי gen_recordsorce) — ראה ממצא"
+    }
+   ],
+   "crmEffects": [
+    {
+     "entity": "contact",
+     "verb": "create",
+     "mechanism": "SDK (ExecuteMultiple Create)",
+     "when_he": "ת\"ז לא נמצאה בין אנשי הקשר הפעילים"
+    },
+    {
+     "entity": "contact (ContactBase)",
+     "verb": "update",
+     "mechanism": "SQL (Unsupported)",
+     "when_he": "כל איש קשר שנמצא — ללא בדיקת \"אין צורך בעדכון\""
+    },
+    {
+     "entity": "customeraddress (CustomerAddressBase, AddressNumber=1, ObjectTypeCode=2)",
+     "verb": "update",
+     "mechanism": "SQL (Unsupported)",
+     "when_he": "כל איש קשר שנמצא"
+    },
+    {
+     "entity": "gen_contactlogs (gen_contactlogsbase)",
+     "verb": "create",
+     "mechanism": "SQL INSERT (Unsupported)",
+     "when_he": "isUpdateCustomerPreference == true"
+    }
+   ],
+   "evidence": [
+    "DTSX:22842 data flow",
+    "DTSX:23592-23628 Check customer type; DTSX:23643-23661 Check for last row; DTSX:28690-28708 Is Contact",
+    "Add 0 main.cs:33-50 @DTSX:22850 (body commented out)",
+    "Remove Duplicate main.cs:112-121 @DTSX:28925",
+    "DTSX:24034-24052 Check if customer id number; DTSX:31319-31341 Set unknwon customer data",
+    "DTSX:26886-26939 Custom Fields",
+    "Set MobilePhone End EmailAddress1 main.cs:34-86 @DTSX:29831",
+    "DTSX:23676-24022 Check if contact exists (NoMatchBehavior=1)",
+    "Create Contact main.cs:34-137 @DTSX:25113",
+    "DTSX:26957-27031 Derived Column (recordsource = gendercodeDB at DTSX:27007-27010)",
+    "DTSX:34651-34772 Update Correct Value",
+    "Update fields by mobilephone and email main.cs:80-198 @DTSX:34792",
+    "DTSX:34275-34360 UPDate contact and CustomerAddress (connection CRM)",
+    "DTSX:24067-24093 Conditional Split; DTSX:26692-26695 Create ContactLog (connection CRM)"
+   ],
+   "openQuestions_he": [
+    "משמעות Row_Level_147 (1 = רמת לקוח?) ומשמעות gen_recordsorce = 1 — לא ידוע מהחבילה.",
+    "האם ההתניה של עדכון שם הכתובת ב-gendercodeDB מכוונת? (השערה: אמור היה להיות gen_recordsorceDB)."
+   ],
+   "short": {
+    "nodes": [
+     {
+      "type": "step",
+      "text": "נבחרים מהקובץ הלקוחות הפרטיים, בשורות ברמת לקוח."
+     },
+     {
+      "type": "step",
+      "text": "לקוח ללא זיהוי נרשם כ\"לקוח לא ידוע\", טלפון נייד מזוהה מתוך מספרי הטלפון, ודוא\"ל לא תקין נמחק."
+     },
+     {
+      "type": "decision",
+      "text": "האם קיים ב-CRM איש קשר פעיל עם אותה תעודת זהות?",
+      "branches": [
+       {
+        "label": "לא",
+        "nodes": [
+         {
+          "type": "write",
+          "text": "נוצר איש קשר חדש עם הפרטים האישיים, פרטי הקשר והכתובת."
+         }
+        ]
+       },
+       {
+        "label": "כן",
+        "nodes": [
+         {
+          "type": "write",
+          "text": "פרטי איש הקשר והכתובת מתעדכנים תמיד; נייד ודוא\"ל נכנסים מהקובץ רק כשמקור הרשומה מאפשר זאת והשדה ב-CRM ריק."
+         },
+         {
+          "type": "write",
+          "text": "כשהנייד או הדוא\"ל הושלמו מהקובץ, נקבע ערוץ הדיוור המועדף ונרשם יומן שינוי. נתיב זה מותנה בהתנהגות קריאת ערך ה-CRM הריק (ראה התיאור המפורט)."
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "type": "end",
+      "text": "כל לקוח פרטי בקובץ קיים ב-CRM כאיש קשר פעיל המסומן כלקוח הבנק."
+     }
+    ]
+   },
+   "detailed": {
+    "nodes": [
+     {
+      "type": "step",
+      "text": "השורות נקראות מטבלת הביניים ורווחים מיותרים מוסרים.",
+      "tech": "Read MY Data From Staging → Trim String Fields"
+     },
+     {
+      "type": "decision",
+      "text": "האם השורה מתחילה ב-@ (פלט בשם Last row)?",
+      "tech": "SUBSTRING(CheckLastRow,1,1) == \"@\"  (Check for last row; output \"Last row\" unconnected)",
+      "branches": [
+       {
+        "label": "כן",
+        "nodes": [
+         {
+          "type": "step",
+          "text": "השורה מושמטת ואינה מעובדת."
+         }
+        ]
+       },
+       {
+        "label": "לא",
+        "nodes": [
+         {
+          "type": "step",
+          "text": "השורה ממשיכה לעיבוד."
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "type": "decision",
+      "text": "לאיזה סוג לקוח שייכת השורה?",
+      "tech": "Check customer type, evaluation order 0→2, default \"פרטי\"",
+      "branches": [
+       {
+        "label": "estate type 210",
+        "nodes": [
+         {
+          "type": "step",
+          "text": "שורה שבה Sector_Code_17 הוא 0210 ומספר הסכם המעסיק שונה מ-0 אינה מטופלת כאן ומושמטת; משמעות הקוד 0210 אינה מוגדרת בקבצים.",
+          "tech": "(Sector_Code_17 == \"0210\" && (DT_I4)Employer_Agreement_Number_35 != 0) — unconnected"
+         }
+        ]
+       },
+       {
+        "label": "חברה-כספי פיצולים-מרכזית פיצויים",
+        "nodes": [
+         {
+          "type": "step",
+          "text": "שורה מסוג זה אינה מטופלת כאן. שלב החשבונות (Create Accounts For Minhali) מטפל בה רק כשרמת השורה היא 3. שורות מסוג זה שרמת השורה שלהן אינה 3 אינן מטופלות באף אחד משני השלבים, ולכן לא נוצר ולא מתעדכן עבורן איש קשר או חשבון לפי סיווג זה.",
+          "tech": "(Gen_CustomerIdType_STR_INT == \"7\" && Sector_Code_17 != \"0210\") || (Sector_Code_17 == \"0210\" && (DT_I4)Employer_Agreement_Number_35 == 0) || Sector_Code_17 == \"0775\" — unconnected here; Create Accounts For Minhali uses the same condition && Row_Level_147 == \"3\" (DTSX:15014), other levels fall to its unconnected outputs"
+         }
+        ]
+       },
+       {
+        "label": "Other Customer",
+        "nodes": [
+         {
+          "type": "step",
+          "text": "לקוח בלי סוג זיהוי, או עם סוג שאינו 1, 5 או 6, מושמט.",
+          "tech": "ISNULL(Gen_CustomerIdType_STR_INT) || (... != \"1\" && ... != \"5\" && ... != \"6\") — unconnected"
+         }
+        ]
+       },
+       {
+        "label": "פרטי",
+        "nodes": [
+         {
+          "type": "step",
+          "text": "השורה ממשיכה לעיבוד כלקוח פרטי."
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "type": "decision",
+      "text": "האם זו שורה ברמת לקוח?",
+      "tech": "Is Contact: Row_Level_147 == \"1\"",
+      "branches": [
+       {
+        "label": "כן",
+        "nodes": [
+         {
+          "type": "step",
+          "text": "השורה ממשיכה."
+         }
+        ]
+       },
+       {
+        "label": "לא",
+        "nodes": [
+         {
+          "type": "step",
+          "text": "השורה מושמטת.",
+          "tech": "default output unconnected"
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "type": "step",
+      "text": "תעודת הזהות אינה מרופדת באפסים, כי רכיב הריפוד מנוטרל; לכן ההתאמה ל-CRM נעשית לפי הערך כפי שהוא בקובץ.",
+      "tech": "Add 0: loop commented out (no-op)",
+      "evidence": "main.cs:33-50 @DTSX:22850"
+     },
+     {
+      "type": "step",
+      "text": "תעודת זהות שמופיעה כמה פעמים בקובץ מטופלת פעם אחת בלבד.",
+      "tech": "Remove Duplicate (HashSet on gen_identitynumber)"
+     },
+     {
+      "type": "decision",
+      "text": "האם הלקוח אינו מזוהה?",
+      "tech": "Check if customer id number: (DT_I8)gen_identitynumber ∈ {0, 1, 18}",
+      "branches": [
+       {
+        "label": "לקוח לא מזוהה",
+        "nodes": [
+         {
+          "type": "step",
+          "text": "הלקוח נרשם בשם משפחה \"לקוח\", שם פרטי \"לא ידוע\", תעודת זהות 000000000 וללא תאריך לידה.",
+          "tech": "Set unknwon customer data",
+          "evidence": "DTSX:31323-31341"
+         }
+        ]
+       },
+       {
+        "label": "מזוהה",
+        "nodes": [
+         {
+          "type": "step",
+          "text": "הפרטים מהקובץ נשמרים."
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "type": "step",
+      "text": "תאריכי לידה, פטירה והנפקת תעודת זהות מומרים לתאריך תקין.",
+      "tech": "Format date"
+     },
+     {
+      "type": "step",
+      "text": "נבנים שם מלא, קוד מין (רק 1 או 2), שורת כתובת, כתובת בשם \"ראשי\", מספר בניין ודירה עד 10 תווים, וסימונים \"פעיל\" ו\"לקוח הבנק\".",
+      "tech": "Custom Fields: fullname, gendercode, address1_line1, address1_name, gen_address1_buildingid = LEFT(...,10), gen_isoperate = TRUE, gen_leumi = TRUE",
+      "evidence": "DTSX:26886-26939"
+     },
+     {
+      "type": "step",
+      "text": "טלפון שאחרי הסרת מקפים אורכו 10 תווים ומתחיל ב-05 (ללא בדיקה שהתווים ספרות) נחשב לטלפון נייד, והטלפון השני מוזז למקומו; דוא\"ל שאינו בתבנית תקינה נמחק.",
+      "tech": "Set MobilePhone End EmailAddress1: telephone.Replace(\"-\",\"\") → Length == 10 && Substring(0,2) == \"05\" (main.cs:61-62, 74-75), telephone1 then telephone2; e-mail Regex",
+      "evidence": "main.cs:34-86 @DTSX:29831"
+     },
+     {
+      "type": "decision",
+      "text": "האם קיים ב-CRM איש קשר פעיל עם אותה תעודת זהות?",
+      "tech": "Check if contact exists: contact WHERE statecode = 0 AND gen_identitynumber = gen_identitynumber (NoMatchBehavior=1)",
+      "branches": [
+       {
+        "label": "לא קיים",
+        "nodes": [
+         {
+          "type": "write",
+          "text": "נוצר איש קשר חדש עם מין, שמות, תעודת זהות, טלפונים, נייד, דוא\"ל, פקס, מספר לקוח בנק, כתובת, תא דואר ותאריכים, ומסומן כפעיל, כלקוח הבנק ועם gen_inputsource = 1; לנייד ולדוא\"ל נרשמים מקור ותאריך עדכון, ונרשם גם gen_modifiedbybank (השעה הנוכחית).",
+          "tech": "contact · create · SDK (ExecuteMultiple, batches of 10); gen_inputsource=1; gen_*sourcelastupdate = 3; gen_postalcode = Mailbox_78"
+         }
+        ]
+       },
+       {
+        "label": "קיים",
+        "nodes": [
+         {
+          "type": "step",
+          "text": "נייד ודוא\"ל מהקובץ נכנסים רק אם מקור הרשומה ב-CRM הוא 1 והשדה ב-CRM ריק; אז נרשמים תאריך עדכון, מקור 3, וסטטוס שידור 2 אם יש מספר לקוח בנק, אחרת 3, ותאריך השידור, שם קובץ השידור, המשוב ושגיאת השידור של אותו ערוץ (נייד או דוא\"ל) מתאפסים; עדכון איש הקשר כותב את כל אלה. כשאין השלמה, נכתבים בשדות אלה הערכים שכבר ב-CRM – למעט מקרה אחד: אם מקור הרשומה ב-CRM ריק (NULL), השדה ב-CRM ריק ובקובץ יש ערך, התנאי מחזיר NULL, ולפי התנהגות SSIS המתועדת (לא מוצג בקבצים) גם התוצאה NULL; אז נכתב NULL בתאריך העדכון, במקור, בסטטוס השידור ובפרטי השידור של אותו ערוץ.",
+          "tech": "Update Correct Value: gen_recordsorceDB == 1 && ISNULL(<db>) && !ISNULL(<file>) ? (value, GETDATE(), 3, ISNULL(Gen_bankcustomeridnumberDB) ? 3 : 2, transmissiondate/filename/feedback/transmissionerror = NULL) : DB values → UPDATE ContactBase Param_18-31",
+          "evidence": "DTSX:34651-34772"
+         },
+         {
+          "type": "decision",
+          "text": "האם הנייד או הדוא\"ל (אחרי ההשלמה) שונים מה-CRM אצל לקוח שמקורו 1? בפועל זה קורה רק כשהשדה הושלם מהקובץ כי ב-CRM הוא ריק, וההשוואה קוראת את ערך ה-CRM הריק בלי בדיקה. אם קריאת ערך חסר זורקת חריגה (לפי התנהגות SSIS המתועדת, לא מוצג בקבצים), הרכיב נכשל והזרימה נעצרת; אם היא מחזירה null, ההמשך הוא כמתואר כאן.",
+          "tech": "isUpdateCustomerPreference = !genrecordsorceDB_IsNull && genrecordsorceDB == 1 && ((!mobilephone_IsNull && mobilephone != mobilephoneDB) || (!UpdateCorrectValueemailaddress1_IsNull && UpdateCorrectValueemailaddress1 != emailaddress1DB)); no try/catch (main.cs:123-170); corrected value differs from DB only when Update Correct Value filled it (DB NULL)",
+          "branches": [
+           {
+            "label": "כן",
+            "nodes": [
+             {
+              "type": "step",
+              "text": "מחושב ערוץ הדיוור המועדף: דוא\"ל אם יש דוא\"ל ונייד תקינים, נייד אם רק הנייד תקין, אחרת דואר ישראל. אם הוא זהה לערוץ שב-CRM, הערוץ ונתוני השידור אינם משתנים (אך סימון רישום היומן כבר נקבע). אם הוא שונה, הערוץ מתעדכן, סטטוס השידור נקבע \"ממתין לשליחה\" אם יש מספר לקוח בנק ו\"לא נדרש\" אחרת, ותאריך השידור, שם קובץ השידור, המשוב וסיבת השגיאה של השידור מתאפסים; עדכון איש הקשר כותב את כל אלה.",
+              "tech": "EMAIL=1, MOBILE_PHONE=2, ISRAEL_POST=3; equal to gencustomerpreferenceDB → return (main.cs:148-152); else WAITING_FOR_SENDING=2 / NOT_REQUIRED=1, transmissiondate/filename/feedback/errorreason _IsNull = true (main.cs:165-168) → UPDATE ContactBase Param_32-37",
+              "evidence": "main.cs:80-169 @DTSX:34792"
+             }
+            ]
+           },
+           {
+            "label": "לא",
+            "nodes": [
+             {
+              "type": "step",
+              "text": "ערוץ הדיוור נשאר כפי שהוא ב-CRM."
+             }
+            ]
+           }
+          ]
+         },
+         {
+          "type": "write",
+          "text": "פרטי איש הקשר מתעדכנים לכל איש קשר שנמצא, ללא בדיקת שינוי: מין, שמות, מספר לקוח בנק, כתובת, תאריכים, תא דואר, נייד, דוא\"ל, ערוץ דיוור וסימוני פעיל, לקוח הבנק ומקור קליטה; וכן gen_modifiedbybank ו-ModifiedOn (השעה הנוכחית) ו-ModifiedBy (משתמש המערכת). תעודת זהות, טלפונים ופקס מתעדכנים רק כשמקור הרשומה הוא 1, וערך ריק בקובץ מוחק ערך קיים.",
+          "tech": "contact · update · SQL (UPDATE ContactBase, Unsupported)"
+         },
+         {
+          "type": "write",
+          "text": "הכתובת הראשית מתעדכנת במיקוד ובשורת הכתובת; השם \"ראשי\" נכתב לכתובת רק כאשר קוד המין ב-CRM הוא 1 (ראה ממצא).",
+          "tech": "customeraddress · update · SQL (UPDATE CustomerAddressBase, AddressNumber=1, ObjectTypeCode=2); name condition param = recordsource = gendercodeDB"
+         },
+         {
+          "type": "decision",
+          "text": "האם יש לרשום יומן שינוי פרטי קשר? נתיב זה מתקיים רק אם הרכיב הקודם לא נכשל, כלומר אם קריאת ערך ה-CRM הריק בהשוואה החזירה null (ראה לעיל).",
+          "tech": "Conditional Split: isUpdateCustomerPreference",
+          "branches": [
+           {
+            "label": "כן",
+            "nodes": [
+             {
+              "type": "write",
+              "text": "נרשמת רשומת יומן עם הדוא\"ל והנייד הישנים והחדשים וערוץ הדיוור. היומן נרשם גם כאשר הערוץ לא השתנה בפועל (ראה ממצא).",
+              "tech": "gen_contactlogs · create · SQL (INSERT gen_contactlogsbase, gen_processname = 4)"
+             }
+            ]
+           },
+           {
+            "label": "לא",
+            "nodes": [
+             {
+              "type": "step",
+              "text": "לא נרשם יומן."
+             }
+            ]
+           }
+          ]
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "type": "end",
+      "text": "כל לקוח פרטי בקובץ קיים ב-CRM כאיש קשר פעיל המסומן כלקוח הבנק, ופרטי הקשר שלו נשלטים על ידי הקובץ רק כאשר מקור הרשומה הוא 1."
+     }
+    ]
+   }
+  },
+  {
+   "refId": "Package\\Foreach Loop Container\\Create Accounts For Minhali",
+   "title_he": "חשבונות (Account) לתאגידים / כספי פיצולים / מרכזית פיצויים",
+   "techName": "Create Accounts For Minhali",
+   "short_he": "לקוחות מסוג \"חברה-כספי פיצולים-מרכזית פיצויים\" ברמת שורה 3 נוצרים כ-Account או מתעדכנים ב-SQL ישיר לפי מספר החשבון (ת\"ז/ח\"פ).",
+   "flow_he": [
+    "Trim; השמטת שורות שמתחילות ב-@ (פלט בשם Last row).",
+    "סיווג לקוח: רק \"חברה-כספי פיצולים-מרכזית פיצויים\" שגם Row_Level_147 == \"3\" ממשיך.",
+    "ריפוד accountnumber באפסים; ביטול כפילויות לפי accountnumber.",
+    "שדות מחושבים: address1_name=\"ראשי\", name (משפחה + \" \" + פרטי), בניין/דירה, address1_line1, gen_isoperate=TRUE.",
+    "לקוח לא מזוהה (מספר ∈ {0,1,18}) → accountnumber=\"000000000\", name=\"לקוח לא ידוע\".",
+    "Lookup account לפי accountnumber — ללא סינון statecode.",
+    "לא נמצא → Create Account (SDK). נמצא → UPDATE ישיר ל-AccountBase ול-CustomerAddressBase לכל שורה."
+   ],
+   "detail_he": [
+    {
+     "h": "מקור ואוכלוסייה",
+     "t": "MY_FileData, שורות שעונות על ((Gen_CustomerIdType_STR_INT == \"7\" && Sector_Code_17 != \"0210\") || (Sector_Code_17 == \"0210\" && Employer_Agreement_Number_35 == 0) || Sector_Code_17 == \"0775\") && Row_Level_147 == \"3\", ושלא נתפסו קודם ב-\"estate type 210\"."
+    },
+    {
+     "h": "התאמה לרשומות קיימות",
+     "t": "account לפי accountnumber בלבד, כולל חשבונות לא פעילים (אין WHERE statecode)."
+    },
+    {
+     "h": "החלטות",
+     "t": "נמצא → עדכון תמיד (אין השוואת \"אין צורך בעדכון\"); לא נמצא → יצירה."
+    },
+    {
+     "h": "כתיבה ל-CRM",
+     "t": "Create account (SDK, מנות 1000): gen_inputsource=1, gen_isoperate, emailaddress1, accountnumber, name, telephone1/2, fax, gen_postalcode=Mailbox_78, כתובת, address1_name, gen_returnedmailcount, gen_customerdateofbirth, gen_modifiedbybank=Now. Update ב-SQL: AccountBase (gen_inputsource=1, gen_isoperate=1, name, gen_address1_buildingid, gen_address1_city, gen_returnedmailcount, Gen_customerdateofbirth, gen_modifiedbybank=getDate(), ModifiedOn=GETDATE(), ModifiedBy=UserId, gen_postalcode=Mailbox_78) ו-CustomerAddressBase (postalcode, line1; AddressNumber=1, ObjectTypeCode=1)."
+    },
+    {
+     "h": "תוצאה עסקית",
+     "t": "כל לקוח תאגידי/פיצולים בקובץ ברמת שורה 3 (Row_Level_147 == \"3\") קיים כחשבון מסומן gen_isoperate=1 ו-gen_inputsource=1 עם שם/כתובת מהקובץ; שורות מסוג זה ברמה אחרת אינן מטופלות כאן."
+    }
+   ],
+   "decisions": [
+    {
+     "where": "Check for last row",
+     "condition": "SUBSTRING(CheckLastRow,1,1) == \"@\"",
+     "meaning_he": "שורות שמתחילות ב-@ (פלט בשם Last row)",
+     "outcome_he": "נזרקת"
+    },
+    {
+     "where": "Check customer type (order 0)",
+     "condition": "(Sector_Code_17 == \"0210\" && (DT_I4)Employer_Agreement_Number_35 != 0)",
+     "meaning_he": "estate type 210",
+     "outcome_he": "לא מחובר → נזרק"
+    },
+    {
+     "where": "Check customer type (order 1)",
+     "condition": "((Gen_CustomerIdType_STR_INT == \"7\" && Sector_Code_17 != \"0210\") || (Sector_Code_17 == \"0210\" && (DT_I4)Employer_Agreement_Number_35 == 0) || Sector_Code_17 == \"0775\") && Row_Level_147 == \"3\"",
+     "meaning_he": "חברה-כספי פיצולים-מרכזית פיצויים, רמת שורה 3",
+     "outcome_he": "ממשיך"
+    },
+    {
+     "where": "Check customer type (order 2 / default)",
+     "condition": "ISNULL(Gen_CustomerIdType_STR_INT) || (Gen_CustomerIdType_STR_INT != \"1\" && Gen_CustomerIdType_STR_INT != \"5\")  /  פרטי",
+     "meaning_he": "Other Customer / פרטי",
+     "outcome_he": "לא מחוברים → נזרקים"
+    },
+    {
+     "where": "remove duplicates account main.vb:18-25",
+     "condition": "If accountnumbers.Contains(Row.accountnumber) Then Row.DirectRowTodeuplicate()",
+     "meaning_he": "כפילות מספר חשבון",
+     "outcome_he": "רק הראשון נשמר"
+    },
+    {
+     "where": "Check if customer id number",
+     "condition": "(((DT_I8)accountnumber) == 0) || (((DT_I8)accountnumber) == 1) || (((DT_I8)accountnumber) == 18)",
+     "meaning_he": "לקוח לא מזוהה",
+     "outcome_he": "accountnumber = \"000000000\", name = \"לקוח לא ידוע\""
+    },
+    {
+     "where": "Check if account exists (NoMatchBehavior=1)",
+     "condition": "account.accountnumber = accountnumber (no statecode filter)",
+     "meaning_he": "חשבון קיים",
+     "outcome_he": "Match → UPDATE SQL; No Match → Create Account"
+    }
+   ],
+   "crmEffects": [
+    {
+     "entity": "account",
+     "verb": "create",
+     "mechanism": "SDK (ExecuteMultiple Create)",
+     "when_he": "מספר החשבון לא קיים כלל"
+    },
+    {
+     "entity": "account (AccountBase)",
+     "verb": "update",
+     "mechanism": "SQL (Unsupported)",
+     "when_he": "כל חשבון שנמצא (גם לא פעיל)"
+    },
+    {
+     "entity": "customeraddress (CustomerAddressBase, AddressNumber=1, ObjectTypeCode=1)",
+     "verb": "update",
+     "mechanism": "SQL (Unsupported)",
+     "when_he": "כל חשבון שנמצא"
+    }
+   ],
+   "evidence": [
+    "DTSX:14174 data flow",
+    "DTSX:14990-15027 Check customer type; DTSX:15042-15060 Check for last row",
+    "Add 0 to short id num main.cs:33-53 @DTSX:14182; remove duplicates account main.vb @DTSX:19388",
+    "DTSX:20274-20315 Set columns; DTSX:15211-15229 Check if customer id number; DTSX:21005-21015 Set unknwon customer data",
+    "DTSX:15075-15199 Check if account exists (SqlCommand without statecode)",
+    "Create Account main.cs:123-205 @DTSX:16123",
+    "DTSX:22692-22712 Update Account (OLEDBCommand, connection CRM)"
+   ],
+   "openQuestions_he": [
+    "משמעות Row_Level_147 = \"3\" וסוג ת\"ז \"7\", קודי מגזר 0210/0775 — לא ידוע מהחבילה."
+   ],
+   "short": {
+    "nodes": [
+     {
+      "type": "step",
+      "text": "נבחרים מהקובץ לקוחות מסוג חברה, כספי פיצולים או מרכזית פיצויים, בשורות ברמה 3."
+     },
+     {
+      "type": "step",
+      "text": "לקוח ללא זיהוי נרשם במספר 000000000 ובשם \"לקוח לא ידוע\"."
+     },
+     {
+      "type": "decision",
+      "text": "האם קיים ב-CRM חשבון עם אותו מספר?",
+      "branches": [
+       {
+        "label": "לא",
+        "nodes": [
+         {
+          "type": "write",
+          "text": "נוצר חשבון חדש עם שם, מספר, פרטי קשר וכתובת."
+         }
+        ]
+       },
+       {
+        "label": "כן",
+        "nodes": [
+         {
+          "type": "write",
+          "text": "שם, כתובת, תאריך לידה ודואר חוזר מתעדכנים תמיד מהקובץ."
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "type": "end",
+      "text": "כל לקוח מסוג זה בקובץ נוצר או מתעדכן כחשבון עם gen_isoperate = 1. חשבון שנמצא במצב לא פעיל (statecode שונה מ-0) נשאר במצב זה, כי העדכון אינו משנה את statecode."
+     }
+    ]
+   },
+   "detailed": {
+    "nodes": [
+     {
+      "type": "step",
+      "text": "השורות נקראות מטבלת הביניים ורווחים מיותרים מוסרים.",
+      "tech": "Read MY Data From Staging → Trim String Fields"
+     },
+     {
+      "type": "decision",
+      "text": "האם השורה מתחילה ב-@ (פלט בשם Last row)?",
+      "tech": "SUBSTRING(CheckLastRow,1,1) == \"@\"  (Check for last row; output \"Last row\" unconnected)",
+      "branches": [
+       {
+        "label": "כן",
+        "nodes": [
+         {
+          "type": "step",
+          "text": "השורה מושמטת ואינה מעובדת."
+         }
+        ]
+       },
+       {
+        "label": "לא",
+        "nodes": [
+         {
+          "type": "step",
+          "text": "השורה ממשיכה לעיבוד."
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "type": "decision",
+      "text": "לאיזה סוג לקוח שייכת השורה?",
+      "tech": "Check customer type, evaluation order 0→2",
+      "branches": [
+       {
+        "label": "estate type 210",
+        "nodes": [
+         {
+          "type": "step",
+          "text": "שורה שבה Sector_Code_17 הוא 0210 ומספר הסכם המעסיק שונה מ-0 אינה מטופלת כאן ומושמטת; משמעות הקוד 0210 אינה מוגדרת בקבצים.",
+          "tech": "(Sector_Code_17 == \"0210\" && (DT_I4)Employer_Agreement_Number_35 != 0) — unconnected"
+         }
+        ]
+       },
+       {
+        "label": "חברה-כספי פיצולים-מרכזית פיצויים",
+        "nodes": [
+         {
+          "type": "step",
+          "text": "לקוח מסוג חברה, כספי פיצולים או מרכזית פיצויים, בשורה ברמה 3, ממשיך לעיבוד.",
+          "tech": "((Gen_CustomerIdType_STR_INT == \"7\" && Sector_Code_17 != \"0210\") || (Sector_Code_17 == \"0210\" && (DT_I4)Employer_Agreement_Number_35 == 0) || Sector_Code_17 == \"0775\") && Row_Level_147 == \"3\""
+         }
+        ]
+       },
+       {
+        "label": "Other Customer / פרטי",
+        "nodes": [
+         {
+          "type": "step",
+          "text": "שאר השורות, כולל שורות מסוג חברה-כספי פיצולים-מרכזית פיצויים שרמת השורה שלהן אינה 3, אינן מטופלות כאן ומושמטות.",
+          "tech": "ISNULL(Gen_CustomerIdType_STR_INT) || (... != \"1\" && ... != \"5\"); default \"פרטי\" — both unconnected"
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "type": "step",
+      "text": "מספר החשבון מרופד באפסים מובילים, ומספר שמופיע כמה פעמים בקובץ מטופל פעם אחת.",
+      "tech": "Add 0 to short id num → remove duplicates account (VB ArrayList: accountnumbers.Contains / Add; duplicates → unconnected output \"deuplicate\")"
+     },
+     {
+      "type": "step",
+      "text": "נבנים שם החשבון משם המשפחה והשם הפרטי, כתובת בשם \"ראשי\", שורת כתובת ומספר בניין ודירה, והחשבון מסומן כפעיל.",
+      "tech": "Set columns: name, address1_name, address1_line1, gen_address1_buildingid, gen_isoperate = TRUE",
+      "evidence": "DTSX:20274-20315"
+     },
+     {
+      "type": "decision",
+      "text": "האם הלקוח אינו מזוהה?",
+      "tech": "Check if customer id number: (DT_I8)accountnumber ∈ {0, 1, 18}",
+      "branches": [
+       {
+        "label": "לקוח לא מזוהה",
+        "nodes": [
+         {
+          "type": "step",
+          "text": "החשבון נרשם במספר 000000000 ובשם \"לקוח לא ידוע\".",
+          "tech": "Set unknwon customer data",
+          "evidence": "DTSX:21009-21015"
+         }
+        ]
+       },
+       {
+        "label": "מזוהה",
+        "nodes": [
+         {
+          "type": "step",
+          "text": "המספר והשם מהקובץ נשמרים."
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "type": "step",
+      "text": "תאריך הלידה מומר לתאריך תקין.",
+      "tech": "Format Dates 1, Convert To Date"
+     },
+     {
+      "type": "decision",
+      "text": "האם קיים ב-CRM חשבון עם אותו מספר חשבון, בכל סטטוס?",
+      "tech": "Check if account exists: account WHERE accountnumber = accountnumber (no statecode filter; NoMatchBehavior=1)",
+      "branches": [
+       {
+        "label": "לא קיים",
+        "nodes": [
+         {
+          "type": "write",
+          "text": "נוצר חשבון חדש עם שם, מספר, דוא\"ל, טלפונים, פקס, תא דואר, כתובת, מספר דברי דואר חוזרים ותאריך לידה, ומסומן כפעיל, עם gen_inputsource = 1 ותאריך העדכון מהבנק (gen_modifiedbybank) = הזמן הנוכחי.",
+          "tech": "account · create · SDK (ExecuteMultiple, batches of 1000); gen_inputsource=1; gen_postalcode = Mailbox_78; gen_modifiedbybank = DateTime.Now (main.cs:187)"
+         }
+        ]
+       },
+       {
+        "label": "קיים",
+        "nodes": [
+         {
+          "type": "write",
+          "text": "החשבון מתעדכן תמיד, ללא בדיקת שינוי וגם אם אינו פעיל: שם, בניין, עיר, דואר חוזר, תאריך לידה, תא דואר, סימון פעיל ומקור קליטה; ערך ריק בקובץ מוחק ערך קיים. בנוסף נרשמים תאריך העדכון מהבנק ותאריך השינוי (הזמן הנוכחי), ומשתמש המערכת נרשם כמי שביצע את השינוי.",
+          "tech": "account · update · SQL (UPDATE AccountBase, Unsupported); gen_modifiedbybank = getDate(), ModifiedOn = GETDATE(), ModifiedBy = Param_5 = (DT_GUID)@[User::UserId]"
+         },
+         {
+          "type": "write",
+          "text": "הכתובת הראשית של החשבון מתעדכנת במיקוד ובשורת הכתובת.",
+          "tech": "customeraddress · update · SQL (UPDATE CustomerAddressBase, AddressNumber=1, ObjectTypeCode=1)"
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "type": "end",
+      "text": "כל שורה בקובץ מסוג חברה, כספי פיצולים או מרכזית פיצויים שרמת השורה שלה 3 קיימת ב-CRM כחשבון מסומן כפעיל, עם שם וכתובת מהקובץ. שורות מסוג זה שרמת השורה שלהן אינה 3 אינן מטופלות כאן."
+     }
+    ]
+   }
+  },
+  {
+   "refId": "Package\\Foreach Loop Container\\Create Kibutz",
+   "title_he": "קיבוצים (gen_kibutz) וקישורם לחשבון",
+   "techName": "Create Kibutz",
+   "short_he": "מזהה קיבוצים מהקובץ (מעסיק במגזר 0149/0743 או לקוח במגזר 0197 עם סוג ת\"ז 6); לכל קיבוץ שיש לו חשבון ב-CRM ואין לו עדיין רשומת gen_kibutz — יוצר gen_kibutz ומקשר אותו לחשבון.",
+   "flow_he": [
+    "Trim; השמטת שורות שמתחילות ב-@ (פלט בשם Last Row); ריפוד Customer_Id_Number_6 ו-Employer_Number_38 באפסים.",
+    "Set AccountName And AccountNumber: 0149 + 0743 (הערת קוד: Kibutz for Employers) → מספר = Employer_Number_38, שם = Employer_Name_39; 0197 + סוג ת\"ז 6 (הערת קוד: Kibutz for Minhali) → מספר = Customer_Id_Number_6, שם = שם משפחה+שם פרטי (ללא רווח). שורות אחרות לא יוצאות.",
+    "Sort עם הסרת כפילויות לפי AccountNumber.",
+    "החשבון חייב להתקיים (כל סטטוס) לפי Right('000000000'+accountnumber,9); אחרת נזרק.",
+    "אם כבר קיים gen_kibutz עם אותו מספר (Right('000000000'+gen_accountnumber,9)) — נזרק.",
+    "פיצול round-robin ל-5 ענפים זהים (RowNumber = ++counter % 5): יצירת gen_kibutz ב-SDK ואז UPDATE Account set gen_kibutz."
+   ],
+   "detail_he": [
+    {
+     "h": "מקור ואוכלוסייה",
+     "t": "MY_FileData, אחרי השמטת שורות שמתחילות ב-@ (SUBSTRING(CheckLastRow,1,1) == \"@\"; יציאת Last Row לא מחוברת); שורות עם Sector_Code_17 לא NULL; שתי אוכלוסיות: Sector_Code_17==\"0149\" && Sector_Estate_Type_23==\"0743\" (מספר = Employer_Number_38); או Sector_Code_17==\"0197\" && Customer_Id_Type_5==\"6\" (מספר = Customer_Id_Number_6). בקוד יש בדיקת \"מספר לא ריק\", אבל המספרים רופדו באפסים לפני כן, ולכן הבדיקה אינה מסננת שורות (זה כשקריאת ערך חסר מחזירה null; אם היא זורקת חריגה — לפי התנהגות SSIS המתועדת, לא מוצג בקבצים — רכיב הריפוד נכשל והזרימה נעצרת)."
+    },
+    {
+     "h": "התאמה לרשומות קיימות",
+     "t": "account לפי מספר חשבון מרופד ל-9 ספרות (ללא סינון statecode); gen_kibutz לפי gen_accountnumber מרופד ל-9."
+    },
+    {
+     "h": "החלטות",
+     "t": "שורה שמתחילה ב-@ → מושמטת. מספר קיבוץ (AccountNumber) שחוזר כמה פעמים מטופל פעם אחת (Sort עם EliminateDuplicates=true על AccountNumber; איזו מהשורות הכפולות נשמרת אינו מוצג בקבצים). נוצר רק אם החשבון קיים והקיבוץ לא קיים. שגיאת יצירה → יציאת Error לא מחוברת, השורה נעלמת ללא עדכון חשבון."
+    },
+    {
+     "h": "כתיבה ל-CRM",
+     "t": "Create gen_kibutz (service.Create, שורה-שורה): gen_accountnumber, gen_name. אחריו SQL: update Account set gen_kibutz = <id חדש>, ModifiedBy = UserId, ModifiedOn = GETUTCDATE() where AccountId = <החשבון>."
+    },
+    {
+     "h": "תוצאה עסקית",
+     "t": "רשומת gen_kibutz נוצרת והחשבון מקושר אליה רק כשאין עדיין gen_kibutz עם אותו מספר בן 9 ספרות והיצירה הצליחה. כשרשומת קיבוץ כבר קיימת, החבילה אינה מקשרת אליה את החשבון. ב-Minhali daily קופות חדשות עם הקודים 0149/0743 (הצירוף שהערת הקוד כאן מכנה Kibutz for Employers) מקושרות לקיבוץ לפי מספר המעסיק."
+    }
+   ],
+   "decisions": [
+    {
+     "where": "Conditional Split",
+     "condition": "SUBSTRING(CheckLastRow,1,1) == \"@\"",
+     "meaning_he": "שורות שמתחילות ב-@ (פלט בשם Last Row)",
+     "outcome_he": "Last Row לא מחובר → נזרקת"
+    },
+    {
+     "where": "Set AccountName And AccountNumber main.cs:120",
+     "condition": "Row.SectorCode17 == \"0149\" && !Row.SectorEstateType23_IsNull && Row.SectorEstateType23 == \"0743\"",
+     "meaning_he": "הערת קוד: Kibutz for Employers",
+     "outcome_he": "AccountNumber = Employer_Number_38 (אם לא ריק), AccountName = Employer_Name_39"
+    },
+    {
+     "where": "Set AccountName And AccountNumber main.cs:132",
+     "condition": "Row.SectorCode17 == \"0197\" && !Row.CustomerIdType5_IsNull && Row.CustomerIdType5 == \"6\"",
+     "meaning_he": "הערת קוד: Kibutz for Minhali",
+     "outcome_he": "AccountNumber = Customer_Id_Number_6, AccountName = LastName9 + FirstName10"
+    },
+    {
+     "where": "Sort",
+     "condition": "EliminateDuplicates=true; sort key AccountNumber (NewSortKeyPosition=1), AccountName passthrough",
+     "meaning_he": "קיבוץ פעם אחת",
+     "outcome_he": "כפילויות מספר מוסרות"
+    },
+    {
+     "where": "Is Account Exists (NoMatchBehavior=1)",
+     "condition": "Right('000000000' + accountnumber, 9) = AccountNumber",
+     "meaning_he": "יש חשבון",
+     "outcome_he": "No Match לא מחובר → נזרק"
+    },
+    {
+     "where": "If Kibutz Exsits (NoMatchBehavior=1)",
+     "condition": "Right('000000000' + gen_accountnumber, 9) = AccountNumber",
+     "meaning_he": "הקיבוץ כבר קיים",
+     "outcome_he": "Match לא מחובר → נזרק; No Match → יצירה"
+    },
+    {
+     "where": "Set Row Number main.cs:61 + Conditional Split 1",
+     "condition": "Row.RowNumber = ++counter % 5; RowNumber == 1/2/3/4, default",
+     "meaning_he": "חלוקת עומס",
+     "outcome_he": "5 ענפים זהים (Create Kibutz..Create Kibutz 4 + Update Account..4)"
+    }
+   ],
+   "crmEffects": [
+    {
+     "entity": "gen_kibutz",
+     "verb": "create",
+     "mechanism": "SDK (IOrganizationService.Create)",
+     "when_he": "החשבון קיים והקיבוץ לא קיים"
+    },
+    {
+     "entity": "account (Account)",
+     "verb": "update gen_kibutz",
+     "mechanism": "SQL (Unsupported)",
+     "when_he": "מיד אחרי יצירת קיבוץ מוצלחת"
+    }
+   ],
+   "evidence": [
+    "DTSX:47590 data flow",
+    "DTSX:48430-48448 Conditional Split (Last Row unconnected)",
+    "Set AccountName And AccountNumber main.cs:115-144 @DTSX:53631",
+    "DTSX:55434 Sort (EliminateDuplicates=true)",
+    "DTSX:53488-53533 Is Account Exists; DTSX:53438-53476 If Kibutz Exsits",
+    "Set Row Number main.cs:59-65 @DTSX:54713; DTSX:48463-48505 Conditional Split 1",
+    "Create Kibutz main.cs:64-85 @DTSX:48522 (×5 functionally identical: dupes.json + whitespace-only diff of Create Kibutz vs 1/2)",
+    "DTSX:56520-56524 Update Account (×5 identical per dupes.json)"
+   ],
+   "openQuestions_he": [
+    "קיבוצים מסוג 0197 מקושרים לחשבון אך ב-Minhali daily רק 0149/0743 מקושרים לקופה — האם זו כוונה?"
+   ],
+   "short": {
+    "nodes": [
+     {
+      "type": "step",
+      "text": "מזוהות בקובץ שתי קבוצות שמהן נוצרים קיבוצים: שורות שבהן קוד המגזר 0149 וסוג המעמד במגזר 0743 (בהערת הקוד: Kibutz for Employers), ושורות שבהן קוד המגזר 0197 וסוג הזיהוי 6 (בהערת הקוד: Kibutz for Minhali)."
+     },
+     {
+      "type": "decision",
+      "text": "האם לקיבוץ יש חשבון ב-CRM, ועדיין אין לו רשומת קיבוץ?",
+      "branches": [
+       {
+        "label": "כן",
+        "nodes": [
+         {
+          "type": "write",
+          "text": "נוצרת רשומת קיבוץ, והחשבון מקושר אליה."
+         }
+        ]
+       },
+       {
+        "label": "לא",
+        "nodes": [
+         {
+          "type": "step",
+          "text": "לא נעשה דבר עבור הקיבוץ."
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "type": "end",
+      "text": "רשומת קיבוץ נוצרת ומקושרת לחשבון רק כשאין עדיין רשומת קיבוץ עם אותו מספר וכשהיצירה הצליחה. כשרשומת קיבוץ כבר קיימת, החשבון אינו מקושר אליה בשלב זה; כשהיצירה נכשלת, השורה נעלמת בלי אזהרה; וקיבוץ בלי חשבון ב-CRM מדולג."
+     }
+    ]
+   },
+   "detailed": {
+    "nodes": [
+     {
+      "type": "step",
+      "text": "השורות נקראות מטבלת הביניים ורווחים מיותרים מוסרים.",
+      "tech": "Read MY Data From Staging → Trim String Fields"
+     },
+     {
+      "type": "decision",
+      "text": "האם השורה מתחילה ב-@ (פלט בשם Last Row)?",
+      "tech": "Conditional Split: SUBSTRING(CheckLastRow,1,1) == \"@\"  (output \"Last Row\" unconnected)",
+      "branches": [
+       {
+        "label": "כן",
+        "nodes": [
+         {
+          "type": "step",
+          "text": "השורה מושמטת ואינה מעובדת."
+         }
+        ]
+       },
+       {
+        "label": "לא",
+        "nodes": [
+         {
+          "type": "step",
+          "text": "השורה ממשיכה לעיבוד."
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "type": "step",
+      "text": "מספר הזיהוי ומספר המעסיק מרופדים באפסים. אם קריאת ערך חסר זורקת חריגה (לפי התנהגות SSIS המתועדת, לא מוצג בקבצים), ערך חסר מכשיל את הרכיב והזרימה נעצרת; אם היא מחזירה null, המספר הופך למחרוזת אפסים. בשני המקרים בדיקת \"מספר לא ריק\" בהמשך אינה מסננת שורות.",
+      "tech": "Add 0 to short id num main.cs:49-67: p.GetValue(Row) → IsNullOrEmpty → \"\" → PadLeft(size,'0'); Set AccountName And AccountNumber main.cs:122, 134 (IsNullOrWhiteSpace)",
+      "evidence": "main.cs:61-68 @DTSX:47597"
+     },
+     {
+      "type": "decision",
+      "text": "איזה סוג קיבוץ מתאר השורה?",
+      "tech": "Set AccountName And AccountNumber",
+      "branches": [
+       {
+        "label": "Kibutz for Employers (הערת קוד)",
+        "nodes": [
+         {
+          "type": "step",
+          "text": "מספר הקיבוץ הוא מספר המעסיק ושמו הוא שם המעסיק.",
+          "tech": "Sector_Code_17 == \"0149\" && Sector_Estate_Type_23 == \"0743\" → AccountNumber = Employer_Number_38, AccountName = Employer_Name_39",
+          "evidence": "main.cs:120-130"
+         }
+        ]
+       },
+       {
+        "label": "Kibutz for Minhali (הערת קוד)",
+        "nodes": [
+         {
+          "type": "step",
+          "text": "מספר הקיבוץ הוא מספר הזיהוי ושמו הוא שם המשפחה והשם הפרטי, ללא רווח ביניהם.",
+          "tech": "Sector_Code_17 == \"0197\" && Customer_Id_Type_5 == \"6\" → AccountNumber = Customer_Id_Number_6, AccountName = LastName9 + FirstName10",
+          "evidence": "main.cs:132-141"
+         }
+        ]
+       },
+       {
+        "label": "אחר",
+        "nodes": [
+         {
+          "type": "step",
+          "text": "השורה אינה מטופלת."
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "type": "step",
+      "text": "כל מספר קיבוץ מטופל פעם אחת בלבד.",
+      "tech": "Sort: EliminateDuplicates = true, key AccountNumber",
+      "evidence": "DTSX:55434"
+     },
+     {
+      "type": "decision",
+      "text": "האם קיים ב-CRM חשבון עם מספר זה, בכל סטטוס?",
+      "tech": "Is Account Exists: Right('000000000' + accountnumber, 9) = AccountNumber",
+      "branches": [
+       {
+        "label": "לא",
+        "nodes": [
+         {
+          "type": "step",
+          "text": "הקיבוץ אינו נוצר, ללא אזהרה.",
+          "tech": "No Match output unconnected"
+         }
+        ]
+       },
+       {
+        "label": "כן",
+        "nodes": [
+         {
+          "type": "step",
+          "text": "החשבון נשמר לקישור."
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "type": "decision",
+      "text": "האם כבר קיימת רשומת קיבוץ עם מספר זה?",
+      "tech": "If Kibutz Exsits: Right('000000000' + gen_accountnumber, 9) = AccountNumber",
+      "branches": [
+       {
+        "label": "כן",
+        "nodes": [
+         {
+          "type": "step",
+          "text": "לא נעשה דבר.",
+          "tech": "Match output unconnected"
+         }
+        ]
+       },
+       {
+        "label": "לא",
+        "nodes": [
+         {
+          "type": "step",
+          "text": "הקיבוץ ממשיך ליצירה."
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "type": "step",
+      "text": "הקיבוצים מחולקים לסירוגין (לפי מונה שורות מודולו 5) לחמישה ענפים זהים. מטרת החלוקה אינה מצוינת בקבצים (עיבוד מקבילי — השערה).",
+      "tech": "Set Row Number: RowNumber = ++counter % 5 → Conditional Split 1 (1/2/3/4/default)"
+     },
+     {
+      "type": "write",
+      "text": "נוצרת רשומת קיבוץ עם מספר הקיבוץ ושמו.",
+      "tech": "gen_kibutz · create · SDK (IOrganizationService.Create, row by row) — ×5 identical"
+     },
+     {
+      "type": "decision",
+      "text": "האם יצירת הקיבוץ הצליחה?",
+      "tech": "Create Kibutz: DirectRowToSuccess / catch → ErrorBuffer (Error output unconnected)",
+      "branches": [
+       {
+        "label": "הצליחה",
+        "nodes": [
+         {
+          "type": "write",
+          "text": "החשבון מקושר לרשומת הקיבוץ החדשה.",
+          "tech": "account · update gen_kibutz · SQL (update Account set gen_kibutz = ?, ModifiedBy = ?, ModifiedOn = GETUTCDATE(), Unsupported)"
+         }
+        ]
+       },
+       {
+        "label": "נכשלה",
+        "nodes": [
+         {
+          "type": "step",
+          "text": "השורה נעלמת ללא עדכון החשבון וללא אזהרה."
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "type": "end",
+      "text": "רשומת קיבוץ נוצרת ומקושרת לחשבון רק כשהחשבון קיים ב-CRM, אין עדיין רשומת קיבוץ עם אותו מספר בן 9 ספרות, והיצירה הצליחה. כשרשומת קיבוץ כזו כבר קיימת, החשבון אינו מקושר אליה בשלב זה; כשהיצירה נכשלת, השורה נעלמת בלי אזהרה; וקיבוץ בלי חשבון ב-CRM אינו נוצר."
+     }
+    ]
+   }
+  },
+  {
+   "refId": "Package\\Foreach Loop Container\\Aggregate Account Balance",
+   "title_he": "צבירת יתרות לפי חשבון בנק וסוג מוצר",
+   "techName": "Aggregate Account Balance",
+   "short_he": "מחשב לכל שורת קופה יתרה (עובד + מעביד + פיצויים) ומסכם אותה לפי בנק, מספר חשבון וסוג מוצר לטבלת העבודה AggregateFunds, שמשמשת לבחירת מדרגת דמי הניהול ב-Minhali daily.",
+   "flow_he": [
+    "שדות כספיים מחולקים ב-100 (ערך לא מספרי או 0 → 0).",
+    "gen_accountbalance = gen_employeeportiontotal + gen_employerportiontotal + gen_compensationportiontotal.",
+    "השמטת שורות שמתחילות ב-@ (פלט בשם Last row) ושורות ללא מוצר (Course_Number_22 ריק או \"0000\").",
+    "Lookup מוצר בבנק 10 לפי ProductNumber = Course_Number_22; לא נמצא → נזרק.",
+    "Aggregate: GROUP BY gen_bankname, gen_bankaccountnumber, gen_producttypeid; SUM(gen_accountbalance).",
+    "INSERT ל-GENERIX_STAGING.dbo.AggregateFunds (לא CRM)."
+   ],
+   "detail_he": [
+    {
+     "h": "מקור ואוכלוסייה",
+     "t": "שורות MY_FileData פרט לשורות שמתחילות ב-@ (פלט בשם Last row), לשורות \"No product\" (gen_fundtypenumber ריק או \"0000\"), ולשורות שמספר המוצר שלהן לא נמצא ב-CRM בבנק 10 (יציאת No Match של Get fund type name(product) לא מחוברת)."
+    },
+    {
+     "h": "כתיבה ל-CRM",
+     "t": "אין. הכתיבה היא לטבלת עבודה ב-Staging (SQL.GENERIX_STAGING: psql/GENERIX_STAGING)."
+    },
+    {
+     "h": "תוצאה עסקית",
+     "t": "יתרה מצטברת לכל צירוף בנק+חשבון+סוג מוצר — בסיס לבחירת מדרגת דמי ניהול מתבנית (Get fund MF template data)."
+    }
+   ],
+   "decisions": [
+    {
+     "where": "Check for last row and product exist",
+     "condition": "Last row: SUBSTRING(CheckLastRow,1,1) == \"@\" ; No product: ISNULL(gen_fundtypenumber) || gen_fundtypenumber == \"0000\"",
+     "meaning_he": "שורות שמתחילות ב-@ (פלט בשם Last row) / שורה ללא מוצר",
+     "outcome_he": "שתי היציאות לא מחוברות → נזרקות"
+    },
+    {
+     "where": "Get fund type name(product) (NoMatchBehavior=1)",
+     "condition": "product.ProductNumber = gen_fundtypenumber AND gen_banks.Gen_BankNumber = '10'",
+     "meaning_he": "המוצר קיים",
+     "outcome_he": "No Match לא מחובר → נזרק"
+    },
+    {
+     "where": "Format money fields main.cs:48-58",
+     "condition": "if (isDecimal && x != 0) x = x / 100; else x = 0;",
+     "meaning_he": "הערך מחולק ב-100; יחידת הערכים בקובץ אינה מצוינת בקבצים, ואותה שגרה חלה גם על שדות האחוזים",
+     "outcome_he": "ערך חלקי 100; ערך לא מספרי או 0 → 0"
+    },
+    {
+     "where": "Aggregate",
+     "condition": "AggregationType: gen_bankname=0 (GroupBy), gen_bankaccountnumber=0, gen_producttypeid=0, gen_accountbalance=4 (Sum)",
+     "meaning_he": "סיכום יתרות",
+     "outcome_he": "שורה אחת לכל צירוף"
+    }
+   ],
+   "crmEffects": [],
+   "evidence": [
+    "DTSX:536 data flow; DTSX:604-631 Check for last row and product exist; DTSX:2059-2134 Get fund type name(product)",
+    "Format money fields main.cs:33-58 @DTSX:718; DTSX:2015-2041 Format money fileds; DTSX:2499-2513 Set fund field data",
+    "DTSX:541-561 Aggregate; DTSX:661-664 Fill table AggregateFunds (connection SQL.GENERIX_STAGING)"
+   ],
+   "openQuestions_he": [
+    "כאן gen_bankaccountnumber נלקח גולמי (ללא Trim/ריפוד) ואילו ב-Minhali daily הוא עובר Trim וריפוד ל-12 לפני ה-Lookup ל-AggregateFunds — ההתאמה תלויה בכך שהשדה בקובץ כבר באורך 12 מלא (השערה)."
+   ],
+   "short": {
+    "nodes": [
+     {
+      "type": "step",
+      "text": "לכל קופה בקובץ מחושבת יתרה: חלק העובד, חלק המעביד ופיצויים."
+     },
+     {
+      "type": "step",
+      "text": "היתרות מסוכמות לכל חשבון בנק וסוג מוצר."
+     },
+     {
+      "type": "end",
+      "text": "הסיכום נשמר בטבלת עבודה ומשמש לבחירת מדרגת דמי הניהול בשלב הקופות; אין שינוי ב-CRM."
+     }
+    ]
+   },
+   "detailed": {
+    "nodes": [
+     {
+      "type": "step",
+      "text": "טבלת העבודה של היתרות המצטברות מרוקנת לפני החישוב.",
+      "tech": "Truncate table AggregateFunds (מסגרת)",
+      "evidence": "DTSX:93616"
+     },
+     {
+      "type": "step",
+      "text": "ערכי הסכומים בקובץ, וגם שדות האחוזים שעוברים באותו רכיב, מחולקים ב-100; יחידת הערכים בקובץ אינה מצוינת בקבצים. ערך לא מספרי או אפס נחשב 0.",
+      "tech": "Format money fields main.cs:48-57: decimal.TryParse && x != 0 ? x / 100 : 0 — applied to every string input incl. Deposit_*_Percentage_205/208/209/246 and gen_weightedmanagementfeepercentageSTR_FLOAT",
+      "evidence": "main.cs:48-58 @DTSX:718"
+     },
+     {
+      "type": "step",
+      "text": "יתרת הקופה מחושבת כסכום חלק העובד, חלק המעביד וחלק הפיצויים.",
+      "tech": "gen_accountbalance = gen_employeeportiontotal + gen_employerportiontotal + gen_compensationportiontotal",
+      "evidence": "DTSX:2513"
+     },
+     {
+      "type": "decision",
+      "text": "האם השורה מתחילה ב-@ (פלט בשם Last row) או שאין לה מוצר?",
+      "tech": "Last row: SUBSTRING(CheckLastRow,1,1) == \"@\" ; No product: ISNULL(gen_fundtypenumber) || gen_fundtypenumber == \"0000\" (both unconnected)",
+      "branches": [
+       {
+        "label": "כן",
+        "nodes": [
+         {
+          "type": "step",
+          "text": "השורה אינה נכללת בסיכום."
+         }
+        ]
+       },
+       {
+        "label": "לא",
+        "nodes": [
+         {
+          "type": "step",
+          "text": "השורה ממשיכה."
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "type": "decision",
+      "text": "האם המוצר קיים ב-CRM עבור הבנק?",
+      "tech": "Get fund type name(product): ProductNumber = Course_Number_22 AND Gen_BankNumber = '10' (NoMatchBehavior=1, No Match unconnected)",
+      "branches": [
+       {
+        "label": "לא",
+        "nodes": [
+         {
+          "type": "step",
+          "text": "השורה אינה נכללת בסיכום."
+         }
+        ]
+       },
+       {
+        "label": "כן",
+        "nodes": [
+         {
+          "type": "step",
+          "text": "הבנק וסוג המוצר נשמרים לסיכום."
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "type": "step",
+      "text": "היתרות מסוכמות לכל צירוף של בנק, מספר חשבון בנק וסוג מוצר.",
+      "tech": "Aggregate: GROUP BY gen_bankname, gen_bankaccountnumber, gen_producttypeid; SUM(gen_accountbalance)",
+      "evidence": "DTSX:541-561"
+     },
+     {
+      "type": "step",
+      "text": "הסיכום נשמר בטבלת עבודה בשרת ה-Staging ולא ב-CRM.",
+      "tech": "INSERT [dbo].[AggregateFunds] (connection SQL.GENERIX_STAGING)",
+      "evidence": "DTSX:661-664"
+     },
+     {
+      "type": "end",
+      "text": "לכל חשבון וסוג מוצר קיימת יתרה מצטברת, שמשמשת בשלב הקופות לבחירת מדרגת דמי הניהול."
+     }
+    ]
+   }
+  },
+  {
+   "refId": "Package\\Foreach Loop Container\\Minhali daily",
+   "title_he": "קליטה יומית של קופות (gen_fundmain)",
+   "techName": "Minhali daily",
+   "short_he": "לכל שורת קופה בקובץ מאתר מוצר, לקוח (איש קשר או חשבון), מעסיק, סוכן ודמי ניהול, מחשב חסימת הפקדות ומסלול השקעה, ואז מעדכן את הקופה הקיימת (לפי מוצר + מספר חשבון) או יוצר קופה חדשה — שניהם ב-SQL ישיר.",
+   "flow_he": [
+    "Trim; השמטת שורות שמתחילות ב-@ (פלט בשם Last row) ושורות ללא מוצר (Course_Number_22 ריק/\"0000\"); Lookup מוצר בבנק 10 — לא נמצא → אזהרת ETL והשורה לא נקלטת.",
+    "Lookups (IgnoreFailure): סניף בנק פעיל, קוד מעמד קופה (Sector_Code_17). ריפוד באפסים: מספר חשבון בנק, ת\"ז, מספר סוכן, מספר מעסיק.",
+    "לקוח לא מזוהה (ת\"ז ∈ {0,1,18}) → ת\"ז \"000000000\", שם \"לא ידוע לקוח\", ללא תאריך לידה.",
+    "פירמוט תאריכים וסכומים (÷100); מסלול פיננסי (תקופת השקעה, תאריכי התחלה/העברה, מוצר בסוף תקופה, סוג רכיב); חישובי יתרה/הפקדות/העברות; שם לקוח; כתובת; דגלים.",
+    "סיווג לקוח: \"פרטי\" → איש קשר פעיל עם gen_leumi=1 לפי ת\"ז (לא נמצא → אזהרה); \"חברה-כספי פיצולים-מרכזית פיצויים\" → חשבון פעיל לפי מספר (לא נמצא → אזהרה); \"estate type 210\" ו-\"Other Customers\" נזרקים.",
+    "פרטי: עצמאי (מגזר 0149) או שכיר; לשכיר — חשבון המעסיק לפי Employer_Number_38, ואם מספר חשבון בנק>0 ומספר הסכם>0 — רשומת gen_employers לפי מספר הסכם + מוצר ראשי.",
+    "חוזה סוכן לפי מספר סוכן (11 ספרות אחרונות): השורה הראשונה לפי statecode, כלומר חוזה פעיל מועדף אך חוזה לא פעיל נבחר אם אין אחר; לא נמצא → שדות הסוכן ריקים. המרת קודי מגזר לערכי picklist; יתרה מצטברת מ-AggregateFunds; מדרגת דמי ניהול מתבנית MF; מקור הנחה לפי רמת הטבה.",
+    "גמל (ProductTypeCode 1/200001): דמי ניהול מהפקדה = המינימום מבין שיעורי ישות/מעסיק/חשבון לקוח שתקפים היום (תאריך התחלה עד היום, ותאריך סיום ריק או אחרי היום) ושיעור סוג הקופה (נבדק רק ≥ 0, ללא בדיקת תאריך); 9.99 → 0.",
+    "חסימת הפקדות לפי קוד 991/992 ו-gen_accountblockingcode.",
+    "Lookup קופה קיימת לפי (מוצר, מספר חשבון בנק) בבנק 10.",
+    "קיימת → כללי \"קובץ או DB\" (דמי ניהול, הטבות, מכתב הטבה, תאריכים), החלפת סוכן, UPDATE Gen_fundmain (ללא היתרות והסכומים המצטברים; gen_allowancevalue כן מתעדכן), עדכון תאריך מינוי סוכן לשאר הקופות (בכל סטטוס) עם אותו gen_customeraccountname (הפניה ל-gen_customeraccount לפי חבילה 0005_Customer Account), סימון חישוב זכאות להלוואה באיש הקשר.",
+    "לא קיימת → עמודות מערכת, אינדיקטורים=1, קישור לקיבוץ (מעסיקים 0149/0743 בלבד; קיבוץ לא נמצא → נזרק), INSERT ל-Gen_fundmainbase, סימון זכאות להלוואה."
+   ],
+   "detail_he": [
+    {
+     "h": "מקור ואוכלוסייה",
+     "t": "כל שורות MY_FileData שיש להן מוצר קיים ב-CRM (בנק 10) ולקוח שנמצא: איש קשר (פרטי) או חשבון (חברה/פיצולים/מרכזית פיצויים). שורות \"estate type 210\" (Sector_Code_17 == \"0210\" עם הסכם מעסיק ≠ 0) ו-\"Other Customers\" אינן נקלטות כקופות."
+    },
+    {
+     "h": "התאמה לרשומות קיימות",
+     "t": "קופה: gen_fundmain פעילה (StateCode = 0, gen_banknumber = 10) לפי gen_fundtypename (ProductId של Course_Number_22) + gen_bankaccountnumber. לקוח: contact (gen_leumi=1, statecode=0) לפי Gen_Identitynumber או account (StateCode=0) לפי AccountNumber. מעסיק: account לפי Employer_Number_38 (≠'000000000'); gen_employers לפי Gen_EmployerNumber=Employer_Agreement_Number_35 + Product.ProductNumber=Fund_Type_Number_21. סוכן: gen_agentcontract לפי Gen_brokernumber עם RowNum=1 (מסודר לפי statecode). חסימה: gen_accountblockingcode לפי gen_BlockingReasonCode = Deposit_Forbidden_55 ללא אפסים מובילים."
+    },
+    {
+     "h": "החלטות",
+     "t": "ראה decisions: סיווג לקוח, עצמאי/שכיר, תנאי מעסיק, גמל/לא גמל, חסימה 991/992, יצירה/עדכון, כללי \"קובץ או DB\", החלפת סוכן, קיבוץ."
+    },
+    {
+     "h": "כתיבה ל-CRM",
+     "t": "עדכון: UPDATE Gen_fundmain לכל קופה שנמצאה (ללא השוואה): gen_existinfile=1, gen_modifiedbybank=getdate(), דגלים, אחוזי דמי ניהול, פרטי לקוח/כתובת, קישורים (חשבון, איש קשר, מעסיק, סוכן, סניף, gen_bankname, gen_estatetype, gen_mftemplate, ומבין קישורי המוצר רק המוצר בסוף תקופה — gen_productAtEndOfPeriod), gen_allowancevalue (ערך הקובץ חלקי 100), תאריכים, אינדיקטורי הטבה, חסימה, מסלול. היתרות והסכומים המצטברים (Gen_AccountBalance, Portion totals, הפקדות/העברות שנתיות, Gen_revaluationdate) וקישור הקיבוץ אינם בעדכון; גם gen_customercategory, gen_mfratedtotal, gen_address1_name (\"ראשי\"), gen_fundnumber, gen_fundtypenumber, gen_fundtypename, gen_bankaccountnumber ו-gen_excludedupdatedepositmfpercentage, וכן עמודות המערכת (CreatedBy, CreatedOn, ModifiedBy, ModifiedOn, OwnerId, OwnerIdType, OwningBusinessUnit, statecode, statuscode, TransactionCurrencyId, ExchangeRate), נכתבים רק ביצירה, ולכן בקופה קיימת קטגוריית הלקוח וסימון התבנית המדורגת אינם מתרעננים. UPDATE Gen_fundmain set gen_agentappointmentdate לשאר הקופות של אותו gen_customeraccountname כשהסוכן הוחלף. יצירה: INSERT ל-Gen_fundmainbase עם GUID חדש, statecode=0, statuscode=1, Owner/CreatedBy=משתמש מערכת, ExchangeRate=1.0, gen_existinfile=1, gen_excludedupdatedepositmfpercentage=0 ושדות הקופה מהזרימה כולל יתרות. עמודות שנכתבות רק בעדכון ולא ביצירה: gen_updatebenefitsdate (מ-Beneficiary_Reporting_Date_94), gen_agentappointmentdate, gen_updatebonusfromdepositdate, gen_updatebonusfromaccumulationdate, gen_bonusfilename, gen_letterofbenefitindex ו-gen_modifiedbybank; לכן קופה חדשה אינה מקבלת את תאריך דיווח המוטבים מהקובץ. אחרי עדכון/יצירה: update ContactBase set gen_loaneligibilitycalculationrequired = 1 לאיש הקשר של הקופה."
+    },
+    {
+     "h": "תוצאה עסקית",
+     "t": "קופות חדשות נוצרות עם יתרות. בקופות קיימות מתעדכנות עמודות העדכון בלבד: פרטי לקוח/מעסיק/סוכן/דמי ניהול/חסימה/מסלול, תיעוד ירידה בדמי ניהול (הטבה) עם שם הקובץ ותאריך, וסימון לשליחת מכתב הטבה; היתרות והסכומים המצטברים, תאריך השערוך, קטגוריית הלקוח, gen_mfratedtotal וקישור הקיבוץ אינם מתעדכנים (gen_allowancevalue כן מתעדכן). אנשי הקשר של הקופות מסומנים לחישוב זכאות להלוואה."
+    }
+   ],
+   "decisions": [
+    {
+     "where": "Check for last row and product exist",
+     "condition": "Last row: SUBSTRING(CheckLastRow,1,1) == \"@\" ; No product: ISNULL(gen_fundtypenumber) || gen_fundtypenumber == \"0000\"",
+     "meaning_he": "שורות שמתחילות ב-@ (פלט בשם Last row) / ללא מוצר",
+     "outcome_he": "לא מחוברות → נזרקות"
+    },
+    {
+     "where": "Get fund type name(product) (NoMatchBehavior=1)",
+     "condition": "product.ProductNumber = gen_fundtypenumber (Course_Number_22) AND gen_banks.Gen_BankNumber = '10'",
+     "meaning_he": "המוצר קיים",
+     "outcome_he": "No Match → Set Warning columns 1 → ETL Warning 1 (השורה לא נקלטת)"
+    },
+    {
+     "where": "Check if customer id number",
+     "condition": "(((DT_I8)gen_customeridnumber) == 0) || (((DT_I8)gen_customeridnumber) == 1) || (((DT_I8)gen_customeridnumber) == 18)",
+     "meaning_he": "לקוח לא מזוהה",
+     "outcome_he": "gen_customeridnumber=\"000000000\", gen_customerdateofbirth=NULL, Last_Name_9=\"לא ידוע\", First_Name_10=\"לקוח\""
+    },
+    {
+     "where": "Check customer type (order 0)",
+     "condition": "(Sector_Code_17 == \"0210\" && (DT_I4)Employer_Agreement_Number_35 != 0)",
+     "meaning_he": "estate type 210",
+     "outcome_he": "לא מחובר → לא נקלט כקופה"
+    },
+    {
+     "where": "Check customer type (order 1)",
+     "condition": "(gen_customeridtype_STR_INT == \"7\" && Sector_Code_17 != \"0210\") || (Sector_Code_17 == \"0210\" && (DT_I4)Employer_Agreement_Number_35 == 0) || Sector_Code_17 == \"0775\"",
+     "meaning_he": "חברה-כספי פיצולים-מרכזית פיצויים",
+     "outcome_he": "→ Check if account exists"
+    },
+    {
+     "where": "Check customer type (order 2)",
+     "condition": "ISNULL(gen_customeridtype_STR_INT) || (gen_customeridtype_STR_INT != \"1\" && gen_customeridtype_STR_INT != \"5\" && gen_customeridtype_STR_INT != \"6\")",
+     "meaning_he": "Other Customers",
+     "outcome_he": "לא מחובר → לא נקלט"
+    },
+    {
+     "where": "Check customer type (default)",
+     "condition": "פרטי",
+     "meaning_he": "לקוח פרטי",
+     "outcome_he": "→ Check if contact exists"
+    },
+    {
+     "where": "Check if account exists (NoMatchBehavior=1)",
+     "condition": "Account.AccountNumber = gen_customeridnumber AND StateCode = 0",
+     "meaning_he": "חשבון הלקוח קיים",
+     "outcome_he": "gen_accountname = accountid; No Match → ETL Warning 1 2 (לא נקלט)"
+    },
+    {
+     "where": "Check if contact exists (NoMatchBehavior=1)",
+     "condition": "contact.Gen_Identitynumber = gen_customeridnumber AND gen_leumi = 1 AND statecode = 0",
+     "meaning_he": "איש הקשר קיים",
+     "outcome_he": "gen_contactname = ContactId, Gen_CustomerCategory; No Match → ETL Warning 1 1 (לא נקלט)"
+    },
+    {
+     "where": "Employee or indipendent",
+     "condition": "Sector_Code_17 == \"0149\"",
+     "meaning_he": "עצמאי",
+     "outcome_he": "Indipendent → ללא קישור מעסיק; אחרת Employee"
+    },
+    {
+     "where": "Get corporate number 1 (IgnoreFailure)",
+     "condition": "account.accountnumber = Employer_Number_38 AND accountnumber <> '000000000' AND StateCode = 0",
+     "meaning_he": "חשבון המעסיק",
+     "outcome_he": "gen_employername = accountid (NULL אם לא נמצא)"
+    },
+    {
+     "where": "Check employer number 1",
+     "condition": "(DT_I8)gen_bankaccountnumber > 0 && (DT_I8)Employer_Agreement_Number_35 > 0",
+     "meaning_he": "מעמד במיגזר תואם",
+     "outcome_he": "get Employer (IgnoreFailure): gen_employernumber = Gen_employersId, gen_linkemployername = Gen_employerName לפי Gen_EmployerNumber=Employer_Agreement_Number_35 ו-ProductNumber=Main_Fund_Number; בנוסף, כשנמצאה התאמה, gen_employername (חשבון המעסיק שנמצא ב-Get corporate number 1 לפי Employer_Number_38) מוחלף בערך Gen_employers.gen_corporatename — חשבון התאגיד הרשום ברשומת המעסיק (CopyFromReferenceColumn על עמודת הקלט, DTSX:70197-70200). מה נכתב ב-gen_employername כשאין התאמה (IgnoreFailure עם החלפה במקום) — לא הוכח."
+    },
+    {
+     "where": "Set fund field data",
+     "condition": "Recruiting_Agent_Number_83 = RIGHT(Recruiting_Agent_Number_83,11) ; gen_fundnumber = (DT_WSTR,4)(DT_I4)gen_fundtypenumber + \"-\" + (DT_WSTR,12)(DT_I8)gen_bankaccountnumber ; gen_accountbalance = gen_fundcurrentyeartotal = employee + employer + compensation portion totals ; gen_modeldependage = (ChangedByAge_PensionPayment_239 == \"1\" || ChangedByAge_Compensation_240 == \"1\") ? 2 : 1 ; gen_employerconfirmation = (DT_I4)...+1 ; gen_paragraph14 = (DT_I4)...+1 ; gen_banknumber = \"10\" ; ChangedByAge_PensionPayment_239 = !ISNULL(ChangedByAge_PensionPayment_239) && (DT_I4)ChangedByAge_PensionPayment_239 > 0 ? 1 : 0 ; ChangedByAge_Compensation_240 = !ISNULL(ChangedByAge_Compensation_240) && (DT_I4)ChangedByAge_Compensation_240 > 0 ? 1 : 0 ; gen_subestatetype = 0 ; gen_fundauthenticationindication = NULL(DT_I1)",
+     "meaning_he": "חישובי קופה",
+     "outcome_he": "ערכים לכתיבה. ChangedByAge_PensionPayment_239 (1/0) נכתב ל-gen_rewardsbyagemodel ו-ChangedByAge_Compensation_240 (1/0) נכתב ל-gen_compensationbyagemodel, גם בעדכון (Param_65/64) וגם ביצירה (Param_94/93). gen_subestatetype ו-gen_fundauthenticationindication הם ערכי ברירת מחדל ש-Convesrt עשוי לדרוס"
+    },
+    {
+     "where": "Format money fileds",
+     "condition": "gen_weightedmanagementfeepercentage = (DT_I4)gen_weightedmanagementfeepercentageSTR_FLOAT > 2 ? 2 : (DT_I4)gen_weightedmanagementfeepercentageSTR_FLOAT <= 0 ? 0 : (DT_R8)gen_weightedmanagementfeepercentageSTR_FLOAT",
+     "meaning_he": "דמי ניהול משוקללים: הערך (אחרי חלוקה ב-100) מושווה כמספר שלם (DT_I4) ל-2 ול-0; זה אינו קיטום מדויק לטווח 0-2",
+     "outcome_he": "אם הערך כמספר שלם גדול מ-2 → 2; אם קטן או שווה ל-0 → 0; אחרת הערך המקורי כ-DT_R8. לערך לא שלם התוצאה תלויה בהמרת SSIS בזמן ריצה: אם ההמרה חותכת, ערך כמו 0.45 נותן 0 וערך מעט מעל 2 אינו מוגבל; אם ההמרה נכשלת, הרכיב נכשל (errorRowDisposition=FailComponent)."
+    },
+    {
+     "where": "Get active agent contract guid (IgnoreFailure)",
+     "condition": "Gen_brokernumber = Recruiting_Agent_Number_83; Row_Number() over (partition by Gen_brokernumber order by statecode) = 1",
+     "meaning_he": "חוזה סוכן (עדיפות לפעיל)",
+     "outcome_he": "gen_brokernumber = Gen_agentcontractId, gen_agentname, gen_agencyname (NULL אם לא נמצא)"
+    },
+    {
+     "where": "Convesrt fund estate id ... main.vb:17-45",
+     "condition": "Sector_Code_17: \"0228\"→1, \"0149\"→2, \"0210\"→4, \"0775\"→3 ; Sector_Estate_Type_23: \"0743\"→1, \"5385\"→2, \"0650\"→3, \"0490\"→4, \"0649\"→5, \"0648\"→6, \"5386\"→7, \"0651\"→8 ; Account_Verification_Indication_243 \"0\"/\"1\"",
+     "meaning_he": "המרה ל-picklist",
+     "outcome_he": "gen_fundestateid, gen_sectorstatus (דרך gen_subestatetype), gen_fundauthenticationindication. Sector_Estate_Type_23 NULL או קוד שאינו ברשימה → gen_sectorstatus = 0 (ברירת המחדל מ-Set fund field data). Sector_Code_17 שאינו ברשימה → gen_fundestateid לא מוצב ולכן NULL (עמודת פלט חדשה; לפי התנהגות SSIS המתועדת, לא מוצג בקבצים). gen_fundauthenticationindication נשאר NULL (מ-Set fund field data) אלא אם ערך הקובץ \"0\" או \"1\""
+    },
+    {
+     "where": "Get Aggregate Fund Balance (IgnoreFailure) + Get fund MF template data (IgnoreFailure, partial cache)",
+     "condition": "AggregateFunds by (gen_bankaccountnumber, gen_bankname, gen_producttypeid) ; template row: Gen_mftemplateid = gen_mftemplateid AND gen_maxamount = (select ISNULL(min(gen_maxamount),(select max(gen_maxamount) from gen_fundmftemplates)) from Gen_fundmftemplates where gen_maxamount >= <aggregate balance> and Gen_mftemplateid = <template>) ; numofrecords = count of template rows",
+     "meaning_he": "מדרגת דמי ניהול לפי יתרה מצטברת",
+     "outcome_he": "gen_managementfeepercentage = Gen_mfpercentage; gen_mfratedtotal = numofrecords > 1"
+    },
+    {
+     "where": "Set MF main.cs:117-142",
+     "condition": "Mf_Benefit_Level_167: 0→1 ; 2380/2992/2074/2281/2455/2460→2 ; 2285/2459→3 ; other→1",
+     "meaning_he": "מקור הנחת דמי ניהול",
+     "outcome_he": "gen_mfdiscountsource"
+    },
+    {
+     "where": "Conditional Split",
+     "condition": "ProductTypeCode == 1 || ProductTypeCode == 200001",
+     "meaning_he": "גמל",
+     "outcome_he": "גמל → חישוב דמי ניהול מהפקדה; לא גמל → ללא חישוב"
+    },
+    {
+     "where": "Set Deposit Mf Percentage main.cs:23-78",
+     "condition": "לכל רמה (Entity 203-205, Employer 206-208, CustomerAccount 244-246): start <= Today && (expiration NULL || expiration > Today) → אם percentage <= min: min=percentage, start/end=של הרמה ; FundType 209: percentage >= 0 && <= min → min (ללא החלפת תאריכים) ; אם min != 999 → gen_depositmfpercentage/start/end",
+     "meaning_he": "דמי ניהול מהפקדה = המינימום בין שיעורי הרמות התקפות היום (ישות, מעסיק, חשבון לקוח) לבין שיעור סוג הקופה (ללא בדיקת תאריך)",
+     "outcome_he": "gen_depositmfpercentage, gen_depositcommissionstartdate, gen_depositcommissionenddate"
+    },
+    {
+     "where": "Change gen_depositmfpercentage From 99 To 0",
+     "condition": "gen_depositmfpercentage == 9.99 ? 0 : gen_depositmfpercentage",
+     "meaning_he": "שיעור 9.99 (אחרי חלוקה ב-100) מוחלף ב-0; המשמעות העסקית של הערך אינה מוגדרת בקבצים (השערה: \"אין\")",
+     "outcome_he": "0"
+    },
+    {
+     "where": "Conditional Split 1 + Remove Leading Zeros + Get Account Blocking Code (NoMatchBehavior=1; both outputs → Union All 5)",
+     "condition": "!ISNULL(gen_depositblockertypecode) && gen_depositblockertypecode == \"0992\" ; gen_forbidendeposit_STR_BIT = (DT_WSTR,50)(DT_I8)gen_forbidendeposit_STR_BIT ; gen_BlockingReasonCode = gen_forbidendeposit_STR_BIT",
+     "meaning_he": "חסימת מערכת — קוד סיבת חסימה",
+     "outcome_he": "מביא דגלי חסימה לפי סוג מוצר"
+    },
+    {
+     "where": "Handle Deposit Blocking Logic main.cs:45-135",
+     "condition": "991 (AdministrationBlocking) → IsDepositBlocked=true, type=991, code=NULL ; 992 (SystemBlocking) → אם Deposit_Forbidden ו-blocking code נמצאו: gen_subproduct 1 → gen_IsGemelDepositBlocked, 2 → gen_IsInvestmentGemelDepositBlocked, אחר → gen_IsOtherDepositProductsBlocked; true → blocked, type=992, code=gen_accountblockingcodeid ; כל השאר (כולל 993) → IsDepositBlocked=false, type/code NULL",
+     "meaning_he": "חסימת הפקדות",
+     "outcome_he": "gen_isdepositblocked, gen_depositblocktypecode, gen_accountblockingcodeid"
+    },
+    {
+     "where": "Handale financial track main.cs:29-100",
+     "condition": "investmentPeriodMap {6:1, 12:2, 24:3} (Compensation 248 ואז Bonus 247 גובר) ; investmentStartOn/expectedTransferOn = תאריך yyyyMMdd תקין ראשון (Compensation ואז Bonus) ; ageDependent = \"1\" באחד → true, \"0\" → false ; financeNumber = futureTransferTrack (Bonus גובר) ; componentTypeCode מחושב רק אם (BonusFunds_investmentStartDate_251 לא NULL ו-int.Parse(...) != 0) או (CompensationFunds_investmentStartDate_252 לא NULL ו-int.Parse(...) != 0), אחרת נשאר NULL; בתוכו: שני תאריכי yyyyMMdd תקינים → 3, רק Bonus תקין → 1, אחרת → 2. int.Parse של ערך לא מספרי ו-investmentPeriodMap[result] לערך שאינו 6/12/24 זורקים חריגה (אין try/catch)",
+     "meaning_he": "מסלול פיננסי",
+     "outcome_he": "gen_investmentPeriod, gen_investmentStartOn, gen_expectedTransferOn, gen_ageDependentProductAtEndOfPeriod, gen_componentTypeCode; Get Product (IgnoreFailure) לפי productnumber = gen_financeNumber → gen_productAtEndOfPeriod"
+    },
+    {
+     "where": "Check if fund exists (NoMatchBehavior=1, partial cache)",
+     "condition": "gen_fundmain.gen_fundtypename = gen_fundtypename AND gen_bankaccountnumber = gen_bankaccountnumber AND StateCode = 0 AND gen_banknumber = 10",
+     "meaning_he": "קופה קיימת",
+     "outcome_he": "Match → מסלול עדכון; No Match → מסלול יצירה"
+    },
+    {
+     "where": "Set Date Fields main.cs:153-169",
+     "condition": "last deposit date / employment start date: מהקובץ, ואם NULL — ערך ה-DB",
+     "meaning_he": "שמירת ערך קיים",
+     "outcome_he": "gen_lastdepositdate (מסלול עדכון), gen_employmentstartedon"
+    },
+    {
+     "where": "Set Date Fields main.cs:176-207",
+     "condition": "agentContractChanged = (!genbrokernumber_IsNull && !genbrokernumberDB_IsNull && genbrokernumber != genbrokernumberDB) ; if (agencyname != agencynameDB || agentname != agentnameDB) && agentContractChanged → ChangeOthrFundsSameAccount = true, gen_agentappointmentdate = DateTime.Now",
+     "meaning_he": "החלפת סוכן",
+     "outcome_he": "תאריך מינוי סוכן = עכשיו בקופה"
+    },
+    {
+     "where": "check if broker number has been change",
+     "condition": "ChangeOthrFundsSameAccount == TRUE",
+     "meaning_he": "סוכן הוחלף",
+     "outcome_he": "UPDATE Gen_fundmain SET gen_agentappointmentdate = ? WHERE gen_customeraccountname = <DB> and Gen_fundmainid <> <this>"
+    },
+    {
+     "where": "Fields From File Or DB main.cs:37-60",
+     "condition": "אינדיקטורים מתחילים מערכי DB; gen_bonusfilename = DB ; אם דמי ניהול קובץ ו-DB לא NULL: gen_mfratedtotal == true → דמי ניהול = DB ; אם קובץ < DB → gen_updatebonusfromaccumulationdate = Now, gen_bonusfilename = FileName ; אם DB NULL וקובץ לא → אותו דבר",
+     "meaning_he": "תיעוד ירידה בדמי ניהול מצבירה",
+     "outcome_he": "תאריך הטבה + שם הקובץ"
+    },
+    {
+     "where": "Fields From File Or DB main.cs:62-77",
+     "condition": "if (genexcludedupdatedepositmfpercentage == false): deposit file < DB או DB NULL → gen_updatebonusfromdepositdate = Now, gen_bonusfilename = FileName",
+     "meaning_he": "תיעוד ירידה בדמי ניהול מהפקדה",
+     "outcome_he": "תאריך הטבה + שם הקובץ"
+    },
+    {
+     "where": "Fields From File Or DB main.cs:79-89",
+     "condition": "disconnecting date: קובץ NULL ו-DB לא → DB ; reason: קובץ \"0\" → DB אם DB לא \"0\" ולא NULL, אחרת NULL",
+     "meaning_he": "שמירת נתוני ניתוק",
+     "outcome_he": "gen_disconnectingconnectiondate / reason"
+    },
+    {
+     "where": "Fields From File Or DB main.cs:93-101",
+     "condition": "CheckLastRow (Revaluation_Date_1) → gen_mycreateddate = max(תאריך הקובץ, gen_mycreateddateDB)",
+     "meaning_he": "תאריך \"נוצר ב-MY\"",
+     "outcome_he": "gen_mycreateddate"
+    },
+    {
+     "where": "Fields From File Or DB main.cs:101-188",
+     "condition": "רק אם gen_mycreateddateDB NULL או < תאריך הקובץ, וגם (gen_subproduct ∈ {1,2,4,5} או (subproduct NULL ו-ProductTypeCode ∈ {1,2,3,200000,200001,200002})): deposit/accrual MF file < DB → indicator=2 (+BENEFITMAIL אם תאריך תחילת העמלה > 7 ימי עסקים אחרי פתיחת הקופה) ; file > DB → indicator=3 ; שיעור זהה → אינדיקטור פנימי -1 (ללא מכתב) ; אם לרכיב לא בוצעה השוואה (אינדיקטור פנימי 0: שיעור בקובץ או ב-DB NULL, או בהפקדה gen_excludedupdatedepositmfpercentage == true) ו-DB indicator == 2 ותאריך תחילת העמלה שונה מה-DB (yyyy/MM/dd) → BENEFITMAIL",
+     "meaning_he": "אינדיקטור הטבה ומכתב הטבה",
+     "outcome_he": "gen_depositmfindicator, gen_accrualmfindicator, gen_letterofbenefitindex (BENEFITMAIL)"
+    },
+    {
+     "where": "Fields From File Or DB main.cs:216-231 (CheckIsWorkingDaysBetweenDatesGreaterThen7)",
+     "condition": "dt (NonWorkingDays מ-CalendarRule).Select(\"starttime = '\" + dateTo.ToString() + \"'\") ; סופר ימים שאינם בטבלה מ-dateTo אחורה עד fundcreationdate ; return count > 7",
+     "meaning_he": "יותר מ-7 ימי עסקים בין פתיחת הקופה לתחילת ההטבה",
+     "outcome_he": "BENEFITMAIL = true"
+    },
+    {
+     "where": "Set gen_depositmfpercentage",
+     "condition": "gen_depositmfpercentage = ISNULL(gen_excludedupdatedepositmfpercentage) == FALSE && gen_excludedupdatedepositmfpercentage == TRUE ? gen_depositmfpercentageDB : gen_depositmfpercentage",
+     "meaning_he": "קופה מוחרגת מעדכון דמי ניהול מהפקדה",
+     "outcome_he": "נשמר ערך ה-DB"
+    },
+    {
+     "where": "Is Kibutz (מסלול יצירה בלבד)",
+     "condition": "!ISNULL(Sector_Code_17) && !ISNULL(gen_subestatetype_STR_INT) && Sector_Code_17 == \"0149\" && gen_subestatetype_STR_INT == \"0743\"",
+     "meaning_he": "חבר קיבוץ מעסיקים",
+     "outcome_he": "Get Kibutz לפי Right('000000000'+gen_accountnumber,9) = Employer_Number_38 → gen_kibutzname/gen_kibutznumber; No Match לא מחובר → הקופה לא נוצרת; אחרת קיבוץ NULL"
+    },
+    {
+     "where": "Set Additional Columns main.cs:145-150 (מסלול יצירה)",
+     "condition": "gen_accrualmfindicator = 1; gen_depositmfindicator = 1; CheckLastRow → gen_mycreateddate",
+     "meaning_he": "קופה חדשה",
+     "outcome_he": "אינדיקטורים התחלתיים"
+    }
+   ],
+   "crmEffects": [
+    {
+     "entity": "gen_fundmain (view Gen_fundmain)",
+     "verb": "update",
+     "mechanism": "SQL (Unsupported)",
+     "when_he": "כל קופה שנמצאה לפי מוצר+מספר חשבון — ללא בדיקת \"אין צורך בעדכון\""
+    },
+    {
+     "entity": "gen_fundmain (view Gen_fundmain)",
+     "verb": "update gen_agentappointmentdate (קופות אחרות)",
+     "mechanism": "SQL (Unsupported)",
+     "when_he": "ChangeOthrFundsSameAccount == TRUE"
+    },
+    {
+     "entity": "gen_fundmain (Gen_fundmainbase)",
+     "verb": "create (INSERT)",
+     "mechanism": "SQL (Unsupported)",
+     "when_he": "קופה לא נמצאה ולקוח נמצא (ולחבר קיבוץ מעסיקים — גם הקיבוץ נמצא)"
+    },
+    {
+     "entity": "contact (ContactBase)",
+     "verb": "update gen_loaneligibilitycalculationrequired = 1",
+     "mechanism": "SQL (Unsupported)",
+     "when_he": "אחרי כל עדכון/יצירת קופה (פרמטר gen_contactname; לקופות חשבון הערך NULL)"
+    }
+   ],
+   "evidence": [
+    "DTSX:58548 data flow",
+    "DTSX:59959-59986 Check for last row and product exist; DTSX:70390-70465 Get fund type name(product) (No Match → Set Warning columns 1 → ETL Warning 1)",
+    "DTSX:70060, 70276 Lookup Match Output IgnoreFailure (bank branch, fund estate code); Set String Fields main.cs:33-54 @DTSX:79573",
+    "DTSX:60165-60183 Check if customer id number; DTSX:81054-81076 Set unknwon customer data",
+    "DTSX:78471-78666 Set fund field data; DTSX:69682-69764 Format money fileds; Format money fields main.cs:48-58 @DTSX:68385; Format dates main.cs:48-74 @DTSX:66760",
+    "Handale financial track main.cs:11-150 @DTSX:70602; DTSX:70539-70578 Get Product (IgnoreFailure)",
+    "DTSX:59874-59910 Check customer type; DTSX:60001-60056 Check if account exists; DTSX:60101-60153 Check if contact exists",
+    "DTSX:62561-62579 Employee or indipendent; DTSX:70082-70123 Get corporate number 1; DTSX:59925-59944 Check employer number 1; DTSX:70145-70208 get Employer",
+    "DTSX:69854-69913 Get active agent contract guid; Convesrt fund estate id ... main.vb @DTSX:60784",
+    "DTSX:69950-69995 Get Aggregate Fund Balance; DTSX:70298-70358 Get fund MF template data (ParameterMap DTSX:70328, CacheType=1); Set MF main.cs:115-160 @DTSX:78715",
+    "DTSX:60716-60734 Conditional Split גמל; DTSX:78387-78420 Set depositMFpercentage Fields; Set Deposit Mf Percentage main.cs:21-79 @DTSX:77381; DTSX:59847-59851 Change gen_depositmfpercentage From 99 To 0",
+    "DTSX:60749-60767 Conditional Split 1; DTSX:73332-73336 Remove Leading Zeros; DTSX:69782-69842 Get Account Blocking Code; Handle Deposit Blocking Logic main.cs:19-135 @DTSX:71787",
+    "DTSX:60198-60704 Check if fund exists (NoMatchBehavior=1, CacheType=1, ParameterMap DTSX:60339)",
+    "DTSX:58554-58693 Add Additional Fields; Set Date Fields main.cs:115-215 @DTSX:75240; DTSX:60068-60086 check if broker number has been change; DTSX:92815-92818 Update gen_agentappointmentdate",
+    "Fields From File Or DB main.cs:16-231 @DTSX:64909 (ReadOnlyVariables DTSX:66697)",
+    "DTSX:78684-78688 Set gen_depositmfpercentage; DTSX:92870-92873 Update gen_fundmain (78 params, no Gen_AccountBalance)",
+    "Add System Columns main.cs:115-129 @DTSX:58713; Set Additional Columns main.cs:112-153 @DTSX:73376; DTSX:72792-72811 Is Kibutz; DTSX:70477-70527 Get Kibutz (No Match unconnected); DTSX:78438-78453 Set empty kibutz id and number",
+    "DTSX:61785-61788 Create gen_FundMain (INSERT Gen_fundmainbase, 106 params + literals '1.0000000000' ExchangeRate and 0 gen_excludedupdatedepositmfpercentage)",
+    "DTSX:93448-93451, 93486-93489 Update Loaneligibilitycalculationrequired In Contact To Yes (×2 identical per dupes.json)"
+   ],
+   "openQuestions_he": [
+    "האם היתרות והסכומים של קופה קיימת (Gen_AccountBalance, Portion totals, הפקדות/העברות שנתיות, Gen_revaluationdate) מתעדכנים ע\"י חבילה אחרת? בחבילה זו הם נכתבים רק ביצירה.",
+    "מי מאפס gen_existinfile לקופות שלא הופיעו בקובץ? לא בחבילה זו.",
+    "ב-Lookup MF template במצב Partial cache עם שאילתה מותאמת — האם SSIS בודק גם שוויון amount = gen_aggregateaccountbalance על השורה המוחזרת? (תלוי התנהגות זמן ריצה; לא ניתן להוכיח מהחבילה).",
+    "משמעות הקודים: בקבצים יש להם רק תוויות של שמות פלט ושל הערות קוד, לא משמעות עסקית מוכחת. בפיצול \"Employee or indipendent\" הפלט ל-Sector_Code_17 == \"0149\" נקרא \"Indipendent\" והשאר \"Employee\". בפיצול \"Check customer type\" הפלט \"חברה-כספי פיצולים-מרכזית פיצויים\" תופס את 0775, את 0210 עם מספר הסכם מעסיק 0 ואת סוג זיהוי 7, והפלט \"estate type 210\" תופס את 0210 עם מספר הסכם שונה מ-0. ב-Create Account For Employers וב-Create Employers הפלט \"מעסיקים-כספי פיצולים\" תופס את 0210 או מספר חשבון בנק 0 (עם סוג מעסיק ומספר הסכם חיוביים). בהערות הקוד ב-Create Kibutz, הצירוף 0149 עם Sector_Estate_Type_23 == \"0743\" מסומן \"Kibutz for Employers\", והצירוף 0197 עם Customer_Id_Type_5 == \"6\" מסומן \"Kibutz for Minhali\". ל-0228, לשאר ערכי Sector_Estate_Type_23 ול-Mf_Benefit_Level_167 אין תווית בקבצים. המשמעות העסקית של כל הקודים — לא ידוע."
+   ],
+   "short": {
+    "nodes": [
+     {
+      "type": "step",
+      "text": "לכל שורת קופה בקובץ מאותרים המוצר והלקוח — איש קשר ללקוח פרטי או חשבון לתאגיד — ושורה בלי מוצר או בלי לקוח קיים אינה נקלטת. גם שורות מסוג \"estate type 210\" ו-\"Other Customers\" אינן נקלטות, בלי אזהרה."
+     },
+     {
+      "type": "step",
+      "text": "לקופה נקבעים מעסיק, סוכן, דמי ניהול לפי מדרגת היתרה המצטברת, דמי ניהול מהפקדה, חסימת הפקדות ומסלול השקעה."
+     },
+     {
+      "type": "decision",
+      "text": "האם הקופה כבר קיימת ב-CRM?",
+      "branches": [
+       {
+        "label": "לא",
+        "nodes": [
+         {
+          "type": "write",
+          "text": "נוצרת קופה חדשה עם נתוני הקופה מהקובץ, כולל היתרות והסכומים, והקישורים ללקוח, למעסיק, לסוכן ולקיבוץ. ביצירה לא נכתבים תאריך דיווח המוטבים מהקובץ, תאריך מינוי הסוכן, תאריכי ההטבה בדמי הניהול, שם קובץ ההטבה וסימון מכתב ההטבה; אלה נכתבים רק כשקופה קיימת מתעדכנת. קופה חדשה עם הקודים 0149/0743 (הצירוף שהערת קוד ב-Create Kibutz מכנה Kibutz for Employers) שרשומת הקיבוץ שלה לא נמצאה ב-CRM אינה נוצרת, בלי אזהרה."
+         }
+        ]
+       },
+       {
+        "label": "כן",
+        "nodes": [
+         {
+          "type": "write",
+          "text": "פרטי הקופה מתעדכנים, ללא היתרות, כולל תיעוד הטבה בדמי ניהול, החלפת סוכן וסימון למכתב הטבה."
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "type": "write",
+      "text": "איש הקשר של הקופה מסומן לחישוב זכאות להלוואה."
+     },
+     {
+      "type": "end",
+      "text": "קופות חדשות נוצרות עם נתוני הקובץ והיתרות, אבל בלי תאריך דיווח המוטבים, תאריך מינוי הסוכן, תאריכי ההטבה, שם קובץ ההטבה וסימון מכתב ההטבה. בקופות קיימות מתעדכנות רק עמודות העדכון, ביניהן שדה הסכום gen_allowancevalue; היתרות והסכומים המצטברים, תאריך השערוך, קטגוריית הלקוח, סימון התבנית המדורגת וקישור הקיבוץ נשארים כפי שהיו."
+     }
+    ]
+   },
+   "detailed": {
+    "nodes": [
+     {
+      "type": "step",
+      "text": "השורות נקראות מטבלת הביניים, רווחים מיותרים מוסרים, ומספרי חשבון הבנק, הזיהוי, הסוכן והמעסיק מרופדים באפסים.",
+      "tech": "Trim String Fields; Set String Fields (PadLeft '0')"
+     },
+     {
+      "type": "decision",
+      "text": "האם השורה מתחילה ב-@ (פלט בשם Last row) או שאין לה מוצר?",
+      "tech": "Last row: SUBSTRING(CheckLastRow,1,1) == \"@\" ; No product: ISNULL(gen_fundtypenumber) || gen_fundtypenumber == \"0000\" (both unconnected)",
+      "branches": [
+       {
+        "label": "כן",
+        "nodes": [
+         {
+          "type": "step",
+          "text": "השורה מושמטת בשקט."
+         }
+        ]
+       },
+       {
+        "label": "לא",
+        "nodes": [
+         {
+          "type": "step",
+          "text": "השורה ממשיכה."
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "type": "decision",
+      "text": "האם המוצר קיים ב-CRM עבור הבנק?",
+      "tech": "Get fund type name(product): ProductNumber = Course_Number_22 AND Gen_BankNumber = '10' (NoMatchBehavior=1)",
+      "branches": [
+       {
+        "label": "לא",
+        "nodes": [
+         {
+          "type": "step",
+          "text": "נרשמת אזהרת קליטה והשורה אינה נקלטת.",
+          "tech": "No Match → Set Warning columns 1 → ETL Warning 1"
+         }
+        ]
+       },
+       {
+        "label": "כן",
+        "nodes": [
+         {
+          "type": "step",
+          "text": "המוצר והבנק נשמרים לקופה. סוג המוצר ותת-המוצר משמשים רק להחלטות בהמשך (גמל, בדיקת הטבה, חסימה) ואינם נכתבים ל-CRM."
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "type": "step",
+      "text": "נשלפים סניף הבנק וקוד מעמד הקופה; כשאין התאמה הערך ריק.",
+      "tech": "Get bank branch Id / Get fund estate code — IgnoreFailure",
+      "evidence": "DTSX:70060, 70276"
+     },
+     {
+      "type": "decision",
+      "text": "האם הלקוח אינו מזוהה?",
+      "tech": "Check if customer id number: (DT_I8)gen_customeridnumber ∈ {0, 1, 18}",
+      "branches": [
+       {
+        "label": "לקוח לא מזוהה",
+        "nodes": [
+         {
+          "type": "step",
+          "text": "הקופה משויכת ללקוח 000000000, בשם \"לא ידוע לקוח\", ללא תאריך לידה.",
+          "tech": "Set unknwon customer data",
+          "evidence": "DTSX:81058-81076"
+         }
+        ]
+       },
+       {
+        "label": "מזוהה",
+        "nodes": [
+         {
+          "type": "step",
+          "text": "פרטי הלקוח מהקובץ נשמרים."
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "type": "step",
+      "text": "תאריכים מומרים, סכומים מחולקים ב-100 (ערך ריק או לא מספרי הופך ל-0), ומחושבים יתרת הקופה, ההפקדות וההעברות השנתיות, מספר הקופה, שם הלקוח, הכתובת, תלות בגיל והדגלים. דמי הניהול המשוקללים מחושבים בביטוי שמשווה את הערך כמספר שלם ל-2 ול-0; זה אינו קיטום מדויק לטווח 0 עד 2, והתוצאה לערך לא שלם תלויה בהמרה של SSIS בזמן ריצה (ראה החלטות).",
+      "tech": "Format dates; Format money fields main.cs:48-58 (TryParse fails or 0 → \"0\"); Format money fileds: (DT_I4)x > 2 ? 2 : (DT_I4)x <= 0 ? 0 : (DT_R8)x, errorRowDisposition=FailComponent; Set fund field data",
+      "evidence": "DTSX:78471-78666, 69764"
+     },
+     {
+      "type": "step",
+      "text": "מסלול ההשקעה נקבע מהקובץ: תקופת השקעה (6, 12 או 24 חודשים), תאריכי התחלה והעברה צפויה, מוצר בסוף התקופה, תלות בגיל, וסוג רכיב (מענקים, פיצויים או שניהם).",
+      "tech": "Handale financial track: investmentPeriodMap {6:1,12:2,24:3}; componentTypeCode 1/2/3; Get Product (IgnoreFailure) by gen_financeNumber",
+      "evidence": "main.cs:11-150 @DTSX:70602"
+     },
+     {
+      "type": "decision",
+      "text": "לאיזה סוג לקוח שייכת הקופה?",
+      "tech": "Check customer type, evaluation order 0→2, default \"פרטי\"",
+      "branches": [
+       {
+        "label": "estate type 210",
+        "nodes": [
+         {
+          "type": "step",
+          "text": "שורה שבה Sector_Code_17 הוא 0210 ומספר הסכם המעסיק שונה מ-0 אינה נקלטת כקופה, בלי אזהרה. משמעות הקוד 0210 אינה מוגדרת בקבצים.",
+          "tech": "(Sector_Code_17 == \"0210\" && (DT_I4)Employer_Agreement_Number_35 != 0) — unconnected"
+         }
+        ]
+       },
+       {
+        "label": "Other Customers",
+        "nodes": [
+         {
+          "type": "step",
+          "text": "לקוח בלי סוג זיהוי, או עם סוג שאינו 1, 5 או 6, אינו נקלט.",
+          "tech": "unconnected"
+         }
+        ]
+       },
+       {
+        "label": "חברה-כספי פיצולים-מרכזית פיצויים",
+        "nodes": [
+         {
+          "type": "decision",
+          "text": "האם קיים ב-CRM חשבון פעיל עם מספר הלקוח?",
+          "tech": "Check if account exists: Account WHERE StateCode = 0 AND AccountNumber = gen_customeridnumber",
+          "branches": [
+           {
+            "label": "לא",
+            "nodes": [
+             {
+              "type": "step",
+              "text": "נרשמת אזהרת קליטה והקופה אינה נקלטת.",
+              "tech": "ETL Warning 1 2"
+             }
+            ]
+           },
+           {
+            "label": "כן",
+            "nodes": [
+             {
+              "type": "step",
+              "text": "הקופה משויכת לחשבון.",
+              "tech": "gen_accountname = accountid"
+             }
+            ]
+           }
+          ]
+         }
+        ]
+       },
+       {
+        "label": "פרטי",
+        "nodes": [
+         {
+          "type": "decision",
+          "text": "האם קיים ב-CRM איש קשר פעיל של הבנק עם תעודת הזהות?",
+          "tech": "Check if contact exists: contact WHERE gen_leumi = 1 AND statecode = 0 AND Gen_Identitynumber = gen_customeridnumber",
+          "branches": [
+           {
+            "label": "לא",
+            "nodes": [
+             {
+              "type": "step",
+              "text": "נרשמת אזהרת קליטה והקופה אינה נקלטת.",
+              "tech": "ETL Warning 1 1"
+             }
+            ]
+           },
+           {
+            "label": "כן",
+            "nodes": [
+             {
+              "type": "step",
+              "text": "הקופה משויכת לאיש הקשר. קטגוריית הלקוח נלקחת מאיש הקשר ונכתבת רק בקופה חדשה; בעדכון קופה קיימת היא אינה נכתבת.",
+              "tech": "gen_contactname = ContactId; Gen_CustomerCategory"
+             },
+             {
+              "type": "decision",
+              "text": "האם הלקוח עצמאי או שכיר?",
+              "tech": "Employee or indipendent: Sector_Code_17 == \"0149\" → Indipendent",
+              "branches": [
+               {
+                "label": "עצמאי",
+                "nodes": [
+                 {
+                  "type": "step",
+                  "text": "לא משויך מעסיק לקופה."
+                 }
+                ]
+               },
+               {
+                "label": "שכיר",
+                "nodes": [
+                 {
+                  "type": "step",
+                  "text": "חשבון המעסיק מאותר לפי מספר המעסיק; כשאין התאמה הוא נשאר ריק.",
+                  "tech": "Get corporate number 1 (IgnoreFailure): account WHERE accountnumber <> '000000000' AND StateCode = 0 AND accountnumber = Employer_Number_38 → gen_employername"
+                 },
+                 {
+                  "type": "decision",
+                  "text": "האם יש לקופה מספר חשבון בנק ומספר הסכם מעסיק?",
+                  "tech": "Check employer number 1 [מעמד במיגזר תואם]: (DT_I8)gen_bankaccountnumber > 0 && (DT_I8)Employer_Agreement_Number_35 > 0",
+                  "branches": [
+                   {
+                    "label": "מעמד במיגזר תואם",
+                    "nodes": [
+                     {
+                      "type": "step",
+                      "text": "רשומת המעסיק מאותרת לפי מספר ההסכם והמוצר הראשי, והקופה מקושרת אליה; חשבון המעסיק מוחלף בחשבון התאגיד שרשום ברשומת המעסיק.",
+                      "tech": "get Employer (IgnoreFailure): Gen_EmployerNumber = Employer_Agreement_Number_35 AND ProductNumber = Main_Fund_Number → gen_employernumber, gen_linkemployername; gen_employername ← ref.gen_corporatename",
+                      "evidence": "DTSX:70145-70208"
+                     }
+                    ]
+                   },
+                   {
+                    "label": "else",
+                    "nodes": [
+                     {
+                      "type": "step",
+                      "text": "הקופה נשארת עם חשבון המעסיק בלבד."
+                     }
+                    ]
+                   }
+                  ]
+                 }
+                ]
+               }
+              ]
+             }
+            ]
+           }
+          ]
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "type": "step",
+      "text": "חוזה הסוכן נקבע לפי מספר הסוכן, בעדיפות לחוזה פעיל; קודי המגזר והמעמד מומרים לערכי רשימה.",
+      "tech": "Get active agent contract guid (IgnoreFailure, RowNum = 1 by statecode); Convesrt fund estate id ... (0228→1, 0149→2, 0210→4, 0775→3; 0743..0651 → 1..8)"
+     },
+     {
+      "type": "step",
+      "text": "דמי הניהול מהצבירה נשלפים מתבנית דמי הניהול. השאילתה בוחרת את שורת התבנית שהתקרה שלה היא הנמוכה מבין התקרות שגדולות או שוות ליתרה המצטברת של החשבון וסוג המוצר, ואם אין כזו — את התקרה הגבוהה ביותר מכל התבניות (בלי סינון לתבנית). האם SSIS מחזיר את השורה הזו כהתאמה תלוי בהתנהגות זמן הריצה, כי עמודות ההתאמה כוללות גם את היתרה; אם אין התאמה, דמי הניהול נשארים ריקים. תבנית עם יותר מרשומה אחת מסומנת כמדורגת, ומקור ההנחה נקבע לפי רמת ההטבה.",
+      "tech": "Get Aggregate Fund Balance → Get fund MF template data (CacheType=1, join gen_mftemplateid + gen_aggregateaccountbalance→amount; gen_maxamount = ISNULL(min(gen_maxamount ≥ balance for template), max(gen_maxamount) from all gen_fundmftemplates); IgnoreFailure); gen_mfratedtotal = numofrecords > 1; Set MF: benefit level 0→1, 2380/2992/2074/2281/2455/2460→2, 2285/2459→3"
+     },
+     {
+      "type": "decision",
+      "text": "האם המוצר הוא קופת גמל?",
+      "tech": "Conditional Split: ProductTypeCode == 1 || ProductTypeCode == 200001",
+      "branches": [
+       {
+        "label": "גמל",
+        "nodes": [
+         {
+          "type": "step",
+          "text": "דמי הניהול מהפקדה נקבעים כנמוך מבין שיעורי הישות, המעסיק וחשבון הלקוח שתקפים היום (יש שיעור ותאריך התחלה, תאריך ההתחלה עד היום, ותאריך הסיום ריק או אחרי היום) לבין שיעור סוג הקופה, שנבדק רק שאינו שלילי וללא בדיקת תאריך. יחד עם השיעור נשמרים תאריכי ההתחלה והסיום של הרמה שנבחרה; כששיעור סוג הקופה הוא הנמוך, נשארים התאריכים של הרמה שנבחרה לפניו, אם הייתה; שיעור 9.99 מוחלף ב-0. שיעור ריק או לא מספרי בקובץ הופך ל-0 כבר בשלב הסכומים; ברמת סוג הקופה אין בדיקת תאריך, ולכן שיעור ריק בה נכנס לחישוב כ-0 (זה כשקריאת ערך חסר מחזירה null; אם היא זורקת חריגה — לפי התנהגות SSIS המתועדת, לא מוצג בקבצים — רכיב הסכומים נכשל על שיעור ריק והזרימה נעצרת).",
+          "tech": "Format money fields main.cs:48-58 (Deposit_MF_Percentage_Employer_208, _Fund_Type_209, _Entity_205, _CustomerAccount_246 → \"0\" when empty/non-numeric); Set Deposit Mf Percentage main.cs:64-70 (FundType: no date check; min; fund-type winner keeps previous dates) → gen_depositmfpercentage == 9.99 ? 0",
+          "evidence": "main.cs:21-79 @DTSX:77381"
+         }
+        ]
+       },
+       {
+        "label": "לא גמל",
+        "nodes": [
+         {
+          "type": "step",
+          "text": "דמי ניהול מהפקדה אינם מחושבים ונשארים ריקים."
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "type": "decision",
+      "text": "מהו סוג חוסם ההפקדות של הקופה?",
+      "tech": "Deposits_Bloker_Type_82 without leading zeros (Handle Deposit Blocking Logic)",
+      "branches": [
+       {
+        "label": "991",
+        "nodes": [
+         {
+          "type": "step",
+          "text": "ההפקדות חסומות בחסימה מנהלית, ללא קוד סיבה.",
+          "tech": "IsDepositBlocked = true, type = 991, code = NULL"
+         }
+        ]
+       },
+       {
+        "label": "992",
+        "nodes": [
+         {
+          "type": "decision",
+          "text": "האם קיימת סיבת חסימה מוגדרת שחוסמת את סוג המוצר הזה?",
+          "tech": "gen_accountblockingcode by gen_BlockingReasonCode = Deposit_Forbidden_55 (no leading zeros); gen_subproduct 1 → gen_IsGemelDepositBlocked, 2 → gen_IsInvestmentGemelDepositBlocked, else → gen_IsOtherDepositProductsBlocked",
+          "branches": [
+           {
+            "label": "כן",
+            "nodes": [
+             {
+              "type": "step",
+              "text": "ההפקדות חסומות בחסימת מערכת עם קוד הסיבה.",
+              "tech": "IsDepositBlocked = true, type = 992, code = gen_accountblockingcodeid"
+             }
+            ]
+           },
+           {
+            "label": "לא",
+            "nodes": [
+             {
+              "type": "step",
+              "text": "ההפקדות אינן חסומות."
+             }
+            ]
+           }
+          ]
+         }
+        ]
+       },
+       {
+        "label": "אחר (כולל 993 וריק)",
+        "nodes": [
+         {
+          "type": "step",
+          "text": "ההפקדות אינן חסומות.",
+          "tech": "IsDepositBlocked = false, type/code NULL"
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "type": "decision",
+      "text": "האם הקופה כבר קיימת ב-CRM?",
+      "tech": "Check if fund exists: gen_fundmain WHERE StateCode = 0 AND gen_banknumber = 10 AND gen_fundtypename = product AND gen_bankaccountnumber = bank account",
+      "branches": [
+       {
+        "label": "קיימת",
+        "nodes": [
+         {
+          "type": "step",
+          "text": "תאריך ההפקדה האחרונה ותאריך תחילת ההעסקה נלקחים מהקובץ, ואם חסרים בו — נשמרים מה-CRM. כל כללי הרכיב (כולל זיהוי החלפת הסוכן) עטופים ב-try/catch ריק: אם נזרקת חריגה, שאר הכללים של הרכיב לאותה קופה מדולגים בשקט, והקופה ממשיכה לעדכון.",
+          "tech": "Set Date Fields main.cs:153-169; try { main.cs:117-210 } catch (Exception) { } main.cs:212-214"
+         },
+         {
+          "type": "decision",
+          "text": "האם הוחלף הסוכן של הקופה?",
+          "tech": "agent contract id differs from CRM AND (agency name OR agent name differs)",
+          "branches": [
+           {
+            "label": "כן",
+            "nodes": [
+             {
+              "type": "step",
+              "text": "תאריך מינוי הסוכן בקופה נקבע לעכשיו.",
+              "tech": "gen_agentappointmentdate = DateTime.Now"
+             },
+             {
+              "type": "write",
+              "text": "תאריך מינוי הסוכן מתעדכן גם בשאר הקופות (בכל סטטוס) שערך gen_customeraccountname שלהן זהה לערך שב-CRM לקופה זו. gen_customeraccountname הוא הפניה לישות gen_customeraccount (לפי חבילה 0005_Customer Account).",
+              "tech": "gen_fundmain · update gen_agentappointmentdate · SQL (WHERE gen_customeraccountname = ? AND Gen_fundmainid <> ?; Param_1 = gen_customeraccountnameDB from Check if fund exists; no statecode filter); 0005 writes gen_customeraccountname = EntityReference(\"gen_customeraccount\", …)"
+             }
+            ]
+           },
+           {
+            "label": "לא",
+            "nodes": [
+             {
+              "type": "step",
+              "text": "תאריך מינוי הסוכן נשאר כפי שהוא."
+             }
+            ]
+           }
+          ]
+         },
+         {
+          "type": "step",
+          "text": "כשהתבנית מדורגת ויש ערך גם בקובץ וגם ב-CRM, נשמרים דמי הניהול מה-CRM. כשדמי הניהול מהצבירה ירדו (או לא היו קודם), נרשמים תאריך ההטבה מהצבירה ושם הקובץ. כשדמי הניהול מההפקדה ירדו (או לא היו קודם), נרשמים תאריך ההטבה מההפקדה ושם הקובץ, אבל רק בקופה שאינה מוחרגת מעדכון דמי ניהול מהפקדה. כל כללי הרכיב (כולל נתוני ניתוק, תאריך הקליטה, אינדיקטורים ומכתב הטבה) עטופים ב-try/catch ריק: חריגה, למשל סיבת ניתוק לא מספרית, מדלגת בשקט על הכללים שאחריה לאותה קופה, והקופה עדיין מתעדכנת.",
+          "tech": "Fields From File Or DB main.cs:37-77 (rated template: main.cs:43-48; deposit bonus date + file name only if gen_excludedupdatedepositmfpercentage == false, main.cs:62-77); try { main.cs:31-191 } catch (Exception) { } main.cs:193-195; int.Parse at main.cs:83",
+          "evidence": "DTSX:64909"
+         },
+         {
+          "type": "decision",
+          "text": "האם הקובץ חדש יותר מהקליטה האחרונה של הקופה, והמוצר מזכה בבדיקת הטבה? הזכאות נקבעת לפי תת-המוצר (1, 2, 4 או 5); רק כשאין לקופה תת-מוצר היא נקבעת לפי סוג המוצר.",
+          "tech": "CheckLastRow parses as yyyy/MM/dd AND (gen_mycreateddateDB NULL or < file date) AND (gen_subproduct NOT NULL ? gen_subproduct ∈ {1,2,4,5} : (ProductTypeCode NOT NULL AND ProductTypeCode ∈ {1,2,3,200000,200001,200002})) (main.cs:93-113)",
+          "branches": [
+           {
+            "label": "כן",
+            "nodes": [
+             {
+              "type": "step",
+              "text": "מסומן אינדיקטור הטבה (2 בירידה, 3 בעלייה; שיעור זהה אינו משנה אותו), ומסומן משלוח מכתב הטבה כאשר ההטבה התחילה יותר מ-7 ימי עסקים אחרי פתיחת הקופה לפי לוח הימים הלא-עסקיים. דמי ניהול מהפקדה נבדקים רק כשהקופה אינה מוחרגת. בנוסף, לכל רכיב שלא הושווה (השיעור בקובץ או ב-CRM ריק, או בהפקדה — קופה מוחרגת), אם האינדיקטור ב-CRM הוא 2 ותאריך תחילת העמלה בקובץ שונה מהתאריך ב-CRM, מסומן משלוח מכתב הטבה.",
+              "tech": "Fields From File Or DB main.cs:117-187: deposit only if gen_excludedupdatedepositmfpercentage == false; file < DB → indicator 2 (+BENEFITMAIL if > 7 business days); file > DB → 3; equal → internal -1; internal 0 && DB indicator == 2 && start date != DB (yyyy/MM/dd) → BENEFITMAIL; BENEFITMAIL → gen_letterofbenefitindex",
+              "evidence": "main.cs:101-231"
+             }
+            ]
+           },
+           {
+            "label": "לא",
+            "nodes": [
+             {
+              "type": "step",
+              "text": "האינדיקטורים נשארים כפי שהם ב-CRM."
+             }
+            ]
+           }
+          ]
+         },
+         {
+          "type": "step",
+          "text": "קופה המוחרגת מעדכון דמי ניהול מהפקדה שומרת את השיעור הקיים ב-CRM.",
+          "tech": "Set gen_depositmfpercentage: gen_excludedupdatedepositmfpercentage == TRUE ? gen_depositmfpercentageDB : file"
+         },
+         {
+          "type": "write",
+          "text": "הקופה מתעדכנת ללא בדיקת שינוי: פרטי לקוח, כתובת, דגלים, דמי ניהול, מעסיק, סוכן, סניף, תאריכים, הטבות, חסימה ומסלול, ומסומנת כקיימת בקובץ. היתרות והסכומים המצטברים אינם מתעדכנים, אבל שדה הסכום gen_allowancevalue (ערך הקובץ חלקי 100) כן מתעדכן. ערך ריק מהקובץ נכתב כ-NULL, פרט לשדות שכללי \"קובץ או DB\" ו-Set Date Fields משלימים מה-CRM (ראה ממצא).",
+          "tech": "gen_fundmain · update · SQL (UPDATE Gen_fundmain, Unsupported); gen_existinfile = 1, gen_modifiedbybank = getdate(); gen_allowancevalue = Param_33; not in UPDATE: Gen_AccountBalance, portion totals, yearly deposits/transfers, Gen_FundCurrentYearTotal, Gen_revaluationdate"
+         },
+         {
+          "type": "write",
+          "text": "איש הקשר של הקופה מסומן לחישוב זכאות להלוואה; בקופה של חשבון אין איש קשר ולכן אין שינוי.",
+          "tech": "contact · update gen_loaneligibilitycalculationrequired = 1 · SQL (UPDATE ContactBase)"
+         }
+        ]
+       },
+       {
+        "label": "לא קיימת",
+        "nodes": [
+         {
+          "type": "step",
+          "text": "לקופה החדשה נקבעים בעלים ויוצר (משתמש המערכת), סטטוס פעיל, אינדיקטורי הטבה 1, ותאריך הקליטה מהקובץ.",
+          "tech": "Add System Columns; Set Additional Columns (indicators = 1, gen_mycreateddate = CheckLastRow)"
+         },
+         {
+          "type": "decision",
+          "text": "האם הקופה היא מהצירוף 0149/0743 (שהערת קוד ב-Create Kibutz מכנה Kibutz for Employers)?",
+          "tech": "Is Kibutz: Sector_Code_17 == \"0149\" && gen_subestatetype_STR_INT == \"0743\"",
+          "branches": [
+           {
+            "label": "כן",
+            "nodes": [
+             {
+              "type": "decision",
+              "text": "האם קיימת ב-CRM רשומת קיבוץ עם מספר המעסיק?",
+              "tech": "Get Kibutz: Right('000000000' + gen_accountnumber, 9) = Employer_Number_38 (No Match unconnected)",
+              "branches": [
+               {
+                "label": "כן",
+                "nodes": [
+                 {
+                  "type": "step",
+                  "text": "הקופה מקושרת לקיבוץ.",
+                  "tech": "gen_kibutzname = gen_kibutzid, gen_kibutznumber"
+                 }
+                ]
+               },
+               {
+                "label": "לא",
+                "nodes": [
+                 {
+                  "type": "step",
+                  "text": "הקופה אינה נוצרת, ללא אזהרה."
+                 }
+                ]
+               }
+              ]
+             }
+            ]
+           },
+           {
+            "label": "לא",
+            "nodes": [
+             {
+              "type": "step",
+              "text": "הקופה אינה מקושרת לקיבוץ."
+             }
+            ]
+           }
+          ]
+         },
+         {
+          "type": "write",
+          "text": "נוצרת קופה חדשה עם נתוני הקובץ, כולל היתרות, הסכומים, הקישורים והקיבוץ, ומסומנת כקיימת בקובץ. היצירה אינה כותבת את תאריך דיווח המוטבים, תאריך מינוי הסוכן, שני תאריכי ההטבה בדמי הניהול, שם קובץ ההטבה, סימון מכתב ההטבה ותאריך העדכון מהבנק; אלה נכתבים רק בעדכון קופה קיימת.",
+          "tech": "gen_fundmain · create · SQL (INSERT Gen_fundmainbase, Unsupported); ExchangeRate = 1.0, gen_excludedupdatedepositmfpercentage = 0; INSERT has no gen_updatebenefitsdate (Beneficiary_Reporting_Date_94), gen_agentappointmentdate, gen_updatebonusfromdepositdate, gen_updatebonusfromaccumulationdate, gen_bonusfilename, gen_letterofbenefitindex, gen_modifiedbybank (UPDATE-only)"
+         },
+         {
+          "type": "write",
+          "text": "איש הקשר של הקופה מסומן לחישוב זכאות להלוואה.",
+          "tech": "contact · update gen_loaneligibilitycalculationrequired = 1 · SQL (UPDATE ContactBase)"
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "type": "end",
+      "text": "קופות חדשות נוצרות עם יתרות. בקופות קיימות מתעדכנות עמודות העדכון בלבד (פרטים, דמי ניהול, תיעוד הטבות, חסימה, מסלול ושדה הסכום gen_allowancevalue), והיתרות והסכומים המצטברים, תאריך השערוך, קטגוריית הלקוח, gen_mfratedtotal וקישור הקיבוץ נשארים כפי שהיו. אנשי הקשר של הקופות מסומנים לחישוב זכאות להלוואה."
+     }
+    ]
+   }
+  }
+ ],
+ "findings_he": [
+  {
+   "severity": "high",
+   "text": "כתיבה ישירה ב-SQL לטבלאות מסד ה-CRM (Unsupported): ContactBase ו-CustomerAddressBase (אנשי קשר), AccountBase ו-CustomerAddressBase (חשבונות מינהלי), Account (gen_kibutz), gen_contactlogsbase (INSERT), Gen_fundmain (UPDATE ×2) ו-Gen_fundmainbase (INSERT), ContactBase (gen_loaneligibilitycalculationrequired). הכתיבה עוקפת Plugins/Workflows/Audit ואבטחה של CRM. עובדה: כל רכיבי OLEDBCommand אלו משתמשים בחיבור CRM = psql / ALTSHULER_MSCRM.",
+   "evidence": "DTSX:22692, 34275, 26692, 56520-56728, 61785, 92815, 92870, 93448, 93486; connection manager CRM"
+  },
+  {
+   "severity": "medium",
+   "text": "עדכון קופה קיימת (Update gen_fundmain) אינו כולל את היתרות והסכומים המצטברים: Gen_AccountBalance, Portion totals, הפקדות/העברות השנה, Gen_revaluationdate (gen_allowancevalue כן נכלל, Param_33), וגם לא קיבוץ וקטגוריית לקוח — אלו נכתבים רק ביצירת קופה. עובדה מתוך רשימת העמודות ב-UPDATE; האם הם מתעדכנים במקום אחר — לא ידוע.",
+   "evidence": "DTSX:92870-92873 vs DTSX:61785-61788"
+  },
+  {
+   "severity": "medium",
+   "text": "Update gen_fundmain כותב כל פרמטר כפי שהוא (ללא ISNULL/COALESCE), ו-8 Lookups בזרימה מוגדרים IgnoreFailure (סוכן, סניף, קוד מעמד, חשבון מעסיק, gen_employers, יתרה מצטברת, תבנית MF, מוצר בסוף תקופה). עובדה: כשאין התאמה הערך NULL; השערה: ערך קיים ב-CRM (למשל gen_brokernumber, gen_managementfeepercentage, gen_employernumber) יידרס ל-NULL.",
+   "evidence": "Lookup Match Output errorRowDisposition=\"IgnoreFailure\" DTSX:69913, 69995, 70060, 70123, 70208, 70276, 70358, 70578; SQL DTSX:92873"
+  },
+  {
+   "severity": "medium",
+   "text": "Create Employers: הביטוי gen_address1_line1 = ISNULL(Address_Street_98) && Address_Street_98 != \"\" ? Address_Street_98 + \" \" + Address_Neighborhood_103 : Address_Neighborhood_103 הפוך — כשהרחוב קיים נכתבת רק השכונה, וכשהוא NULL התנאי NULL ולכן גם התוצאה NULL. הרחוב לעולם לא נכתב לכתובת המעסיק (עובדה לפי סמנטיקת SSIS; כנראה חסר \"!\").",
+   "evidence": "DTSX:42592-42596 set bank id value"
+  },
+  {
+   "severity": "medium",
+   "text": "Create Contacts For Minhali: עדכון שם הכתובת (CustomerAddressBase.name = \"ראשי\") מותנה בפרמטר recordsource שמחושב כ-gendercodeDB (מין) ולא כ-gen_recordsorceDB. עובדה מהביטוי; השערה: באג העתקה.",
+   "evidence": "DTSX:27007-27010 Derived Column recordsource; DTSX:34352-34360"
+  },
+  {
+   "severity": "medium",
+   "text": "Update fields by mobilephone and email: Row.isUpdateCustomerPreference נקבע true לפני הבדיקה אם ההעדפה זהה ל-DB; האיפוס בשורה 150 משנה רק משתנה מקומי ולכן נרשם gen_contactlogs גם כשההעדפה לא השתנתה (עם ערכי ה-DB). עובדה מהקוד.",
+   "evidence": "Update fields by mobilephone and email main.cs:125-151 @DTSX:34792"
+  },
+  {
+   "severity": "medium",
+   "text": "Fields From File Or DB עטוף ב-try/catch ריק. הגישה Row.genexcludedupdatedepositmfpercentage == false (שורה 62) נעשית ללא בדיקת IsNull. אם gen_excludedupdatedepositmfpercentage הוא NULL ואם קריאת ערך חסר זורקת חריגה (לפי התנהגות SSIS המתועדת, לא מוצג בקבצים), אז החריגה נבלעת, וכל הכללים שאחרי שורה 62 (תאריך ההטבה מההפקדה, נתוני ניתוק, gen_mycreateddate, אינדיקטורי הטבה, מכתב הטבה) לא מופעלים לאותה קופה, בשקט; הקופה עדיין מתעדכנת.",
+   "evidence": "Fields From File Or DB main.cs:29-196 @DTSX:64909"
+  },
+  {
+   "severity": "medium",
+   "text": "Handale financial track: investmentPeriodMap מכיל רק 6/12/24 ואין try/catch; int.Parse על תאריכי השקעה ללא TryParse. השערה: ערך אחר בקובץ יכשיל את רכיב הזרימה ואת כל Minhali daily.",
+   "evidence": "Handale financial track main.cs:11-16, 33-41, 97 @DTSX:70602"
+  },
+  {
+   "severity": "low",
+   "text": "Create Employer: gen_corporatename נכתב רק אם gen_activecustomernumber אינו NULL (בדיקת עמודה אחרת); gen_estatecodetype נכתב מאותו ערך כמו gen_employernumberestate, ותוצאת Get fund estate code (gen_estatetypename) לא נכתבת. בעדכון מעסיק gen_inputsource לא נכתב למרות החישוב ב-Set inputsource for update employers.",
+   "evidence": "Create Employer main.cs:178-191 @DTSX:37310; DTSX:42804-42808; Update Employer main.cs @DTSX:45273"
+  },
+  {
+   "severity": "low",
+   "text": "Create Kibutz: כשל ביצירת gen_kibutz מנותב ליציאת Error שאינה מחוברת — השורה נעלמת בלי עדכון החשבון ובלי אזהרה.",
+   "evidence": "Create Kibutz main.cs:79-83 @DTSX:48522; Error outputs unconnected (×5)"
+  },
+  {
+   "severity": "low",
+   "text": "Get fund MF template data: ברירת המחדל כשאין מדרגה ≥ היתרה היא max(gen_maxamount) מכל gen_fundmftemplates ללא סינון לתבנית/בנק/סטטוס. השערה: אם המקסימום הכללי שונה מהמקסימום של התבנית — אין התאמה ודמי הניהול NULL.",
+   "evidence": "DTSX:70300-70312"
+  },
+  {
+   "severity": "low",
+   "text": "Set Deposit Mf Percentage: כשרמת סוג הקופה (209) היא המינימום, האחוז מוחלף אך תאריכי ההתחלה/סיום נשארים של הרמה הקודמת. עובדה מהקוד; כוונה לא ידועה.",
+   "evidence": "Set Deposit Mf Percentage main.cs:63-78 @DTSX:77381"
+  },
+  {
+   "severity": "low",
+   "text": "Set Files: ההערה אומרת מיון יורד לקבלת הקובץ האחרון, אבל הקוד ממיין בסדר עולה ומעבד את כל הקבצים התואמים. העברה לארכיון מושבתת.",
+   "evidence": "Set Files ScriptMain.cs:63-76 @DTSX:101589; DTSX:99361, 99370"
+  },
+  {
+   "severity": "low",
+   "text": "בזרימות אנשי קשר/חשבונות מינהלי ביטול הכפילויות קורה לפני החלפת לקוח לא מזוהה ל-\"000000000\"; כמה מזהים 0/1/18 שונים יהפכו לאותו מפתח אחרי הדה-דופליקציה.",
+   "evidence": "Remove Duplicate @DTSX:28925 → Check if customer id number DTSX:24034; remove duplicates account @DTSX:19388 → DTSX:15211"
+  },
+  {
+   "severity": "info",
+   "text": "שמות \"לקוח לא ידוע\" לא אחידים: חשבונות → name=\"לקוח לא ידוע\"; איש קשר → lastname=\"לקוח\", firstname=\"לא ידוע\"; קופה → Last_Name_9=\"לא ידוע\", First_Name_10=\"לקוח\" (gen_customername=\"לא ידוע לקוח\"). בחשבונות מעסיקים המספר לא מוחלף ל-\"000000000\".",
+   "evidence": "DTSX:9511, 21009-21015, 31323-31335, 81058-81076"
+  },
+  {
+   "severity": "info",
+   "text": "שורות \"estate type 210\" ו-\"Other Customers\" נזרקות בלי אזהרה (יציאות לא מחוברות) בזרימות Create Contacts For Minhali, Create Accounts For Minhali ו-Minhali daily. ב-Minhali daily: שורה בלי מספר מוצר (gen_fundtypenumber ריק או \"0000\") נזרקת בלי אזהרה (יציאת \"No product\" לא מחוברת); שורה שמספר המוצר שלה לא נמצא ב-CRM בבנק 10, או שאיש הקשר או החשבון שלה לא נמצאו, מייצרת אזהרת ETL ואינה נקלטת.",
+   "evidence": "DTSX:59886, 59902, 23604, 23620, 15003, 15019; Set Warning columns 1/1 1/1 2; DTSX:59959-59990 No product output unconnected"
+  },
+  {
+   "severity": "info",
+   "text": "Create Accounts For Minhali (Check if account exists) ו-Create Kibutz (Is Account Exists) מאתרים חשבון לפי מספר בלי סינון statecode, ולכן גם חשבון לא פעיל נמצא: ב-Create Accounts For Minhali החשבון שנמצא מתעדכן בכל מקרה, וב-Create Kibutz קיבוץ חדש מקושר אליו. Create Account For Employers, Create Employers ו-Minhali daily (Check if account exists, Get corporate number 1) מחפשים חשבון עם statecode = 0 בלבד.",
+   "evidence": "DTSX:15077, 53490 vs DTSX:4164, 37035, 60003, 70084"
+  },
+  {
+   "severity": "info",
+   "text": "14 רכיבי Lookup מגדירים errorRowDisposition=\"IgnoreFailure\" ביציאת ה-Match: 3 ב-Create Account For Employers, 3 ב-Create Employers ו-8 ב-Minhali daily. הנתון שמור ב-evidence JSON (errorRowDisposition ברמת output). לפי התנהגות SSIS המתועדת (לא מוצג בקבצים), שורה בלי התאמה ממשיכה עם NULL בעמודות שה-Lookup מוסיף.",
+   "evidence": "evidence/0004_LeumiFile-MY.json (outputs[].errorRowDisposition); tools/dtsx-extract.mjs:249; DTSX:7417, 7484, 7555, 40613, 40678, 40745, 69913, 69995, 70060, 70123, 70208, 70276, 70358, 70578"
+  },
+  {
+   "severity": "info",
+   "text": "השערה: חיפוש ימים לא-עסקיים עושה DataTable.Select עם dateTo.ToString() (תלוי Culture ושעה 00:00); אם starttime ב-CalendarRule שמור ב-UTC או בשעה אחרת — חגים לא יימצאו וכל הימים ייחשבו ימי עסקים.",
+   "evidence": "Fields From File Or DB main.cs:216-231 @DTSX:64909; DTSX:99383"
+  },
+  {
+   "severity": "medium",
+   "text": "Minhali daily: בשכיר שעובר את \"מעמד במיגזר תואם\" ונמצאה לו רשומת gen_employers, השדה gen_employername (חשבון המעסיק לפי Employer_Number_38) מוחלף בחשבון התאגיד שרשום ברשומת המעסיק (gen_corporatename), ולכן הקופה מקושרת לחשבון התאגיד של ההסכם ולא בהכרח לחשבון שמספרו Employer_Number_38. עובדה מהגדרת ה-Lookup; אם זו הכוונה העסקית — לא ידוע.",
+   "evidence": "get Employer input column gen_employername: CopyFromReferenceColumn = gen_corporatename (DTSX:70197-70200); Get corporate number 1 → gen_employername (DTSX:70082-70123); written to gen_fundmain.gen_employername (Create gen_FundMain Param_39, Update gen_fundmain Param_30)"
+  },
+  {
+   "severity": "medium",
+   "text": "Update Employer: כשסטטוס הפעילות שונה מה-CRM (בהשוואה ערך הקובץ נחשב true רק אם הוא \"1\"), הקוד מבצע Convert.ToBoolean על ערך הקובץ, שהוא טקסט בן תו אחד (wstr(1)). לפי התנהגות .NET המתועדת Convert.ToBoolean(string) מקבל רק \"True\"/\"False\" ומחזיר false עבור null. לכן: אם בקובץ יש ערך, נזרקת FormatException, השורה מנותבת ל-CastingError (אזהרת ETL) ואף שינוי של אותו מעסיק אינו נכתב. אם בקובץ אין ערך וב-CRM יש ערך: אם קריאת ערך חסר זורקת חריגה (לפי התנהגות SSIS המתועדת, לא מוצג בקבצים), התוצאה זהה; אם היא מחזירה null, המעסיק מתעדכן עם gen_isactiveemplyer = false. בקוד היצירה אותו ערך מומר קודם ל-int ואחר כך ל-bool.",
+   "evidence": "Update Employer main.cs:200-203, 229-238 @DTSX:45273; Helpers.cs bool compare (\"1\"/\"true\"); Create Employer main.cs:166-171 @DTSX:37310; gen_isactiveemplyer wstr(1) (DTSX:41012)"
+  },
+  {
+   "severity": "low",
+   "text": "Create Kibutz: רכיב הריפוד ממיר ערך ריק של מספר המעסיק או מספר הזיהוי למחרוזת אפסים (IsNullOrEmpty → \"\" → PadLeft). לכן, אם קריאת ערך חסר מחזירה null, הבדיקות \"מספר לא ריק\" ב-Set AccountName And AccountNumber אינן חוסמות שורה בלי מספר, ושורה כזו מחפשת חשבון ורשומת קיבוץ במספר אפסים (למשל חשבון \"לקוח לא ידוע\" 000000000). אם קריאת ערך חסר זורקת חריגה (לפי התנהגות SSIS המתועדת, לא מוצג בקבצים), הזרימה נכשלת במקום זאת.",
+   "evidence": "Add 0 to short id num main.cs:63-67 @DTSX:47597 (IsNullOrEmpty → \"\" → PadLeft '0'); Set AccountName And AccountNumber main.cs:122, 134 @DTSX:53631 (IsNullOrWhiteSpace guards)"
+  },
+  {
+   "severity": "medium",
+   "text": "עדכוני ה-SQL הישירים כותבים את ערכי הזרימה כמות שהם, ללא ISNULL/COALESCE וללא בדיקת שינוי. לכן אם שדה בקובץ ריק (NULL אחרי Trim), העדכון כותב NULL במקום הערך הקיים: כך ב-AccountBase (שם, בניין, עיר, דואר חוזר, תאריך לידה, תא דואר) ובכתובת החשבון; ב-ContactBase (מין, שמות, מספר לקוח בנק, כתובת, תאריכים, תא דואר; ת\"ז, טלפונים ופקס כש-gen_recordsorce = 1) ובכתובת איש הקשר; וב-Gen_fundmain בעמודות שאין להן כלל השלמה מה-CRM. חריגים: דוא\"ל ונייד של איש קשר מוגנים ב-CASE (רק כשהשדה ב-CRM ריק). בקופה קיימת, לפני העדכון: Fields From File Or DB מחזיר את ערך ה-CRM לתאריך ניתוק (כשבקובץ NULL), לסיבת ניתוק (כשבקובץ 0: ערך ה-CRM, או NULL אם ב-CRM 0 או NULL), לאינדיקטורי דמי ניהול מהפקדה ומצבירה (מתחילים מערך ה-CRM), לאחוז דמי ניהול (כש-gen_mfratedtotal = true ושני הערכים קיימים), ל-gen_mycreateddate (כשתאריך ה-CRM מאוחר או שווה לתאריך הקובץ) ול-gen_bonusfilename (כשקיים ב-CRM, אלא אם הוחלף בשם הקובץ); Set Date Fields משלים מה-CRM תאריך הפקדה אחרונה ותאריך תחילת העסקה כשהם ריקים בקובץ; ודמי ניהול מהפקדה נשמרים מה-CRM כשהקופה מוחרגת. כללי Fields From File Or DB ו-Set Date Fields עטופים ב-try/catch ריק (ראה ממצא 7), ואם נזרקת בהם חריגה, הכללים שאחריה לא מופעלים לאותה קופה.",
+   "evidence": "Create Accounts For Minhali\\Update Account DTSX:22692-22712 (UPDATE AccountBase … name = ?, …); Create Contacts For Minhali\\UPDate contact and CustomerAddress DTSX:34275-34360 (update ContactBase set gendercode = ?, firstname = ?, …); Minhali daily\\Update gen_fundmain DTSX:92870-92873; Trim String Fields (\"\" → NULL); Fields From File Or DB main.cs:37-100 @DTSX:64909; Set Date Fields main.cs:153-169 @DTSX:75240"
+  }
+ ]
+}

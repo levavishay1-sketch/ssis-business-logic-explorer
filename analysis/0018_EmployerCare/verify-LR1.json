@@ -1,0 +1,70 @@
+{
+  "verifier": "ssis-verifier",
+  "package": "0018_EmployerCare",
+  "scope": "logic-claims re-check after fixes",
+  "checkedAt": "2026-11-07T12:00:00.000Z",
+  "checked": 6,
+  "results": [
+    {
+      "id": "L|finding#2",
+      "hash": "0c9940926894",
+      "verdict": "CONFIRMED",
+      "detail": "Re-derived from main.cs of Update employer care: the only Fault handling is '//ErrorBuffer.AddRow(); //ErrorBuffer.Description = resultItem.Fault.Message;' (commented out, main.cs:167-168 = DTSX:1963-1964). The Error output is asynchronous (no synchronousInputId, DTSX:2463) so it receives rows only via AddRow, so it never receives rows; it is connected to Union All (path DTSX:2475). ExecuteBulk/ProcessInput have no try/catch, so an exception thrown by ExecuteMultipleRequest fails the component and the data flow. The task-level OnError handler (DTSX:34-41) runs script 'Error ETL Process record' which updates gen_etlprocess (statuscode 277880001, gen_runtime) and creates an annotation with subject 'Error Description' and notetext = System::ErrorDescription (DTSX:236-256). CRM.Proxy logging is external_unknown. All statements match. Note (not a defect of this claim): batches already sent before the exception stay committed, and because Close Gen_employercare -> Update operation person is a Success constraint (DTSX:7927), a failure also skips the operation-person sync; this is covered by L|exec.",
+      "evidence": "DTSX:1797-1987 (main.cs 127-191), DTSX:2460-2465 outputs, DTSX:2475 path, DTSX:34-41 OnError, DTSX:236-256 handler script, DTSX:7927",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Close Gen_employercare|title",
+      "hash": "a175f2522039",
+      "verdict": "CONFIRMED",
+      "detail": "Source SQL (DTSX:1425-1432): Gen_CurrentState = 2 AND (Gen_depositereason not IN (6,7,8,9,11) or Gen_depositereason is null), inner joins to gen_customeraccount and Gen_fundmain (one row per fund). Lookup Get All Transaction (DTSX:1362-1369): gen_fundnumber from gen_ftcurrentyear JOIN Gen_fundtransactiontype WHERE Gen_fundtransactiontype.gen_transgrouptype = 1 AND gen_transactiontypeid NOT LIKE '%99%'; join gen_fundmainid = gen_fundnumber (DTSX:1388-1390). Aggregate groups by Gen_employercareid (AggregationType 0, DTSX:580-581). main.cs sets gen_currentstate = OptionSetValue(3) //Finished and gen_modifiedbybank = DateTime.Now. The 'current year' meaning is labelled as hypothesis; 'open' is accompanied by the exact state (2). gen_ftcurrentyear.gen_fundnumber exists as a qualified column in 0009_LeumiFile-BY.dtsx, so the fund column belongs to the transaction table.",
+      "evidence": "DTSX:1362-1390, 1425-1432, 554-589, main.cs 127-137 (DTSX:1923-1933)",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Close Gen_employercare|short",
+      "hash": "593ded05d241",
+      "verdict": "WRONG",
+      "detail": "Units 2-6 are correct (decision operator NOT LIKE '%99%' now right, group 1 on the transaction type, write = state 3 + run time, no-match = unchanged). Unit 1 states the population as 'open employer-care records not in excluded deposit reasons' and drops the actual state filter Gen_CurrentState = 2. The SQL selects only state 2; 'open' is not equal to state 2 (the package's own open question [1] says the meaning of state 2 is unknown), so other non-finished states are not processed. Unit 7 repeats the over-generalisation ('employer-care records for which a transaction arrived are closed automatically') without the state-2 / deposit-reason restriction.",
+      "evidence": "DTSX:1430-1432 (WHERE Gen_employercare.Gen_CurrentState = 2 AND (...))",
+      "wrongUnits": [
+        {
+          "unit": 1,
+          "problem": "Population described as 'פתוחות' without the state condition; the code selects only Gen_CurrentState = 2, and 'open = state 2' is not proven (open question [1]).",
+          "correct": "המערכת מאתרת רשומות טיפול מעסיק במצב 2 (Gen_CurrentState = 2) שסיבת ההפקדה שלהן ריקה או שונה מ-6/7/8/9/11, יחד עם קופות חשבון הלקוח שלהן.",
+          "evidence": "DTSX:1425-1432"
+        },
+        {
+          "unit": 7,
+          "problem": "End statement generalises to all employer-care records with a transaction; only state-2 records with empty / non-excluded deposit reason are closed.",
+          "correct": "טיפולי מעסיק במצב 2 (סיבת הפקדה ריקה או שאינה 6/7/8/9/11) שלאחת מקופות החשבון שלהם יש תנועה מתאימה עוברים למצב 3.",
+          "evidence": "DTSX:1425-1432"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Close Gen_employercare|detailed",
+      "hash": "6d450731c729",
+      "verdict": "CONFIRMED",
+      "detail": "All 12 units re-derived. [1] matches DTSX:1430-1432 incl. NULL. [2] inner joins DTSX:1428-1429. [3] Lookup SQL DTSX:1364-1369, CacheType 0 = full (DTSX:1377). [4]-[8] JoinToReferenceColumn gen_fundnumber on gen_fundmainid (DTSX:1388-1390), NoMatchBehavior 1 (DTSX:1379), No Match output has no path (paths DTSX:2473-2478), so unmatched fund rows are dropped. [9] Aggregate group-by Gen_employercareid (DTSX:580-581). [10] OptionSetValue(3)//Finished, DateTime.Now, Update via ExecuteMultipleExtension in batches of 100 plus a final flush at EndOfRowset; meaning of gen_modifiedbybank labelled hypothesis. [11] commented ErrorBuffer lines; exception path to OnError handler which updates gen_etlprocess and creates an annotation (DTSX:236-256). [12] end summary, preceded by the exact population in [1].",
+      "evidence": "DTSX:1362-1436, 554-589, 2473-2478, main.cs 127-191 (DTSX:1923-1987), DTSX:34-41, 236-256",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Close Gen_employercare|detail",
+      "hash": "1b48fc2b6c61",
+      "verdict": "CONFIRMED",
+      "detail": "[1] NULL or not in 6,7,8,9,11 with state 2, joined to all Gen_fundmain of the customer account (DTSX:1425-1432). [2] Lookup gen_fundmainid = gen_fundnumber, Gen_fundtransactiontype.gen_transgrouptype = 1 and gen_transactiontypeid NOT LIKE '%99%'; entity.Id = Row.Genemployercareid (main.cs:131). [3] No date condition exists in either query; No Match unconnected. [4] OptionSetValue(3) literal at main.cs:132, DateTime.Now at main.cs:133 (local clock of the machine running the package). [5] consistent with finding#2.",
+      "evidence": "DTSX:1362-1390, 1425-1432, main.cs 127-137 (DTSX:1923-1933), 164-171",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Close Gen_employercare|decisions",
+      "hash": "8ca2449de617",
+      "verdict": "CONFIRMED",
+      "detail": "[1] verbatim of DTSX:1430-1432. [2] set expression reproduces the Lookup SQL exactly, including the Gen_fundtransactiontype qualifier and NOT LIKE '%99%' (DTSX:1364-1369); outcome no-match = dropped matches NoMatchBehavior 1 with no path. [3] 'if (Row.Genemployercareid_IsNull) return;' at main.cs:127.",
+      "evidence": "DTSX:1364-1369, 1379, 1430-1432, 2473-2478, main.cs:127 (DTSX:1923)",
+      "wrongUnits": []
+    }
+  ]
+}

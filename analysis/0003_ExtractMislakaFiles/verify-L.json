@@ -1,0 +1,122 @@
+{
+  "verifier": "ssis-verifier",
+  "package": "0003_ExtractMislakaFiles",
+  "scope": "logic-claims all",
+  "checkedAt": "2026-11-07T11:38:15.067Z",
+  "checked": 15,
+  "results": [
+    {
+      "id": "L|summary",
+      "hash": "69384a024d1d",
+      "verdict": "CONFIRMED",
+      "detail": "Clear Archive and WorkFolder deletes subfolders (AllDirectories) of ArchivePath and DestPath whose creation time is more than 7 days ago (ScriptMain.cs:96-110). Extract Mislaka Files then extracts each <ZipFileName>*.7z, found recursively in SourcePath, to DestPath+<file name without extension>, and moves the 7z to ArchivePath+yyyyMMdd (ScriptMain.cs:34-74). Package ObjectName is ExtractMislakaFiles; 'pension clearing house' is correctly labelled השערה. Scope note: SharpCompress Reference/HintPath at DTSX:818-819; the 4 variables are 'fromDB' (DTSX:11-22); gen_etlvariable query with gen_scope='global' OR ? mapped to System::PackageName (DTSX:1232-1239). There are no configurations, no event handlers, no log provider and no ETL process record. The only connection (Psql -> Psql/ALTSHULER_MSCRM) serves that SELECT; there is no DML, no SDK, and the scripts only touch the file system (Directory.Delete, File.Delete, File.Move).",
+      "evidence": "DTSX:3-22, 25, 354-365, 634, 818-819, 905-947, 1232-1239, 2071-2072"
+    },
+    {
+      "id": "L|exec",
+      "hash": "9fcfb9c06a0a",
+      "verdict": "CONFIRMED",
+      "detail": "There are 2 constraints, both without DTS:Value (so Success) and LogicalAnd, with no expression. The order is Get Organization Variables -> Clear Archive and WorkFolder (2071) -> Extract Mislaka Files (2072). No disabled executables.",
+      "evidence": "DTSX:2071-2072"
+    },
+    {
+      "id": "L|ignored",
+      "hash": "b86d29ca9d23",
+      "verdict": "CONFIRMED",
+      "detail": "Get Etl Variables / Set Variables only load the 4 path variables from gen_etlvariable (Set Variables throws if a key is missing). Clear Archive and WorkFolder only deletes old folders on disk. It has no CRM write and no business filter, and it produces no data that reaches CRM (its failure risk is covered by finding#2).",
+      "evidence": "Set Variables main.cs:100-126; Clear ScriptMain.cs:94-113"
+    },
+    {
+      "id": "L|finding#1",
+      "hash": "73aaec158548",
+      "verdict": "CONFIRMED",
+      "detail": "There is no SDK reference or call. The only SQL is the SELECT from gen_etlvariable. Clear ScriptMain.cs:109 uses Directory.Delete; Extract ScriptMain.cs:51-52 uses File.Delete and File.Move.",
+      "evidence": "DTSX:1232; Clear ScriptMain.cs:109; Extract ScriptMain.cs:51-52"
+    },
+    {
+      "id": "L|finding#2",
+      "hash": "cb8c0213262d",
+      "verdict": "CONFIRMED",
+      "detail": "The list is built with GetDirectories(..., \"*.*\", SearchOption.AllDirectories), so it includes nested folders. Directory.Delete(path, true) on the parent removes the child. A later Directory.Delete on the missing child throws DirectoryNotFoundException, Main has no try/catch, and the Success-only constraint 2072 blocks Extract. The finding is worded conditionally.",
+      "evidence": "Clear ScriptMain.cs:99-110 (DTSX:354-365); DTSX:2072; Extract ScriptMain.cs:69 ExtractFullPath=true"
+    },
+    {
+      "id": "L|finding#3",
+      "hash": "607590767641",
+      "verdict": "CONFIRMED",
+      "detail": "Extract Main and Extract7z have no try/catch. The package has no event handlers, no log provider and no ETL process record. Files processed before a failing file have already been moved (File.Move inside the loop); later files are not processed.",
+      "evidence": "Extract ScriptMain.cs:32-74 (DTSX:905-947); no EventHandlers/LogProviders in DTSX"
+    },
+    {
+      "id": "L|finding#4",
+      "hash": "b2d4b5d90e75",
+      "verdict": "CONFIRMED",
+      "detail": "Line 37 is Path.Combine(ArchivePath + yyyyMMdd), a single argument, so the strings are just concatenated. Line 46 is destPath + GetFileNameWithoutExtension. Without a trailing '\\' the folders become siblings of the intended folder. The finding is worded conditionally.",
+      "evidence": "Extract ScriptMain.cs:37,46"
+    },
+    {
+      "id": "L|finding#5",
+      "hash": "8d9e69945911",
+      "verdict": "INCOMPLETE",
+      "detail": "The recursive search is correct (line 39), and so is the conditional premise. The stated consequence ('re-extracted and re-archived') holds only for 7z files sitting in an archive folder of an EARLIER day. For a file already in TODAY's archive folder (a second run on the same day), archiveFullName equals the found path. File.Exists is true, File.Delete deletes the archived file itself (line 51), and File.Move then throws FileNotFoundException (line 52). The archived 7z is lost and the task fails, so the remaining files are not processed.",
+      "evidence": "Extract ScriptMain.cs:39-52",
+      "wrongUnits": [
+        {
+          "unit": 0,
+          "problem": "Missing consequence",
+          "correct": "If ArchivePath lies under SourcePath, a second run on the same day finds today's archived 7z files. For each, line 51 deletes the file itself and line 52 then throws, so the archived copy is lost and the package fails at that file. Files from earlier days are re-extracted and moved into today's folder. This depends on the runtime path values.",
+          "evidence": "Extract ScriptMain.cs:37,39,49-52"
+        }
+      ]
+    },
+    {
+      "id": "L|finding#6",
+      "hash": "50c516827ca9",
+      "verdict": "CONFIRMED",
+      "detail": "Clear deletes every DestPath subfolder (recursive) with creation time older than 7 days, so extracted content is kept only about a week. Note: the creation time of a reused extract folder is not refreshed by later extractions.",
+      "evidence": "Clear ScriptMain.cs:103-109"
+    },
+    {
+      "id": "L|Package\\Extract Mislaka Files|title",
+      "hash": "0ce6d22c3ce2",
+      "verdict": "CONFIRMED",
+      "detail": "Every flow step matches ScriptMain.cs:34-74 (search pattern, conditional archive folder creation, extraction with Overwrite, delete-then-move into the archive).",
+      "evidence": "Extract ScriptMain.cs:34-74 (DTSX:907-947)"
+    },
+    {
+      "id": "L|Package\\Extract Mislaka Files|short",
+      "hash": "96a6ff89eb22",
+      "verdict": "CONFIRMED",
+      "detail": "Matches lines 39-56. When no file is found the task just returns Success.",
+      "evidence": "Extract ScriptMain.cs:39-56"
+    },
+    {
+      "id": "L|Package\\Extract Mislaka Files|detailed",
+      "hash": "97f65c33d683",
+      "verdict": "CONFIRMED",
+      "detail": "Re-derived all 18 units against the code. Variables come from gen_etlvariable with the PackageName scope. Archive path is concatenated (single-argument Path.Combine). GetFiles uses AllDirectories. Branch on Length > 0. CreateDirectory for archive and extract folders. SharpCompress ExtractAllEntries skips directories, with ExtractFullPath=true and Overwrite=true. A same-named archive file is deleted, then File.Move. There is no try/catch and no event handlers.",
+      "evidence": "Extract ScriptMain.cs:32-74; DTSX:1232-1239"
+    },
+    {
+      "id": "L|Package\\Extract Mislaka Files|detail",
+      "hash": "8063d2e886bb",
+      "verdict": "CONFIRMED",
+      "detail": "Population, file-name-based matching, the 3 decisions, no CRM write (read-only gen_etlvariable), and the outcome are all correct. The consumer is correctly stated as unproven.",
+      "evidence": "Extract ScriptMain.cs:39-71; DTSX:1232"
+    },
+    {
+      "id": "L|Package\\Extract Mislaka Files|decisions",
+      "hash": "ff94e23f7d64",
+      "verdict": "CONFIRMED",
+      "detail": "All 4 conditions are quoted correctly from code: Extract lines 39-40, 50-52 and 66-71, and Clear lines 99-109.",
+      "evidence": "as listed"
+    },
+    {
+      "id": "L|Package\\Extract Mislaka Files|open",
+      "hash": "1c73d607eaad",
+      "verdict": "CONFIRMED",
+      "detail": "The scope parameter is System::PackageName and the package ObjectName is ExtractMislakaFiles. The path values, the consumer, the inner structure of the 7z files and the deployed SharpCompress version are not in the files: the csproj Reference has no Version and only a local HintPath.",
+      "evidence": "DTSX:1238; DTSX:818-819; package header ObjectName"
+    }
+  ]
+}

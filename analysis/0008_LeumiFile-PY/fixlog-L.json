@@ -1,0 +1,1939 @@
+{
+ "changes": [
+  {
+   "claimId": "L|summary",
+   "field": "summary_he",
+   "before": "החבילה קולטת את קובץ ה-PY היומי של בנק לאומי (תנועות ובקשות בקופות של בנק 10), טוענת אותו ל-Staging ומעדכנת לפיו את CRM: מוסיפה תנועות חדשות לטבלת התנועות של השנה השוטפת (Gen_ftCurrentYear) בהכנסת SQL ישירה למסד CRM (Unsupported), מסמנת את איש הקשר לחישוב זכאות להלוואה ומסמנת זיהוי הפקדה לחודש שכר מדווח. בנוסף, להעברות בין מסלולים באותו חשבון היא יוצרת דרך CRM SDK קופה במסלול היעד (gen_fundmain), בקשת העברה נכנסת (gen_transferin) ומסלולי חשבון/פיצולי מסלול (gen_accountcourses / gen_coursepartition).",
+   "after": "החבילה קולטת את קובץ ה-PY היומי של בנק לאומי (תנועות ובקשות בקופות של בנק 10), טוענת אותו ל-Staging ומעדכנת לפיו את CRM: מוסיפה תנועות חדשות לטבלת התנועות של השנה השוטפת (Gen_ftCurrentYear) בהכנסת SQL ישירה למסד CRM (Unsupported), מסמנת את איש הקשר לחישוב זכאות להלוואה ומסמנת זיהוי הפקדה לחודש שכר מדווח. בנוסף, להעברות בין מסלולים באותו חשבון (פעולה 57, אותו חשבון ואותו סוג קופה) היא יוצרת דרך CRM SDK קופה במסלול היעד (gen_fundmain) ובקשת העברה נכנסת (gen_transferin). מסלולי חשבון ופיצולי מסלול (gen_accountcourses / gen_coursepartition) נוצרים דרך SDK לשורות בקובץ בלי סינון לפי סוג פעולה: לכל שורה שמזהה הבקשה (Request_ID_74) וחשבון היעד (Target_Fund_AccountNumber_47) שלה תואמים gen_transferin קיים ב-CRM, בלי סינון לפי מצב ההעברה או לפי התהליך שיצר אותה.",
+   "why": "מסלולי חשבון ופיצולי מסלול אינם מוגבלים להעברות בין מסלולים שהחבילה יצרה: ה-Data Flow לא מסנן לפי סוג פעולה, וה-Lookup מוצא כל gen_transferin לפי מזהה בקשה וחשבון יעד.",
+   "evidence": "source/DailyProcess/0008_LeumiFile-PY.dtsx: Create Acount Courses data flow – PY File Data From Staging → Trim → Check For Last Row → Append Zeros → get tranferin (DTSX:5916-5940, SqlCommandParam: Gen_transferin join Gen_customeraccount on gen_customeraccountdest, where Gen_bankaccountnumber = ? and gen_requestidentifier = ?) – אין Conditional Split לפי Action_Type_56 / Transfer_Type_2",
+   "verifierAccepted": true
+  },
+  {
+   "claimId": "L|ignored",
+   "field": "ignoredAsFramework[11]",
+   "before": "<בכל Data Flow> Set Task Name Variable, Trim All Input Columns, Count*/Row*Count, Multicast שמזין מונים, Add Column for etl process warning, insert etl process warning*, Set Error columns*, Set Warning columns*, Get Error Description, Union All Error*/Union All Errors",
+   "after": "<בכל Data Flow> Set Task Name Variable, Count*/Row*Count, Multicast שמזין מונים, Add Column for etl process warning, insert etl process warning*, Set Error columns*, Set Warning columns*, Get Error Description, Union All Error*/Union All Errors",
+   "why": "Trim All Input Columns משנה ערכים: הוא מקצץ רווחים בכל עמודות הטקסט שבקלט שלו לפני הסינונים, החיפושים והכתיבה ל-CRM. הוסר מרשימת התשתית ותואר כשלב ב-detailed של כל אחד מארבעת ה-Data Flows.",
+   "evidence": "source/DailyProcess/0008_LeumiFile-PY.dtsx: FT\\Trim All Input Columns (DTSX:70288) main.cs:51-58; Create fundmain (DTSX:36458), Create transferin Maslulim (DTSX:50487), Create Acount Courses (DTSX:19996) main.cs:42-48 (str.Trim() כשהערך אינו ריק)",
+   "verifierAccepted": true
+  },
+  {
+   "claimId": "L|Package\\Get Sytem User Id|title",
+   "field": "short_he",
+   "before": "מאתר את משתמש המערכת שמריץ את החבילה (לפי שם דומיין), את היחידה העסקית, הארגון ומטבע \"שקל חדש\". ערכים אלה נרשמים כבעלים/יוצר/מעדכן ומטבע ברשומות שהחבילה יוצרת.",
+   "after": "מאתר את משתמש ה-CRM ששם הדומיין שלו שווה לערך UserDomainName שמוגדר בטבלת gen_etlvariable, את היחידה העסקית שלו, את הארגון ואת מטבע \"שקל חדש\". המשתמש והיחידה נרשמים כבעלים/יוצר/מעדכן רק ברשומות התנועה (Gen_ftCurrentYearBase); המטבע נרשם בתנועות ובבקשות ההעברה הנכנסות (gen_transferin).",
+   "why": "המשתמש אינו מי שמריץ את החבילה אלא המשתמש שהוגדר ב-UserDomainName; הערכים לא נרשמים בכל הרשומות שהחבילה יוצרת.",
+   "evidence": "source/DailyProcess/0008_LeumiFile-PY.dtsx: Get User Id DTSX:84654-84661 (select systemuserid, BusinessUnitId from systemuser where lower(domainname) = ?; ParameterMapping → {875510C6…} = User::UserDomainName, DTSX:278); Get Organization Variables: select gen_key, gen_value from gen_etlvariable where gen_scope = global / LeumiFile-PY (DTSX:82694) → Set Organization Variables main.cs:100-107; source/DailyProcess/0008_LeumiFile-PY.dtsx: FT\\Create System Columns DTSX:57723-57731 (OwningBusinessUnit, OwningUser, ModifiedBy, CreatedBy, OwnerId = UserId/BusinessUnitId; TransactionCurrencyId); SDK Create gen_TransferIn DTSX:43947-43949 (transactioncurrencyid בלבד); אין ownerid/transactioncurrencyid בסקריפטי gen_fundmain / gen_accountcourses / gen_coursepartition; CrmProxy(ServerName, OrganizationName) DTSX:6483 – רכיב חיצוני CRM.Proxy שלא סופק",
+   "verifierAccepted": true
+  },
+  {
+   "claimId": "L|Package\\Get Sytem User Id|short",
+   "field": "short.nodes[0].text",
+   "before": {
+    "type": "step",
+    "text": "המערכת מזהה את משתמש CRM שבשמו מתבצעת הטעינה ואת היחידה העסקית שלו."
+   },
+   "after": {
+    "type": "step",
+    "text": "המערכת מאתרת את משתמש ה-CRM ששם הדומיין שלו מוגדר בהגדרות הטעינה, ואת היחידה העסקית שלו."
+   },
+   "why": "המשתמש נבחר לפי ערך מוגדר (UserDomainName), לא לפי זהות ההרצה.",
+   "evidence": "source/DailyProcess/0008_LeumiFile-PY.dtsx: Get User Id DTSX:84654-84661 (select systemuserid, BusinessUnitId from systemuser where lower(domainname) = ?; ParameterMapping → {875510C6…} = User::UserDomainName, DTSX:278); Get Organization Variables: select gen_key, gen_value from gen_etlvariable where gen_scope = global / LeumiFile-PY (DTSX:82694) → Set Organization Variables main.cs:100-107",
+   "verifierAccepted": true
+  },
+  {
+   "claimId": "L|Package\\Get Sytem User Id|short",
+   "field": "short.nodes[2].text",
+   "before": {
+    "type": "end",
+    "text": "הרשומות שייווצרו בהמשך יירשמו על שם משתמש זה ובמטבע זה."
+   },
+   "after": {
+    "type": "end",
+    "text": "רשומות התנועה שנוספות בהמשך נרשמות על שם משתמש זה ויחידה זו ובמטבע זה. בקשות ההעברה הנכנסות מקבלות רק את המטבע, ושאר הרשומות שנוצרות דרך שירותי CRM לא מקבלות אף אחד מהם."
+   },
+   "why": "רק הכנסות Gen_ftCurrentYearBase משתמשות ב-UserId/BusinessUnitId; gen_transferin מקבל רק מטבע; gen_fundmain/gen_accountcourses/gen_coursepartition לא מקבלים אף אחד.",
+   "evidence": "source/DailyProcess/0008_LeumiFile-PY.dtsx: FT\\Create System Columns DTSX:57723-57731 (OwningBusinessUnit, OwningUser, ModifiedBy, CreatedBy, OwnerId = UserId/BusinessUnitId; TransactionCurrencyId); SDK Create gen_TransferIn DTSX:43947-43949 (transactioncurrencyid בלבד); אין ownerid/transactioncurrencyid בסקריפטי gen_fundmain / gen_accountcourses / gen_coursepartition; CrmProxy(ServerName, OrganizationName) DTSX:6483 – רכיב חיצוני CRM.Proxy שלא סופק",
+   "verifierAccepted": true
+  },
+  {
+   "claimId": "L|Package\\Get Sytem User Id|detailed",
+   "field": "detailed.nodes[1]",
+   "before": {
+    "type": "step",
+    "text": "המערכת מאתרת את משתמש המערכת לפי שם הדומיין ושולפת את מזהה המשתמש והיחידה העסקית.",
+    "tech": "Get User Id: select systemuserid, BusinessUnitId from systemuser where lower(domainname) = ? (DTSX:84654)"
+   },
+   "after": {
+    "type": "step",
+    "text": "המערכת מאתרת את משתמש המערכת ששם הדומיין שלו (באותיות קטנות) שווה לשם הדומיין שהוגדר בהגדרות הטעינה, ושולפת את מזהה המשתמש והיחידה העסקית.",
+    "tech": "Get User Id: select systemuserid, BusinessUnitId from systemuser where lower(domainname) = ? (DTSX:84654); ? = User::UserDomainName (DTSX:84661), נטען מ-gen_etlvariable ב-Get Organization Variables (DTSX:82694)"
+   },
+   "why": "דיוק: מקור שם הדומיין הוא ערך מוגדר, לא זהות ההרצה.",
+   "evidence": "source/DailyProcess/0008_LeumiFile-PY.dtsx: Get User Id DTSX:84654-84661 (select systemuserid, BusinessUnitId from systemuser where lower(domainname) = ?; ParameterMapping → {875510C6…} = User::UserDomainName, DTSX:278); Get Organization Variables: select gen_key, gen_value from gen_etlvariable where gen_scope = global / LeumiFile-PY (DTSX:82694) → Set Organization Variables main.cs:100-107",
+   "verifierAccepted": true
+  },
+  {
+   "claimId": "L|Package\\Get Sytem User Id|detailed",
+   "field": "detailed.nodes[4] (חדש)",
+   "before": null,
+   "after": {
+    "type": "step",
+    "text": "אם לא נמצא משתמש תואם, רכיב השמירה עדיין מציב את המשתנים בסיום: המשתמש, היחידה, הארגון והמטבע מקבלים מזהה ריק (Guid.Empty), וגם המטבע מהשלב הראשון נדרס. השלב לא נכשל במקרה כזה. אם נמצאו כמה משתמשים, נשמרים הערכים מהשורה האחרונה.",
+    "tech": "Set Variables main.cs:49-56: PostExecute מציב BusinessUnitId, TransactionCurrencyId, UserId, OrganizationId בלי תנאי; main.cs:68-77: הערכים נקבעים רק כשמגיעה שורה",
+    "evidence": "DTSX:84864-84866"
+   },
+   "why": "חסר המקרה שבו לא נמצא משתמש: PostExecute מציב Guid.Empty בלי כישלון.",
+   "evidence": "source/DailyProcess/0008_LeumiFile-PY.dtsx: Get Sytem User Id\\Set Variables main.cs:49-56 (PostExecute מציב את המשתנים תמיד), 68-77 (ProcessInputRow); DTSX:84864-84866",
+   "verifierAccepted": true
+  },
+  {
+   "claimId": "L|Package\\Get Sytem User Id|detailed",
+   "field": "detailed.nodes[5]",
+   "before": {
+    "type": "step",
+    "text": "בהמשך: UserId משמש כבעלים/יוצר/מעדכן ברשומות התנועה, BusinessUnitId כיחידה הבעלים, ו-TransactionCurrencyId כמטבע בתנועות ובבקשות ההעברה.",
+    "tech": "FT\\Create System Columns (ReadOnlyVariables DTSX:59695); Create transferin Maslulim main.cs:83–88"
+   },
+   "after": {
+    "type": "step",
+    "text": "בהמשך: UserId משמש כבעלים/יוצר/מעדכן ו-BusinessUnitId כיחידה הבעלים רק בהכנסת התנועות ל-Gen_ftCurrentYearBase. TransactionCurrencyId נכתב בתנועות ובבקשות ההעברה הנכנסות. הרשומות שנוצרות דרך SDK (קופות, בקשות העברה, מסלולי חשבון ופיצולי מסלול) לא מקבלות בעלים מהשלב הזה.",
+    "tech": "FT\\Create System Columns (DTSX:57723-57731); Create transferin Maslulim SDK Create gen_TransferIn main.cs:83-88 (DTSX:43947-43949, transactioncurrencyid בלבד)"
+   },
+   "why": "הניסוח הקודם רמז שהערכים משמשים בכל הכתיבות.",
+   "evidence": "source/DailyProcess/0008_LeumiFile-PY.dtsx: FT\\Create System Columns DTSX:57723-57731 (OwningBusinessUnit, OwningUser, ModifiedBy, CreatedBy, OwnerId = UserId/BusinessUnitId; TransactionCurrencyId); SDK Create gen_TransferIn DTSX:43947-43949 (transactioncurrencyid בלבד); אין ownerid/transactioncurrencyid בסקריפטי gen_fundmain / gen_accountcourses / gen_coursepartition; CrmProxy(ServerName, OrganizationName) DTSX:6483 – רכיב חיצוני CRM.Proxy שלא סופק",
+   "verifierAccepted": true
+  },
+  {
+   "claimId": "L|Package\\Get Sytem User Id|detailed",
+   "field": "detailed.nodes[end]",
+   "before": {
+    "type": "end",
+    "text": "לכל הכתיבות ב-CRM יש משתמש, יחידה ומטבע מוגדרים."
+   },
+   "after": {
+    "type": "end",
+    "text": "התנועות נרשמות על שם המשתמש והיחידה שאותרו ובמטבע \"שקל חדש\"; בקשות ההעברה הנכנסות מקבלות את המטבע בלבד. הזהות שבה נוצרות רשומות ה-SDK נקבעת ברכיב החיצוני CrmProxy, שלא סופק – לא ידוע."
+   },
+   "why": "לא לכל הכתיבות יש משתמש/יחידה/מטבע מהשלב הזה; רשומות SDK נוצרות בזהות של CrmProxy (חיצוני).",
+   "evidence": "source/DailyProcess/0008_LeumiFile-PY.dtsx: FT\\Create System Columns DTSX:57723-57731 (OwningBusinessUnit, OwningUser, ModifiedBy, CreatedBy, OwnerId = UserId/BusinessUnitId; TransactionCurrencyId); SDK Create gen_TransferIn DTSX:43947-43949 (transactioncurrencyid בלבד); אין ownerid/transactioncurrencyid בסקריפטי gen_fundmain / gen_accountcourses / gen_coursepartition; CrmProxy(ServerName, OrganizationName) DTSX:6483 – רכיב חיצוני CRM.Proxy שלא סופק",
+   "verifierAccepted": true
+  },
+  {
+   "claimId": "L|Package\\Get Sytem User Id|detail",
+   "field": "detail_he[4].t",
+   "before": "משתמש/יחידה/מטבע שבשמם נרשמות התנועות וההעברות.",
+   "after": "משתמש ויחידה שבשמם נרשמות התנועות (Gen_ftCurrentYearBase), ומטבע שנרשם בתנועות ובבקשות ההעברה הנכנסות (gen_transferin). בקשות ההעברה לא נרשמות על שם המשתמש הזה. אם לא נמצא משתמש תואם, המשתנים מקבלים Guid.Empty.",
+   "why": "gen_transferin מקבל רק transactioncurrencyid; הבעלים/היוצר שלו נקבעים בזהות CrmProxy.",
+   "evidence": "source/DailyProcess/0008_LeumiFile-PY.dtsx: FT\\Create System Columns DTSX:57723-57731 (OwningBusinessUnit, OwningUser, ModifiedBy, CreatedBy, OwnerId = UserId/BusinessUnitId; TransactionCurrencyId); SDK Create gen_TransferIn DTSX:43947-43949 (transactioncurrencyid בלבד); אין ownerid/transactioncurrencyid בסקריפטי gen_fundmain / gen_accountcourses / gen_coursepartition; CrmProxy(ServerName, OrganizationName) DTSX:6483 – רכיב חיצוני CRM.Proxy שלא סופק; source/DailyProcess/0008_LeumiFile-PY.dtsx: Get Sytem User Id\\Set Variables main.cs:49-56 (PostExecute מציב את המשתנים תמיד), 68-77 (ProcessInputRow); DTSX:84864-84866",
+   "verifierAccepted": true
+  },
+  {
+   "claimId": "L|Package\\Write PY File To Staging|detailed",
+   "field": "detailed.nodes[2]",
+   "before": {
+    "type": "step",
+    "text": "ממזהה התנועה הבנקאי וממזהה הפעולה הקשורה מוסרים אפסים מובילים (אפסים פנימיים נשמרים; ערך שכולו אפסים הופך לריק).",
+    "tech": "Remove Leading Zero (DTSX:87203): REPLACE(LTRIM(REPLACE(x,\"0\",\" \")),\" \",\"0\") על FILLER1_29_BankTransactionId, Filler_83_RelatedActionId"
+   },
+   "after": {
+    "type": "step",
+    "text": "ממזהה התנועה הבנקאי וממזהה הפעולה הקשורה מוסרים אפסים מובילים (אפסים פנימיים נשמרים; ערך שכולו אפסים הופך לריק). בנוסף, רווחים בתחילת הערך נמחקים, וכל רווח שהיה בערך המקורי אחרי החלק המוביל (באמצע או בסוף) הופך ל-0; אין חיתוך רווחים מהסוף. אם הבנק מרפד את המזהים ברווחים בסוף, הערך שנשמר משתנה – תלוי בנתונים, לא ידוע.",
+    "tech": "Remove Leading Zero (DTSX:87203): REPLACE(LTRIM(REPLACE(x,\"0\",\" \")),\" \",\"0\") על FILLER1_29_BankTransactionId, Filler_83_RelatedActionId"
+   },
+   "why": "הביטוי REPLACE(LTRIM(REPLACE(x,\"0\",\" \")),\" \",\"0\") הופך גם רווחים מקוריים שאחרי החלק המוביל ל-0, ואין RTRIM.",
+   "evidence": "source/DailyProcess/0008_LeumiFile-PY.dtsx:87210, 87216 (FriendlyExpression של Remove Leading Zero)",
+   "verifierAccepted": true
+  },
+  {
+   "claimId": "L|Package\\FT|short",
+   "field": "short.nodes[end].text",
+   "before": {
+    "type": "end",
+    "text": "התנועות היומיות של בנק לאומי נקלטות ב-CRM פעם אחת, ומנגנוני ההלוואה והשכר המדווח מקבלים סימון לעדכון."
+   },
+   "after": {
+    "type": "end",
+    "text": "תנועות חדשות נקלטות ב-CRM; תנועה שכבר הייתה ב-CRM לפני הריצה מדולגת. אם אותה תנועה מופיעה פעמיים באותו קובץ, שתי השורות עוברות את בדיקת הקיום ונשלחות להכנסה. מנגנוני ההלוואה והשכר המדווח מקבלים סימון לעדכון."
+   },
+   "why": "\"פעם אחת\" אינו מובטח: בדיקת הקיום היא מטמון מלא שנטען לפני מעבר השורות, ואין הסרת כפילויות בתוך הקובץ.",
+   "evidence": "source/DailyProcess/0008_LeumiFile-PY.dtsx: Check if trans exists DTSX:57313, CacheType=0 (Full, DTSX:57332), NoMatchBehavior=1; אין רכיב Sort/Aggregate להסרת כפילויות לפני ההכנסה",
+   "verifierAccepted": true
+  },
+  {
+   "claimId": "L|Package\\FT|detailed",
+   "field": "detailed.nodes (Trim, חדש)",
+   "before": null,
+   "after": {
+    "type": "step",
+    "text": "לפני בדיקת שורת הסיום ולפני הסינונים והחיפושים, מוסרים רווחים מתחילת ומסוף כל ערך טקסט בעמודות שמוגדרות כקלט לשלב הזה. בעמודות האלה, ההשוואות והערכים שנכתבים בהמשך מבוססים על הערכים בלי רווחים מסביב.",
+    "tech": "Trim All Input Columns (DTSX:70288) main.cs:51-58: str.Trim() לכל עמודת string בקלט שאינה ריקה; בין היתר Transfer_Type_2, gen_TranstypeId, gen_transferid, מספרי חשבון ומסלול",
+    "evidence": "DTSX:70288"
+   },
+   "why": "Trim All Input Columns הוצא מרשימת התשתית (L|ignored) כי הוא משנה ערכים שמשמשים בסינון, בחיפוש ובכתיבה ל-CRM; נוסף כשלב ב-detailed.",
+   "evidence": "source/DailyProcess/0008_LeumiFile-PY.dtsx:70288 FT\\Trim All Input Columns",
+   "verifierAccepted": true
+  },
+  {
+   "claimId": "L|Package\\FT|detailed",
+   "field": "detailed.nodes[existence check]",
+   "before": {
+    "type": "decision",
+    "text": "האם התנועה כבר קיימת בטבלת התנועות של השנה השוטפת בקופות בנק 10?",
+    "tech": "Check if trans exists (DTSX:57313, Full cache): Gen_ftCurrentYearBase ⨝ Gen_fundmainBase ⨝ Product ⨝ gen_banks (Gen_BankNumber = 10, gen_transferid not null); מפתח: Gen_TransTypeID = Action_Type_56, Gen_transgrouptypeid = Action_Operation_Type_57, gen_transferid = BankTransaction_ID_91, Gen_FundFinanceID = (Action_Transfer_Direction_69 == \"2\" ? Target_Fund_FinanceID_45 : Source_Fund_FinanceID_18)",
+    "branches": [
+     {
+      "label": "כן",
+      "nodes": [
+       {
+        "type": "step",
+        "text": "התנועה מדולגת – אין עדכון לתנועה קיימת (יציאת Match לא מחוברת)."
+       }
+      ]
+     },
+     {
+      "label": "לא",
+      "nodes": [
+       {
+        "type": "step",
+        "text": "התנועה ממשיכה ליצירה."
+       }
+      ]
+     }
+    ]
+   },
+   "after": {
+    "type": "decision",
+    "text": "האם התנועה כבר הייתה קיימת בטבלת התנועות של השנה השוטפת בקופות בנק 10 כשהזרימה התחילה?",
+    "tech": "Check if trans exists (DTSX:57313, Full cache): Gen_ftCurrentYearBase ⨝ Gen_fundmainBase ⨝ Product ⨝ gen_banks (Gen_BankNumber = 10, gen_transferid not null); מפתח: Gen_TransTypeID = Action_Type_56, Gen_transgrouptypeid = Action_Operation_Type_57, gen_transferid = BankTransaction_ID_91, Gen_FundFinanceID = (Action_Transfer_Direction_69 == \"2\" ? Target_Fund_FinanceID_45 : Source_Fund_FinanceID_18); המטמון נטען לפני מעבר השורות, ואין סינון כפילויות בתוך הקובץ",
+    "branches": [
+     {
+      "label": "כן",
+      "nodes": [
+       {
+        "type": "step",
+        "text": "התנועה מדולגת – אין עדכון לתנועה קיימת (יציאת Match לא מחוברת)."
+       }
+      ]
+     },
+     {
+      "label": "לא",
+      "nodes": [
+       {
+        "type": "step",
+        "text": "התנועה ממשיכה ליצירה."
+       }
+      ]
+     }
+    ]
+   },
+   "why": "הבדיקה היא מול מצב הטבלה בתחילת הזרימה (Full cache).",
+   "evidence": "source/DailyProcess/0008_LeumiFile-PY.dtsx: Check if trans exists DTSX:57313, CacheType=0 (Full, DTSX:57332), NoMatchBehavior=1; אין רכיב Sort/Aggregate להסרת כפילויות לפני ההכנסה",
+   "verifierAccepted": true
+  },
+  {
+   "claimId": "L|Package\\FT|detailed",
+   "field": "detailed.nodes (Get Bank Id, חדש)",
+   "before": null,
+   "after": {
+    "type": "decision",
+    "text": "האם קיים ב-CRM בנק שמספרו 10?",
+    "tech": "Get Bank Id (DTSX:61790): select gen_banksid from gen_banks where gen_banknumber = BankNumber; BankNumber = \"10\" קבוע (Set trans additional fields, DTSX:68896); NoMatchBehavior=0, errorRowDisposition=FailComponent",
+    "branches": [
+     {
+      "label": "כן",
+      "nodes": [
+       {
+        "type": "step",
+        "text": "מזהה הבנק נשמר, וזה הערך שנכתב לשדה הבנק (gen_bankname) ברשומת התנועה.",
+        "tech": "gen_banksid → Param_40 = gen_bankname (DTSX:63118)"
+       }
+      ]
+     },
+     {
+      "label": "לא",
+      "nodes": [
+       {
+        "type": "step",
+        "text": "אם בנק 10 לא נמצא, רכיב החיפוש נכשל וזרימת התנועות כולה נעצרת בכישלון; בשרשרת אילוצי Success השלבים הבאים בחבילה לא רצים."
+       }
+      ]
+     }
+    ]
+   },
+   "why": "חסר בתיאור: חיפוש הבנק שממנו נלקח gen_bankname שנכתב לתנועה, והתנהגות \"אין התאמה\" (FailComponent).",
+   "evidence": "source/DailyProcess/0008_LeumiFile-PY.dtsx: Get Bank Id DTSX:61790-61804 (select gen_banksid, gen_banknumber from gen_banks; [gen_banknumber] = BankNumber), NoMatchBehavior=0, errorRowDisposition=FailComponent; BankNumber = \"10\" (Set trans additional fields, DTSX:68896); gen_banksid → Param_40 = gen_bankname (insert ftCurrentYearBase SQL DTSX:63118, עמודה 41 מתוך 80)",
+   "verifierAccepted": true
+  },
+  {
+   "claimId": "L|Package\\FT|detailed",
+   "field": "detailed.nodes (Append Zeros, חדש)",
+   "before": null,
+   "after": {
+    "type": "step",
+    "text": "לפני איתור הקופה, מספר החשבון, מספר סוג הקופה ומספר המסלול מרופדים באפסים משמאל עד אורך השדה, ונקודות מוסרות מהם. ערך ריק הופך לאפסים בלבד.",
+    "tech": "Append Zeros To Fields (DTSX:54355) main.cs:57-66: gen_bankaccountnumber (12), gen_fundtypenumber (4), gen_coursenumber (4)"
+   },
+   "why": "חסר בתיאור: שינוי מפתח החיפוש (מספר החשבון) לפני Get fund main id.",
+   "evidence": "source/DailyProcess/0008_LeumiFile-PY.dtsx: FT\\Append Zeros To Fields DTSX:54355 main.cs:57-66 (gen_bankaccountnumber 12, gen_fundtypenumber 4, gen_coursenumber 4); path Append Zeros → Create System Columns → Get fund main id",
+   "verifierAccepted": true
+  },
+  {
+   "claimId": "L|Package\\FT|detailed",
+   "field": "detailed.nodes[end].text",
+   "before": {
+    "type": "end",
+    "text": "תנועות חדשות נקלטות פעם אחת לפי מזהה התנועה הבנקאי; איש הקשר מסומן לחישוב זכאות להלוואה, וחודשי שכר מדווחים מסומנים כמזוהים."
+   },
+   "after": {
+    "type": "end",
+    "text": "תנועות חדשות נקלטות ב-CRM; תנועה שכבר הייתה ב-CRM לפני הריצה (לפי סוג פעולה, סוג פעולה משני, מזהה התנועה הבנקאי ומספר הגוף המנהל) מדולגת. אם אותה תנועה מופיעה פעמיים באותו קובץ, שתי השורות נשלחות להכנסה. איש הקשר מסומן לחישוב זכאות להלוואה, וחודשי שכר מדווחים מסומנים כמזוהים."
+   },
+   "why": "\"פעם אחת\" אינו מובטח בתוך אותו קובץ.",
+   "evidence": "source/DailyProcess/0008_LeumiFile-PY.dtsx: Check if trans exists DTSX:57313, CacheType=0 (Full, DTSX:57332), NoMatchBehavior=1; אין רכיב Sort/Aggregate להסרת כפילויות לפני ההכנסה",
+   "verifierAccepted": true
+  },
+  {
+   "claimId": "L|Package\\FT|detail",
+   "field": "detail_he[1].t",
+   "before": "קיום תנועה: Gen_ftCurrentYear (בנק 10) לפי סוג פעולה, סוג פעולה משני, מזהה תנועה בנקאי ומספר גוף מנהל. מוצר: Product בנק 10 לפי Gen_FundFinanceID. גוף שכנגד: Competitor לפי Gen_FundFinanceID. קופה: Gen_fundmain בנק 10 לפי מספר חשבון + מוצר. סוג תנועה: gen_fundtransactiontype בנק 10. חודש שכר: gen_demislikamonthsalary פתוח לפי חשבון לקוח + שנה + חודש.",
+   "after": "קיום תנועה: Gen_ftCurrentYear (בנק 10) לפי סוג פעולה, סוג פעולה משני, מזהה תנועה בנקאי ומספר גוף מנהל. מוצר: Product בנק 10 לפי Gen_FundFinanceID. גוף שכנגד: Competitor לפי Gen_FundFinanceID. קופה: Gen_fundmain בנק 10 לפי מספר חשבון + מוצר. סוג תנועה: gen_fundtransactiontype בנק 10. חודש שכר: gen_demislikamonthsalary פתוח לפי חשבון לקוח + שנה + חודש. בנק: gen_banks לפי gen_banknumber = '10' (Get Bank Id); מזהה הבנק נכתב ל-gen_bankname של התנועה, ואם הבנק לא נמצא – זרימת הנתונים נכשלת (FailComponent). לפני איתור הקופה מספר החשבון מרופד באפסים לאורך 12 ונקודות מוסרות (Append Zeros To Fields). בדיקת קיום התנועה היא מול מצב הטבלה בתחילת הזרימה (Full cache), כך שכפילות בתוך אותו קובץ לא מזוהה.",
+   "why": "חסר חיפוש הבנק (gen_banks) ברשימת ההתאמות; נוסף גם ריפוד המפתח ומגבלת בדיקת הקיום.",
+   "evidence": "source/DailyProcess/0008_LeumiFile-PY.dtsx: Get Bank Id DTSX:61790-61804 (select gen_banksid, gen_banknumber from gen_banks; [gen_banknumber] = BankNumber), NoMatchBehavior=0, errorRowDisposition=FailComponent; BankNumber = \"10\" (Set trans additional fields, DTSX:68896); gen_banksid → Param_40 = gen_bankname (insert ftCurrentYearBase SQL DTSX:63118, עמודה 41 מתוך 80); source/DailyProcess/0008_LeumiFile-PY.dtsx: FT\\Append Zeros To Fields DTSX:54355 main.cs:57-66 (gen_bankaccountnumber 12, gen_fundtypenumber 4, gen_coursenumber 4); path Append Zeros → Create System Columns → Get fund main id; source/DailyProcess/0008_LeumiFile-PY.dtsx: Check if trans exists DTSX:57313, CacheType=0 (Full, DTSX:57332), NoMatchBehavior=1; אין רכיב Sort/Aggregate להסרת כפילויות לפני ההכנסה",
+   "verifierAccepted": true
+  },
+  {
+   "claimId": "L|Package\\Create fundmain for transferin|detailed",
+   "field": "detailed.nodes (Trim, חדש)",
+   "before": null,
+   "after": {
+    "type": "step",
+    "text": "לפני בדיקת שורת הסיום ולפני הסינונים והחיפושים, מוסרים רווחים מתחילת ומסוף כל ערך טקסט בעמודות שמוגדרות כקלט לשלב הזה. בעמודות האלה, ההשוואות והערכים שנכתבים בהמשך מבוססים על הערכים בלי רווחים מסביב.",
+    "tech": "Trim All Input Columns (DTSX:36458) main.cs:42-48: str.Trim() לכל עמודת string בקלט שאינה ריקה; בין היתר Transfer_Type_2, Action_Type_56, מספרי חשבון, Request_ID_74",
+    "evidence": "DTSX:36458"
+   },
+   "why": "Trim All Input Columns הוצא מרשימת התשתית (L|ignored) כי הוא משנה ערכים שמשמשים בסינון, בחיפוש ובכתיבה ל-CRM; נוסף כשלב ב-detailed.",
+   "evidence": "source/DailyProcess/0008_LeumiFile-PY.dtsx:36458 Create fundmain for transferin\\Trim All Input Columns",
+   "verifierAccepted": true
+  },
+  {
+   "claimId": "L|Package\\Create transferin Maslulim|title",
+   "field": "short_he",
+   "before": "לתנועות העברה בין מסלולים באותו חשבון (פעולה 57, סוג רשומה 2, סוג פעולה שאינו 04) שאין להן עדיין gen_transferin לפי מזהה הבקשה, ושתאריך הביצוע הצפוי שלהן בחודשיים האחרונים – יוצרת בקשת העברה נכנסת מסוג 5 במצב 1 על חשבון הלקוח.",
+   "after": "לתנועות העברה בין מסלולים באותו חשבון (פעולה 57, סוג רשומה 2, סוג פעולה שאינו 04) שאין להן עדיין gen_transferin לפי מזהה הבקשה, ושתאריך הביצוע הצפוי שלהן מאוחר מהיום פחות חודשיים (כולל תאריכים עתידיים) – יוצרת בקשת העברה נכנסת מסוג 5 עם gen_currentstate = 1 על חשבון הלקוח.",
+   "why": "התנאי הוא גבול תחתון בלבד (date > UtcNow-2 חודשים); \"בחודשיים האחרונים\" מוסיף גבול עליון שלא קיים.",
+   "evidence": "source/DailyProcess/0008_LeumiFile-PY.dtsx: Filter Last Two Month main.cs:31-37 (if (!Row.gendeliverydate_IsNull) … DateTime.TryParse(he-IL) … if (date > DateTime.UtcNow.AddMonths(-2)) DirectRowToLastTwoMonth) – גבול תחתון בלבד",
+   "verifierAccepted": true
+  },
+  {
+   "claimId": "L|Package\\Create transferin Maslulim|short",
+   "field": "short.nodes[decision date]",
+   "before": {
+    "type": "decision",
+    "text": "האם תאריך הביצוע הצפוי הוא בחודשיים האחרונים?",
+    "branches": [
+     {
+      "label": "לא",
+      "nodes": [
+       {
+        "type": "end",
+        "text": "הבקשה אינה נוצרת."
+       }
+      ]
+     },
+     {
+      "label": "כן",
+      "nodes": [
+       {
+        "type": "step",
+        "text": "ממשיכים לאיתור חשבון הלקוח."
+       }
+      ]
+     }
+    ]
+   },
+   "after": {
+    "type": "decision",
+    "text": "האם תאריך הביצוע הצפוי מאוחר מהיום פחות חודשיים (כולל תאריך עתידי)?",
+    "branches": [
+     {
+      "label": "לא",
+      "nodes": [
+       {
+        "type": "end",
+        "text": "הבקשה אינה נוצרת."
+       }
+      ]
+     },
+     {
+      "label": "כן",
+      "nodes": [
+       {
+        "type": "step",
+        "text": "ממשיכים לאיתור חשבון הלקוח."
+       }
+      ]
+     },
+     {
+      "label": "תאריך ריק",
+      "nodes": [
+       {
+        "type": "end",
+        "text": "אם בקשה כזו מגיעה בלי תאריך ביצוע צפוי, רכיב עיבוד התאריכים נכשל וזרימת הנתונים נעצרת."
+       }
+      ]
+     }
+    ]
+   },
+   "why": "התנאי לא מגביל תאריכים עתידיים; ותאריך ריק לא נזרק בשקט אלא מכשיל את Format Dates לפני הסינון.",
+   "evidence": "source/DailyProcess/0008_LeumiFile-PY.dtsx: Filter Last Two Month main.cs:31-37 (if (!Row.gendeliverydate_IsNull) … DateTime.TryParse(he-IL) … if (date > DateTime.UtcNow.AddMonths(-2)) DirectRowToLastTwoMonth) – גבול תחתון בלבד; source/DailyProcess/0008_LeumiFile-PY.dtsx: Create transferin Maslulim\\Format Dates DTSX:41626 main.cs:55-71 (if IsNullOrEmpty(str) str = null; switch (str.Trim().Length) → NullReferenceException; 8 תווים → yyyy/MM/dd, 6 תווים → \"20\"+yy/MM/dd, אחר → null; TryParse נכשל → null); gen_deliverydate wstr(30) DTSX:42396; path Merge Join → Append Zeros → Format Dates → Dates ToUniveral → Filter Last Two Month; Trim All Input Columns (gen_deliverydate בקלט) הופך ערך של רווחים בלבד למחרוזת ריקה",
+   "verifierAccepted": true
+  },
+  {
+   "claimId": "L|Package\\Create transferin Maslulim|short",
+   "field": "short.nodes[end]",
+   "before": {
+    "type": "end",
+    "text": "העברות בין מסלולים מהחודשיים האחרונים נרשמות ב-CRM כבקשות העברה נכנסות פתוחות."
+   },
+   "after": {
+    "type": "end",
+    "text": "העברות בין מסלולים שתאריך הביצוע הצפוי שלהן מאוחר מהיום פחות חודשיים נרשמות ב-CRM כבקשות העברה נכנסות מסוג 5 עם מצב נוכחי 1 (משמעות הערך 1 לא מופיעה בקבצים שסופקו)."
+   },
+   "why": "חלון התאריכים תוקן; \"פתוחות\" היא משמעות לא מוכחת של gen_currentstate = 1.",
+   "evidence": "source/DailyProcess/0008_LeumiFile-PY.dtsx: Filter Last Two Month main.cs:31-37 (if (!Row.gendeliverydate_IsNull) … DateTime.TryParse(he-IL) … if (date > DateTime.UtcNow.AddMonths(-2)) DirectRowToLastTwoMonth) – גבול תחתון בלבד; source/DailyProcess/0008_LeumiFile-PY.dtsx: Set Additional fields DTSX:49608 (gen_currentstate = 1); אין בקבצים תווית/הערה לערך 1",
+   "verifierAccepted": true
+  },
+  {
+   "claimId": "L|Package\\Create transferin Maslulim|detailed",
+   "field": "detailed.nodes (Trim, חדש)",
+   "before": null,
+   "after": {
+    "type": "step",
+    "text": "לפני בדיקת שורת הסיום ולפני הסינונים והחיפושים, מוסרים רווחים מתחילת ומסוף כל ערך טקסט בעמודות שמוגדרות כקלט לשלב הזה. בעמודות האלה, ההשוואות והערכים שנכתבים בהמשך מבוססים על הערכים בלי רווחים מסביב.",
+    "tech": "Trim All Input Columns (DTSX:50487) main.cs:42-48: str.Trim() לכל עמודת string בקלט שאינה ריקה; בין היתר Transfer_Type_2, Action_Type_56, מספרי חשבון, gen_requestidentifier, gen_deliverydate",
+    "evidence": "DTSX:50487"
+   },
+   "why": "Trim All Input Columns הוצא מרשימת התשתית (L|ignored) כי הוא משנה ערכים שמשמשים בסינון, בחיפוש ובכתיבה ל-CRM; נוסף כשלב ב-detailed.",
+   "evidence": "source/DailyProcess/0008_LeumiFile-PY.dtsx:50487 Create transferin Maslulim\\Trim All Input Columns",
+   "verifierAccepted": true
+  },
+  {
+   "claimId": "L|Package\\Create transferin Maslulim|detailed",
+   "field": "detailed.nodes[15]",
+   "before": {
+    "type": "step",
+    "text": "מספר החשבון וסוג הקופה מרופדים באפסים, ותאריך הביצוע מומר לתאריך.",
+    "tech": "Append Zeros To Fields (DTSX:38575); Format Dates; Dates ToUniveral"
+   },
+   "after": {
+    "type": "step",
+    "text": "מספר החשבון וסוג הקופה מרופדים באפסים. תאריך הביצוע הצפוי מעובד: 8 תווים נקראים כשנה-חודש-יום (YYYYMMDD), ו-6 תווים כ-YYMMDD עם 20 בתחילת השנה. אורך אחר או תאריך לא תקין הופכים לריק, והתאריך מומר ל-UTC.",
+    "tech": "Append Zeros To Fields (DTSX:38575); Format Dates (DTSX:41626) main.cs:58-71; Dates ToUniveral"
+   },
+   "why": "דיוק בעיבוד התאריך (YYMMDD ולא YYYYMM), כחלק מתיקון התנהגות התאריך הריק.",
+   "evidence": "source/DailyProcess/0008_LeumiFile-PY.dtsx: Create transferin Maslulim\\Format Dates DTSX:41626 main.cs:55-71 (if IsNullOrEmpty(str) str = null; switch (str.Trim().Length) → NullReferenceException; 8 תווים → yyyy/MM/dd, 6 תווים → \"20\"+yy/MM/dd, אחר → null; TryParse נכשל → null); gen_deliverydate wstr(30) DTSX:42396; path Merge Join → Append Zeros → Format Dates → Dates ToUniveral → Filter Last Two Month; Trim All Input Columns (gen_deliverydate בקלט) הופך ערך של רווחים בלבד למחרוזת ריקה",
+   "verifierAccepted": true
+  },
+  {
+   "claimId": "L|Package\\Create transferin Maslulim|detailed",
+   "field": "detailed.nodes (תאריך ריק, חדש)",
+   "before": null,
+   "after": {
+    "type": "decision",
+    "text": "האם תאריך הביצוע הצפוי ריק כשהבקשה מגיעה לעיבוד התאריכים?",
+    "tech": "Format Dates main.cs:55-58: if (String.IsNullOrEmpty(str)) str = null; switch (str.Trim().Length) → NullReferenceException שלא נתפס",
+    "branches": [
+     {
+      "label": "כן",
+      "nodes": [
+       {
+        "type": "step",
+        "text": "רכיב עיבוד התאריכים זורק חריגה, וזרימת הנתונים נכשלת; בשרשרת אילוצי Success השלבים הבאים בחבילה לא רצים."
+       }
+      ]
+     },
+     {
+      "label": "לא",
+      "nodes": [
+       {
+        "type": "step",
+        "text": "ממשיכים לבדיקת התאריך."
+       }
+      ]
+     }
+    ]
+   },
+   "why": "תאריך ריק לא נזרק בשקט: Format Dates קורא str.Trim() על null.",
+   "evidence": "source/DailyProcess/0008_LeumiFile-PY.dtsx: Create transferin Maslulim\\Format Dates DTSX:41626 main.cs:55-71 (if IsNullOrEmpty(str) str = null; switch (str.Trim().Length) → NullReferenceException; 8 תווים → yyyy/MM/dd, 6 תווים → \"20\"+yy/MM/dd, אחר → null; TryParse נכשל → null); gen_deliverydate wstr(30) DTSX:42396; path Merge Join → Append Zeros → Format Dates → Dates ToUniveral → Filter Last Two Month; Trim All Input Columns (gen_deliverydate בקלט) הופך ערך של רווחים בלבד למחרוזת ריקה",
+   "verifierAccepted": true
+  },
+  {
+   "claimId": "L|Package\\Create transferin Maslulim|detailed",
+   "field": "detailed.nodes[16].text",
+   "before": {
+    "type": "decision",
+    "text": "האם תאריך הביצוע הצפוי מאוחר מהיום פחות חודשיים?",
+    "tech": "Filter Last Two Month main.cs:31–40: DateTime.TryParse(gendeliverydate, he-IL) && date > DateTime.UtcNow.AddMonths(-2)",
+    "branches": [
+     {
+      "label": "לא",
+      "nodes": [
+       {
+        "type": "step",
+        "text": "השורה נזרקת (גם כשהתאריך ריק או לא תקין)."
+       }
+      ]
+     },
+     {
+      "label": "כן",
+      "nodes": [
+       {
+        "type": "step",
+        "text": "ממשיכים."
+       }
+      ]
+     }
+    ]
+   },
+   "after": {
+    "type": "decision",
+    "text": "האם תאריך הביצוע הצפוי מאוחר מהיום פחות חודשיים (כולל תאריך עתידי)?",
+    "tech": "Filter Last Two Month main.cs:31–40: DateTime.TryParse(gendeliverydate, he-IL) && date > DateTime.UtcNow.AddMonths(-2)",
+    "branches": [
+     {
+      "label": "לא",
+      "nodes": [
+       {
+        "type": "step",
+        "text": "השורה נזרקת (גם כשהתאריך ריק או לא תקין)."
+       }
+      ]
+     },
+     {
+      "label": "כן",
+      "nodes": [
+       {
+        "type": "step",
+        "text": "ממשיכים."
+       }
+      ]
+     }
+    ]
+   },
+   "why": "הבהרה שאין גבול עליון.",
+   "evidence": "source/DailyProcess/0008_LeumiFile-PY.dtsx: Filter Last Two Month main.cs:31-37 (if (!Row.gendeliverydate_IsNull) … DateTime.TryParse(he-IL) … if (date > DateTime.UtcNow.AddMonths(-2)) DirectRowToLastTwoMonth) – גבול תחתון בלבד",
+   "verifierAccepted": true
+  },
+  {
+   "claimId": "L|Package\\Create transferin Maslulim|detailed",
+   "field": "detailed.nodes[18]",
+   "before": {
+    "type": "step",
+    "text": "השורה נזרקת (גם כשהתאריך ריק או לא תקין)."
+   },
+   "after": {
+    "type": "step",
+    "text": "השורה נזרקת. זה קורה גם כשהתאריך בקובץ לא היה תקין או באורך שאינו 6 או 8 תווים, כי בשלב הקודם הוא הפך לריק.",
+    "tech": "Filter Last Two Month main.cs:31: if (!Row.gendeliverydate_IsNull); תאריך שהיה ריק בקובץ לא מגיע לכאן – Format Dates נכשל עליו"
+   },
+   "why": "תאריך ריק בקובץ אינו נזרק כאן אלא מכשיל את הזרימה ב-Format Dates; רק תאריך לא תקין (שהפך ל-NULL) נזרק.",
+   "evidence": "source/DailyProcess/0008_LeumiFile-PY.dtsx: Create transferin Maslulim\\Format Dates DTSX:41626 main.cs:55-71 (if IsNullOrEmpty(str) str = null; switch (str.Trim().Length) → NullReferenceException; 8 תווים → yyyy/MM/dd, 6 תווים → \"20\"+yy/MM/dd, אחר → null; TryParse נכשל → null); gen_deliverydate wstr(30) DTSX:42396; path Merge Join → Append Zeros → Format Dates → Dates ToUniveral → Filter Last Two Month; Trim All Input Columns (gen_deliverydate בקלט) הופך ערך של רווחים בלבד למחרוזת ריקה; source/DailyProcess/0008_LeumiFile-PY.dtsx: Filter Last Two Month main.cs:31-37 (if (!Row.gendeliverydate_IsNull) … DateTime.TryParse(he-IL) … if (date > DateTime.UtcNow.AddMonths(-2)) DirectRowToLastTwoMonth) – גבול תחתון בלבד",
+   "verifierAccepted": true
+  },
+  {
+   "claimId": "L|Package\\Create transferin Maslulim|detailed",
+   "field": "detailed.nodes[end]",
+   "before": {
+    "type": "end",
+    "text": "בקשות העברה בין מסלולים מהחודשיים האחרונים נפתחות ב-CRM פעם אחת לכל מזהה בקשה."
+   },
+   "after": {
+    "type": "end",
+    "text": "בקשות העברה בין מסלולים שתאריך הביצוע הצפוי שלהן מאוחר מהיום פחות חודשיים (כולל עתידי), ושלא היו ב-CRM לפני הריצה, נוצרות ב-CRM כבקשות העברה נכנסות. אם אותה בקשה מופיעה בקובץ ביותר מזוג שורות אחד, נוצרת בקשה לכל שורה מצורפת – אין סינון כפילויות בתוך הקובץ."
+   },
+   "why": "\"בחודשיים האחרונים\" ו\"פעם אחת לכל מזהה בקשה\" אינם מדויקים: אין גבול עליון לתאריך, ובדיקת הקיום היא מטמון מלא בלי הסרת כפילויות.",
+   "evidence": "source/DailyProcess/0008_LeumiFile-PY.dtsx: Filter Last Two Month main.cs:31-37 (if (!Row.gendeliverydate_IsNull) … DateTime.TryParse(he-IL) … if (date > DateTime.UtcNow.AddMonths(-2)) DirectRowToLastTwoMonth) – גבול תחתון בלבד; source/DailyProcess/0008_LeumiFile-PY.dtsx: get tranferin DTSX:42492, CacheType=0 (Full, DTSX:42500); Merge Join DTSX:43485 Inner על 3 מפתחות; אין סינון כפילויות",
+   "verifierAccepted": true
+  },
+  {
+   "claimId": "L|Package\\Create transferin Maslulim|detail",
+   "field": "detail_he[0].t",
+   "before": "שורות PY_FileData (לא שורת סיום) עם פעולה 57, סוג רשומה 2, סוג פעולה ≠ 04, אותו חשבון ואותו סוג קופה (אחרי מיפוי 5006→1025), Age_Dependent_Model_112 ≠ 1, ותאריך ביצוע צפוי בחודשיים האחרונים.",
+   "after": "שורות PY_FileData (לא שורת סיום) עם פעולה 57, סוג רשומה 2, סוג פעולה ≠ 04, אותו חשבון ואותו סוג קופה (אחרי מיפוי 5006→1025), Age_Dependent_Model_112 ≠ 1, ותאריך ביצוע צפוי מאוחר מהיום פחות חודשיים (כולל תאריכים עתידיים). אם בקשה כזו מגיעה לעיבוד התאריכים בלי תאריך ביצוע צפוי, זרימת הנתונים נכשלת (Format Dates main.cs:55-58).",
+   "why": "חלון התאריכים תוקן; נוסף מקרה התאריך הריק.",
+   "evidence": "source/DailyProcess/0008_LeumiFile-PY.dtsx: Filter Last Two Month main.cs:31-37 (if (!Row.gendeliverydate_IsNull) … DateTime.TryParse(he-IL) … if (date > DateTime.UtcNow.AddMonths(-2)) DirectRowToLastTwoMonth) – גבול תחתון בלבד; source/DailyProcess/0008_LeumiFile-PY.dtsx: Create transferin Maslulim\\Format Dates DTSX:41626 main.cs:55-71 (if IsNullOrEmpty(str) str = null; switch (str.Trim().Length) → NullReferenceException; 8 תווים → yyyy/MM/dd, 6 תווים → \"20\"+yy/MM/dd, אחר → null; TryParse נכשל → null); gen_deliverydate wstr(30) DTSX:42396; path Merge Join → Append Zeros → Format Dates → Dates ToUniveral → Filter Last Two Month; Trim All Input Columns (gen_deliverydate בקלט) הופך ערך של רווחים בלבד למחרוזת ריקה",
+   "verifierAccepted": true
+  },
+  {
+   "claimId": "L|Package\\Create transferin Maslulim|detail",
+   "field": "detail_he[2].t",
+   "before": "סינון תנועה; קיום בקשה; צירוף מקור-יעד; חלון חודשיים; קיום חשבון לקוח.",
+   "after": "סינון תנועה; קיום בקשה; צירוף מקור-יעד; תאריך ביצוע צפוי ריק (כישלון) או מאוחר מהיום פחות חודשיים; קיום חשבון לקוח.",
+   "why": "אותה טעות (\"חלון חודשיים\") – עקביות.",
+   "evidence": "source/DailyProcess/0008_LeumiFile-PY.dtsx: Filter Last Two Month main.cs:31-37 (if (!Row.gendeliverydate_IsNull) … DateTime.TryParse(he-IL) … if (date > DateTime.UtcNow.AddMonths(-2)) DirectRowToLastTwoMonth) – גבול תחתון בלבד",
+   "verifierAccepted": true
+  },
+  {
+   "claimId": "L|Package\\Create transferin Maslulim|detail",
+   "field": "detail_he[4].t",
+   "before": "העברה בין מסלולים נרשמת כבקשת העברה נכנסת פתוחה.",
+   "after": "העברה בין מסלולים נרשמת כבקשת העברה נכנסת מסוג 5 עם gen_currentstate = 1 (משמעות הערך 1 לא מופיעה בקבצים שסופקו).",
+   "why": "\"פתוחה\" היא משמעות לא מוכחת של gen_currentstate = 1.",
+   "evidence": "source/DailyProcess/0008_LeumiFile-PY.dtsx: Set Additional fields DTSX:49608 (gen_currentstate = 1); אין בקבצים תווית/הערה לערך 1",
+   "verifierAccepted": true
+  },
+  {
+   "claimId": "L|Package\\Create transferin Maslulim|decisions",
+   "field": "decisions[4].meaning_he",
+   "before": "תאריך ביצוע צפוי בחודשיים האחרונים",
+   "after": "תאריך ביצוע צפוי מאוחר מהיום פחות חודשיים; אין גבול עליון, גם תאריך עתידי עובר",
+   "why": "התנאי הוא גבול תחתון בלבד.",
+   "evidence": "source/DailyProcess/0008_LeumiFile-PY.dtsx: Filter Last Two Month main.cs:31-37 (if (!Row.gendeliverydate_IsNull) … DateTime.TryParse(he-IL) … if (date > DateTime.UtcNow.AddMonths(-2)) DirectRowToLastTwoMonth) – גבול תחתון בלבד",
+   "verifierAccepted": true
+  },
+  {
+   "claimId": "L|Package\\Create transferin Maslulim|decisions",
+   "field": "decisions[4].outcome_he",
+   "before": "אחרת נזרק",
+   "after": "עובר → המשך; תאריך ריק (NULL, כי לא היה תקין) או מוקדם יותר → נזרק. תאריך שהיה ריק בקובץ לא מגיע לכאן: Format Dates נכשל עליו לפני הסינון",
+   "why": "חסר מקרה התאריך הריק.",
+   "evidence": "source/DailyProcess/0008_LeumiFile-PY.dtsx: Create transferin Maslulim\\Format Dates DTSX:41626 main.cs:55-71 (if IsNullOrEmpty(str) str = null; switch (str.Trim().Length) → NullReferenceException; 8 תווים → yyyy/MM/dd, 6 תווים → \"20\"+yy/MM/dd, אחר → null; TryParse נכשל → null); gen_deliverydate wstr(30) DTSX:42396; path Merge Join → Append Zeros → Format Dates → Dates ToUniveral → Filter Last Two Month; Trim All Input Columns (gen_deliverydate בקלט) הופך ערך של רווחים בלבד למחרוזת ריקה",
+   "verifierAccepted": true
+  },
+  {
+   "claimId": "L|Package\\Create transferin Maslulim|crm",
+   "field": "crmEffects[0].when_he",
+   "before": "העברה בין מסלולים חדשה (אין gen_transferin עם אותו מזהה בקשה), בחלון חודשיים, וחשבון הלקוח נמצא",
+   "after": "העברה בין מסלולים שאין לה gen_transferin עם אותו מזהה בקשה לפני הריצה, תאריך הביצוע הצפוי שלה מאוחר מהיום פחות חודשיים (כולל עתידי), וחשבון הלקוח נמצא",
+   "why": "\"בחלון חודשיים\" מוסיף גבול עליון שלא קיים.",
+   "evidence": "source/DailyProcess/0008_LeumiFile-PY.dtsx: Filter Last Two Month main.cs:31-37 (if (!Row.gendeliverydate_IsNull) … DateTime.TryParse(he-IL) … if (date > DateTime.UtcNow.AddMonths(-2)) DirectRowToLastTwoMonth) – גבול תחתון בלבד; source/DailyProcess/0008_LeumiFile-PY.dtsx: get tranferin DTSX:42492, CacheType=0 (Full, DTSX:42500); Merge Join DTSX:43485 Inner על 3 מפתחות; אין סינון כפילויות",
+   "verifierAccepted": true
+  },
+  {
+   "claimId": "L|Package\\Create Acount Courses and course partition for transferin|short",
+   "field": "short.nodes[end]",
+   "before": {
+    "type": "end",
+    "text": "לכל העברה נכנסת נבנים ב-CRM המסלולים המועברים והמקבלים – פעם אחת לכל העברה וקופה."
+   },
+   "after": {
+    "type": "end",
+    "text": "להעברות נכנסות קיימות נוספים ב-CRM מסלולי החשבון המועברים ופיצולי המסלול המקבלים, כשהקופה המתאימה נמצאת. מסלול או פיצול שכבר היה קיים ב-CRM מדולג; אם כמה שורות באותה ריצה מתאימות לאותה העברה ולאותה קופה, יכולה להיווצר רשומה לכל אחת מהן."
+   },
+   "why": "\"פעם אחת לכל העברה וקופה\" אינו מובטח בתוך ריצה: היצירות נשלחות במנות, ובדיקת הפיצול היא מטמון מלא.",
+   "evidence": "source/DailyProcess/0008_LeumiFile-PY.dtsx: Check for exist account courses DTSX:3282, CacheType=2 (No cache, DTSX:3294); Check if exist course partition DTSX:3375, CacheType=0 (Full, DTSX:3387); יצירה ב-ExecuteMultiple במנות של 10; אין הסרת כפילויות",
+   "verifierAccepted": true
+  },
+  {
+   "claimId": "L|Package\\Create Acount Courses and course partition for transferin|short",
+   "field": "short.nodes[branch כן].text",
+   "before": {
+    "type": "step",
+    "text": "השורה ממשיכה לפי הצד שלה בהעברה."
+   },
+   "after": {
+    "type": "step",
+    "text": "השורה ממשיכה לפי הצד שלה בהעברה. אם חסר בה תאריך ביצוע צפוי, זרימת הנתונים נכשלת."
+   },
+   "why": "עקביות עם ה-detailed: כל שורה שנמצאה לה העברה עוברת עיבוד תאריכים שנכשל על ערך ריק.",
+   "evidence": "source/DailyProcess/0008_LeumiFile-PY.dtsx: Create Acount Courses\\Format Dates DTSX:4854 main.cs:55-71 (Action_Expected_Date_54 wstr(30); IsNullOrEmpty → null → str.Trim() → NullReferenceException); paths get tranferin Match → Format Dates → Dates ToUniveral → set additional fields; Trim All Input Columns (Action_Expected_Date_54 בקלט) הופך ערך של רווחים בלבד למחרוזת ריקה",
+   "verifierAccepted": true
+  },
+  {
+   "claimId": "L|Package\\Create Acount Courses and course partition for transferin|detailed",
+   "field": "detailed.nodes (Trim, חדש)",
+   "before": null,
+   "after": {
+    "type": "step",
+    "text": "לפני בדיקת שורת הסיום ולפני הסינונים והחיפושים, מוסרים רווחים מתחילת ומסוף כל ערך טקסט בעמודות שמוגדרות כקלט לשלב הזה. בעמודות האלה, ההשוואות והערכים שנכתבים בהמשך מבוססים על הערכים בלי רווחים מסביב.",
+    "tech": "Trim All Input Columns (DTSX:19996) main.cs:42-48: str.Trim() לכל עמודת string בקלט שאינה ריקה; Target_Fund_AccountNumber_47, Target_Fund_course_44, Source_Fund_Course_17, Action_Expected_Date_54, Request_ID_74, Action_Type_56, Action_Transfer_Direction_69, Action_Operation_Type_57",
+    "evidence": "DTSX:19996"
+   },
+   "why": "Trim All Input Columns הוצא מרשימת התשתית (L|ignored) כי הוא משנה ערכים שמשמשים בסינון, בחיפוש ובכתיבה ל-CRM; נוסף כשלב ב-detailed.",
+   "evidence": "source/DailyProcess/0008_LeumiFile-PY.dtsx:19996 Create Acount Courses\\Trim All Input Columns",
+   "verifierAccepted": true
+  },
+  {
+   "claimId": "L|Package\\Create Acount Courses and course partition for transferin|detailed",
+   "field": "detailed.nodes (עיבוד תאריך, חדש)",
+   "before": null,
+   "after": {
+    "type": "decision",
+    "text": "האם תאריך הביצוע הצפוי בשורה ריק?",
+    "tech": "Format Dates (DTSX:4854) main.cs:55-71 → Dates ToUniveral; ערך ריק: str = null ואז str.Trim() → NullReferenceException שלא נתפס",
+    "branches": [
+     {
+      "label": "כן",
+      "nodes": [
+       {
+        "type": "step",
+        "text": "רכיב עיבוד התאריכים זורק חריגה וזרימת הנתונים נכשלת. זה חל על כל שורה שנמצאה לה העברה, בצד המקור או בצד היעד."
+       }
+      ]
+     },
+     {
+      "label": "לא",
+      "nodes": [
+       {
+        "type": "step",
+        "text": "התאריך מעובד: 8 תווים נקראים כ-YYYYMMDD ו-6 תווים כ-YYMMDD עם 20 בתחילת השנה; אורך אחר או תאריך לא תקין הופכים לריק. התאריך מומר ל-UTC."
+       }
+      ]
+     }
+    ]
+   },
+   "why": "חסר בתיאור: כל שורה שנמצאה לה העברה עוברת Format Dates, שנכשל על תאריך ריק.",
+   "evidence": "source/DailyProcess/0008_LeumiFile-PY.dtsx: Create Acount Courses\\Format Dates DTSX:4854 main.cs:55-71 (Action_Expected_Date_54 wstr(30); IsNullOrEmpty → null → str.Trim() → NullReferenceException); paths get tranferin Match → Format Dates → Dates ToUniveral → set additional fields; Trim All Input Columns (Action_Expected_Date_54 בקלט) הופך ערך של רווחים בלבד למחרוזת ריקה",
+   "verifierAccepted": true
+  },
+  {
+   "claimId": "L|Package\\Create Acount Courses and course partition for transferin|detailed",
+   "field": "detailed.nodes[end]",
+   "before": {
+    "type": "end",
+    "text": "לכל העברה נכנסת קיימת נבנים מסלולי החשבון המועברים ופיצולי המסלול המקבלים, פעם אחת לכל העברה וקופה."
+   },
+   "after": {
+    "type": "end",
+    "text": "להעברות נכנסות קיימות נוספים ב-CRM מסלולי החשבון המועברים ופיצולי המסלול המקבלים, כשהקופה המתאימה נמצאת. מסלול או פיצול שכבר היה קיים ב-CRM מדולג; אם כמה שורות באותה ריצה מתאימות לאותה העברה ולאותה קופה, יכולה להיווצר רשומה לכל אחת מהן."
+   },
+   "why": "\"פעם אחת לכל העברה וקופה\" אינו מובטח בתוך ריצה.",
+   "evidence": "source/DailyProcess/0008_LeumiFile-PY.dtsx: Check for exist account courses DTSX:3282, CacheType=2 (No cache, DTSX:3294); Check if exist course partition DTSX:3375, CacheType=0 (Full, DTSX:3387); יצירה ב-ExecuteMultiple במנות של 10; אין הסרת כפילויות",
+   "verifierAccepted": true
+  },
+  {
+   "round": 2,
+   "claimId": "L|Package\\Get Sytem User Id|title",
+   "field": "flow_he[0]",
+   "before": "Get Transaction Currency ID: מטבע ראשון בטבלה → TransactionCurrencyId",
+   "after": "Get Transaction Currency ID: מטבע אחד כלשהו (TOP 1 ללא ORDER BY) → TransactionCurrencyId (נדרס בסוף השלב הבא)",
+   "why": "TOP 1 בלי ORDER BY מחזיר שורה שרירותית, לא \"המטבע הראשון\".",
+   "evidence": "source/DailyProcess/0008_LeumiFile-PY.dtsx:85591 (select top 1 TransactionCurrencyId from TransactionCurrency)",
+   "verifierAccepted": null,
+   "date": "2026-11-07T16:57:37.913Z",
+   "logicSha256Before": "C849A5EF94F6E52DCCEA40624E04EA7F0952C0DAAFFFA415D0FD271ECB901569",
+   "logicSha256After": "A1A81CCF9CE61B5A551EA9484FA85E0E843ED0E29BC981D4FBC2DBBFA66AD53A"
+  },
+  {
+   "round": 2,
+   "claimId": "L|Package\\Get Sytem User Id|detailed",
+   "field": "detailed.nodes[0]",
+   "before": "{\"type\":\"step\",\"text\":\"משימת SQL קוראת את המטבע הראשון בטבלת המטבעות ושומרת אותו כמטבע לכתיבה.\",\"tech\":\"Get Transaction Currency ID: select top 1 TransactionCurrencyId from TransactionCurrency → User::TransactionCurrencyId (DTSX:85587–85591)\"}",
+   "after": "{\"type\":\"step\",\"text\":\"משימת SQL קוראת מטבע אחד כלשהו מטבלת המטבעות ושומרת אותו זמנית כמטבע לכתיבה. השאילתה לוקחת שורה אחת בלי סדר מוגדר, ולכן לא נקבע איזה מטבע יוחזר; הערך נדרס בסוף השלב הבא.\",\"tech\":\"Get Transaction Currency ID: select top 1 TransactionCurrencyId from TransactionCurrency (ללא ORDER BY) → User::TransactionCurrencyId (DTSX:85587–85591); נדרס ב-Set Variables PostExecute (main.cs:49-56)\"}",
+   "why": "אותה טעות (\"המטבע הראשון בטבלה\"). כישלון ה-Lookup כשאין התאמה הוא plumbing ולא נוסף; שום יחידה לא סותרת אותו (כשאין משתמש, אין שורות שמגיעות ל-Lookups).",
+   "evidence": "source/DailyProcess/0008_LeumiFile-PY.dtsx:85587-85591",
+   "verifierAccepted": null,
+   "date": "2026-11-07T16:57:37.913Z",
+   "logicSha256Before": "C849A5EF94F6E52DCCEA40624E04EA7F0952C0DAAFFFA415D0FD271ECB901569",
+   "logicSha256After": "A1A81CCF9CE61B5A551EA9484FA85E0E843ED0E29BC981D4FBC2DBBFA66AD53A"
+  },
+  {
+   "round": 2,
+   "claimId": "L|Package\\Write PY File To Staging|title",
+   "field": "short_he + flow_he[2]",
+   "before": "קובץ ה-PY (רוחב קבוע, cp1255) נטען כמות שהוא לטבלת PY_FileData ב-GENERIX_STAGING, לאחר הסרת אפסים מובילים ממזהה התנועה הבנקאי וממזהה הפעולה הקשורה. | → GENERIX_STAGING.dbo.PY_FileData",
+   "after": "קובץ ה-PY (רוחב קבוע, cp1255) נטען כמות שהוא לטבלת PY_FileData בחיבור SRS.GENERIX_STAGING (בזמן התכנון Psrs/GENERIX_STAGING; קובץ התצורה SSISConfigFileSrs.dtsConfig, שלא סופק, עשוי לדרוס את היעד), לאחר הסרת אפסים מובילים ממזהה התנועה הבנקאי וממזהה הפעולה הקשורה. | → [dbo].[PY_FileData] בחיבור SRS.GENERIX_STAGING (זמן תכנון: Psrs/GENERIX_STAGING; עשוי להידרס מקובץ התצורה SSISConfigFileSrs.dtsConfig שלא סופק)",
+   "why": "GENERIX_STAGING הוא יעד זמן-התכנון; החבילה טוענת את SSISConfigFileSrs.dtsConfig שלא סופק ועשוי לדרוס אותו.",
+   "evidence": "source/DailyProcess/0008_LeumiFile-PY.dtsx:192-196 (CM SRS.GENERIX_STAGING: Data Source=Psrs;Initial Catalog=GENERIX_STAGING), 200 (Configuration SRS_STAGING = C:\\Generix\\SSISConfigFileSrs.dtsConfig), 85631 (Insert To PY_FileData → SRS.GENERIX_STAGING)",
+   "verifierAccepted": null,
+   "date": "2026-11-07T16:57:37.913Z",
+   "logicSha256Before": "C849A5EF94F6E52DCCEA40624E04EA7F0952C0DAAFFFA415D0FD271ECB901569",
+   "logicSha256After": "A1A81CCF9CE61B5A551EA9484FA85E0E843ED0E29BC981D4FBC2DBBFA66AD53A"
+  },
+  {
+   "round": 2,
+   "claimId": "L|Package\\Write PY File To Staging|detailed",
+   "field": "detailed.nodes[3].tech",
+   "before": "Insert To PY_FileData (DTSX:85616) → GENERIX_STAGING.dbo.PY_FileData",
+   "after": "Insert To PY_FileData (DTSX:85616) → [dbo].[PY_FileData] (OpenRowset) בחיבור SRS.GENERIX_STAGING (DTSX:85631); מחרוזת החיבור בזמן התכנון: Data Source=Psrs; Initial Catalog=GENERIX_STAGING (DTSX:192-196). החבילה טוענת את קובץ התצורה C:\\Generix\\SSISConfigFileSrs.dtsConfig (SRS_STAGING, DTSX:200), שלא סופק ועשוי לדרוס את היעד בזמן ריצה.",
+   "why": "אותו תיקון: היעד בזמן ריצה עשוי להידרס מקובץ התצורה שלא סופק.",
+   "evidence": "source/DailyProcess/0008_LeumiFile-PY.dtsx:192-196, 200, 85619 (OpenRowset [dbo].[PY_FileData]), 85631",
+   "verifierAccepted": null,
+   "date": "2026-11-07T16:57:37.913Z",
+   "logicSha256Before": "C849A5EF94F6E52DCCEA40624E04EA7F0952C0DAAFFFA415D0FD271ECB901569",
+   "logicSha256After": "A1A81CCF9CE61B5A551EA9484FA85E0E843ED0E29BC981D4FBC2DBBFA66AD53A"
+  },
+  {
+   "round": 2,
+   "claimId": "L|Package\\FT|detailed",
+   "field": "detailed: direction-1 branch node; new date-processing step after the money step",
+   "before": "{\"type\":\"step\",\"text\":\"הקופה שלנו היא צד המקור: מספר החשבון, המסלול וסוג הקופה נלקחים מצד המקור (ואם מספר הקופה 0 – מחשבון העו״ש), והצד השני הוא היעד.\",\"tech\":\"transfer (DTSX:70133)\"} || null",
+   "after": "{\"type\":\"step\",\"text\":\"הקופה שלנו היא צד המקור: מספר החשבון, המסלול וסוג הקופה נלקחים מצד המקור, והצד השני הוא היעד. מספר החשבון נלקח מחשבון העו״ש רק כשמספר חשבון הקופה בקובץ (אחרי הסרת רווחים) הוא בדיוק המחרוזת \\\"0\\\"; ערך מרופד באפסים, כמו \\\"000000000000\\\", אינו נחשב 0.\",\"tech\":\"transfer (DTSX:70133): gen_bankaccountnumber = Source_Fund_AccountNumber_20 != \\\"0\\\" ? Source_Fund_AccountNumber_20 : Source_gen_CurrentAccountNumber (השוואת מחרוזת)\"} || {\"type\":\"step\",\"text\":\"בין המרת הסכומים לחישוב השדות הנגזרים מעובדים שבעה שדות תאריך מהקובץ. ערך של 8 תווים נקרא כשנה-חודש-יום (YYYYMMDD), וערך של 6 תווים כשנה-חודש (YYYYMM) עם היום הראשון בחודש. ערך ריק, ערך באורך אחר, ערך שאינו תאריך תקין או תאריך שקודם לשנת 1900 הופך לריק. אחר כך כל תאריך שאינו ריק ואינו שווה לערך המשתנה CrmMinimumDate מומר משעון השרת המקומי ל-UTC. הערכים המומרים האלה הם שנכתבים לרשומת התנועה, ישירות או דרך שדות נגזרים.\",\"tech\":\"Format money fields → Format Dates (DTSX:60676) main.cs:51-77 → Dates ToUniveral (DTSX:59787) main.cs:34-58: ToUniversalTime → \\\"yyyy/MM/dd HH:mm:ss\\\", ללא המרה לערך השווה ל-User::CrmMinimumDate → Set trans additional fields. עמודות: gen_EntryDate, gen_ValueDate, gen_SalaryMonthId, Escrow_Account_Deposit_Date_110, Creation_Deposit_Source_File_Date_145, Appendix_GH_Issuing_Date_157, Action_Expected_Date_54. נכתבות בין היתר כ-Param_14 (gen_EntryDate), Param_32 (gen_ValueDate), Param_24 (gen_SalaryMonthId), Param_31 (Escrow), Param_45 (FileReceivingDateNoga ← Creation_Deposit_Source_File_Date_145), Param_46 (gen_appendixghissuingdate ← Appendix_GH_Issuing_Date_157), ודרך gen_salarydate (Param_23), gen_actualexecutiondate (Param_49), gen_refunddate (Param_58) ו-gen_paymentdate (Param_67) (DTSX:63118)\",\"evidence\":\"DTSX:60676, 59787, 68823, 70133\"}",
+   "why": "הנפילה לחשבון העו\"ש מתרחשת רק כשהערך הוא המחרוזת \"0\" בדיוק. בנוסף חסר עיבוד התאריכים (Format Dates, Dates ToUniveral), שמשנה את הערכים שנכתבים לתנועה.",
+   "evidence": "source/DailyProcess/0008_LeumiFile-PY.dtsx:70133 (transfer: Source_Fund_AccountNumber_20 != \"0\" ? ... : Source_gen_CurrentAccountNumber), 60676 (Format Dates main.cs:51-77), 59787 (Dates ToUniveral main.cs:34-58), 61666-61672 (7 עמודות באורך 30), 63118 (Param_14/23/24/31/32/45/46/49/58/67), 68823, 73001/73336 (Appendix_GH_Issuing_Date_157 → gen_appendixghissuingdate)",
+   "verifierAccepted": null,
+   "date": "2026-11-07T16:57:37.913Z",
+   "logicSha256Before": "C849A5EF94F6E52DCCEA40624E04EA7F0952C0DAAFFFA415D0FD271ECB901569",
+   "logicSha256After": "A1A81CCF9CE61B5A551EA9484FA85E0E843ED0E29BC981D4FBC2DBBFA66AD53A"
+  },
+  {
+   "round": 2,
+   "claimId": "L|Package\\FT|detail",
+   "field": "detail_he[4].t",
+   "before": "תנועות היום של קופות בנק לאומי מופיעות ב-CRM; זכאות הלוואה של העמית מסומנת לחישוב מחדש; חודשי שכר מדווחים שזוהתה להם הפקדה מסומנים.",
+   "after": "תנועות חדשות מקובץ ה-PY שנקלט (קופות בנק 10; התנועות מסומנות gen_isdailytrans = כן) מופיעות ב-CRM. החבילה אינה בודקת שתאריך התנועה הוא היום; זכאות הלוואה של העמית מסומנת לחישוב מחדש; חודשי שכר מדווחים שזוהתה להם הפקדה מסומנים.",
+   "why": "\"תנועות היום\" לא מוכח: החבילה אינה משווה תאריך תנועה להיום; היא מסמנת gen_isdailytrans = TRUE.",
+   "evidence": "source/DailyProcess/0008_LeumiFile-PY.dtsx:508-528 (Check File Existence), 68823 (gen_isdailytrans = TRUE)",
+   "verifierAccepted": null,
+   "date": "2026-11-07T16:57:37.913Z",
+   "logicSha256Before": "C849A5EF94F6E52DCCEA40624E04EA7F0952C0DAAFFFA415D0FD271ECB901569",
+   "logicSha256After": "A1A81CCF9CE61B5A551EA9484FA85E0E843ED0E29BC981D4FBC2DBBFA66AD53A"
+  },
+  {
+   "round": 2,
+   "claimId": "L|Package\\Create fundmain for transferin|detailed",
+   "field": "detailed: write node text; new Dates To Local step before the write",
+   "before": "null || נוצרת קופה חדשה במסלול היעד: מספר הקופה, מספר החשבון, מוצר ומספר מסלול היעד, פרטי הלקוח והסוכן מקופת המקור, \"קיימת בקובץ\" = כן, מקור קליטה = 1, כל שדות היתרה וההפקדה = 0, אחוז דמי ניהול משוקלל = 0, תאריך עדכון בנק = עכשיו, תאריך פתיחה = זמן השאילתה (UTC).",
+   "after": "{\"type\":\"step\",\"text\":\"לפני היצירה, תאריך הפתיחה וכל שדות התאריך שהועתקו מקופת המקור מומרים לשעון המקומי של השרת; תאריך השווה לערך המשתנה CrmMinimumDate נשאר כמות שהוא. הערכים נשלחים ל-CRM בשעון המקומי, ולא כ-UTC. האופן שבו CRM שומר אותם תלוי ברכיב CrmProxy, שלא סופק.\",\"tech\":\"Dates To Local (DTSX:32977) main.cs:40-75: ToLocalTime() לכל עמודת תאריך שאינה NULL ואינה שווה ל-User::CrmMinimumDate; עמודות: gen_fundcreationdate (getutcdate() ב-get source fund, DTSX:34192, Full cache), gen_brokerstartdate, gen_commissionexpirationdate, gen_commissionstartdate, gen_customerdateofbirth, gen_customerdeathdate, gen_customerverifieddate, gen_depositcommissionenddate, gen_depositcommissionstartdate; Set Fields → Multicast 1 → Dates To Local → Add Row Number → Split Rows For MultiThread → Create gen_fundmain (main.cs:50-58)\",\"evidence\":\"DTSX:32977, 34192\"} || נוצרת קופה חדשה במסלול היעד: מספר הקופה, מספר החשבון, מוצר ומספר מסלול היעד, פרטי הלקוח והסוכן מקופת המקור, \"קיימת בקובץ\" = כן, מקור קליטה = 1, כל שדות היתרה וההפקדה = 0, אחוז דמי ניהול משוקלל = 0, תאריך עדכון בנק = עכשיו, תאריך פתיחה = הזמן שבו נטענו נתוני קופות המקור (getutcdate), אחרי המרה לשעון המקומי של השרת.",
+   "why": "תאריך הפתיחה והתאריכים המועתקים מקופת המקור עוברים Dates To Local (ToLocalTime) לפני ה-SDK Create; הם לא נשלחים כ-UTC.",
+   "evidence": "source/DailyProcess/0008_LeumiFile-PY.dtsx:32977 (Dates To Local main.cs:40-75), 34192 (getutcdate() as gen_fundcreationdate, CacheType 0), path Multicast 1 → Dates To Local → Add Row Number",
+   "verifierAccepted": null,
+   "date": "2026-11-07T16:57:37.913Z",
+   "logicSha256Before": "C849A5EF94F6E52DCCEA40624E04EA7F0952C0DAAFFFA415D0FD271ECB901569",
+   "logicSha256After": "A1A81CCF9CE61B5A551EA9484FA85E0E843ED0E29BC981D4FBC2DBBFA66AD53A"
+  },
+  {
+   "round": 2,
+   "claimId": "L|Package\\Create transferin Maslulim|detailed",
+   "field": "detailed: pairing node, date node, new Dates To Local step, write node, end node",
+   "before": "{\"type\":\"step\",\"text\":\"שורת כיוון 2 ושורת הכיוון האחר מוצמדות לפי מזהה בקשה, חשבון וסוג קופה; רק בקשות עם שני הצדדים ממשיכות, עם חשבון המקור, סוג הקופה ותאריך הביצוע הצפוי של צד המקור.\",\"tech\":\"Conditional Split (DTSX:39413): Action_Transfer_Direction_69 == \\\"2\\\"; Merge Join (DTSX:43485) JoinType=2 (Inner), NumKeyColumns=3; gen_bankaccountnumber ← Source_Fund_AccountNumber_20, gen_id ← Source_Fund_FundType_16\"} || {\"type\":\"step\",\"text\":\"מספר החשבון וסוג הקופה מרופדים באפסים. תאריך הביצוע הצפוי מעובד: 8 תווים נקראים כשנה-חודש-יום (YYYYMMDD), ו-6 תווים כ-YYMMDD עם 20 בתחילת השנה. אורך אחר או תאריך לא תקין הופכים לריק, והתאריך מומר ל-UTC.\",\"tech\":\"Append Zeros To Fields (DTSX:38575); Format Dates (DTSX:41626) main.cs:58-71; Dates ToUniveral\"} ||  || {\"type\":\"write\",\"text\":\"נוצרת בקשת העברה נכנסת: סוג 5, מצב 1, תאריך מסירה, מזהה בקשה, ת.ז. הלקוח, חשבון מקור = חשבון יעד = חשבון הלקוח, איש קשר, מטבע; בשדה gen_transferid נשמר מספר החשבון.\",\"tech\":\"gen_transferin · Create · SDK (SDK Create gen_TransferIn main.cs:32–92; ExecuteMultiple מנות 10; ×5 מקביליים זהים)\"} || {\"type\":\"end\",\"text\":\"בקשות העברה בין מסלולים שתאריך הביצוע הצפוי שלהן מאוחר מהיום פחות חודשיים (כולל עתידי), ושלא היו ב-CRM לפני הריצה, נוצרות ב-CRM כבקשות העברה נכנסות. אם אותה בקשה מופיעה בקובץ ביותר מזוג שורות אחד, נוצרת בקשה לכל שורה מצורפת – אין סינון כפילויות בתוך הקובץ.\"}",
+   "after": "{\"type\":\"step\",\"text\":\"שורות כיוון 2 (צד היעד) ושאר השורות (צד המקור) ממוינות בנפרד, ובכל צד שורות כפולות מסוננות: בצד המקור נשארת שורה אחת לכל צירוף של מזהה בקשה, חשבון, סוג קופה ותאריך ביצוע צפוי, ובצד היעד שורה אחת לכל צירוף של מזהה בקשה, חשבון וסוג קופה. אחר כך שני הצדדים מוצמדים לפי מזהה בקשה, חשבון וסוג קופה; רק בקשות עם שני הצדדים ממשיכות, עם חשבון המקור, סוג הקופה ותאריך הביצוע הצפוי של צד המקור.\",\"tech\":\"Conditional Split (DTSX:39413): Action_Transfer_Direction_69 == \\\"2\\\"; Sort (DTSX:50313) EliminateDuplicates=true (DTSX:50315), מפתחות: gen_requestidentifier, Source_Fund_AccountNumber_20, Source_Fund_FundType_16, gen_deliverydate; Sort 1 (DTSX:50377) EliminateDuplicates=true (DTSX:50379), מפתחות: gen_requestidentifier, Target_Fund_AccountNumber_47, Target_Fund_FundType_43 (בשני המיונים כל העמודות הן מפתחות); Merge Join (DTSX:43485) JoinType=2 (Inner), NumKeyColumns=3; gen_bankaccountnumber ← Source_Fund_AccountNumber_20, gen_id ← Source_Fund_FundType_16\",\"evidence\":\"DTSX:50315, 50379, 43485\"} || {\"type\":\"step\",\"text\":\"מספר החשבון וסוג הקופה מרופדים באפסים. תאריך הביצוע הצפוי מעובד: 8 תווים נקראים כשנה-חודש-יום (YYYYMMDD), ו-6 תווים כ-YYMMDD עם 20 בתחילת השנה. אורך אחר או תאריך לא תקין הופכים לריק, והתאריך מומר ל-UTC לצורך הסינון שבהמשך.\",\"tech\":\"Append Zeros To Fields (DTSX:38575); Format Dates (DTSX:41626) main.cs:58-71; Dates ToUniveral\"} || {\"type\":\"step\",\"text\":\"לפני היצירה תאריך הביצוע הצפוי מומר חזרה מ-UTC לשעון המקומי של השרת, והערך המקומי הוא שנשלח ל-CRM כתאריך המסירה.\",\"tech\":\"Multicast 1 → Dates To Local (DTSX:39491) main.cs:53-57: ToLocalTime() → \\\"yyyy/MM/dd HH:mm:ss\\\" (ערך השווה ל-User::CrmMinimumDate לא מומר) → Add Row Number; SDK Create gen_TransferIn main.cs:46-48: gen_deliverydate = DateTime.Parse(Row.gendeliverydate)\",\"evidence\":\"DTSX:39491\"} || {\"type\":\"write\",\"text\":\"נוצרת בקשת העברה נכנסת: סוג 5, מצב 1, תאריך מסירה (תאריך הביצוע הצפוי בשעון המקומי של השרת), מזהה בקשה, ת.ז. הלקוח, חשבון מקור = חשבון יעד = חשבון הלקוח, איש קשר, מטבע; בשדה gen_transferid נשמר מספר החשבון.\",\"tech\":\"gen_transferin · Create · SDK (SDK Create gen_TransferIn main.cs:32–92; ExecuteMultiple מנות 10; ×5 מקביליים זהים)\"} || {\"type\":\"end\",\"text\":\"בקשות העברה בין מסלולים שתאריך הביצוע הצפוי שלהן מאוחר מהיום פחות חודשיים (כולל עתידי), ושלא היו ב-CRM לפני הריצה, נוצרות ב-CRM כבקשות העברה נכנסות. שורות כפולות בתוך הקובץ מסוננות לפני ההצמדה, ולכן חזרה על אותו זוג שורות יוצרת בקשה אחת. לאותו מזהה בקשה נוצרת יותר מבקשה אחת רק אם בצד המקור יש לו כמה צירופים שונים של חשבון, סוג קופה ותאריך ביצוע צפוי שלכל אחד מהם יש צד יעד תואם (למשל אותו מזהה עם תאריכי ביצוע צפויים שונים). בדיקת הקיום ב-CRM נשענת על מטמון שנטען בתחילת הזרימה, ולכן אינה רואה בקשות שנוצרו באותה ריצה.\"}",
+   "why": "שני ה-Sort לפני ה-Merge Join מוגדרים EliminateDuplicates=true, ולכן יש סינון כפילויות לפי מפתחות המיון (כל העמודות בכל צד). בנוסף, לפני היצירה Dates To Local ממיר את תאריך המסירה חזרה לשעון המקומי.",
+   "evidence": "source/DailyProcess/0008_LeumiFile-PY.dtsx:50315, 50379 (EliminateDuplicates=true; מפתחות Sort: gen_requestidentifier, Source_Fund_AccountNumber_20, Source_Fund_FundType_16, gen_deliverydate; Sort 1: gen_requestidentifier, Target_Fund_AccountNumber_47, Target_Fund_FundType_43), 43485, 42500 (get tranferin CacheType 0), 39491 (Dates To Local main.cs:53-57); SDK main.cs:46-48",
+   "verifierAccepted": null,
+   "date": "2026-11-07T16:57:37.913Z",
+   "logicSha256Before": "C849A5EF94F6E52DCCEA40624E04EA7F0952C0DAAFFFA415D0FD271ECB901569",
+   "logicSha256After": "A1A81CCF9CE61B5A551EA9484FA85E0E843ED0E29BC981D4FBC2DBBFA66AD53A"
+  },
+  {
+   "round": 2,
+   "claimId": "L|Package\\Create transferin Maslulim|decisions",
+   "field": "decisions: new Sort / Sort 1 entry before Merge Join",
+   "before": "null",
+   "after": "{\"where\":\"Sort / Sort 1 (DTSX:50313 / 50377)\",\"condition\":\"EliminateDuplicates=true (DTSX:50315, 50379). Sort (צד המקור): gen_requestidentifier, Source_Fund_AccountNumber_20, Source_Fund_FundType_16, gen_deliverydate; Sort 1 (צד היעד, כיוון \\\"2\\\"): gen_requestidentifier, Target_Fund_AccountNumber_47, Target_Fund_FundType_43. בשני המיונים כל העמודות הן מפתחות מיון\",\"meaning_he\":\"שורות כפולות בכל צד מסוננות לפני ההצמדה\",\"outcome_he\":\"בכל צד נשארת שורה אחת לכל צירוף מפתחות; לאותו מזהה בקשה נוצרות לכל היותר בקשות כמספר הצירופים השונים בצד המקור שיש להם צד יעד תואם\"}",
+   "why": "סינון הכפילויות במיון קובע כמה בקשות נוצרות כשהקובץ חוזר על בקשה.",
+   "evidence": "source/DailyProcess/0008_LeumiFile-PY.dtsx:50313-50315, 50377-50379",
+   "verifierAccepted": null,
+   "date": "2026-11-07T16:57:37.913Z",
+   "logicSha256Before": "C849A5EF94F6E52DCCEA40624E04EA7F0952C0DAAFFFA415D0FD271ECB901569",
+   "logicSha256After": "A1A81CCF9CE61B5A551EA9484FA85E0E843ED0E29BC981D4FBC2DBBFA66AD53A"
+  },
+  {
+   "round": 2,
+   "claimId": "L|Package\\Create Acount Courses and course partition for transferin|title",
+   "field": "flow_he (סוג העברה)",
+   "before": "סוג העברה: Action_Operation_Type_57 ריק או 2 → 1 / true; אחרת 2 / false",
+   "after": "סוג העברה: Action_Operation_Type_57 NULL או 2 → 1 / true; ערך מספרי אחר → 2 / false",
+   "why": "רק NULL נותן 1; ערך ריק אינו NULL. \"אחרת\" הוחלף ב\"ערך מספרי אחר\".",
+   "evidence": "source/DailyProcess/0008_LeumiFile-PY.dtsx:19093 (ISNULL(Action_Operation_Type_57) ? 1 : (((DT_I4)Action_Operation_Type_57) == 2 ? 1 : 2))",
+   "verifierAccepted": null,
+   "date": "2026-11-07T16:57:37.913Z",
+   "logicSha256Before": "C849A5EF94F6E52DCCEA40624E04EA7F0952C0DAAFFFA415D0FD271ECB901569",
+   "logicSha256After": "A1A81CCF9CE61B5A551EA9484FA85E0E843ED0E29BC981D4FBC2DBBFA66AD53A"
+  },
+  {
+   "round": 2,
+   "claimId": "L|Package\\Create Acount Courses and course partition for transferin|detailed",
+   "field": "detailed: transfer-type node, date branch, course-partition write node",
+   "before": "{\"type\":\"step\",\"text\":\"נקבע סוג ההעברה: כשסוג הפעולה ריק או 2 – ערך 1 ו\\\"חישוב סכום\\\" = כן; אחרת – ערך 2 ו\\\"חישוב סכום\\\" = לא.\",\"tech\":\"set additional fields (DTSX:19093): IsFullTransfer = ISNULL(Action_Operation_Type_57) ? 1 : (((DT_I4)Action_Operation_Type_57) == 2 ? 1 : 2); AmountCalculationType = (DT_BOOL)(ISNULL(...) ? 1 : (... == 2 ? 1 : 0))\"} || {\"type\":\"step\",\"text\":\"התאריך מעובד: 8 תווים נקראים כ-YYYYMMDD ו-6 תווים כ-YYMMDD עם 20 בתחילת השנה; אורך אחר או תאריך לא תקין הופכים לריק. התאריך מומר ל-UTC.\"} || {\"type\":\"write\",\"text\":\"נוצר פיצול מסלול: סוג פיצול 2, תאריך יצירה = תאריך הביצוע הצפוי, ת.ז. המבקש, מספר גוף מנהל, מספר חוזה, קישור להעברה, ללקוח, לקופת היעד, למוצר, לסוכן, לסוכנות ולמפקח.\",\"tech\":\"gen_coursepartition · Create · SDK (SDK Create gen_coursepartition main.cs:27–112; ×5 זהים)\"}",
+   "after": "{\"type\":\"step\",\"text\":\"נקבע סוג ההעברה: כשסוג הפעולה NULL או 2 – ערך 1 ו\\\"חישוב סכום\\\" = כן; כשסוג הפעולה הוא ערך מספרי אחר – ערך 2 ו\\\"חישוב סכום\\\" = לא.\",\"tech\":\"set additional fields (DTSX:19093): IsFullTransfer = ISNULL(Action_Operation_Type_57) ? 1 : (((DT_I4)Action_Operation_Type_57) == 2 ? 1 : 2); AmountCalculationType = (DT_BOOL)(ISNULL(...) ? 1 : (... == 2 ? 1 : 0))\"} || {\"type\":\"step\",\"text\":\"התאריך מעובד: 8 תווים נקראים כ-YYYYMMDD ו-6 תווים כ-YYMMDD עם 20 בתחילת השנה; אורך אחר או תאריך לא תקין הופכים לריק. התאריך מומר ל-UTC. בענף היעד הוא מומר חזרה לשעון המקומי של השרת לפני יצירת פיצול המסלול.\"} || {\"type\":\"write\",\"text\":\"נוצר פיצול מסלול: סוג פיצול 2, תאריך יצירה = תאריך הביצוע הצפוי (אחרי המרה חזרה לשעון המקומי של השרת), ת.ז. המבקש, מספר גוף מנהל, מספר חוזה, קישור להעברה, ללקוח, לקופת היעד, למוצר, לסוכן, לסוכנות ולמפקח.\",\"tech\":\"gen_coursepartition · Create · SDK (SDK Create gen_coursepartition main.cs:27–112; ×5 זהים; לפני היצירה: Multicast 1 → Dates To Local (DTSX:3480) main.cs:53-57 ToLocalTime() על Action_Expected_Date_54 (ערך השווה ל-User::CrmMinimumDate לא מומר); gen_creationdate = DateTime.Parse(Row.ActionExpectedDate54))\"}",
+   "why": "רק NULL נותן ערך 1 (ערך ריק אינו NULL; הכישלון בהמרה הוא plumbing ולא פורט). בנוסף, בענף היעד Dates To Local ממיר את התאריך חזרה לשעון המקומי לפני יצירת פיצול המסלול.",
+   "evidence": "source/DailyProcess/0008_LeumiFile-PY.dtsx:19093; 3480 (Dates To Local main.cs:53-57); path Check if exist course partition No Match → Multicast 1 → Dates To Local → Add Row Number 1 → SDK Create gen_coursepartition (gen_creationdate = DateTime.Parse(Row.ActionExpectedDate54))",
+   "verifierAccepted": null,
+   "date": "2026-11-07T16:57:37.913Z",
+   "logicSha256Before": "C849A5EF94F6E52DCCEA40624E04EA7F0952C0DAAFFFA415D0FD271ECB901569",
+   "logicSha256After": "A1A81CCF9CE61B5A551EA9484FA85E0E843ED0E29BC981D4FBC2DBBFA66AD53A"
+  },
+  {
+   "round": 2,
+   "claimId": "L|Package\\Create Acount Courses and course partition for transferin|decisions",
+   "field": "decisions[set additional fields].meaning_he",
+   "before": "סוג פעולה ריק/2 → 1/true, אחרת 2/false",
+   "after": "סוג פעולה NULL או 2 → 1/true; ערך מספרי אחר → 2/false",
+   "why": "אותו תיקון: NULL (לא \"ריק\") או 2 → 1/true; ערך מספרי אחר → 2/false.",
+   "evidence": "source/DailyProcess/0008_LeumiFile-PY.dtsx:19093",
+   "verifierAccepted": null,
+   "date": "2026-11-07T16:57:37.913Z",
+   "logicSha256Before": "C849A5EF94F6E52DCCEA40624E04EA7F0952C0DAAFFFA415D0FD271ECB901569",
+   "logicSha256After": "A1A81CCF9CE61B5A551EA9484FA85E0E843ED0E29BC981D4FBC2DBBFA66AD53A"
+  },
+  {
+   "round": 3,
+   "claimId": "L|summary",
+   "field": "summary_he",
+   "before": "החבילה קולטת את קובץ ה-PY היומי של בנק לאומי (תנועות ובקשות בקופות של בנק 10), טוענת אותו ל-Staging ומעדכנת לפיו את CRM: מוסיפה תנועות חדשות לטבלת התנועות של השנה השוטפת (Gen_ftCurrentYear) בהכנסת SQL ישירה למסד CRM (Unsupported), מסמנת את איש הקשר לחישוב זכאות להלוואה ומסמנת זיהוי הפקדה לחודש שכר מדווח. בנוסף, להעברות בין מסלולים באותו חשבון (פעולה 57, אותו חשבון ואותו סוג קופה) היא יוצרת דרך CRM SDK קופה במסלול היעד (gen_fundmain) ובקשת העברה נכנסת (gen_transferin). מסלולי חשבון ופיצולי מסלול (gen_accountcourses / gen_coursepartition) נוצרים דרך SDK לשורות בקובץ בלי סינון לפי סוג פעולה: לכל שורה שמזהה הבקשה (Request_ID_74) וחשבון היעד (Target_Fund_AccountNumber_47) שלה תואמים gen_transferin קיים ב-CRM, בלי סינון לפי מצב ההעברה או לפי התהליך שיצר אותה.",
+   "after": "החבילה קולטת את קובץ ה-PY היומי של בנק לאומי (תנועות ובקשות בקופות של בנק 10), טוענת אותו ל-Staging ומעדכנת לפיו את CRM: מוסיפה תנועות חדשות לטבלת התנועות של השנה השוטפת (Gen_ftCurrentYear) בהכנסת SQL ישירה למסד CRM (Unsupported), כותבת לאיש הקשר gen_loaneligibilitycalculationrequired = 1, וכותבת לרשומת gen_demislikamonthsalary מתאימה gen_depositidentificationforreportedmonth = 1 עם תאריך (משמעות השדות לפי שמם בלבד, לא מוכחת). בנוסף, להעברות בין מסלולים באותו חשבון (פעולה 57, אותו חשבון ואותו סוג קופה) היא יוצרת דרך CRM SDK קופה במסלול היעד (gen_fundmain) ובקשת העברה נכנסת (gen_transferin). מסלולי חשבון ופיצולי מסלול (gen_accountcourses / gen_coursepartition) נוצרים דרך SDK לשורות בקובץ בלי סינון לפי סוג פעולה: לכל שורה שמזהה הבקשה (Request_ID_74) וחשבון היעד (Target_Fund_AccountNumber_47) שלה תואמים gen_transferin קיים ב-CRM, בלי סינון לפי מצב ההעברה או לפי התהליך שיצר אותה.",
+   "why": "משמעויות 'חישוב זכאות להלוואה' ו'זיהוי הפקדה' נלקחו משמות העמודות; הקוד רק כותב 1 ותאריך. סומן כמשמעות לפי שם השדה.",
+   "evidence": "source/DailyProcess/0008_LeumiFile-PY.dtsx:82566 (update ContactBase set gen_loaneligibilitycalculationrequired =1 where ContactId =?); DTSX:82519-82524 (update gen_demislikamonthsalary set gen_depositidentificationstatusdate = GETDATE(), ModifiedOn = GETDATE(), gen_depositidentificationforreportedmonth = 1, --yes, ModifiedBy = ? where gen_demislikamonthsalaryId = ?)",
+   "verifierAccepted": null,
+   "date": "2026-11-07T21:56:04.121Z",
+   "logicSha256Before": "A1A81CCF9CE61B5A551EA9484FA85E0E843ED0E29BC981D4FBC2DBBFA66AD53A",
+   "logicSha256After": "6467D029C35002FADD79985769DF61810C08A93C46E743425A92A7A3781FEBAA"
+  },
+  {
+   "round": 3,
+   "claimId": "L|finding#2",
+   "field": "findings_he[1].text",
+   "before": "סימון \"זוהתה הפקדה\" לחודש השכר המדווח מתבצע בענף מקביל מיד אחרי איתור הקופה, ללא תלות בהצלחת הכנסת התנועה – אם ה-INSERT נכשל (ונרשם כאזהרה), חודש השכר עדיין מסומן כמזוהה.",
+   "after": "העדכון של gen_demislikamonthsalary (gen_depositidentificationforreportedmonth = 1 ותאריך) מתבצע בענף מקביל מיד אחרי איתור הקופה, ללא תלות בהצלחת הכנסת התנועה: אם ה-INSERT של התנועה נכשל (ונרשם כאזהרה), הרשומה עדיין מתעדכנת.",
+   "why": "משמעויות 'חישוב זכאות להלוואה' ו'זיהוי הפקדה' נלקחו משמות העמודות; הקוד רק כותב 1 ותאריך. סומן כמשמעות לפי שם השדה.",
+   "evidence": "source/DailyProcess/0008_LeumiFile-PY.dtsx:82566 (update ContactBase set gen_loaneligibilitycalculationrequired =1 where ContactId =?); DTSX:82519-82524 (update gen_demislikamonthsalary set gen_depositidentificationstatusdate = GETDATE(), ModifiedOn = GETDATE(), gen_depositidentificationforreportedmonth = 1, --yes, ModifiedBy = ? where gen_demislikamonthsalaryId = ?)",
+   "verifierAccepted": null,
+   "date": "2026-11-07T21:56:04.121Z",
+   "logicSha256Before": "A1A81CCF9CE61B5A551EA9484FA85E0E843ED0E29BC981D4FBC2DBBFA66AD53A",
+   "logicSha256After": "6467D029C35002FADD79985769DF61810C08A93C46E743425A92A7A3781FEBAA"
+  },
+  {
+   "round": 3,
+   "claimId": "L|Package\\Write PY File To Staging|title",
+   "field": "components[PY].short_he",
+   "before": "קובץ ה-PY (רוחב קבוע, cp1255) נטען כמות שהוא לטבלת PY_FileData בחיבור SRS.GENERIX_STAGING (בזמן התכנון Psrs/GENERIX_STAGING; קובץ התצורה SSISConfigFileSrs.dtsConfig, שלא סופק, עשוי לדרוס את היעד), לאחר הסרת אפסים מובילים ממזהה התנועה הבנקאי וממזהה הפעולה הקשורה.",
+   "after": "קובץ ה-PY (רוחב קבוע, cp1255) נטען לטבלת PY_FileData בחיבור SRS.GENERIX_STAGING (בזמן התכנון Psrs/GENERIX_STAGING; קובץ התצורה SSISConfigFileSrs.dtsConfig, שלא סופק, עשוי לדרוס את היעד). לעמודות BankTransaction_ID_91 ו-Related_Action_ID_98 בטבלה נכתבים השדות FILLER1_29_BankTransactionId (עמודה 29 בקובץ) ו-Filler_83_RelatedActionId (עמודה 83) אחרי הסרת אפסים מובילים. השדות BankTransaction_ID_91 (עמודה 91) ו-Related_Action_ID_98 (עמודה 98) שבקובץ, ועוד 16 עמודות (146-148, 150-156, 158, 159, 202-204, Filler_205_211), אינם נטענים.",
+   "why": "'נטען כמות שהוא' לא מדויק: עמודות Staging BankTransaction_ID_91 ו-Related_Action_ID_98 מקבלות את שדות הקובץ 29 ו-83; שדות הקובץ 91 ו-98 ועוד 16 עמודות (146-148, 150-156, 158, 159, 202-204, Filler_205_211) לא נטענים.",
+   "evidence": "source/DailyProcess/0008_LeumiFile-PY.dtsx:9-190 (CM PY source: 174 FlatFileColumn; FILLER1_29_BankTransactionId = עמודה 29, Filler_83_RelatedActionId = 83, BankTransaction_ID_91 = 91, Related_Action_ID_98 = 98); DTSX:87203 Remove Leading Zero; DTSX:85616 Insert To PY_FileData (153 עמודות קלט; FILLER1_29_BankTransactionId → ext BankTransaction_ID_91, Filler_83_RelatedActionId → ext Related_Action_ID_98); FT insert ftCurrentYearBase SQL DTSX:63118: Gen_transferid = Param_26 ← gen_transferid ← BankTransaction_ID_91, gen_relatedactionidentifier = Param_72 ← Related_Action_ID_98",
+   "verifierAccepted": null,
+   "date": "2026-11-07T21:56:04.121Z",
+   "logicSha256Before": "A1A81CCF9CE61B5A551EA9484FA85E0E843ED0E29BC981D4FBC2DBBFA66AD53A",
+   "logicSha256After": "6467D029C35002FADD79985769DF61810C08A93C46E743425A92A7A3781FEBAA"
+  },
+  {
+   "round": 3,
+   "claimId": "L|Package\\Write PY File To Staging|title",
+   "field": "components[PY].flow_he[1]",
+   "before": "Remove Leading Zero: BankTransactionId, RelatedActionId",
+   "after": "Remove Leading Zero: FILLER1_29_BankTransactionId → BankTransaction_ID_91, Filler_83_RelatedActionId → Related_Action_ID_98 (שדות הקובץ BankTransaction_ID_91 / Related_Action_ID_98 ועוד 16 עמודות לא נטענים)",
+   "why": "'נטען כמות שהוא' לא מדויק: עמודות Staging BankTransaction_ID_91 ו-Related_Action_ID_98 מקבלות את שדות הקובץ 29 ו-83; שדות הקובץ 91 ו-98 ועוד 16 עמודות (146-148, 150-156, 158, 159, 202-204, Filler_205_211) לא נטענים.",
+   "evidence": "source/DailyProcess/0008_LeumiFile-PY.dtsx:9-190 (CM PY source: 174 FlatFileColumn; FILLER1_29_BankTransactionId = עמודה 29, Filler_83_RelatedActionId = 83, BankTransaction_ID_91 = 91, Related_Action_ID_98 = 98); DTSX:87203 Remove Leading Zero; DTSX:85616 Insert To PY_FileData (153 עמודות קלט; FILLER1_29_BankTransactionId → ext BankTransaction_ID_91, Filler_83_RelatedActionId → ext Related_Action_ID_98); FT insert ftCurrentYearBase SQL DTSX:63118: Gen_transferid = Param_26 ← gen_transferid ← BankTransaction_ID_91, gen_relatedactionidentifier = Param_72 ← Related_Action_ID_98",
+   "verifierAccepted": null,
+   "date": "2026-11-07T21:56:04.121Z",
+   "logicSha256Before": "A1A81CCF9CE61B5A551EA9484FA85E0E843ED0E29BC981D4FBC2DBBFA66AD53A",
+   "logicSha256After": "6467D029C35002FADD79985769DF61810C08A93C46E743425A92A7A3781FEBAA"
+  },
+  {
+   "round": 3,
+   "claimId": "L|Package\\Write PY File To Staging|detailed",
+   "field": "components[PY].detailed.nodes[3]",
+   "before": {
+    "type": "step",
+    "text": "כל השורות, כולל שורת הסיום, נכתבות לטבלת ה-Staging.",
+    "tech": "Insert To PY_FileData (DTSX:85616) → [dbo].[PY_FileData] (OpenRowset) בחיבור SRS.GENERIX_STAGING (DTSX:85631); מחרוזת החיבור בזמן התכנון: Data Source=Psrs; Initial Catalog=GENERIX_STAGING (DTSX:192-196). החבילה טוענת את קובץ התצורה C:\\Generix\\SSISConfigFileSrs.dtsConfig (SRS_STAGING, DTSX:200), שלא סופק ועשוי לדרוס את היעד בזמן ריצה."
+   },
+   "after": {
+    "type": "step",
+    "text": "כל השורות, כולל שורת הסיום, נכתבות לטבלת ה-Staging, אבל לא כל העמודות. לעמודות BankTransaction_ID_91 ו-Related_Action_ID_98 בטבלה נכתבים השדות FILLER1_29_BankTransactionId (עמודה 29 בקובץ) ו-Filler_83_RelatedActionId (עמודה 83), אחרי הסרת האפסים המובילים. השדות BankTransaction_ID_91 (עמודה 91) ו-Related_Action_ID_98 (עמודה 98) שבקובץ אינם נטענים, וכך גם 16 עמודות נוספות: 146-148, 150-156, 158, 159, 202-204 ו-Filler_205_211. שלב FT כותב ל-CRM את BankTransaction_ID_91 של ה-Staging כ-Gen_transferid ואת Related_Action_ID_98 כ-gen_relatedactionidentifier, ולכן ערכים אלה מגיעים משדות 29 ו-83 בקובץ.",
+    "tech": "Insert To PY_FileData (DTSX:85616) → [dbo].[PY_FileData] (OpenRowset) בחיבור SRS.GENERIX_STAGING (DTSX:85631); מחרוזת החיבור בזמן התכנון: Data Source=Psrs; Initial Catalog=GENERIX_STAGING (DTSX:192-196). החבילה טוענת את קובץ התצורה C:\\Generix\\SSISConfigFileSrs.dtsConfig (SRS_STAGING, DTSX:200), שלא סופק ועשוי לדרוס את היעד בזמן ריצה. · מיפוי Insert To PY_FileData (DTSX:85616): 153 עמודות קלט מתוך 171 שהמקור מוציא; FILLER1_29_BankTransactionId → ext:BankTransaction_ID_91, Filler_83_RelatedActionId → ext:Related_Action_ID_98 · FT insert ftCurrentYearBase (DTSX:63118): Gen_transferid = Param_26, gen_relatedactionidentifier = Param_72"
+   },
+   "why": "'נטען כמות שהוא' לא מדויק: עמודות Staging BankTransaction_ID_91 ו-Related_Action_ID_98 מקבלות את שדות הקובץ 29 ו-83; שדות הקובץ 91 ו-98 ועוד 16 עמודות (146-148, 150-156, 158, 159, 202-204, Filler_205_211) לא נטענים.",
+   "evidence": "source/DailyProcess/0008_LeumiFile-PY.dtsx:9-190 (CM PY source: 174 FlatFileColumn; FILLER1_29_BankTransactionId = עמודה 29, Filler_83_RelatedActionId = 83, BankTransaction_ID_91 = 91, Related_Action_ID_98 = 98); DTSX:87203 Remove Leading Zero; DTSX:85616 Insert To PY_FileData (153 עמודות קלט; FILLER1_29_BankTransactionId → ext BankTransaction_ID_91, Filler_83_RelatedActionId → ext Related_Action_ID_98); FT insert ftCurrentYearBase SQL DTSX:63118: Gen_transferid = Param_26 ← gen_transferid ← BankTransaction_ID_91, gen_relatedactionidentifier = Param_72 ← Related_Action_ID_98",
+   "verifierAccepted": null,
+   "date": "2026-11-07T21:56:04.121Z",
+   "logicSha256Before": "A1A81CCF9CE61B5A551EA9484FA85E0E843ED0E29BC981D4FBC2DBBFA66AD53A",
+   "logicSha256After": "6467D029C35002FADD79985769DF61810C08A93C46E743425A92A7A3781FEBAA"
+  },
+  {
+   "round": 3,
+   "claimId": "L|Package\\FT|detailed",
+   "field": "components[FT].detailed.nodes[5].text",
+   "before": "הסכומים מומרים מאגורות לשקלים, ומחושבים שדות נגזרים: סכום כולל ובקשה = עובד + מעביד + פיצויים; סכום החזר = סכום כולל פחות מס; תנועה יומית = כן; ממשק תשלומים = 1 כשיוצר הבקשה 7672; מודל תלוי גיל = 2 כשבקובץ 1, אחרת 1; קוד ליד 1092/1093 לסוג קופת יעד 0512/0513.",
+   "after": "סכומי הקובץ מחולקים ב-100 (DT_CY), וערך ריק (NULL) הופך ל-0 (יחידת המידה של הסכומים לא מוכחת), ומחושבים שדות נגזרים: סכום כולל ובקשה = עובד + מעביד + פיצויים; סכום החזר = סכום כולל פחות מס; תנועה יומית = כן; ממשק תשלומים = 1 כשיוצר הבקשה 7672; מודל תלוי גיל = 2 כשבקובץ 1, אחרת 1; קוד ליד 1092/1093 לסוג קופת יעד 0512/0513.",
+   "why": "'מאגורות לשקלים' לא מוכח; הקוד רק מחלק ב-100.",
+   "evidence": "source/DailyProcess/0008_LeumiFile-PY.dtsx:61683 Format money fields: (DT_CY)(ISNULL(x) ? 0 : (DT_CY)x / 100)",
+   "verifierAccepted": null,
+   "date": "2026-11-07T21:56:04.121Z",
+   "logicSha256Before": "A1A81CCF9CE61B5A551EA9484FA85E0E843ED0E29BC981D4FBC2DBBFA66AD53A",
+   "logicSha256After": "6467D029C35002FADD79985769DF61810C08A93C46E743425A92A7A3781FEBAA"
+  },
+  {
+   "round": 3,
+   "claimId": "L|Package\\FT|detailed",
+   "field": "components[FT].detailed.nodes[13].text",
+   "before": "נקבע סוג קבוצת התנועה לפי סוג הפעולה (51→12, 52→13, 53→1, 54→19, 55→2, 56→3, 57→16, 59/61/63→17, 60→10, 62→11, אחר→18), וסוג ההפרשה לפי אילו רכיבי סכום (עובד/מעביד/פיצויים) שונים מאפס (1–7; אם כולם אפס – ריק).",
+   "after": "נקבע סוג קבוצת התנועה לפי סוג הפעולה, Action_Type_56 (51→12, 52→13, 53→1, 54→19, 55→2, 56→3, 57→16, 59/61/63→17, 60→10, 62→11, אחר→18), וסוג ההפרשה לפי אילו רכיבי סכום (עובד/מעביד/פיצויים) שונים מאפס (1–7; אם כולם אפס – ריק).",
+   "why": "מינוח אחיד: 'סוג הפעולה' = Action_Type_56 (gen_TranstypeId), 'סוג הפעולה המשני' = Action_Operation_Type_57 (gen_TransgroupTypeId); התנאים שויכו לעמודה הנכונה ונוסף השם הטכני.",
+   "evidence": "source/DailyProcess/0008_LeumiFile-PY.dtsx: PY File Data From Staging (DTSX:65865) gen_TranstypeId ← Action_Type_56, gen_TransgroupTypeId ← Action_Operation_Type_57; Check for overpayment main.cs:119-120; Set Tax Fields main.cs:24-25, 41; Set trans group type main.vb:17-31; Set FinancialModuleWay DTSX:67179; TranstypeId is 54 DTSX:70255; Check Type And Year DTSX:57393",
+   "verifierAccepted": null,
+   "date": "2026-11-07T21:56:04.121Z",
+   "logicSha256Before": "A1A81CCF9CE61B5A551EA9484FA85E0E843ED0E29BC981D4FBC2DBBFA66AD53A",
+   "logicSha256After": "6467D029C35002FADD79985769DF61810C08A93C46E743425A92A7A3781FEBAA"
+  },
+  {
+   "round": 3,
+   "claimId": "L|Package\\FT|detailed",
+   "field": "components[FT].detailed.nodes[14].text",
+   "before": "האם צירוף סוג הפעולה וסוג הפעולה המשני מוגדר בטבלת סוגי התנועות של בנק 10?",
+   "after": "האם צירוף סוג הפעולה (Action_Type_56) וסוג הפעולה המשני (Action_Operation_Type_57) מוגדר בטבלת סוגי התנועות של בנק 10?",
+   "why": "מינוח אחיד: 'סוג הפעולה' = Action_Type_56 (gen_TranstypeId), 'סוג הפעולה המשני' = Action_Operation_Type_57 (gen_TransgroupTypeId); התנאים שויכו לעמודה הנכונה ונוסף השם הטכני.",
+   "evidence": "source/DailyProcess/0008_LeumiFile-PY.dtsx: PY File Data From Staging (DTSX:65865) gen_TranstypeId ← Action_Type_56, gen_TransgroupTypeId ← Action_Operation_Type_57; Check for overpayment main.cs:119-120; Set Tax Fields main.cs:24-25, 41; Set trans group type main.vb:17-31; Set FinancialModuleWay DTSX:67179; TranstypeId is 54 DTSX:70255; Check Type And Year DTSX:57393",
+   "verifierAccepted": null,
+   "date": "2026-11-07T21:56:04.121Z",
+   "logicSha256Before": "A1A81CCF9CE61B5A551EA9484FA85E0E843ED0E29BC981D4FBC2DBBFA66AD53A",
+   "logicSha256After": "6467D029C35002FADD79985769DF61810C08A93C46E743425A92A7A3781FEBAA"
+  },
+  {
+   "round": 3,
+   "claimId": "L|Package\\FT|detailed",
+   "field": "components[FT].detailed.nodes[15].text",
+   "before": "סימון \"החזר יתר\" נקבע כ\"כן\" רק כאשר הסכום הכולל שלילי, סוג הפעולה 01 או 03, הפעולה 53, יוצר הבקשה 7672, קיים מזהה עובד בקובץ, קיים פרט כלשהו של חשבון עו״ש מקור, ו-Action_Type_196 = 5; אחרת \"לא\".",
+   "after": "סימון \"החזר יתר\" נקבע כ\"כן\" רק כאשר הסכום הכולל שלילי, סוג הפעולה המשני (Action_Operation_Type_57) 01 או 03, סוג הפעולה (Action_Type_56) 53, יוצר הבקשה 7672, קיים מזהה עובד בקובץ, קיים פרט כלשהו של חשבון עו״ש מקור, ו-Action_Type_196 = 5; אחרת \"לא\".",
+   "why": "מינוח אחיד: 'סוג הפעולה' = Action_Type_56 (gen_TranstypeId), 'סוג הפעולה המשני' = Action_Operation_Type_57 (gen_TransgroupTypeId); התנאים שויכו לעמודה הנכונה ונוסף השם הטכני.",
+   "evidence": "source/DailyProcess/0008_LeumiFile-PY.dtsx: PY File Data From Staging (DTSX:65865) gen_TranstypeId ← Action_Type_56, gen_TransgroupTypeId ← Action_Operation_Type_57; Check for overpayment main.cs:119-120; Set Tax Fields main.cs:24-25, 41; Set trans group type main.vb:17-31; Set FinancialModuleWay DTSX:67179; TranstypeId is 54 DTSX:70255; Check Type And Year DTSX:57393",
+   "verifierAccepted": null,
+   "date": "2026-11-07T21:56:04.121Z",
+   "logicSha256Before": "A1A81CCF9CE61B5A551EA9484FA85E0E843ED0E29BC981D4FBC2DBBFA66AD53A",
+   "logicSha256After": "6467D029C35002FADD79985769DF61810C08A93C46E743425A92A7A3781FEBAA"
+  },
+  {
+   "round": 3,
+   "claimId": "L|Package\\FT|detailed",
+   "field": "components[FT].detailed.nodes[16].text",
+   "before": "האם זו הפקדה (53) לעמית שכיר (קוד סוג עמית 2) במוצר גמל (1) או קרן השתלמות (4)?",
+   "after": "האם זו הפקדה (סוג הפעולה Action_Type_56 = 53) לעמית שכיר (קוד סוג עמית 2) במוצר גמל (1) או קרן השתלמות (4)?",
+   "why": "מינוח אחיד: 'סוג הפעולה' = Action_Type_56 (gen_TranstypeId), 'סוג הפעולה המשני' = Action_Operation_Type_57 (gen_TransgroupTypeId); התנאים שויכו לעמודה הנכונה ונוסף השם הטכני.",
+   "evidence": "source/DailyProcess/0008_LeumiFile-PY.dtsx: PY File Data From Staging (DTSX:65865) gen_TranstypeId ← Action_Type_56, gen_TransgroupTypeId ← Action_Operation_Type_57; Check for overpayment main.cs:119-120; Set Tax Fields main.cs:24-25, 41; Set trans group type main.vb:17-31; Set FinancialModuleWay DTSX:67179; TranstypeId is 54 DTSX:70255; Check Type And Year DTSX:57393",
+   "verifierAccepted": null,
+   "date": "2026-11-07T21:56:04.121Z",
+   "logicSha256Before": "A1A81CCF9CE61B5A551EA9484FA85E0E843ED0E29BC981D4FBC2DBBFA66AD53A",
+   "logicSha256After": "6467D029C35002FADD79985769DF61810C08A93C46E743425A92A7A3781FEBAA"
+  },
+  {
+   "round": 3,
+   "claimId": "L|Package\\FT|detailed",
+   "field": "components[FT].detailed.nodes[17].text",
+   "before": "האם הפעולה היא 54?",
+   "after": "האם סוג הפעולה (Action_Type_56) הוא 54?",
+   "why": "מינוח אחיד: 'סוג הפעולה' = Action_Type_56 (gen_TranstypeId), 'סוג הפעולה המשני' = Action_Operation_Type_57 (gen_TransgroupTypeId); התנאים שויכו לעמודה הנכונה ונוסף השם הטכני.",
+   "evidence": "source/DailyProcess/0008_LeumiFile-PY.dtsx: PY File Data From Staging (DTSX:65865) gen_TranstypeId ← Action_Type_56, gen_TransgroupTypeId ← Action_Operation_Type_57; Check for overpayment main.cs:119-120; Set Tax Fields main.cs:24-25, 41; Set trans group type main.vb:17-31; Set FinancialModuleWay DTSX:67179; TranstypeId is 54 DTSX:70255; Check Type And Year DTSX:57393",
+   "verifierAccepted": null,
+   "date": "2026-11-07T21:56:04.121Z",
+   "logicSha256Before": "A1A81CCF9CE61B5A551EA9484FA85E0E843ED0E29BC981D4FBC2DBBFA66AD53A",
+   "logicSha256After": "6467D029C35002FADD79985769DF61810C08A93C46E743425A92A7A3781FEBAA"
+  },
+  {
+   "round": 3,
+   "claimId": "L|Package\\FT|detailed",
+   "field": "components[FT].detailed.nodes[17].branches[0].nodes[0].text",
+   "before": "במשיכה או ביטול משיכה (סוג פעולה 01/02/04/05/06) מחושבים מס רווחי הון, מס שבירה ומס פיצויים (/100), וסכום נטו = סכום כולל פחות שלושת המסים.",
+   "after": "כאשר סוג הפעולה המשני (Action_Operation_Type_57) הוא 01/02/04 (Withdrawals בקוד) או 05/06 (UndoWithdrawals בקוד), מחושבים שלושה סכומי מס מהקובץ חלקי 100 (לפי שמות השדות: מס רווחי הון, מס שבירה ומס פיצויים), וסכום נטו = סכום כולל פחות שלושת המסים.",
+   "why": "מינוח אחיד: 'סוג הפעולה' = Action_Type_56 (gen_TranstypeId), 'סוג הפעולה המשני' = Action_Operation_Type_57 (gen_TransgroupTypeId); התנאים שויכו לעמודה הנכונה ונוסף השם הטכני.",
+   "evidence": "source/DailyProcess/0008_LeumiFile-PY.dtsx: PY File Data From Staging (DTSX:65865) gen_TranstypeId ← Action_Type_56, gen_TransgroupTypeId ← Action_Operation_Type_57; Check for overpayment main.cs:119-120; Set Tax Fields main.cs:24-25, 41; Set trans group type main.vb:17-31; Set FinancialModuleWay DTSX:67179; TranstypeId is 54 DTSX:70255; Check Type And Year DTSX:57393",
+   "verifierAccepted": null,
+   "date": "2026-11-07T21:56:04.121Z",
+   "logicSha256Before": "A1A81CCF9CE61B5A551EA9484FA85E0E843ED0E29BC981D4FBC2DBBFA66AD53A",
+   "logicSha256After": "6467D029C35002FADD79985769DF61810C08A93C46E743425A92A7A3781FEBAA"
+  },
+  {
+   "round": 3,
+   "claimId": "L|Package\\FT|detailed",
+   "field": "components[FT].detailed.nodes[18].text",
+   "before": "\"דרך המודול הפיננסי\" = 1 כאשר הפעולה 57 וסוג ההעברה בין מסלולים 08776, אחרת 0.",
+   "after": "\"דרך המודול הפיננסי\" = 1 כאשר סוג הפעולה (Action_Type_56) הוא 57 וסוג ההעברה בין מסלולים 08776, אחרת 0.",
+   "why": "מינוח אחיד: 'סוג הפעולה' = Action_Type_56 (gen_TranstypeId), 'סוג הפעולה המשני' = Action_Operation_Type_57 (gen_TransgroupTypeId); התנאים שויכו לעמודה הנכונה ונוסף השם הטכני.",
+   "evidence": "source/DailyProcess/0008_LeumiFile-PY.dtsx: PY File Data From Staging (DTSX:65865) gen_TranstypeId ← Action_Type_56, gen_TransgroupTypeId ← Action_Operation_Type_57; Check for overpayment main.cs:119-120; Set Tax Fields main.cs:24-25, 41; Set trans group type main.vb:17-31; Set FinancialModuleWay DTSX:67179; TranstypeId is 54 DTSX:70255; Check Type And Year DTSX:57393",
+   "verifierAccepted": null,
+   "date": "2026-11-07T21:56:04.121Z",
+   "logicSha256Before": "A1A81CCF9CE61B5A551EA9484FA85E0E843ED0E29BC981D4FBC2DBBFA66AD53A",
+   "logicSha256After": "6467D029C35002FADD79985769DF61810C08A93C46E743425A92A7A3781FEBAA"
+  },
+  {
+   "round": 3,
+   "claimId": "L|Package\\FT|detailed",
+   "field": "components[FT].detailed.nodes[20].branches[0].nodes[0].text",
+   "before": "איש הקשר של הקופה מסומן \"נדרש חישוב זכאות להלוואה\".",
+   "after": "ב-ContactBase של איש הקשר של הקופה השדה gen_loaneligibilitycalculationrequired מקבל 1 (לפי שם השדה: נדרש חישוב זכאות להלוואה – המשמעות לא מוכחת).",
+   "why": "משמעויות 'חישוב זכאות להלוואה' ו'זיהוי הפקדה' נלקחו משמות העמודות; הקוד רק כותב 1 ותאריך. סומן כמשמעות לפי שם השדה.",
+   "evidence": "source/DailyProcess/0008_LeumiFile-PY.dtsx:82566 (update ContactBase set gen_loaneligibilitycalculationrequired =1 where ContactId =?); DTSX:82519-82524 (update gen_demislikamonthsalary set gen_depositidentificationstatusdate = GETDATE(), ModifiedOn = GETDATE(), gen_depositidentificationforreportedmonth = 1, --yes, ModifiedBy = ? where gen_demislikamonthsalaryId = ?)",
+   "verifierAccepted": null,
+   "date": "2026-11-07T21:56:04.121Z",
+   "logicSha256Before": "A1A81CCF9CE61B5A551EA9484FA85E0E843ED0E29BC981D4FBC2DBBFA66AD53A",
+   "logicSha256After": "6467D029C35002FADD79985769DF61810C08A93C46E743425A92A7A3781FEBAA"
+  },
+  {
+   "round": 3,
+   "claimId": "L|Package\\FT|detailed",
+   "field": "components[FT].detailed.nodes[20].branches[1].nodes[0].text",
+   "before": "השורה נרשמת כאזהרת ETL, ואיש הקשר אינו מסומן.",
+   "after": "השורה נרשמת כאזהרת ETL, ו-ContactBase אינו מתעדכן.",
+   "why": "משמעויות 'חישוב זכאות להלוואה' ו'זיהוי הפקדה' נלקחו משמות העמודות; הקוד רק כותב 1 ותאריך. סומן כמשמעות לפי שם השדה.",
+   "evidence": "source/DailyProcess/0008_LeumiFile-PY.dtsx:82566 (update ContactBase set gen_loaneligibilitycalculationrequired =1 where ContactId =?); DTSX:82519-82524 (update gen_demislikamonthsalary set gen_depositidentificationstatusdate = GETDATE(), ModifiedOn = GETDATE(), gen_depositidentificationforreportedmonth = 1, --yes, ModifiedBy = ? where gen_demislikamonthsalaryId = ?)",
+   "verifierAccepted": null,
+   "date": "2026-11-07T21:56:04.121Z",
+   "logicSha256Before": "A1A81CCF9CE61B5A551EA9484FA85E0E843ED0E29BC981D4FBC2DBBFA66AD53A",
+   "logicSha256After": "6467D029C35002FADD79985769DF61810C08A93C46E743425A92A7A3781FEBAA"
+  },
+  {
+   "round": 3,
+   "claimId": "L|Package\\FT|detailed",
+   "field": "components[FT].detailed.nodes[21].text",
+   "before": "(ענף מקביל מיד אחרי איתור הקופה) האם זו הפקדה (53) שחודש השכר שלה בשנה הנוכחית או בקודמת?",
+   "after": "(ענף מקביל מיד אחרי איתור הקופה) האם זו הפקדה (סוג הפעולה Action_Type_56 = 53) שחודש השכר שלה בשנה הנוכחית או בקודמת?",
+   "why": "מינוח אחיד: 'סוג הפעולה' = Action_Type_56 (gen_TranstypeId), 'סוג הפעולה המשני' = Action_Operation_Type_57 (gen_TransgroupTypeId); התנאים שויכו לעמודה הנכונה ונוסף השם הטכני.",
+   "evidence": "source/DailyProcess/0008_LeumiFile-PY.dtsx: PY File Data From Staging (DTSX:65865) gen_TranstypeId ← Action_Type_56, gen_TransgroupTypeId ← Action_Operation_Type_57; Check for overpayment main.cs:119-120; Set Tax Fields main.cs:24-25, 41; Set trans group type main.vb:17-31; Set FinancialModuleWay DTSX:67179; TranstypeId is 54 DTSX:70255; Check Type And Year DTSX:57393",
+   "verifierAccepted": null,
+   "date": "2026-11-07T21:56:04.121Z",
+   "logicSha256Before": "A1A81CCF9CE61B5A551EA9484FA85E0E843ED0E29BC981D4FBC2DBBFA66AD53A",
+   "logicSha256After": "6467D029C35002FADD79985769DF61810C08A93C46E743425A92A7A3781FEBAA"
+  },
+  {
+   "round": 3,
+   "claimId": "L|Package\\FT|detailed",
+   "field": "components[FT].detailed.nodes[21].branches[0].nodes[0].text",
+   "before": "האם קיים לחשבון הלקוח חודש שכר מדווח פתוח (ללא תאריך זיהוי) באותה שנה ובאותו חודש?",
+   "after": "האם קיימת לחשבון הלקוח רשומת gen_demislikamonthsalary (לפי שם הישות: חודש שכר מדווח) לאותה שנה ולאותו חודש, שהשדה gen_depositidentificationstatusdate שלה ריק?",
+   "why": "משמעויות 'חישוב זכאות להלוואה' ו'זיהוי הפקדה' נלקחו משמות העמודות; הקוד רק כותב 1 ותאריך. סומן כמשמעות לפי שם השדה.",
+   "evidence": "source/DailyProcess/0008_LeumiFile-PY.dtsx:61917 Get DemiSlikaMonthSalary",
+   "verifierAccepted": null,
+   "date": "2026-11-07T21:56:04.121Z",
+   "logicSha256Before": "A1A81CCF9CE61B5A551EA9484FA85E0E843ED0E29BC981D4FBC2DBBFA66AD53A",
+   "logicSha256After": "6467D029C35002FADD79985769DF61810C08A93C46E743425A92A7A3781FEBAA"
+  },
+  {
+   "round": 3,
+   "claimId": "L|Package\\FT|detailed",
+   "field": "components[FT].detailed.nodes[21].branches[0].nodes[0].branches[0].nodes[0]",
+   "before": {
+    "type": "write",
+    "text": "חודש השכר המדווח מסומן \"זוהתה הפקדה לחודש המדווח\" עם תאריך הזיהוי הנוכחי.",
+    "tech": "gen_demislikamonthsalary · Update (gen_depositidentificationstatusdate = GETDATE(), gen_depositidentificationforreportedmonth = 1, ModifiedBy = CrmAdminId) · SQL (DTSX:82519)"
+   },
+   "after": {
+    "type": "write",
+    "text": "ברשומת gen_demislikamonthsalary שנמצאה נכתבים gen_depositidentificationforreportedmonth = 1 (בהערת ה-SQL: yes), gen_depositidentificationstatusdate = התאריך הנוכחי, ModifiedOn = התאריך הנוכחי ו-ModifiedBy = משתמש המערכת (לפי שמות השדות: זיהוי הפקדה לחודש המדווח – המשמעות לא מוכחת).",
+    "tech": "gen_demislikamonthsalary · Update (gen_depositidentificationstatusdate = GETDATE(), ModifiedOn = GETDATE(), gen_depositidentificationforreportedmonth = 1 --yes, ModifiedBy = CrmAdminId) WHERE gen_demislikamonthsalaryId = ? · SQL (DTSX:82519)"
+   },
+   "why": "משמעויות 'חישוב זכאות להלוואה' ו'זיהוי הפקדה' נלקחו משמות העמודות; הקוד רק כותב 1 ותאריך. סומן כמשמעות לפי שם השדה.",
+   "evidence": "source/DailyProcess/0008_LeumiFile-PY.dtsx:82566 (update ContactBase set gen_loaneligibilitycalculationrequired =1 where ContactId =?); DTSX:82519-82524 (update gen_demislikamonthsalary set gen_depositidentificationstatusdate = GETDATE(), ModifiedOn = GETDATE(), gen_depositidentificationforreportedmonth = 1, --yes, ModifiedBy = ? where gen_demislikamonthsalaryId = ?)",
+   "verifierAccepted": null,
+   "date": "2026-11-07T21:56:04.121Z",
+   "logicSha256Before": "A1A81CCF9CE61B5A551EA9484FA85E0E843ED0E29BC981D4FBC2DBBFA66AD53A",
+   "logicSha256After": "6467D029C35002FADD79985769DF61810C08A93C46E743425A92A7A3781FEBAA"
+  },
+  {
+   "round": 3,
+   "claimId": "L|Package\\FT|detailed",
+   "field": "components[FT].detailed.nodes[22].text",
+   "before": "תנועות חדשות נקלטות ב-CRM; תנועה שכבר הייתה ב-CRM לפני הריצה (לפי סוג פעולה, סוג פעולה משני, מזהה התנועה הבנקאי ומספר הגוף המנהל) מדולגת. אם אותה תנועה מופיעה פעמיים באותו קובץ, שתי השורות נשלחות להכנסה. איש הקשר מסומן לחישוב זכאות להלוואה, וחודשי שכר מדווחים מסומנים כמזוהים.",
+   "after": "תנועות חדשות נקלטות ב-CRM; תנועה שכבר הייתה ב-CRM לפני הריצה (לפי סוג הפעולה Action_Type_56, סוג הפעולה המשני Action_Operation_Type_57, BankTransaction_ID_91 ב-Staging (שמקורו בשדה FILLER1_29_BankTransactionId, עמודה 29 בקובץ) ומספר הגוף המנהל) מדולגת. אם אותה תנועה מופיעה פעמיים באותו קובץ, שתי השורות נשלחות להכנסה. אחרי הכנסה מוצלחת נכתב ל-ContactBase gen_loaneligibilitycalculationrequired = 1, ולרשומות gen_demislikamonthsalary שנמצאו נכתב gen_depositidentificationforreportedmonth = 1 עם תאריך (משמעות השדות לפי שמם בלבד, לא מוכחת).",
+   "why": "משמעויות 'חישוב זכאות להלוואה' ו'זיהוי הפקדה' נלקחו משמות העמודות; הקוד רק כותב 1 ותאריך. סומן כמשמעות לפי שם השדה. מינוח אחיד: 'סוג הפעולה' = Action_Type_56 (gen_TranstypeId), 'סוג הפעולה המשני' = Action_Operation_Type_57 (gen_TransgroupTypeId); התנאים שויכו לעמודה הנכונה ונוסף השם הטכני.",
+   "evidence": "source/DailyProcess/0008_LeumiFile-PY.dtsx:82566 (update ContactBase set gen_loaneligibilitycalculationrequired =1 where ContactId =?); DTSX:82519-82524 (update gen_demislikamonthsalary set gen_depositidentificationstatusdate = GETDATE(), ModifiedOn = GETDATE(), gen_depositidentificationforreportedmonth = 1, --yes, ModifiedBy = ? where gen_demislikamonthsalaryId = ?); source/DailyProcess/0008_LeumiFile-PY.dtsx: PY File Data From Staging (DTSX:65865) gen_TranstypeId ← Action_Type_56, gen_TransgroupTypeId ← Action_Operation_Type_57; Check for overpayment main.cs:119-120; Set Tax Fields main.cs:24-25, 41; Set trans group type main.vb:17-31; Set FinancialModuleWay DTSX:67179; TranstypeId is 54 DTSX:70255; Check Type And Year DTSX:57393; source/DailyProcess/0008_LeumiFile-PY.dtsx:9-190 (CM PY source: 174 FlatFileColumn; FILLER1_29_BankTransactionId = עמודה 29, Filler_83_RelatedActionId = 83, BankTransaction_ID_91 = 91, Related_Action_ID_98 = 98); DTSX:87203 Remove Leading Zero; DTSX:85616 Insert To PY_FileData (153 עמודות קלט; FILLER1_29_BankTransactionId → ext BankTransaction_ID_91, Filler_83_RelatedActionId → ext Related_Action_ID_98); FT insert ftCurrentYearBase SQL DTSX:63118: Gen_transferid = Param_26 ← gen_transferid ← BankTransaction_ID_91, gen_relatedactionidentifier = Param_72 ← Related_Action_ID_98",
+   "verifierAccepted": null,
+   "date": "2026-11-07T21:56:04.121Z",
+   "logicSha256Before": "A1A81CCF9CE61B5A551EA9484FA85E0E843ED0E29BC981D4FBC2DBBFA66AD53A",
+   "logicSha256After": "6467D029C35002FADD79985769DF61810C08A93C46E743425A92A7A3781FEBAA"
+  },
+  {
+   "round": 3,
+   "claimId": "L|Package\\FT|detail",
+   "field": "components[FT].detail_he[1].t",
+   "before": "קיום תנועה: Gen_ftCurrentYear (בנק 10) לפי סוג פעולה, סוג פעולה משני, מזהה תנועה בנקאי ומספר גוף מנהל. מוצר: Product בנק 10 לפי Gen_FundFinanceID. גוף שכנגד: Competitor לפי Gen_FundFinanceID. קופה: Gen_fundmain בנק 10 לפי מספר חשבון + מוצר. סוג תנועה: gen_fundtransactiontype בנק 10. חודש שכר: gen_demislikamonthsalary פתוח לפי חשבון לקוח + שנה + חודש. בנק: gen_banks לפי gen_banknumber = '10' (Get Bank Id); מזהה הבנק נכתב ל-gen_bankname של התנועה, ואם הבנק לא נמצא – זרימת הנתונים נכשלת (FailComponent). לפני איתור הקופה מספר החשבון מרופד באפסים לאורך 12 ונקודות מוסרות (Append Zeros To Fields). בדיקת קיום התנועה היא מול מצב הטבלה בתחילת הזרימה (Full cache), כך שכפילות בתוך אותו קובץ לא מזוהה.",
+   "after": "קיום תנועה: Gen_ftCurrentYear (בנק 10) לפי סוג הפעולה (Action_Type_56), סוג הפעולה המשני (Action_Operation_Type_57), BankTransaction_ID_91 ב-Staging (שמקורו בשדה FILLER1_29_BankTransactionId, עמודה 29 בקובץ) ומספר גוף מנהל. מוצר: Product בנק 10 לפי Gen_FundFinanceID. גוף שכנגד: Competitor לפי Gen_FundFinanceID. קופה: Gen_fundmain בנק 10 לפי מספר חשבון + מוצר. סוג תנועה: gen_fundtransactiontype בנק 10. חודש שכר: gen_demislikamonthsalary עם gen_depositidentificationstatusdate ריק, לפי חשבון לקוח + שנה + חודש. בנק: gen_banks לפי gen_banknumber = '10' (Get Bank Id); מזהה הבנק נכתב ל-gen_bankname של התנועה, ואם הבנק לא נמצא – זרימת הנתונים נכשלת (FailComponent). לפני איתור הקופה מספר החשבון מרופד באפסים לאורך 12 ונקודות מוסרות (Append Zeros To Fields). בדיקת קיום התנועה היא מול מצב הטבלה בתחילת הזרימה (Full cache), כך שכפילות בתוך אותו קובץ לא מזוהה.",
+   "why": "מינוח אחיד: 'סוג הפעולה' = Action_Type_56 (gen_TranstypeId), 'סוג הפעולה המשני' = Action_Operation_Type_57 (gen_TransgroupTypeId); התנאים שויכו לעמודה הנכונה ונוסף השם הטכני. משמעויות 'חישוב זכאות להלוואה' ו'זיהוי הפקדה' נלקחו משמות העמודות; הקוד רק כותב 1 ותאריך. סומן כמשמעות לפי שם השדה.",
+   "evidence": "source/DailyProcess/0008_LeumiFile-PY.dtsx: PY File Data From Staging (DTSX:65865) gen_TranstypeId ← Action_Type_56, gen_TransgroupTypeId ← Action_Operation_Type_57; Check for overpayment main.cs:119-120; Set Tax Fields main.cs:24-25, 41; Set trans group type main.vb:17-31; Set FinancialModuleWay DTSX:67179; TranstypeId is 54 DTSX:70255; Check Type And Year DTSX:57393; source/DailyProcess/0008_LeumiFile-PY.dtsx:9-190 (CM PY source: 174 FlatFileColumn; FILLER1_29_BankTransactionId = עמודה 29, Filler_83_RelatedActionId = 83, BankTransaction_ID_91 = 91, Related_Action_ID_98 = 98); DTSX:87203 Remove Leading Zero; DTSX:85616 Insert To PY_FileData (153 עמודות קלט; FILLER1_29_BankTransactionId → ext BankTransaction_ID_91, Filler_83_RelatedActionId → ext Related_Action_ID_98); FT insert ftCurrentYearBase SQL DTSX:63118: Gen_transferid = Param_26 ← gen_transferid ← BankTransaction_ID_91, gen_relatedactionidentifier = Param_72 ← Related_Action_ID_98",
+   "verifierAccepted": null,
+   "date": "2026-11-07T21:56:04.121Z",
+   "logicSha256Before": "A1A81CCF9CE61B5A551EA9484FA85E0E843ED0E29BC981D4FBC2DBBFA66AD53A",
+   "logicSha256After": "6467D029C35002FADD79985769DF61810C08A93C46E743425A92A7A3781FEBAA"
+  },
+  {
+   "round": 3,
+   "claimId": "L|Package\\FT|detail",
+   "field": "components[FT].detail_he[2].t",
+   "before": "ראה decisions: סינון שורת סיום וסוג רשומה, דילוג על תנועה קיימת, כיוון, מוצר/קופה חסרים, מיפוי סוג קבוצת תנועה וסוג הפרשה, החזר יתר, שכר מדווח, מס בפעולה 54, דרך מודול פיננסי, זיהוי הפקדה לחודש שכר.",
+   "after": "ראה decisions: סינון שורת סיום וסוג רשומה, דילוג על תנועה קיימת, כיוון, מוצר/קופה חסרים, מיפוי סוג קבוצת תנועה וסוג הפרשה, החזר יתר, שכר מדווח, מס כשסוג הפעולה (Action_Type_56) הוא 54, דרך מודול פיננסי, עדכון gen_demislikamonthsalary.",
+   "why": "מינוח אחיד: 'סוג הפעולה' = Action_Type_56 (gen_TranstypeId), 'סוג הפעולה המשני' = Action_Operation_Type_57 (gen_TransgroupTypeId); התנאים שויכו לעמודה הנכונה ונוסף השם הטכני. משמעויות 'חישוב זכאות להלוואה' ו'זיהוי הפקדה' נלקחו משמות העמודות; הקוד רק כותב 1 ותאריך. סומן כמשמעות לפי שם השדה.",
+   "evidence": "source/DailyProcess/0008_LeumiFile-PY.dtsx: PY File Data From Staging (DTSX:65865) gen_TranstypeId ← Action_Type_56, gen_TransgroupTypeId ← Action_Operation_Type_57; Check for overpayment main.cs:119-120; Set Tax Fields main.cs:24-25, 41; Set trans group type main.vb:17-31; Set FinancialModuleWay DTSX:67179; TranstypeId is 54 DTSX:70255; Check Type And Year DTSX:57393",
+   "verifierAccepted": null,
+   "date": "2026-11-07T21:56:04.121Z",
+   "logicSha256Before": "A1A81CCF9CE61B5A551EA9484FA85E0E843ED0E29BC981D4FBC2DBBFA66AD53A",
+   "logicSha256After": "6467D029C35002FADD79985769DF61810C08A93C46E743425A92A7A3781FEBAA"
+  },
+  {
+   "round": 3,
+   "claimId": "L|Package\\FT|detail",
+   "field": "components[FT].detail_he[3].t",
+   "before": "INSERT ישיר ל-Gen_ftCurrentYearBase (80 עמודות, בעלים/יוצר = UserId, StateCode 0, StatusCode 1); UPDATE ContactBase לסימון חישוב זכאות להלוואה אחרי הכנסה מוצלחת; UPDATE gen_demislikamonthsalary לסימון זיהוי הפקדה. כולם ב-SQL ישיר על חיבור CRM (Unsupported).",
+   "after": "INSERT ישיר ל-Gen_ftCurrentYearBase (80 עמודות, בעלים/יוצר = UserId, StateCode 0, StatusCode 1); UPDATE ContactBase SET gen_loaneligibilitycalculationrequired = 1 אחרי הכנסה מוצלחת; UPDATE gen_demislikamonthsalary SET gen_depositidentificationstatusdate = GETDATE(), ModifiedOn = GETDATE(), gen_depositidentificationforreportedmonth = 1, ModifiedBy = CrmAdminId (משמעות השדות לפי שמם בלבד, לא מוכחת). כולם ב-SQL ישיר על חיבור CRM (Unsupported).",
+   "why": "משמעויות 'חישוב זכאות להלוואה' ו'זיהוי הפקדה' נלקחו משמות העמודות; הקוד רק כותב 1 ותאריך. סומן כמשמעות לפי שם השדה.",
+   "evidence": "source/DailyProcess/0008_LeumiFile-PY.dtsx:82566 (update ContactBase set gen_loaneligibilitycalculationrequired =1 where ContactId =?); DTSX:82519-82524 (update gen_demislikamonthsalary set gen_depositidentificationstatusdate = GETDATE(), ModifiedOn = GETDATE(), gen_depositidentificationforreportedmonth = 1, --yes, ModifiedBy = ? where gen_demislikamonthsalaryId = ?)",
+   "verifierAccepted": null,
+   "date": "2026-11-07T21:56:04.121Z",
+   "logicSha256Before": "A1A81CCF9CE61B5A551EA9484FA85E0E843ED0E29BC981D4FBC2DBBFA66AD53A",
+   "logicSha256After": "6467D029C35002FADD79985769DF61810C08A93C46E743425A92A7A3781FEBAA"
+  },
+  {
+   "round": 3,
+   "claimId": "L|Package\\FT|detail",
+   "field": "components[FT].detail_he[4].t",
+   "before": "תנועות חדשות מקובץ ה-PY שנקלט (קופות בנק 10; התנועות מסומנות gen_isdailytrans = כן) מופיעות ב-CRM. החבילה אינה בודקת שתאריך התנועה הוא היום; זכאות הלוואה של העמית מסומנת לחישוב מחדש; חודשי שכר מדווחים שזוהתה להם הפקדה מסומנים.",
+   "after": "תנועות חדשות מקובץ ה-PY שנקלט (קופות בנק 10; התנועות מסומנות gen_isdailytrans = כן) מופיעות ב-CRM. החבילה אינה בודקת שתאריך התנועה הוא היום; לאיש הקשר של הקופה נכתב gen_loaneligibilitycalculationrequired = 1, ולרשומות gen_demislikamonthsalary שנמצאו נכתב gen_depositidentificationforreportedmonth = 1 עם תאריך (המשמעות העסקית לא מוכחת).",
+   "why": "משמעויות 'חישוב זכאות להלוואה' ו'זיהוי הפקדה' נלקחו משמות העמודות; הקוד רק כותב 1 ותאריך. סומן כמשמעות לפי שם השדה.",
+   "evidence": "source/DailyProcess/0008_LeumiFile-PY.dtsx:82566 (update ContactBase set gen_loaneligibilitycalculationrequired =1 where ContactId =?); DTSX:82519-82524 (update gen_demislikamonthsalary set gen_depositidentificationstatusdate = GETDATE(), ModifiedOn = GETDATE(), gen_depositidentificationforreportedmonth = 1, --yes, ModifiedBy = ? where gen_demislikamonthsalaryId = ?)",
+   "verifierAccepted": null,
+   "date": "2026-11-07T21:56:04.121Z",
+   "logicSha256Before": "A1A81CCF9CE61B5A551EA9484FA85E0E843ED0E29BC981D4FBC2DBBFA66AD53A",
+   "logicSha256After": "6467D029C35002FADD79985769DF61810C08A93C46E743425A92A7A3781FEBAA"
+  },
+  {
+   "round": 3,
+   "claimId": "L|Package\\FT|title",
+   "field": "components[FT].short_he",
+   "before": "לכל תנועה בקובץ (סוג רשומה 2, פעולה שאינה 58) שעדיין לא קיימת ב-CRM ושהקופה שלה קיימת בבנק 10 – מוסיפה רשומת תנועה לשנה השוטפת ב-SQL ישיר, מסמנת את איש הקשר לחישוב זכאות להלוואה, ובהפקדות (53) של שנת שכר שוטפת/קודמת מסמנת זיהוי הפקדה לחודש השכר המדווח.",
+   "after": "לכל תנועה בקובץ (סוג רשומה 2, פעולה שאינה 58) שעדיין לא קיימת ב-CRM ושהקופה שלה קיימת בבנק 10 – מוסיפה רשומת תנועה לשנה השוטפת ב-SQL ישיר, כותבת לאיש הקשר gen_loaneligibilitycalculationrequired = 1, ובהפקדות (53) של שנת שכר שוטפת/קודמת כותבת gen_depositidentificationforreportedmonth = 1 לרשומת gen_demislikamonthsalary המתאימה (משמעות השדות לפי שמם בלבד).",
+   "why": "משמעויות 'חישוב זכאות להלוואה' ו'זיהוי הפקדה' נלקחו משמות העמודות; הקוד רק כותב 1 ותאריך. סומן כמשמעות לפי שם השדה.",
+   "evidence": "source/DailyProcess/0008_LeumiFile-PY.dtsx:82566 (update ContactBase set gen_loaneligibilitycalculationrequired =1 where ContactId =?); DTSX:82519-82524 (update gen_demislikamonthsalary set gen_depositidentificationstatusdate = GETDATE(), ModifiedOn = GETDATE(), gen_depositidentificationforreportedmonth = 1, --yes, ModifiedBy = ? where gen_demislikamonthsalaryId = ?)",
+   "verifierAccepted": null,
+   "date": "2026-11-07T21:56:04.121Z",
+   "logicSha256Before": "A1A81CCF9CE61B5A551EA9484FA85E0E843ED0E29BC981D4FBC2DBBFA66AD53A",
+   "logicSha256After": "6467D029C35002FADD79985769DF61810C08A93C46E743425A92A7A3781FEBAA"
+  },
+  {
+   "round": 3,
+   "claimId": "L|Package\\FT|short",
+   "field": "components[FT].short.nodes[4].text",
+   "before": "איש הקשר של הקופה מסומן לחישוב מחדש של זכאות להלוואה.",
+   "after": "לאיש הקשר של הקופה נכתב 1 בשדה gen_loaneligibilitycalculationrequired (לפי שם השדה: נדרש חישוב זכאות להלוואה – המשמעות לא מוכחת).",
+   "why": "משמעויות 'חישוב זכאות להלוואה' ו'זיהוי הפקדה' נלקחו משמות העמודות; הקוד רק כותב 1 ותאריך. סומן כמשמעות לפי שם השדה.",
+   "evidence": "source/DailyProcess/0008_LeumiFile-PY.dtsx:82566 (update ContactBase set gen_loaneligibilitycalculationrequired =1 where ContactId =?); DTSX:82519-82524 (update gen_demislikamonthsalary set gen_depositidentificationstatusdate = GETDATE(), ModifiedOn = GETDATE(), gen_depositidentificationforreportedmonth = 1, --yes, ModifiedBy = ? where gen_demislikamonthsalaryId = ?)",
+   "verifierAccepted": null,
+   "date": "2026-11-07T21:56:04.121Z",
+   "logicSha256Before": "A1A81CCF9CE61B5A551EA9484FA85E0E843ED0E29BC981D4FBC2DBBFA66AD53A",
+   "logicSha256After": "6467D029C35002FADD79985769DF61810C08A93C46E743425A92A7A3781FEBAA"
+  },
+  {
+   "round": 3,
+   "claimId": "L|Package\\FT|short",
+   "field": "components[FT].short.nodes[5].text",
+   "before": "בהפקדה לשנת שכר שוטפת או קודמת, חודש השכר המדווח הפתוח של חשבון הלקוח מסומן כ\"זוהתה הפקדה\".",
+   "after": "בהפקדה לשנת שכר שוטפת או קודמת, לרשומת gen_demislikamonthsalary של חשבון הלקוח לאותו חודש, שהשדה gen_depositidentificationstatusdate שלה ריק, נכתבים gen_depositidentificationforreportedmonth = 1 ותאריך (לפי שמות השדות: זיהוי הפקדה לחודש המדווח – המשמעות לא מוכחת).",
+   "why": "משמעויות 'חישוב זכאות להלוואה' ו'זיהוי הפקדה' נלקחו משמות העמודות; הקוד רק כותב 1 ותאריך. סומן כמשמעות לפי שם השדה.",
+   "evidence": "source/DailyProcess/0008_LeumiFile-PY.dtsx:82566 (update ContactBase set gen_loaneligibilitycalculationrequired =1 where ContactId =?); DTSX:82519-82524 (update gen_demislikamonthsalary set gen_depositidentificationstatusdate = GETDATE(), ModifiedOn = GETDATE(), gen_depositidentificationforreportedmonth = 1, --yes, ModifiedBy = ? where gen_demislikamonthsalaryId = ?)",
+   "verifierAccepted": null,
+   "date": "2026-11-07T21:56:04.121Z",
+   "logicSha256Before": "A1A81CCF9CE61B5A551EA9484FA85E0E843ED0E29BC981D4FBC2DBBFA66AD53A",
+   "logicSha256After": "6467D029C35002FADD79985769DF61810C08A93C46E743425A92A7A3781FEBAA"
+  },
+  {
+   "round": 3,
+   "claimId": "L|Package\\FT|short",
+   "field": "components[FT].short.nodes[6].text",
+   "before": "תנועות חדשות נקלטות ב-CRM; תנועה שכבר הייתה ב-CRM לפני הריצה מדולגת. אם אותה תנועה מופיעה פעמיים באותו קובץ, שתי השורות עוברות את בדיקת הקיום ונשלחות להכנסה. מנגנוני ההלוואה והשכר המדווח מקבלים סימון לעדכון.",
+   "after": "תנועות חדשות נקלטות ב-CRM; תנועה שכבר הייתה ב-CRM לפני הריצה מדולגת. אם אותה תנועה מופיעה פעמיים באותו קובץ, שתי השורות עוברות את בדיקת הקיום ונשלחות להכנסה. בנוסף מתעדכנים שדות הדגל ב-ContactBase וב-gen_demislikamonthsalary (משמעותם העסקית לא מוכחת).",
+   "why": "משמעויות 'חישוב זכאות להלוואה' ו'זיהוי הפקדה' נלקחו משמות העמודות; הקוד רק כותב 1 ותאריך. סומן כמשמעות לפי שם השדה.",
+   "evidence": "source/DailyProcess/0008_LeumiFile-PY.dtsx:82566 (update ContactBase set gen_loaneligibilitycalculationrequired =1 where ContactId =?); DTSX:82519-82524 (update gen_demislikamonthsalary set gen_depositidentificationstatusdate = GETDATE(), ModifiedOn = GETDATE(), gen_depositidentificationforreportedmonth = 1, --yes, ModifiedBy = ? where gen_demislikamonthsalaryId = ?)",
+   "verifierAccepted": null,
+   "date": "2026-11-07T21:56:04.121Z",
+   "logicSha256Before": "A1A81CCF9CE61B5A551EA9484FA85E0E843ED0E29BC981D4FBC2DBBFA66AD53A",
+   "logicSha256After": "6467D029C35002FADD79985769DF61810C08A93C46E743425A92A7A3781FEBAA"
+  },
+  {
+   "round": 3,
+   "claimId": "L|Package\\Create fundmain for transferin|short",
+   "field": "components[FM].short.nodes[2].branches[0].nodes[0].text",
+   "before": "אין צורך בקופה חדשה.",
+   "after": "לא נוצרת קופה חדשה.",
+   "why": "ניסוח עובדתי במקום 'אין צורך' (מטרה לא מוכחת).",
+   "evidence": "source/DailyProcess/0008_LeumiFile-PY.dtsx:34065 get dest fund (Match לא מחובר)",
+   "verifierAccepted": null,
+   "date": "2026-11-07T21:56:04.121Z",
+   "logicSha256Before": "A1A81CCF9CE61B5A551EA9484FA85E0E843ED0E29BC981D4FBC2DBBFA66AD53A",
+   "logicSha256After": "6467D029C35002FADD79985769DF61810C08A93C46E743425A92A7A3781FEBAA"
+  },
+  {
+   "round": 3,
+   "claimId": "L|Package\\Create fundmain for transferin|short",
+   "field": "components[FM].short.nodes[3].text",
+   "before": "האם קיימת קופת המקור בבנק 10 והיא מסומנת כקיימת בקובץ?",
+   "after": "האם קיימת קופת המקור בבנק 10 שהדגל gen_existinfile שלה שווה 1 (משמעות הדגל לא מוכחת)?",
+   "why": "'קיימת בקובץ' היא משמעות משם העמודה gen_existinfile; הוחלף בתנאי הגולמי עם תווית.",
+   "evidence": "source/DailyProcess/0008_LeumiFile-PY.dtsx:34192-34231 get source fund (… and gen_existinfile = 1); DTSX:23784 entity[\"gen_existinfile\"] = true (×5)",
+   "verifierAccepted": null,
+   "date": "2026-11-07T21:56:04.121Z",
+   "logicSha256Before": "A1A81CCF9CE61B5A551EA9484FA85E0E843ED0E29BC981D4FBC2DBBFA66AD53A",
+   "logicSha256After": "6467D029C35002FADD79985769DF61810C08A93C46E743425A92A7A3781FEBAA"
+  },
+  {
+   "round": 3,
+   "claimId": "L|Package\\Create fundmain for transferin|short",
+   "field": "components[FM].short.nodes[4].text",
+   "before": "ללקוח יש קופה במסלול היעד, כך שההעברה בין המסלולים יכולה להיקלט.",
+   "after": "כשכל התנאים מתקיימים, נוצרת ללקוח קופה במסלול היעד.",
+   "why": "המטרה 'כך שההעברה יכולה להיקלט' לא מוכחת (Create transferin Maslulim לא משתמש בקופה שנוצרה).",
+   "evidence": "source/DailyProcess/0008_LeumiFile-PY.dtsx:23617",
+   "verifierAccepted": null,
+   "date": "2026-11-07T21:56:04.121Z",
+   "logicSha256Before": "A1A81CCF9CE61B5A551EA9484FA85E0E843ED0E29BC981D4FBC2DBBFA66AD53A",
+   "logicSha256After": "6467D029C35002FADD79985769DF61810C08A93C46E743425A92A7A3781FEBAA"
+  },
+  {
+   "round": 3,
+   "claimId": "L|Package\\Create fundmain for transferin|detailed",
+   "field": "components[FM].detailed.nodes[4]",
+   "before": {
+    "type": "step",
+    "text": "מספר החשבון ומספרי המסלולים מרופדים באפסים לאורך השדה.",
+    "tech": "Append Zeros To Fields (DTSX:22694)"
+   },
+   "after": {
+    "type": "step",
+    "text": "ממספר החשבון וממספרי המסלולים מוסרות נקודות, ואז הם מרופדים באפסים משמאל עד אורך השדה; ערך ריק הופך לאפסים בלבד. הערכים המעובדים הם המפתחות לחיפושים שבהמשך והם שנכתבים לקופה החדשה.",
+    "tech": "Append Zeros To Fields (DTSX:22694) main.cs:57-66: if (str.Contains(\".\")) str = str.Replace(\".\", \"\"); while (str.Length < fieldSize) str = \"0\" + str"
+   },
+   "why": "Append Zeros מסיר גם תווי '.' לפני הריפוד; הושמט.",
+   "evidence": "source/DailyProcess/0008_LeumiFile-PY.dtsx: Append Zeros To Fields (DTSX:22694) main.cs:57-66: if (str.Contains(\".\")) str = str.Replace(\".\", \"\"); while (str.Length < fieldSize) str = \"0\" + str",
+   "verifierAccepted": null,
+   "date": "2026-11-07T21:56:04.121Z",
+   "logicSha256Before": "A1A81CCF9CE61B5A551EA9484FA85E0E843ED0E29BC981D4FBC2DBBFA66AD53A",
+   "logicSha256After": "6467D029C35002FADD79985769DF61810C08A93C46E743425A92A7A3781FEBAA"
+  },
+  {
+   "round": 3,
+   "claimId": "L|Package\\Create fundmain for transferin|detailed",
+   "field": "components[FM].detailed.nodes[8].text",
+   "before": "האם קיימת קופת המקור (בנק 10, מסומנת \"קיימת בקובץ\") לחשבון ולמסלול המקור?",
+   "after": "האם קיימת קופת מקור בבנק 10 שהשדה gen_existinfile שלה שווה 1 (משמעות הדגל לא מוכחת), לחשבון ולמסלול המקור?",
+   "why": "'קיימת בקובץ' היא משמעות משם העמודה gen_existinfile; הוחלף בתנאי הגולמי עם תווית.",
+   "evidence": "source/DailyProcess/0008_LeumiFile-PY.dtsx:34192-34231 get source fund (… and gen_existinfile = 1); DTSX:23784 entity[\"gen_existinfile\"] = true (×5)",
+   "verifierAccepted": null,
+   "date": "2026-11-07T21:56:04.121Z",
+   "logicSha256Before": "A1A81CCF9CE61B5A551EA9484FA85E0E843ED0E29BC981D4FBC2DBBFA66AD53A",
+   "logicSha256After": "6467D029C35002FADD79985769DF61810C08A93C46E743425A92A7A3781FEBAA"
+  },
+  {
+   "round": 3,
+   "claimId": "L|Package\\Create fundmain for transferin|detailed",
+   "field": "components[FM].detailed.nodes[11].text",
+   "before": "נוצרת קופה חדשה במסלול היעד: מספר הקופה, מספר החשבון, מוצר ומספר מסלול היעד, פרטי הלקוח והסוכן מקופת המקור, \"קיימת בקובץ\" = כן, מקור קליטה = 1, כל שדות היתרה וההפקדה = 0, אחוז דמי ניהול משוקלל = 0, תאריך עדכון בנק = עכשיו, תאריך פתיחה = הזמן שבו נטענו נתוני קופות המקור (getutcdate), אחרי המרה לשעון המקומי של השרת.",
+   "after": "נוצרת קופה חדשה במסלול היעד: מספר הקופה, מספר החשבון, מוצר ומספר מסלול היעד, פרטי הלקוח והסוכן מקופת המקור, gen_existinfile = true (משמעות הדגל לא מוכחת), מקור קליטה = 1, כל שדות היתרה וההפקדה = 0, אחוז דמי ניהול משוקלל = 0, תאריך עדכון בנק = עכשיו, תאריך פתיחה = הזמן שבו נטענו נתוני קופות המקור (getutcdate), אחרי המרה לשעון המקומי של השרת.",
+   "why": "'קיימת בקובץ' היא משמעות משם העמודה gen_existinfile; הוחלף בתנאי הגולמי עם תווית.",
+   "evidence": "source/DailyProcess/0008_LeumiFile-PY.dtsx:34192-34231 get source fund (… and gen_existinfile = 1); DTSX:23784 entity[\"gen_existinfile\"] = true (×5)",
+   "verifierAccepted": null,
+   "date": "2026-11-07T21:56:04.121Z",
+   "logicSha256Before": "A1A81CCF9CE61B5A551EA9484FA85E0E843ED0E29BC981D4FBC2DBBFA66AD53A",
+   "logicSha256After": "6467D029C35002FADD79985769DF61810C08A93C46E743425A92A7A3781FEBAA"
+  },
+  {
+   "round": 3,
+   "claimId": "L|Package\\Create fundmain for transferin|detailed",
+   "field": "components[FM].detailed.nodes[13].text",
+   "before": "לכל בקשת העברה בין מסלולים שאין לה קופת יעד נוצרת קופה אחת במסלול היעד, כהכנה לקליטת ההעברה.",
+   "after": "לבקשת העברה בין מסלולים שאין לה קופת יעד, כשקיים מוצר יעד של בנק 10 וקיימת קופת מקור בבנק 10 עם gen_existinfile = 1, נוצרת קופה אחת במסלול היעד (פעם אחת לכל מספר קופה).",
+   "why": "'לכל בקשה' מוגזם (נדרשים גם מוצר יעד וקופת מקור, ונשמרת שורה ראשונה לכל מספר קופה); המטרה 'כהכנה לקליטת ההעברה' לא מוכחת.",
+   "evidence": "source/DailyProcess/0008_LeumiFile-PY.dtsx:34127, 34190, 34813",
+   "verifierAccepted": null,
+   "date": "2026-11-07T21:56:04.121Z",
+   "logicSha256Before": "A1A81CCF9CE61B5A551EA9484FA85E0E843ED0E29BC981D4FBC2DBBFA66AD53A",
+   "logicSha256After": "6467D029C35002FADD79985769DF61810C08A93C46E743425A92A7A3781FEBAA"
+  },
+  {
+   "round": 3,
+   "claimId": "L|Package\\Create fundmain for transferin|crm",
+   "field": "components[FM].crmEffects[0].when_he",
+   "before": "בקשת העברה בין מסלולים שאין לה קופת יעד ויש לה קופת מקור בבנק 10 המסומנת קיימת בקובץ",
+   "after": "בקשת העברה בין מסלולים שיש לה מוצר יעד בבנק 10 ואין לה קופת יעד, ויש לה קופת מקור בבנק 10 שהשדה gen_existinfile שלה = 1 (משמעות הדגל לא מוכחת); נוצרת פעם אחת לכל מספר קופה.",
+   "why": "'קיימת בקובץ' היא משמעות משם העמודה gen_existinfile; הוחלף בתנאי הגולמי עם תווית. נוסף תנאי מוצר היעד (get dest fundtype, No Match לא מחובר) והסרת הכפולים.",
+   "evidence": "source/DailyProcess/0008_LeumiFile-PY.dtsx:34127, 34065, 34190, 34813",
+   "verifierAccepted": null,
+   "date": "2026-11-07T21:56:04.121Z",
+   "logicSha256Before": "A1A81CCF9CE61B5A551EA9484FA85E0E843ED0E29BC981D4FBC2DBBFA66AD53A",
+   "logicSha256After": "6467D029C35002FADD79985769DF61810C08A93C46E743425A92A7A3781FEBAA"
+  },
+  {
+   "round": 3,
+   "claimId": "L|Package\\Create transferin Maslulim|detailed",
+   "field": "components[MS].detailed.nodes[7]",
+   "before": {
+    "type": "step",
+    "text": "מספר החשבון וסוג הקופה מרופדים באפסים. תאריך הביצוע הצפוי מעובד: 8 תווים נקראים כשנה-חודש-יום (YYYYMMDD), ו-6 תווים כ-YYMMDD עם 20 בתחילת השנה. אורך אחר או תאריך לא תקין הופכים לריק, והתאריך מומר ל-UTC לצורך הסינון שבהמשך.",
+    "tech": "Append Zeros To Fields (DTSX:38575); Format Dates (DTSX:41626) main.cs:58-71; Dates ToUniveral"
+   },
+   "after": {
+    "type": "step",
+    "text": "ממספר החשבון ומסוג הקופה מוסרות נקודות, ואז הם מרופדים באפסים משמאל עד אורך השדה (ערך ריק הופך לאפסים). מספר החשבון המעובד הוא שנכתב ל-gen_transferid ומשמש לאיתור חשבון הלקוח. תאריך הביצוע הצפוי מעובד: 8 תווים נקראים כשנה-חודש-יום (YYYYMMDD), ו-6 תווים כ-YYMMDD עם 20 בתחילת השנה. אורך אחר או תאריך לא תקין הופכים לריק, והתאריך מומר ל-UTC לצורך הסינון שבהמשך.",
+    "tech": "Append Zeros To Fields (DTSX:38575) main.cs:57-66: Replace(\".\", \"\") ואז ריפוד ב-\"0\"; Format Dates (DTSX:41626) main.cs:58-71; Dates ToUniveral"
+   },
+   "why": "Append Zeros מסיר גם תווי '.' לפני הריפוד; הושמט.",
+   "evidence": "source/DailyProcess/0008_LeumiFile-PY.dtsx: Append Zeros To Fields (DTSX:38575) main.cs:57-66 (אותו קוד: הסרת '.' ואז ריפוד ב-0)",
+   "verifierAccepted": null,
+   "date": "2026-11-07T21:56:04.121Z",
+   "logicSha256Before": "A1A81CCF9CE61B5A551EA9484FA85E0E843ED0E29BC981D4FBC2DBBFA66AD53A",
+   "logicSha256After": "6467D029C35002FADD79985769DF61810C08A93C46E743425A92A7A3781FEBAA"
+  },
+  {
+   "round": 3,
+   "claimId": "L|Package\\Create transferin Maslulim|decisions",
+   "field": "components[MS].decisions",
+   "before": [
+    {
+     "where": "Handle Gemel To Invest Case (main.cs:120–124)",
+     "condition": "FundType == \"5006\" → \"1025\" (מקור ויעד)",
+     "meaning_he": "תרגום סוג קופה גמל להשקעה",
+     "outcome_he": "משפיע על הסינון ועל איתור חשבון הלקוח"
+    },
+    {
+     "where": "Filter for transfer between courses (DTSX:40871)",
+     "condition": "Action_Operation_Type_57 != \"04\" && Action_Type_56 == \"57\" && Transfer_Type_2 == \"2\" && Source_Fund_AccountNumber_20 == Target_Fund_AccountNumber_47 && Source_Fund_FundType_16 == Target_Fund_FundType_43 && Age_Dependent_Model_112 != \"1\"",
+     "meaning_he": "העברה בין מסלולים",
+     "outcome_he": "TransferIn BC → המשך"
+    },
+    {
+     "where": "get tranferin (DTSX:42492)",
+     "condition": "[gen_requestidentifier] = Request_ID_74",
+     "meaning_he": "הבקשה כבר קיימת",
+     "outcome_he": "Match → אין פעולה; No Match → המשך"
+    },
+    {
+     "where": "Sort / Sort 1 (DTSX:50313 / 50377)",
+     "condition": "EliminateDuplicates=true (DTSX:50315, 50379). Sort (צד המקור): gen_requestidentifier, Source_Fund_AccountNumber_20, Source_Fund_FundType_16, gen_deliverydate; Sort 1 (צד היעד, כיוון \"2\"): gen_requestidentifier, Target_Fund_AccountNumber_47, Target_Fund_FundType_43. בשני המיונים כל העמודות הן מפתחות מיון",
+     "meaning_he": "שורות כפולות בכל צד מסוננות לפני ההצמדה",
+     "outcome_he": "בכל צד נשארת שורה אחת לכל צירוף מפתחות; לאותו מזהה בקשה נוצרות לכל היותר בקשות כמספר הצירופים השונים בצד המקור שיש להם צד יעד תואם"
+    },
+    {
+     "where": "Merge Join (DTSX:43485)",
+     "condition": "Inner Join (JoinType=2) על gen_requestidentifier, חשבון, סוג קופה (NumKeyColumns=3); כיוון \"2\" בצד ימין",
+     "meaning_he": "יש גם צד מקור וגם צד יעד",
+     "outcome_he": "רק זוגות שלמים"
+    },
+    {
+     "where": "Filter Last Two Month (main.cs:31–40)",
+     "condition": "date > DateTime.UtcNow.AddMonths(-2)",
+     "meaning_he": "תאריך ביצוע צפוי מאוחר מהיום פחות חודשיים; אין גבול עליון, גם תאריך עתידי עובר",
+     "outcome_he": "עובר → המשך; תאריך ריק (NULL, כי לא היה תקין) או מוקדם יותר → נזרק. תאריך שהיה ריק בקובץ לא מגיע לכאן: Format Dates נכשל עליו לפני הסינון"
+    },
+    {
+     "where": "Get source customer account (DTSX:42407)",
+     "condition": "[gen_bankaccountnumber] = ? and [gen_id] = ?",
+     "meaning_he": "חשבון הלקוח קיים",
+     "outcome_he": "No Match → נזרק"
+    }
+   ],
+   "after": [
+    {
+     "where": "Handle Gemel To Invest Case (main.cs:120–124)",
+     "condition": "FundType == \"5006\" → \"1025\" (מקור ויעד)",
+     "meaning_he": "תרגום סוג קופה גמל להשקעה",
+     "outcome_he": "משפיע על הסינון ועל איתור חשבון הלקוח"
+    },
+    {
+     "where": "Check For Last Row In FIle (DTSX:39380)",
+     "condition": "SUBSTRING(CheckLastRow,1,1) == \"@\"",
+     "meaning_he": "שורת סיום",
+     "outcome_he": "יציאת Last row לא מחוברת – השורה נזרקת; else → Filter for transfer between courses"
+    },
+    {
+     "where": "Filter for transfer between courses (DTSX:40871)",
+     "condition": "Action_Operation_Type_57 != \"04\" && Action_Type_56 == \"57\" && Transfer_Type_2 == \"2\" && Source_Fund_AccountNumber_20 == Target_Fund_AccountNumber_47 && Source_Fund_FundType_16 == Target_Fund_FundType_43 && Age_Dependent_Model_112 != \"1\"",
+     "meaning_he": "העברה בין מסלולים",
+     "outcome_he": "TransferIn BC → המשך"
+    },
+    {
+     "where": "get tranferin (DTSX:42492)",
+     "condition": "[gen_requestidentifier] = Request_ID_74",
+     "meaning_he": "הבקשה כבר קיימת",
+     "outcome_he": "Match → אין פעולה; No Match → המשך"
+    },
+    {
+     "where": "Sort / Sort 1 (DTSX:50313 / 50377)",
+     "condition": "EliminateDuplicates=true (DTSX:50315, 50379). Sort (צד המקור): gen_requestidentifier, Source_Fund_AccountNumber_20, Source_Fund_FundType_16, gen_deliverydate; Sort 1 (צד היעד, כיוון \"2\"): gen_requestidentifier, Target_Fund_AccountNumber_47, Target_Fund_FundType_43. בשני המיונים כל העמודות הן מפתחות מיון",
+     "meaning_he": "שורות כפולות בכל צד מסוננות לפני ההצמדה",
+     "outcome_he": "בכל צד נשארת שורה אחת לכל צירוף מפתחות; לאותו מזהה בקשה נוצרות לכל היותר בקשות כמספר הצירופים השונים בצד המקור שיש להם צד יעד תואם"
+    },
+    {
+     "where": "Merge Join (DTSX:43485)",
+     "condition": "Inner Join (JoinType=2) על gen_requestidentifier, חשבון, סוג קופה (NumKeyColumns=3); כיוון \"2\" בצד ימין",
+     "meaning_he": "יש גם צד מקור וגם צד יעד",
+     "outcome_he": "רק זוגות שלמים"
+    },
+    {
+     "where": "Filter Last Two Month (main.cs:31–40)",
+     "condition": "date > DateTime.UtcNow.AddMonths(-2)",
+     "meaning_he": "תאריך ביצוע צפוי מאוחר מהיום פחות חודשיים; אין גבול עליון, גם תאריך עתידי עובר",
+     "outcome_he": "עובר → המשך; תאריך ריק (NULL, כי לא היה תקין) או מוקדם יותר → נזרק. תאריך שהיה ריק בקובץ לא מגיע לכאן: Format Dates נכשל עליו לפני הסינון"
+    },
+    {
+     "where": "Get source customer account (DTSX:42407)",
+     "condition": "[gen_bankaccountnumber] = ? and [gen_id] = ?",
+     "meaning_he": "חשבון הלקוח קיים",
+     "outcome_he": "No Match → נזרק"
+    }
+   ],
+   "why": "חסרה החלטת בחירת השורות של שורת הסיום.",
+   "evidence": "source/DailyProcess/0008_LeumiFile-PY.dtsx:39380 Check For Last Row In FIle (Last row: אין path; else → Filter for transfer between courses)",
+   "verifierAccepted": null,
+   "date": "2026-11-07T21:56:04.121Z",
+   "logicSha256Before": "A1A81CCF9CE61B5A551EA9484FA85E0E843ED0E29BC981D4FBC2DBBFA66AD53A",
+   "logicSha256After": "6467D029C35002FADD79985769DF61810C08A93C46E743425A92A7A3781FEBAA"
+  },
+  {
+   "round": 3,
+   "claimId": "L|Package\\Create transferin Maslulim|title",
+   "field": "components[MS].short_he",
+   "before": "לתנועות העברה בין מסלולים באותו חשבון (פעולה 57, סוג רשומה 2, סוג פעולה שאינו 04) שאין להן עדיין gen_transferin לפי מזהה הבקשה, ושתאריך הביצוע הצפוי שלהן מאוחר מהיום פחות חודשיים (כולל תאריכים עתידיים) – יוצרת בקשת העברה נכנסת מסוג 5 עם gen_currentstate = 1 על חשבון הלקוח.",
+   "after": "לתנועות העברה בין מסלולים באותו חשבון (סוג הפעולה Action_Type_56 = 57, סוג רשומה 2, סוג הפעולה המשני Action_Operation_Type_57 שאינו 04) שאין להן עדיין gen_transferin לפי מזהה הבקשה, ושתאריך הביצוע הצפוי שלהן מאוחר מהיום פחות חודשיים (כולל תאריכים עתידיים) – יוצרת בקשת העברה נכנסת מסוג 5 עם gen_currentstate = 1 על חשבון הלקוח.",
+   "why": "מינוח אחיד: 'סוג הפעולה' = Action_Type_56 (gen_TranstypeId), 'סוג הפעולה המשני' = Action_Operation_Type_57 (gen_TransgroupTypeId); התנאים שויכו לעמודה הנכונה ונוסף השם הטכני.",
+   "evidence": "source/DailyProcess/0008_LeumiFile-PY.dtsx:40871 Filter for transfer between courses",
+   "verifierAccepted": null,
+   "date": "2026-11-07T21:56:04.121Z",
+   "logicSha256Before": "A1A81CCF9CE61B5A551EA9484FA85E0E843ED0E29BC981D4FBC2DBBFA66AD53A",
+   "logicSha256After": "6467D029C35002FADD79985769DF61810C08A93C46E743425A92A7A3781FEBAA"
+  },
+  {
+   "round": 3,
+   "claimId": "L|Package\\Create Acount Courses and course partition for transferin|detailed",
+   "field": "components[AC].detailed.nodes[2]",
+   "before": {
+    "type": "step",
+    "text": "מספר חשבון היעד ומספרי המסלולים מרופדים באפסים.",
+    "tech": "Append Zeros To Fields (DTSX:2437): Target_Fund_AccountNumber_47, Target_Fund_course_44, Source_Fund_Course_17"
+   },
+   "after": {
+    "type": "step",
+    "text": "ממספר חשבון היעד וממספרי המסלולים מוסרות נקודות, ואז הם מרופדים באפסים משמאל עד אורך השדה; ערך ריק הופך לאפסים. הערכים המעובדים הם המפתחות לאיתור ההעברה, קופת המקור וקופת היעד.",
+    "tech": "Append Zeros To Fields (DTSX:2437): Target_Fund_AccountNumber_47, Target_Fund_course_44, Source_Fund_Course_17 · main.cs:57-66: Replace(\".\", \"\") ואז ריפוד ב-\"0\""
+   },
+   "why": "Append Zeros מסיר גם תווי '.' לפני הריפוד; הושמט.",
+   "evidence": "source/DailyProcess/0008_LeumiFile-PY.dtsx: Append Zeros To Fields (DTSX:2437) main.cs:57-66 (אותו קוד: הסרת '.' ואז ריפוד ב-0)",
+   "verifierAccepted": null,
+   "date": "2026-11-07T21:56:04.121Z",
+   "logicSha256Before": "A1A81CCF9CE61B5A551EA9484FA85E0E843ED0E29BC981D4FBC2DBBFA66AD53A",
+   "logicSha256After": "6467D029C35002FADD79985769DF61810C08A93C46E743425A92A7A3781FEBAA"
+  },
+  {
+   "round": 3,
+   "claimId": "L|Package\\Create Acount Courses and course partition for transferin|detailed",
+   "field": "components[AC].detailed.nodes[5].text",
+   "before": "נקבע סוג ההעברה: כשסוג הפעולה NULL או 2 – ערך 1 ו\"חישוב סכום\" = כן; כשסוג הפעולה הוא ערך מספרי אחר – ערך 2 ו\"חישוב סכום\" = לא.",
+   "after": "נקבע סוג ההעברה: כשסוג הפעולה המשני (Action_Operation_Type_57) NULL או 2 – ערך 1 ו\"חישוב סכום\" = כן; כשהוא ערך מספרי אחר – ערך 2 ו\"חישוב סכום\" = לא.",
+   "why": "מינוח אחיד: 'סוג הפעולה' = Action_Type_56 (gen_TranstypeId), 'סוג הפעולה המשני' = Action_Operation_Type_57 (gen_TransgroupTypeId); התנאים שויכו לעמודה הנכונה ונוסף השם הטכני.",
+   "evidence": "source/DailyProcess/0008_LeumiFile-PY.dtsx:19093 set additional fields",
+   "verifierAccepted": null,
+   "date": "2026-11-07T21:56:04.121Z",
+   "logicSha256Before": "A1A81CCF9CE61B5A551EA9484FA85E0E843ED0E29BC981D4FBC2DBBFA66AD53A",
+   "logicSha256After": "6467D029C35002FADD79985769DF61810C08A93C46E743425A92A7A3781FEBAA"
+  },
+  {
+   "round": 3,
+   "claimId": "L|Package\\Create Acount Courses and course partition for transferin|decisions",
+   "field": "components[AC].decisions",
+   "before": [
+    {
+     "where": "Check For Last Row In FIle (DTSX:3342)",
+     "condition": "SUBSTRING(CheckLastRow,1,1) == \"@\"",
+     "meaning_he": "שורת סיום",
+     "outcome_he": "נזרקת"
+    },
+    {
+     "where": "get tranferin (DTSX:5916)",
+     "condition": "[Gen_bankaccountnumber] = Target_Fund_AccountNumber_47 and [gen_requestidentifier] = Request_ID_74",
+     "meaning_he": "קיימת העברה נכנסת לבקשה",
+     "outcome_he": "No Match → נזרק"
+    },
+    {
+     "where": "set additional fields (DTSX:19093)",
+     "condition": "IsFullTransfer = (DT_I4)(ISNULL(Action_Operation_Type_57) ? 1 : ((((DT_I4)Action_Operation_Type_57) == 2) ? 1 : 2)); AmountCalculationType = (DT_BOOL)(ISNULL(Action_Operation_Type_57) ? 1 : ((((DT_I4)Action_Operation_Type_57) == 2) ? 1 : 0))",
+     "meaning_he": "סוג פעולה NULL או 2 → 1/true; ערך מספרי אחר → 2/false",
+     "outcome_he": "gen_transactiontype, gen_amauntcalculationtype"
+    },
+    {
+     "where": "Split Direction (DTSX:19849)",
+     "condition": "Action_Transfer_Direction_69 == \"2\"",
+     "meaning_he": "צד היעד",
+     "outcome_he": "כן → פיצול מסלול; אחרת → מסלול חשבון"
+    },
+    {
+     "where": "Check for exist account courses (DTSX:3282)",
+     "condition": "[gen_transferin] = gen_transferinid and [gen_fundnumber] = gen_source_fundmainid",
+     "meaning_he": "מסלול חשבון כבר קיים",
+     "outcome_he": "No Match → יצירה"
+    },
+    {
+     "where": "Check if exist course partition (DTSX:3375)",
+     "condition": "[gen_transferin] = gen_transferinid and [gen_fundnumberdest] = gen_dest_fundmainid_D",
+     "meaning_he": "פיצול מסלול כבר קיים",
+     "outcome_he": "No Match → יצירה"
+    }
+   ],
+   "after": [
+    {
+     "where": "Check For Last Row In FIle (DTSX:3342)",
+     "condition": "SUBSTRING(CheckLastRow,1,1) == \"@\"",
+     "meaning_he": "שורת סיום",
+     "outcome_he": "נזרקת"
+    },
+    {
+     "where": "get tranferin (DTSX:5916)",
+     "condition": "[Gen_bankaccountnumber] = Target_Fund_AccountNumber_47 and [gen_requestidentifier] = Request_ID_74",
+     "meaning_he": "קיימת העברה נכנסת לבקשה",
+     "outcome_he": "No Match → נזרק"
+    },
+    {
+     "where": "set additional fields (DTSX:19093)",
+     "condition": "IsFullTransfer = (DT_I4)(ISNULL(Action_Operation_Type_57) ? 1 : ((((DT_I4)Action_Operation_Type_57) == 2) ? 1 : 2)); AmountCalculationType = (DT_BOOL)(ISNULL(Action_Operation_Type_57) ? 1 : ((((DT_I4)Action_Operation_Type_57) == 2) ? 1 : 0))",
+     "meaning_he": "סוג הפעולה המשני (Action_Operation_Type_57) NULL או 2 → 1/true; ערך מספרי אחר → 2/false",
+     "outcome_he": "gen_transactiontype, gen_amauntcalculationtype"
+    },
+    {
+     "where": "Split Direction (DTSX:19849)",
+     "condition": "Action_Transfer_Direction_69 == \"2\"",
+     "meaning_he": "צד היעד",
+     "outcome_he": "כן → פיצול מסלול; אחרת → מסלול חשבון"
+    },
+    {
+     "where": "get source fund (DTSX:5782)",
+     "condition": "Gen_fundmain fm inner join Product p on p.ProductId = fm.gen_fundtypename where gen_banknumber = 10; [productnumber] = Source_Fund_Course_17 and [gen_bankaccountnumber] = Target_Fund_AccountNumber_47 (NoMatchBehavior=1; ל-No Match Output אין path)",
+     "meaning_he": "קיימת קופה של בנק 10 לחשבון היעד ולמסלול המקור",
+     "outcome_he": "Match → בדיקת קיום מסלול חשבון; No Match → השורה נזרקת ולא נוצר gen_accountcourses"
+    },
+    {
+     "where": "get dest fund (DTSX:5635)",
+     "condition": "Gen_fundmain fm join Product p on p.ProductId = fm.gen_fundtypename join Contact c on c.ContactId = fm.gen_contactname join Gen_agentcontract a on fm.gen_brokernumber = a.Gen_agentcontractId where gen_banknumber = 10; [gen_bankaccountnumber] = Target_Fund_AccountNumber_47 and [productnumber] = Target_Fund_course_44 (NoMatchBehavior=1; ל-No Match Output אין path)",
+     "meaning_he": "קיימת קופה של בנק 10 לחשבון ולמסלול היעד, עם איש קשר וחוזה סוכן",
+     "outcome_he": "Match → בדיקת קיום פיצול מסלול; No Match → השורה נזרקת ולא נוצר gen_coursepartition"
+    },
+    {
+     "where": "Check for exist account courses (DTSX:3282)",
+     "condition": "[gen_transferin] = gen_transferinid and [gen_fundnumber] = gen_source_fundmainid",
+     "meaning_he": "מסלול חשבון כבר קיים",
+     "outcome_he": "No Match → יצירה"
+    },
+    {
+     "where": "Check if exist course partition (DTSX:3375)",
+     "condition": "[gen_transferin] = gen_transferinid and [gen_fundnumberdest] = gen_dest_fundmainid_D",
+     "meaning_he": "פיצול מסלול כבר קיים",
+     "outcome_he": "No Match → יצירה"
+    }
+   ],
+   "why": "חסרו החלטות בחירת השורות get source fund / get dest fund שמגבילות את היצירות; ומינוח אחיד ל-Action_Operation_Type_57.",
+   "evidence": "source/DailyProcess/0008_LeumiFile-PY.dtsx:5782-5822 get source fund; DTSX:5635-5683 get dest fund; paths: רק Lookup Match Output מחובר (→ Check for exist account courses / Check if exist course partition)",
+   "verifierAccepted": null,
+   "date": "2026-11-07T21:56:04.121Z",
+   "logicSha256Before": "A1A81CCF9CE61B5A551EA9484FA85E0E843ED0E29BC981D4FBC2DBBFA66AD53A",
+   "logicSha256After": "6467D029C35002FADD79985769DF61810C08A93C46E743425A92A7A3781FEBAA"
+  },
+  {
+   "round": 3,
+   "claimId": "L|Package\\FT|detailed",
+   "field": "components[FT].detailed.nodes[11].text",
+   "before": "לפני איתור הקופה, מספר החשבון, מספר סוג הקופה ומספר המסלול מרופדים באפסים משמאל עד אורך השדה, ונקודות מוסרות מהם. ערך ריק הופך לאפסים בלבד.",
+   "after": "לפני איתור הקופה מוסרות נקודות ממספר החשבון, ממספר סוג הקופה וממספר המסלול, ואז הם מרופדים באפסים משמאל עד אורך השדה. ערך ריק הופך לאפסים בלבד.",
+   "why": "סדר הפעולות ב-Append Zeros: קודם הסרת '.' ואחר כך ריפוד באפסים (הניסוח הקודם הציג סדר הפוך).",
+   "evidence": "source/DailyProcess/0008_LeumiFile-PY.dtsx: Append Zeros To Fields (DTSX:54355) main.cs:57-66: if (str.Contains(\".\")) str = str.Replace(\".\", \"\"); ואחר כך while (str.Length < fieldSize) str = \"0\" + str",
+   "verifierAccepted": null,
+   "date": "2026-11-07T21:56:40.026Z",
+   "logicSha256Before": "6467D029C35002FADD79985769DF61810C08A93C46E743425A92A7A3781FEBAA",
+   "logicSha256After": "505BEA723488AA1A88E076ECFC204B2CDB5D64C5E884848FBDAEEE3427549B87"
+  },
+  {
+   "round": 3,
+   "claimId": "L|Package\\FT|detail",
+   "field": "components[FT].detail_he[1].t",
+   "before": "קיום תנועה: Gen_ftCurrentYear (בנק 10) לפי סוג הפעולה (Action_Type_56), סוג הפעולה המשני (Action_Operation_Type_57), BankTransaction_ID_91 ב-Staging (שמקורו בשדה FILLER1_29_BankTransactionId, עמודה 29 בקובץ) ומספר גוף מנהל. מוצר: Product בנק 10 לפי Gen_FundFinanceID. גוף שכנגד: Competitor לפי Gen_FundFinanceID. קופה: Gen_fundmain בנק 10 לפי מספר חשבון + מוצר. סוג תנועה: gen_fundtransactiontype בנק 10. חודש שכר: gen_demislikamonthsalary עם gen_depositidentificationstatusdate ריק, לפי חשבון לקוח + שנה + חודש. בנק: gen_banks לפי gen_banknumber = '10' (Get Bank Id); מזהה הבנק נכתב ל-gen_bankname של התנועה, ואם הבנק לא נמצא – זרימת הנתונים נכשלת (FailComponent). לפני איתור הקופה מספר החשבון מרופד באפסים לאורך 12 ונקודות מוסרות (Append Zeros To Fields). בדיקת קיום התנועה היא מול מצב הטבלה בתחילת הזרימה (Full cache), כך שכפילות בתוך אותו קובץ לא מזוהה.",
+   "after": "קיום תנועה: Gen_ftCurrentYear (בנק 10) לפי סוג הפעולה (Action_Type_56), סוג הפעולה המשני (Action_Operation_Type_57), BankTransaction_ID_91 ב-Staging (שמקורו בשדה FILLER1_29_BankTransactionId, עמודה 29 בקובץ) ומספר גוף מנהל. מוצר: Product בנק 10 לפי Gen_FundFinanceID. גוף שכנגד: Competitor לפי Gen_FundFinanceID. קופה: Gen_fundmain בנק 10 לפי מספר חשבון + מוצר. סוג תנועה: gen_fundtransactiontype בנק 10. חודש שכר: gen_demislikamonthsalary עם gen_depositidentificationstatusdate ריק, לפי חשבון לקוח + שנה + חודש. בנק: gen_banks לפי gen_banknumber = '10' (Get Bank Id); מזהה הבנק נכתב ל-gen_bankname של התנועה, ואם הבנק לא נמצא – זרימת הנתונים נכשלת (FailComponent). לפני איתור הקופה מוסרות ממספר החשבון נקודות, ואז הוא מרופד באפסים לאורך 12 (Append Zeros To Fields). בדיקת קיום התנועה היא מול מצב הטבלה בתחילת הזרימה (Full cache), כך שכפילות בתוך אותו קובץ לא מזוהה.",
+   "why": "סדר הפעולות ב-Append Zeros: קודם הסרת '.' ואחר כך ריפוד באפסים (הניסוח הקודם הציג סדר הפוך).",
+   "evidence": "source/DailyProcess/0008_LeumiFile-PY.dtsx: Append Zeros To Fields (DTSX:54355) main.cs:57-66: if (str.Contains(\".\")) str = str.Replace(\".\", \"\"); ואחר כך while (str.Length < fieldSize) str = \"0\" + str",
+   "verifierAccepted": null,
+   "date": "2026-11-07T21:56:40.026Z",
+   "logicSha256Before": "6467D029C35002FADD79985769DF61810C08A93C46E743425A92A7A3781FEBAA",
+   "logicSha256After": "505BEA723488AA1A88E076ECFC204B2CDB5D64C5E884848FBDAEEE3427549B87"
+  },
+  {
+   "round": "c1",
+   "claimId": "L|summary",
+   "field": "summary_he",
+   "before": "החבילה קולטת את קובץ ה-PY היומי של בנק לאומי (תנועות ובקשות בקופות של בנק 10), טוענת אותו ל-Staging ומעדכנת לפיו את CRM: מוסיפה תנועות חדשות לטבלת התנועות של השנה השוטפת (Gen_ftCurrentYear) בהכנסת SQL ישירה למסד CRM (Unsupported), כותבת לאיש הקשר gen_loaneligibilitycalculationrequired = 1, וכותבת לרשומת gen_demislikamonthsalary מתאימה gen_depositidentificationforreportedmonth = 1 עם תאריך (משמעות השדות לפי שמם בלבד, לא מוכחת). בנוסף, להעברות בין מסלולים באותו חשבון (פעולה 57, אותו חשבון ואותו סוג קופה) היא יוצרת דרך CRM SDK קופה במסלול היעד (gen_fundmain) ובקשת העברה נכנסת (gen_transferin). מסלולי חשבון ופיצולי מסלול (gen_accountcourses / gen_coursepartition) נוצרים דרך SDK לשורות בקובץ בלי סינון לפי סוג פעולה: לכל שורה שמזהה הבקשה (Request_ID_74) וחשבון היעד (Target_Fund_AccountNumber_47) שלה תואמים gen_transferin קיים ב-CRM, בלי סינון לפי מצב ההעברה או לפי התהליך שיצר אותה.",
+   "after": "החבילה קולטת את קובץ ה-PY היומי של בנק לאומי (תנועות ובקשות בקופות של בנק 10), טוענת אותו ל-Staging ומעדכנת לפיו את CRM: מוסיפה תנועות חדשות לטבלת התנועות של השנה השוטפת (Gen_ftCurrentYear) בהכנסת SQL ישירה למסד CRM (Unsupported), כותבת לאיש הקשר gen_loaneligibilitycalculationrequired = 1, וכותבת לרשומת gen_demislikamonthsalary מתאימה gen_depositidentificationforreportedmonth = 1 עם תאריך (משמעות השדות לפי שמם בלבד, לא מוכחת). בנוסף, להעברות בין מסלולים באותו חשבון (פעולה 57, אותו חשבון ואותו סוג קופה) היא יוצרת דרך CRM SDK קופה במסלול היעד (gen_fundmain) ובקשת העברה נכנסת (gen_transferin). מסלולי חשבון ופיצולי מסלול (gen_accountcourses / gen_coursepartition) נוצרים דרך SDK לשורות בקובץ בלי סינון לפי סוג פעולה: לכל שורה שמזהה הבקשה (Request_ID_74) וחשבון היעד (Target_Fund_AccountNumber_47) שלה תואמים gen_transferin קיים ב-CRM, בלי סינון לפי מצב ההעברה או לפי התהליך שיצר אותה, ובתנאי שקיימת ב-CRM קופה (gen_fundmain) מתאימה בבנק 10 – בצד המקור (Action_Transfer_Direction_69 שאינו \"2\") לחשבון היעד ולמסלול המקור (Source_Fund_Course_17), ובצד היעד (Action_Transfer_Direction_69 = \"2\") לחשבון היעד ולמסלול היעד (Target_Fund_course_44) עם איש קשר וחוזה סוכן – ושעדיין אין ב-CRM מסלול חשבון לאותה העברה ולקופת המקור (gen_transferin + gen_fundnumber) או פיצול מסלול לאותה העברה ולקופת היעד (gen_transferin + gen_fundnumberdest). שורה שאינה עומדת בתנאים אלה נזרקת בלי יצירה.",
+   "why": "משפט המסלולים/הפיצולים הציג את התאמת gen_transferin כתנאי היחיד; חסרו שני שערים: קיום קופה מתאימה בבנק 10 והיעדר מסלול/פיצול קיים.",
+   "evidence": "source/DailyProcess/0008_LeumiFile-PY.dtsx: Split Direction (DTSX:19849) Action_Transfer_Direction_69 == \"2\"; get source fund (DTSX:5782) / get dest fund (DTSX:5635, join Contact + Gen_agentcontract) – No Match לא מחובר; Check for exist account courses (DTSX:3282) gen_transferin + gen_fundnumber; Check if exist course partition (DTSX:3375) gen_transferin + gen_fundnumberdest – רק No Match מחובר",
+   "verifierAccepted": null,
+   "date": "2026-11-10T06:34:59.438Z",
+   "logicSha256Before": "505BEA723488AA1A88E076ECFC204B2CDB5D64C5E884848FBDAEEE3427549B87",
+   "logicSha256After": "E0E1219F1A7F14A0273B5EF9D6C5F06A9C2E5659ACD79579AC8A816859CF1631"
+  },
+  {
+   "round": "c1",
+   "claimId": "L|summary",
+   "field": "executionNotes_he[4]",
+   "before": "הסדר העסקי: קודם תנועות (FT), אחר כך קופת יעד, אחר כך בקשת העברה נכנסת, ואחר כך מסלולים ופיצולים – כך שהמסלולים נבנים על בקשות שנוצרו באותה ריצה.",
+   "after": "הסדר העסקי: קודם תנועות (FT), אחר כך קופת יעד, אחר כך בקשת העברה נכנסת, ואחר כך מסלולים ופיצולים – כך שהמסלולים יכולים להיבנות גם על בקשות שנוצרו באותה ריצה.",
+   "why": "\"נבנים על\" נקרא כבלעדי; get tranferin מתאים גם לבקשות שהיו קיימות לפני הריצה.",
+   "evidence": "source/DailyProcess/0008_LeumiFile-PY.dtsx: get tranferin (DTSX:5916, Partial cache) ללא סינון מצב/מקור",
+   "verifierAccepted": null,
+   "date": "2026-11-10T06:34:59.441Z",
+   "logicSha256Before": "505BEA723488AA1A88E076ECFC204B2CDB5D64C5E884848FBDAEEE3427549B87",
+   "logicSha256After": "E0E1219F1A7F14A0273B5EF9D6C5F06A9C2E5659ACD79579AC8A816859CF1631"
+  },
+  {
+   "round": "c1",
+   "claimId": "L|Package\\FT|title",
+   "field": "components[3].short_he",
+   "before": "לכל תנועה בקובץ (סוג רשומה 2, פעולה שאינה 58) שעדיין לא קיימת ב-CRM ושהקופה שלה קיימת בבנק 10 – מוסיפה רשומת תנועה לשנה השוטפת ב-SQL ישיר, כותבת לאיש הקשר gen_loaneligibilitycalculationrequired = 1, ובהפקדות (53) של שנת שכר שוטפת/קודמת כותבת gen_depositidentificationforreportedmonth = 1 לרשומת gen_demislikamonthsalary המתאימה (משמעות השדות לפי שמם בלבד).",
+   "after": "לכל תנועה בקובץ (Transfer_Type_2 = 2, פעולה שאינה 58) שעדיין לא קיימת ב-CRM ושהקופה שלה קיימת בבנק 10 – מוסיפה רשומת תנועה לשנה השוטפת ב-SQL ישיר, כותבת לאיש הקשר gen_loaneligibilitycalculationrequired = 1, ובהפקדות (53) של שנת שכר שוטפת/קודמת כותבת gen_depositidentificationforreportedmonth = 1 לרשומת gen_demislikamonthsalary המתאימה (משמעות השדות לפי שמם בלבד).",
+   "why": "המשמעות \"סוג רשומה\" ל-Transfer_Type_2 לא מוכחת בקבצים; שם השדה בלבד.",
+   "evidence": "source/DailyProcess/0008_LeumiFile-PY.dtsx:15 (FlatFileColumn Transfer_Type_2), 69989 (Split by trans group type)",
+   "verifierAccepted": null,
+   "date": "2026-11-10T06:34:59.441Z",
+   "logicSha256Before": "505BEA723488AA1A88E076ECFC204B2CDB5D64C5E884848FBDAEEE3427549B87",
+   "logicSha256After": "E0E1219F1A7F14A0273B5EF9D6C5F06A9C2E5659ACD79579AC8A816859CF1631"
+  },
+  {
+   "round": "c1",
+   "claimId": "L|Package\\FT|title",
+   "field": "components[3].short_he",
+   "before": "לכל תנועה בקובץ (Transfer_Type_2 = 2, פעולה שאינה 58) שעדיין לא קיימת ב-CRM ושהקופה שלה קיימת בבנק 10 – מוסיפה רשומת תנועה לשנה השוטפת ב-SQL ישיר, כותבת לאיש הקשר gen_loaneligibilitycalculationrequired = 1, ובהפקדות (53) של שנת שכר שוטפת/קודמת כותבת gen_depositidentificationforreportedmonth = 1 לרשומת gen_demislikamonthsalary המתאימה (משמעות השדות לפי שמם בלבד).",
+   "after": "לכל תנועה בקובץ (Transfer_Type_2 = 2, פעולה שאינה 58) שעדיין לא קיימת ב-CRM ושהקופה שלה קיימת בבנק 10 – מוסיפה רשומת תנועה לשנה השוטפת ב-SQL ישיר, כותבת לאיש הקשר gen_loaneligibilitycalculationrequired = 1, ובפעולות 53 (הפקדה – השערה לפי שם הפלט) של שנת שכר שוטפת/קודמת כותבת gen_depositidentificationforreportedmonth = 1 לרשומת gen_demislikamonthsalary המתאימה (משמעות השדות לפי שמם בלבד).",
+   "why": "המשמעות \"הפקדה\" לפעולה 53 לא מוכחת; הרמז היחיד הוא שם הפלט FtCurrentOrPrevDepositCondition.",
+   "evidence": "source/DailyProcess/0008_LeumiFile-PY.dtsx: Check Type And Year (DTSX:57393) output FtCurrentOrPrevDepositCondition",
+   "verifierAccepted": null,
+   "date": "2026-11-10T06:34:59.441Z",
+   "logicSha256Before": "505BEA723488AA1A88E076ECFC204B2CDB5D64C5E884848FBDAEEE3427549B87",
+   "logicSha256After": "E0E1219F1A7F14A0273B5EF9D6C5F06A9C2E5659ACD79579AC8A816859CF1631"
+  },
+  {
+   "round": "c1",
+   "claimId": "L|Package\\FT|title",
+   "field": "components[3].flow_he[7]",
+   "before": "ענף מקביל: הפקדה 53 בשנת שכר שוטפת/קודמת → עדכון gen_demislikamonthsalary פתוח",
+   "after": "ענף מקביל: פעולה 53 (הפקדה – השערה לפי שם הפלט) בשנת שכר שוטפת/קודמת → עדכון gen_demislikamonthsalary פתוח",
+   "why": "כנ\"ל – \"הפקדה\" לא מוכחת.",
+   "evidence": "source/DailyProcess/0008_LeumiFile-PY.dtsx: DTSX:57393",
+   "verifierAccepted": null,
+   "date": "2026-11-10T06:34:59.441Z",
+   "logicSha256Before": "505BEA723488AA1A88E076ECFC204B2CDB5D64C5E884848FBDAEEE3427549B87",
+   "logicSha256After": "E0E1219F1A7F14A0273B5EF9D6C5F06A9C2E5659ACD79579AC8A816859CF1631"
+  },
+  {
+   "round": "c1",
+   "claimId": "L|Package\\FT|short",
+   "field": "components[3].short.nodes",
+   "before": "(insert before) {\"type\":\"decision\",\"text\":\"האם נמצאו ב-CRM המוצר והקופה של החשבון בבנק 10?\",\"branches\":[{\"label\":\"לא\",\"nodes\":[{\"type\":\"end\",\"text\":\"התנועה אינה נקלטת (כשהמוצר חסר נרשמת אזהרה; כשהקופה חסרה – ללא אזהרה).\"}]},{\"label\":\"כן\",\"nodes\":[{\"type\":\"step\",\"text\":\"נקבעים סוג התנועה, סוג ההפרשה, הסכומים, סימון החזר יתר, שכר מדווח וסכומי מס.\"}]}]}",
+   "after": "{\"type\":\"decision\",\"text\":\"האם כיוון התנועה בקובץ הוא 1 או 2?\",\"tech\":\"Split by trans direction (DTSX:69934): Action_Transfer_Direction_69 == \\\"1\\\" / == \\\"2\\\"; יציאת \\\"אחר\\\" לא מחוברת\",\"branches\":[{\"label\":\"לא\",\"nodes\":[{\"type\":\"end\",\"text\":\"התנועה אינה נקלטת, ללא אזהרה.\"}]},{\"label\":\"כן\",\"nodes\":[{\"type\":\"step\",\"text\":\"התנועה ממשיכה לקליטה.\"}]}]}",
+   "why": "חסר שער הכיוון: שורה שכיוונה אינו \"1\" או \"2\" יוצאת ליציאת \"אחר\" שאינה מחוברת ואינה נקלטת.",
+   "evidence": "source/DailyProcess/0008_LeumiFile-PY.dtsx: Split by trans direction (DTSX:69934); paths only from outputs גמל מעביר / גמל מקבל",
+   "verifierAccepted": null,
+   "date": "2026-11-10T06:34:59.442Z",
+   "logicSha256Before": "505BEA723488AA1A88E076ECFC204B2CDB5D64C5E884848FBDAEEE3427549B87",
+   "logicSha256After": "E0E1219F1A7F14A0273B5EF9D6C5F06A9C2E5659ACD79579AC8A816859CF1631"
+  },
+  {
+   "round": "c1",
+   "claimId": "L|Package\\FT|short",
+   "field": "components[3].short.nodes[*write demislika].text",
+   "before": "בהפקדה לשנת שכר שוטפת או קודמת, לרשומת gen_demislikamonthsalary של חשבון הלקוח לאותו חודש, שהשדה gen_depositidentificationstatusdate שלה ריק, נכתבים gen_depositidentificationforreportedmonth = 1 ותאריך (לפי שמות השדות: זיהוי הפקדה לחודש המדווח – המשמעות לא מוכחת).",
+   "after": "בפעולה 53 (הפקדה – השערה לפי שם הפלט) לשנת שכר שוטפת או קודמת, לרשומת gen_demislikamonthsalary של חשבון הלקוח לאותו חודש, שהשדה gen_depositidentificationstatusdate שלה ריק, נכתבים gen_depositidentificationforreportedmonth = 1 ותאריך (לפי שמות השדות: זיהוי הפקדה לחודש המדווח – המשמעות לא מוכחת).",
+   "why": "המשמעות \"הפקדה\" לפעולה 53 לא מוכחת.",
+   "evidence": "source/DailyProcess/0008_LeumiFile-PY.dtsx: DTSX:57393",
+   "verifierAccepted": null,
+   "date": "2026-11-10T06:34:59.442Z",
+   "logicSha256Before": "505BEA723488AA1A88E076ECFC204B2CDB5D64C5E884848FBDAEEE3427549B87",
+   "logicSha256After": "E0E1219F1A7F14A0273B5EF9D6C5F06A9C2E5659ACD79579AC8A816859CF1631"
+  },
+  {
+   "round": "c1",
+   "claimId": "L|Package\\FT|detailed",
+   "field": "components[3].detailed.nodes[16].text",
+   "before": "האם זו הפקדה (סוג הפעולה Action_Type_56 = 53) לעמית שכיר (קוד סוג עמית 2) במוצר גמל (1) או קרן השתלמות (4)?",
+   "after": "האם סוג הפעולה (Action_Type_56) הוא 53 (הפקדה – השערה לפי שם הפלט FtCurrentOrPrevDepositCondition ברכיב Check Type And Year) לעמית שכיר (קוד סוג עמית 2) במוצר גמל (1) או קרן השתלמות (4)?",
+   "why": "המשמעות \"הפקדה\" לפעולה 53 לא מוכחת.",
+   "evidence": "source/DailyProcess/0008_LeumiFile-PY.dtsx: Split for Salary Reporting (DTSX:70009); Check Type And Year (DTSX:57393)",
+   "verifierAccepted": null,
+   "date": "2026-11-10T06:34:59.442Z",
+   "logicSha256Before": "505BEA723488AA1A88E076ECFC204B2CDB5D64C5E884848FBDAEEE3427549B87",
+   "logicSha256After": "E0E1219F1A7F14A0273B5EF9D6C5F06A9C2E5659ACD79579AC8A816859CF1631"
+  },
+  {
+   "round": "c1",
+   "claimId": "L|Package\\FT|detailed",
+   "field": "components[3].detailed.nodes[21].text",
+   "before": "(ענף מקביל מיד אחרי איתור הקופה) האם זו הפקדה (סוג הפעולה Action_Type_56 = 53) שחודש השכר שלה בשנה הנוכחית או בקודמת?",
+   "after": "(ענף מקביל מיד אחרי איתור הקופה) האם סוג הפעולה (Action_Type_56) הוא 53 (הפקדה – השערה לפי שם הפלט FtCurrentOrPrevDepositCondition) שחודש השכר שלה בשנה הנוכחית או בקודמת?",
+   "why": "המשמעות \"הפקדה\" לפעולה 53 לא מוכחת.",
+   "evidence": "source/DailyProcess/0008_LeumiFile-PY.dtsx: DTSX:57393",
+   "verifierAccepted": null,
+   "date": "2026-11-10T06:34:59.442Z",
+   "logicSha256Before": "505BEA723488AA1A88E076ECFC204B2CDB5D64C5E884848FBDAEEE3427549B87",
+   "logicSha256After": "E0E1219F1A7F14A0273B5EF9D6C5F06A9C2E5659ACD79579AC8A816859CF1631"
+  },
+  {
+   "round": "c1",
+   "claimId": "L|Package\\FT|detailed",
+   "field": "components[3].detailed.nodes[19].text",
+   "before": "נוספת רשומת תנועה חדשה בטבלת התנועות של השנה השוטפת, עם הקופה, המוצר, הבנק, סוג התנועה, הסכומים, התאריכים, השכר, המס ושם הגוף שכנגד; הבעלים והיוצר הם משתמש המערכת.",
+   "after": "נוספת רשומת תנועה חדשה בטבלת התנועות של השנה השוטפת, עם הקופה, המוצר, הבנק, סוג התנועה, הסכומים, התאריכים, השכר, המס ושם הגוף שכנגד; הבעלים והיוצר הם המשתמש שבמשתנה UserId.",
+   "why": "אותו מונח (\"משתמש המערכת\") שימש לשני משתנים שונים; כאן זה User::UserId.",
+   "evidence": "source/DailyProcess/0008_LeumiFile-PY.dtsx: Create System Columns main.cs:119-124 (OwningUser/CreatedBy/OwnerId = Variables.UserId)",
+   "verifierAccepted": null,
+   "date": "2026-11-10T06:34:59.442Z",
+   "logicSha256Before": "505BEA723488AA1A88E076ECFC204B2CDB5D64C5E884848FBDAEEE3427549B87",
+   "logicSha256After": "E0E1219F1A7F14A0273B5EF9D6C5F06A9C2E5659ACD79579AC8A816859CF1631"
+  },
+  {
+   "round": "c1",
+   "claimId": "L|Package\\FT|detailed",
+   "field": "components[3].detailed.nodes[21].branches[0].nodes[0].branches[0].nodes[0].text",
+   "before": "ברשומת gen_demislikamonthsalary שנמצאה נכתבים gen_depositidentificationforreportedmonth = 1 (בהערת ה-SQL: yes), gen_depositidentificationstatusdate = התאריך הנוכחי, ModifiedOn = התאריך הנוכחי ו-ModifiedBy = משתמש המערכת (לפי שמות השדות: זיהוי הפקדה לחודש המדווח – המשמעות לא מוכחת).",
+   "after": "ברשומת gen_demislikamonthsalary שנמצאה נכתבים gen_depositidentificationforreportedmonth = 1 (בהערת ה-SQL: yes), gen_depositidentificationstatusdate = התאריך הנוכחי, ModifiedOn = התאריך הנוכחי ו-ModifiedBy = המשתמש שבמשתנה CrmAdminId (משתנה נפרד מ-UserId, שמשמש כבעלים וכיוצר של התנועה) (לפי שמות השדות: זיהוי הפקדה לחודש המדווח – המשמעות לא מוכחת).",
+   "why": "ModifiedBy של gen_demislikamonthsalary הוא User::CrmAdminId, משתנה שונה מ-UserId.",
+   "evidence": "source/DailyProcess/0008_LeumiFile-PY.dtsx: Create System Columns main.cs:125 (Row.AdminId = Variables.CrmAdminId); SQL DTSX:82519 ModifiedBy = ?; variables DTSX:215 (CrmAdminId), 281 (UserId)",
+   "verifierAccepted": null,
+   "date": "2026-11-10T06:34:59.442Z",
+   "logicSha256Before": "505BEA723488AA1A88E076ECFC204B2CDB5D64C5E884848FBDAEEE3427549B87",
+   "logicSha256After": "E0E1219F1A7F14A0273B5EF9D6C5F06A9C2E5659ACD79579AC8A816859CF1631"
+  },
+  {
+   "round": "c1",
+   "claimId": "L|Package\\FT|detail",
+   "field": "components[3].detail_he[2].t",
+   "before": "ראה decisions: סינון שורת סיום וסוג רשומה, דילוג על תנועה קיימת, כיוון, מוצר/קופה חסרים, מיפוי סוג קבוצת תנועה וסוג הפרשה, החזר יתר, שכר מדווח, מס כשסוג הפעולה (Action_Type_56) הוא 54, דרך מודול פיננסי, עדכון gen_demislikamonthsalary.",
+   "after": "ראה decisions: סינון שורת סיום ו-Transfer_Type_2 = 2 (עם Action_Type_56 != 58), דילוג על תנועה קיימת, כיוון, מוצר/קופה חסרים, מיפוי סוג קבוצת תנועה וסוג הפרשה, החזר יתר, שכר מדווח, מס כשסוג הפעולה (Action_Type_56) הוא 54, דרך מודול פיננסי, עדכון gen_demislikamonthsalary.",
+   "why": "המשמעות \"סוג רשומה\" לא מוכחת.",
+   "evidence": "source/DailyProcess/0008_LeumiFile-PY.dtsx:15, 69989",
+   "verifierAccepted": null,
+   "date": "2026-11-10T06:34:59.442Z",
+   "logicSha256Before": "505BEA723488AA1A88E076ECFC204B2CDB5D64C5E884848FBDAEEE3427549B87",
+   "logicSha256After": "E0E1219F1A7F14A0273B5EF9D6C5F06A9C2E5659ACD79579AC8A816859CF1631"
+  },
+  {
+   "round": "c1",
+   "claimId": "L|Package\\FT|decisions",
+   "field": "components[3].decisions[11].meaning_he",
+   "before": "הפקדת שכיר בגמל/השתלמות",
+   "after": "פעולה 53 (הפקדה – השערה לפי שם הפלט) של שכיר בגמל/השתלמות",
+   "why": "טענה מאומתת עם אותה שגיאה עובדתית (\"הפקדה\" לפעולה 53 כעובדה).",
+   "evidence": "source/DailyProcess/0008_LeumiFile-PY.dtsx: DTSX:70009, 57393",
+   "verifierAccepted": null,
+   "date": "2026-11-10T06:34:59.442Z",
+   "logicSha256Before": "505BEA723488AA1A88E076ECFC204B2CDB5D64C5E884848FBDAEEE3427549B87",
+   "logicSha256After": "E0E1219F1A7F14A0273B5EF9D6C5F06A9C2E5659ACD79579AC8A816859CF1631"
+  },
+  {
+   "round": "c1",
+   "claimId": "L|Package\\FT|decisions",
+   "field": "components[3].decisions[15].meaning_he",
+   "before": "הפקדה לחודש שכר בשנה הנוכחית/קודמת",
+   "after": "פעולה 53 (הפקדה – השערה לפי שם הפלט) לחודש שכר בשנה הנוכחית/קודמת",
+   "why": "טענה מאומתת עם אותה שגיאה עובדתית (\"הפקדה\" לפעולה 53 כעובדה).",
+   "evidence": "source/DailyProcess/0008_LeumiFile-PY.dtsx: DTSX:57393",
+   "verifierAccepted": null,
+   "date": "2026-11-10T06:34:59.442Z",
+   "logicSha256Before": "505BEA723488AA1A88E076ECFC204B2CDB5D64C5E884848FBDAEEE3427549B87",
+   "logicSha256After": "E0E1219F1A7F14A0273B5EF9D6C5F06A9C2E5659ACD79579AC8A816859CF1631"
+  },
+  {
+   "round": "c1",
+   "claimId": "L|Package\\Create fundmain for transferin|title",
+   "field": "components[4].short_he",
+   "before": "לבקשות העברה בין מסלולים באותו חשבון (פעולה 57, סוג רשומה 1, אותו סוג קופה, לא מודל תלוי גיל) – אם אין עדיין קופה במסלול היעד, יוצרת gen_fundmain חדשה במסלול היעד עם פרטי הלקוח, הסוכן והמעסיק המועתקים מקופת המקור.",
+   "after": "לבקשות העברה בין מסלולים באותו חשבון (פעולה 57, Transfer_Type_2 = 1, אותו סוג קופה, לא מודל תלוי גיל) – אם אין עדיין קופה במסלול היעד, יוצרת gen_fundmain חדשה במסלול היעד עם פרטי הלקוח, הסוכן והמעסיק המועתקים מקופת המקור.",
+   "why": "טענה מאומתת עם אותה שגיאה עובדתית (\"סוג רשומה\" ל-Transfer_Type_2).",
+   "evidence": "source/DailyProcess/0008_LeumiFile-PY.dtsx:15, 34045",
+   "verifierAccepted": null,
+   "date": "2026-11-10T06:34:59.442Z",
+   "logicSha256Before": "505BEA723488AA1A88E076ECFC204B2CDB5D64C5E884848FBDAEEE3427549B87",
+   "logicSha256After": "E0E1219F1A7F14A0273B5EF9D6C5F06A9C2E5659ACD79579AC8A816859CF1631"
+  },
+  {
+   "round": "c1",
+   "claimId": "L|Package\\Create fundmain for transferin|short",
+   "field": "components[4].short.nodes[0].tech",
+   "before": null,
+   "after": "Filter for transfer between courses (DTSX:34026): Action_Type_56 == \"57\" && Transfer_Type_2 == \"1\" && gen_bankaccountnumber == Target_Fund_AccountNumber_47 && Source_Fund_FundType_16 == Target_Fund_FundType_43 && Age_Dependent_Model_112 != \"1\"",
+   "why": "המסנן המדויק לא הופיע בתיאור הקצר.",
+   "evidence": "source/DailyProcess/0008_LeumiFile-PY.dtsx:34045",
+   "verifierAccepted": null,
+   "date": "2026-11-10T06:34:59.442Z",
+   "logicSha256Before": "505BEA723488AA1A88E076ECFC204B2CDB5D64C5E884848FBDAEEE3427549B87",
+   "logicSha256After": "E0E1219F1A7F14A0273B5EF9D6C5F06A9C2E5659ACD79579AC8A816859CF1631"
+  },
+  {
+   "round": "c1",
+   "claimId": "L|Package\\Create fundmain for transferin|short",
+   "field": "components[4].short.nodes[1]",
+   "before": "שורת מסלול המקור ושורת מסלול היעד של אותה בקשה מוצמדות זו לזו.",
+   "after": "שורת מסלול המקור ושורת מסלול היעד של אותה בקשה מוצמדות זו לזו; שורה שאין לה שורה תואמת בצד השני נזרקת.",
+   "why": "לא נאמר ששורות ללא בן זוג נזרקות (Inner join).",
+   "evidence": "source/DailyProcess/0008_LeumiFile-PY.dtsx: Merge Join (DTSX:34586) JoinType=2, NumKeyColumns=1 (Request_ID_74)",
+   "verifierAccepted": null,
+   "date": "2026-11-10T06:34:59.442Z",
+   "logicSha256Before": "505BEA723488AA1A88E076ECFC204B2CDB5D64C5E884848FBDAEEE3427549B87",
+   "logicSha256After": "E0E1219F1A7F14A0273B5EF9D6C5F06A9C2E5659ACD79579AC8A816859CF1631"
+  },
+  {
+   "round": "c1",
+   "claimId": "L|Package\\Create fundmain for transferin|short",
+   "field": "components[4].short.nodes[1].tech",
+   "before": null,
+   "after": "Merge Join (DTSX:34586): JoinType=2 (Inner) על Request_ID_74",
+   "why": "ראיה לשער ההצמדה.",
+   "evidence": "source/DailyProcess/0008_LeumiFile-PY.dtsx: DTSX:34586",
+   "verifierAccepted": null,
+   "date": "2026-11-10T06:34:59.442Z",
+   "logicSha256Before": "505BEA723488AA1A88E076ECFC204B2CDB5D64C5E884848FBDAEEE3427549B87",
+   "logicSha256After": "E0E1219F1A7F14A0273B5EF9D6C5F06A9C2E5659ACD79579AC8A816859CF1631"
+  },
+  {
+   "round": "c1",
+   "claimId": "L|Package\\Create fundmain for transferin|short",
+   "field": "components[4].short.nodes",
+   "before": "(insert before) {\"type\":\"decision\",\"text\":\"האם כבר קיימת לחשבון קופה במסלול היעד?\",\"branches\":[{\"label\":\"כן\",\"nodes\":[{\"type\":\"end\",\"text\":\"לא נוצרת קופה חדשה.\"}]},{\"label\":\"לא\",\"nodes\":[{\"type\":\"step\",\"text\":\"ממשיכים לבדוק את קופת המקור.\"}]}]}",
+   "after": "{\"type\":\"decision\",\"text\":\"האם קיים ב-CRM מוצר של בנק 10 למסלול היעד?\",\"tech\":\"get dest fundtype (DTSX:34127): Product ⨝ gen_banks (gen_banknumber = 10) WHERE productnumber = gen_fundtypenumber; יציאת No Match לא מחוברת\",\"branches\":[{\"label\":\"לא\",\"nodes\":[{\"type\":\"end\",\"text\":\"הבקשה נזרקת ולא נוצרת קופה.\"}]},{\"label\":\"כן\",\"nodes\":[{\"type\":\"step\",\"text\":\"ממשיכים לבדוק את קופת היעד.\"}]}]}",
+   "why": "חסר שער מוצר היעד בבנק 10.",
+   "evidence": "source/DailyProcess/0008_LeumiFile-PY.dtsx: get dest fundtype (DTSX:34127) NoMatchBehavior=1; רק Lookup Match Output מחובר",
+   "verifierAccepted": null,
+   "date": "2026-11-10T06:34:59.442Z",
+   "logicSha256Before": "505BEA723488AA1A88E076ECFC204B2CDB5D64C5E884848FBDAEEE3427549B87",
+   "logicSha256After": "E0E1219F1A7F14A0273B5EF9D6C5F06A9C2E5659ACD79579AC8A816859CF1631"
+  },
+  {
+   "round": "c1",
+   "claimId": "L|Package\\Create fundmain for transferin|short",
+   "field": "components[4].short.nodes",
+   "before": "(insert before) {\"type\":\"decision\",\"text\":\"האם קיימת קופת המקור בבנק 10 שהדגל gen_existinfile שלה שווה 1 (משמעות הדגל לא מוכחת)?\",\"branches\":[{\"label\":\"לא\",\"nodes\":[{\"type\":\"end\",\"text\":\"לא נוצרת קופה.\"}]},{\"label\":\"כן\",\"nodes\":[{\"type\":\"write\",\"text\":\"נוצרת קופה חדשה במסלול היעד עם פרטי הלקוח, הסוכן, המעסיק והעמלות של קופת המקור, יתרות אפס וכתובת זמנית.\",\"tech\":\"gen_fundmain · Create · SDK\"}]}]}",
+   "after": "{\"type\":\"step\",\"text\":\"מכל הבקשות שמובילות לאותו מספר קופה חדש (מספר מסלול-מספר חשבון) רק הראשונה ממשיכה; הכפולות נזרקות.\",\"tech\":\"Derived Column (DTSX:33995): gen_fundnumber; remove duplicate (DTSX:34813) main.cs:30–42; יציאת duplicates לא מחוברת\"}",
+   "why": "חסר סינון הכפילויות לפי מספר קופה.",
+   "evidence": "source/DailyProcess/0008_LeumiFile-PY.dtsx: remove duplicate main.cs:30-42; רק Output 0 מחובר",
+   "verifierAccepted": null,
+   "date": "2026-11-10T06:34:59.442Z",
+   "logicSha256Before": "505BEA723488AA1A88E076ECFC204B2CDB5D64C5E884848FBDAEEE3427549B87",
+   "logicSha256After": "E0E1219F1A7F14A0273B5EF9D6C5F06A9C2E5659ACD79579AC8A816859CF1631"
+  },
+  {
+   "round": "c1",
+   "claimId": "L|Package\\Create transferin Maslulim|title",
+   "field": "components[5].short_he",
+   "before": "לתנועות העברה בין מסלולים באותו חשבון (סוג הפעולה Action_Type_56 = 57, סוג רשומה 2, סוג הפעולה המשני Action_Operation_Type_57 שאינו 04) שאין להן עדיין gen_transferin לפי מזהה הבקשה, ושתאריך הביצוע הצפוי שלהן מאוחר מהיום פחות חודשיים (כולל תאריכים עתידיים) – יוצרת בקשת העברה נכנסת מסוג 5 עם gen_currentstate = 1 על חשבון הלקוח.",
+   "after": "לתנועות העברה בין מסלולים באותו חשבון (סוג הפעולה Action_Type_56 = 57, Transfer_Type_2 = 2, סוג הפעולה המשני Action_Operation_Type_57 שאינו 04) שאין להן עדיין gen_transferin לפי מזהה הבקשה, ושתאריך הביצוע הצפוי שלהן מאוחר מהיום פחות חודשיים (כולל תאריכים עתידיים) – יוצרת בקשת העברה נכנסת מסוג 5 עם gen_currentstate = 1 על חשבון הלקוח.",
+   "why": "המשמעות \"סוג רשומה\" ל-Transfer_Type_2 לא מוכחת.",
+   "evidence": "source/DailyProcess/0008_LeumiFile-PY.dtsx:15, 40891",
+   "verifierAccepted": null,
+   "date": "2026-11-10T06:34:59.442Z",
+   "logicSha256Before": "505BEA723488AA1A88E076ECFC204B2CDB5D64C5E884848FBDAEEE3427549B87",
+   "logicSha256After": "E0E1219F1A7F14A0273B5EF9D6C5F06A9C2E5659ACD79579AC8A816859CF1631"
+  },
+  {
+   "round": "c1",
+   "claimId": "L|Package\\Create transferin Maslulim|detail",
+   "field": "components[5].detail_he[0].t",
+   "before": "שורות PY_FileData (לא שורת סיום) עם פעולה 57, סוג רשומה 2, סוג פעולה ≠ 04, אותו חשבון ואותו סוג קופה (אחרי מיפוי 5006→1025), Age_Dependent_Model_112 ≠ 1, ותאריך ביצוע צפוי מאוחר מהיום פחות חודשיים (כולל תאריכים עתידיים). אם בקשה כזו מגיעה לעיבוד התאריכים בלי תאריך ביצוע צפוי, זרימת הנתונים נכשלת (Format Dates main.cs:55-58).",
+   "after": "שורות PY_FileData (לא שורת סיום) עם פעולה 57, Transfer_Type_2 = 2, סוג פעולה ≠ 04, אותו חשבון ואותו סוג קופה (אחרי מיפוי 5006→1025), Age_Dependent_Model_112 ≠ 1, ותאריך ביצוע צפוי מאוחר מהיום פחות חודשיים (כולל תאריכים עתידיים). אם בקשה כזו מגיעה לעיבוד התאריכים בלי תאריך ביצוע צפוי, זרימת הנתונים נכשלת (Format Dates main.cs:55-58).",
+   "why": "טענה מאומתת עם אותה שגיאה עובדתית (\"סוג רשומה\").",
+   "evidence": "source/DailyProcess/0008_LeumiFile-PY.dtsx:15, 40891",
+   "verifierAccepted": null,
+   "date": "2026-11-10T06:34:59.442Z",
+   "logicSha256Before": "505BEA723488AA1A88E076ECFC204B2CDB5D64C5E884848FBDAEEE3427549B87",
+   "logicSha256After": "E0E1219F1A7F14A0273B5EF9D6C5F06A9C2E5659ACD79579AC8A816859CF1631"
+  },
+  {
+   "round": "c1",
+   "claimId": "L|Package\\Create Acount Courses and course partition for transferin|detail",
+   "field": "components[6].detail_he[0].t",
+   "before": "כל שורות PY_FileData (לא שורת סיום) – ללא סינון לפי סוג פעולה או סוג רשומה – שיש להן gen_transferin תואם.",
+   "after": "כל שורות PY_FileData (לא שורת סיום) – ללא סינון לפי סוג פעולה או לפי Transfer_Type_2 – שיש להן gen_transferin תואם.",
+   "why": "טענה מאומתת עם אותה שגיאה עובדתית (\"סוג רשומה\" ל-Transfer_Type_2).",
+   "evidence": "source/DailyProcess/0008_LeumiFile-PY.dtsx: אין תנאי Transfer_Type_2 בזרימה (תנאי Transfer_Type_2 רק ב-DTSX:34045, 40891, 69989)",
+   "verifierAccepted": null,
+   "date": "2026-11-10T06:34:59.442Z",
+   "logicSha256Before": "505BEA723488AA1A88E076ECFC204B2CDB5D64C5E884848FBDAEEE3427549B87",
+   "logicSha256After": "E0E1219F1A7F14A0273B5EF9D6C5F06A9C2E5659ACD79579AC8A816859CF1631"
+  }
+ ]
+}

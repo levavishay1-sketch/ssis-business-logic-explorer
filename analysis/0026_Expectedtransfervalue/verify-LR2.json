@@ -1,0 +1,50 @@
+{
+  "verifier": "ssis-verifier",
+  "package": "0026_Expectedtransfervalue",
+  "scope": "logic-claims re-check round 2",
+  "checkedAt": "2026-11-07",
+  "source": "source/DailyProcess/0026_Expectedtransfervalue.dtsx sha256 6104F34E8F8669BB334B678EFC7083AF243293F8C946DCB16A82C0DAA0BE5360",
+  "checked": 4,
+  "results": [
+    {
+      "id": "L|Package\\Expected Transfer Value|short",
+      "hash": "0e0c87094700",
+      "verdict": "WRONG",
+      "detail": "[2]-[5] correct (group by date+8h cast to date and fund/bank columns; percent and product name; Excel destination sheet '1$', no CRM write). [1] says incoming transfers appear as positive amounts and outgoing transfers and withdrawals as negative. The query has a second Gen_transferin branch ('--TansferIn --> Out', via gen_accountcourses) that produces NEGATIVE amounts for incoming transfers: -1*isnull(gen_expectedtransferamount, Gen_fundmain.Gen_AccountBalance). The package's detailed claim describes this branch; the short text contradicts it by presenting incoming transfers only as positive. (The positive branch also only keeps the stored sign; nothing forces positivity.)",
+      "evidence": "0026_Expectedtransfervalue.dtsx:149-167 (TransferIn -> In), 169-188 (TansferIn -> Out)",
+      "wrongUnits": [
+        {
+          "unit": 1,
+          "problem": "Incoming transfers described only as positive; the 'TansferIn --> Out' branch adds negative rows for Gen_transferin.",
+          "correct": "העברות נכנסות נכללות פעמיים: דרך מסלול ההפקדה כסכום חיובי (לפי סוג ההעברה), ודרך מסלולי החשבון (statecode = 0) כסכום שלילי (הסכום הצפוי או יתרת הקופה); העברות יוצאות ומשיכות כסכום שלילי.",
+          "evidence": "0026_Expectedtransfervalue.dtsx:169-188"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Expected Transfer Value|detailed",
+      "hash": "386f3dfd8823",
+      "verdict": "CONFIRMED",
+      "detail": "Re-derived from the SQL (DTSX:133-244), Percent calc (DTSX:305, 311), Derived Column (DTSX:58-59) and Excel Destination (DTSX:79-127): four UNION parts, window dateadd(hh,8,date) between GETUTCDATE() and GETUTCDATE()+5, Banks.Gen_BankNumber = '10'; transfer-type CASE without ELSE, != 4 also drops NULL; 50000 / 0 defaults times isnull(gen_depositpercent,100)/100 (decimal attribute per 0015:36692, so no integer division); TransferIn->Out and withdrawal parts filter gen_accountcourses.statecode = 0, TransOut does not; producttypecode CASE; GROUP BY / ORDER BY; UNION de-duplication; percent then (DT_DECIMAL,5)*100 written back to the r8 Percent column; product-name mapping; 8 Excel columns mapped by externalMetadataColumnId; no CRM write. Note: after the data flow 'Rename File Name' renames expected.xls to the time-stamped User::ExcelFilePath (DTSX:335-344) - file-move plumbing, out of scope.",
+      "evidence": "0026_Expectedtransfervalue.dtsx:52-59, 79-127, 133-244, 288-311, 335-344",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Expected Transfer Value|detail",
+      "hash": "5b088016d14f",
+      "verdict": "CONFIRMED",
+      "detail": "Four populations with their filters, no record matching/updating, transfer-type amount rules incl. NULL for other non-4 types and 100% default percent, negative outgoing parts, date = CAST(dateadd(hh,8,...) AS date), percent conversion, product-code mapping, Excel destination G:\\Expectedtransfervalue\\expected.xls sheet '1$' (User::Destination expression literal, DTSX:33-34; package has no configuration), no CRM write: all correct.",
+      "evidence": "0026_Expectedtransfervalue.dtsx:26-34, 79-92, 133-244, 288-311",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Expected Transfer Value|decisions",
+      "hash": "044e4acd2b9d",
+      "verdict": "CONFIRMED",
+      "detail": "All seven conditions quoted exactly and their outcomes match the SQL / derived expressions, including NULL handling of != 4 and the absence of the statecode filter in the TransOut part.",
+      "evidence": "0026_Expectedtransfervalue.dtsx:133-244, 305, 311",
+      "wrongUnits": []
+    }
+  ],
+  "missingWrites": []
+}

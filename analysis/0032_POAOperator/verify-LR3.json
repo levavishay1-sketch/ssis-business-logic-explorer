@@ -1,0 +1,337 @@
+{
+  "verifier": "ssis-verifier",
+  "package": "0032_POAOperator",
+  "scope": "logic-claims re-check round 3",
+  "checkedAt": "2026-11-07T00:00:00Z",
+  "source": "source/DailyProcess/0032_POAOperator.dtsx sha256 537C3F53A332ABFA9713E05BB7559DFAB2ED165C37AA40418DAC611E181DF47F",
+  "checked": 21,
+  "results": [
+    {
+      "id": "L|summary",
+      "hash": "e9d78a57924e",
+      "verdict": "WRONG",
+      "detail": "Checked against the DTSX. There is one connection manager [psql] (Data Source=psql; Initial Catalog=ALTSHULER_MSCRM) and no DTS:Configuration, so 'אין קובץ תצורה' is correct. ServerName and OrganizationName come from gen_etlvariable (Get Organization Variables, DTSX:8322-8336). There are no OLE DB Command, Execute SQL or destination components, so all CRM writes are SDK and there is no direct DML. Links whose end date has passed (dateadd(HH,3,gen_enddate) < GETDATE() and status 2, DTSX:10053-10055) get status 4. The four operator-status rules and the two create flows exist. Problems. (1) The scopeNote says 'משמעות ערכי gen_poastatus נלקחה מהערות SQL בחבילה: 2 = valid, 4 = expired, 5 = invalid, 6 = cancelled' without saying which entity. Every one of those comments is on gen_poaaccountoperator.gen_poastatus (DTSX:10055, 11969, 13889, 15807, 17699), and none is on gen_poaoperator.gen_poastatus. That makes the gen_poaoperator meanings look attributed. Yet the same summary hedges gen_poaoperator status 2 as a hypothesis. (2) summary_he says 'פוליסות פנסיה'. Get Policies has no pension or product filter (DTSX:6125-6154); 'pension' comes only from the data-flow name. (3) 'הקישורים שלהם לחשבונות (gen_poaaccountoperator)' defines the entity as account links, but the pension flow creates the same entity for policies (gen_policy, DTSX:3911). (4) 'או לעובד שברשימה' omits that the list record must be active (gen_active = 1, DTSX:485-488), and the conditions sentence omits the no-existing-link gate (DTSX:541-553, 3629-3641). Minor, not counted: 'תחזוקה יומית' rests only on the folder name DailyProcess; no schedule is in the file.",
+      "evidence": "DTSX:4-8 (connection), no DTS:Configurations; DTSX:8322-8336; DTSX:10053-10055; DTSX:11969, 13889, 15807, 17699; DTSX:6125-6154; DTSX:3911; DTSX:485-488; DTSX:541-553; DTSX:3629-3641",
+      "wrongUnits": [
+        {
+          "unit": "[2] scopeNote 'משמעות ערכי gen_poastatus נלקחה מהערות SQL: 2 = valid, 4 = expired, 5 = invalid, 6 = cancelled'",
+          "problem": "All the comments are on gen_poaaccountoperator.gen_poastatus; for gen_poaoperator these meanings are only an analogy.",
+          "correct": "'משמעות ערכי gen_poastatus של gen_poaaccountoperator נלקחה מהערות SQL (…); עבור gen_poaoperator אותם ערכים הם השערה באנלוגיה'.",
+          "evidence": "DTSX:10055, 11969, 13889, 15807, 17699"
+        },
+        {
+          "unit": "[1] 'ולפוליסות פנסיה'",
+          "problem": "Meaning from the data-flow name; the query takes all gen_policies.",
+          "correct": "'ולפוליסות (gen_policies)'.",
+          "evidence": "DTSX:6125-6154"
+        },
+        {
+          "unit": "[1] 'הקישורים שלהם לחשבונות (gen_poaaccountoperator)'; 'או לעובד שברשימה'",
+          "problem": "The links also cover policies. The list match requires gen_active = 1, and creation also requires no existing link.",
+          "correct": "'הקישורים שלהם לחשבונות ולפוליסות (gen_poaaccountoperator)'; 'או לעובד שמופיע עם המתפעל ברשומה פעילה (gen_active = 1), ובתנאי שאין לחשבון/לפוליסה קישור קודם'.",
+          "evidence": "DTSX:3911; DTSX:485-488; DTSX:541-553; DTSX:3629-3641"
+        }
+      ]
+    },
+    {
+      "id": "L|finding#2",
+      "hash": "9803889821d3",
+      "verdict": "CONFIRMED",
+      "detail": "Get Customer Accounts (DTSX:3081-3110) and Get Policies (DTSX:6125-6154) both filter CreatedOn > DATEADD(dd,-2,GETDATE()) and gen_poaoperator.gen_poastatus = 2. They join through Account to gen_poaoperator.gen_employername. Neither query compares anything with the POA's creation or start date. The 'valid' meaning is correctly a hypothesis: VALID = 2 is a constant only for the new gen_poaaccountoperator (DTSX:742, 3803), and '-- valid' is on gen_poaaccountoperator.gen_poastatus (DTSX:10055). The consequence is stated conditionally. A grep of all supplied DTSX finds gen_poaaccountoperator only in 0032, so 'no other package creates it' is correct. The create flows run only after the update chain, through Success Constraints 7 and 8 (DTSX:18801-18802); 'בלי שהחבילה רצה בו' covers that. Note: the join key AccountId/Accountid is unqualified (DTSX:3106, 6149-6150). It is a join key, and the finding does not attribute it. Account.AccountId is qualified at DTSX:3107.",
+      "evidence": "DTSX:3081-3110; DTSX:6125-6154; DTSX:742, 3803, 10055; DTSX:18801-18802; grep gen_poaaccountoperator over source/DailyProcess/*.dtsx (0032 only)",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|finding#3",
+      "hash": "91a370ffaadf",
+      "verdict": "CONFIRMED",
+      "detail": "Check If POA Account Operator Exist runs 'select gen_customeraccount from gen_poaaccountoperator with (nolock)' with the parameter gen_customeraccountid. CacheType is 1 (partial), NoMatchBehavior is 1 and NoMatchCachePercentage is 0 (DTSX:541-553). The pension flow has the same settings on gen_policy = gen_policiesid (DTSX:3629-3641). Neither filters by operator or status, and only No Match is connected. The source produces one row per account or policy for each status-2 POA of the employer. Create is per row (service.Create, no batching). So the same-run duplicate is correctly conditional on both rows being checked before the first create. 'בריצות הבאות, מתפעל נוסף לא יקושר' is correct: any existing link, of any status, matches.",
+      "evidence": "DTSX:541-553; DTSX:3629-3641; Create POA Account Operator main.cs @DTSX:589 (service.Create per row); DTSX:3677",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Update Poa Operator Cancelled by Poa Account|title",
+      "hash": "d3a61627d083",
+      "verdict": "WRONG",
+      "detail": "The query is right as far as it goes (DTSX:13884-13889). It selects gen_poaoperator with gen_poastatus = 2, inner-joined to gen_poaaccountoperator, having count(all links) = count(links with status 6). The derived column CancelStatus = 6 (DTSX:13041/13052) is written through ExecuteMultiple Update in batches of 500 plus a final flush (main.cs @DTSX:14164-14224). There are two problems. (1) The text states the meaning of the VALUE WRITTEN TO gen_poaoperator.gen_poastatus, 6 = 'בוטל', as fact ('ביטול ייפוי כוח מתפעל', 'מקבל סטטוס 6 (\"בוטל\")'). The only file label for 6 is the SQL comment '-- cancelled', on the HAVING test of gen_poaaccountoperator.gen_poastatus = 6 (DTSX:13889). Otherwise there are only the names 'Cancelled Status' and 'Update Poa Operator Cancelled', and names are not proof. This is the same analogy for which the package already hedges gen_poaoperator status 2 ('כנראה תקף – השערה'), so the claims are internally inconsistent. (2) 'כל קישורי החשבון' is narrower than the query. The HAVING counts every gen_poaaccountoperator of the operator, and that includes the policy links created by the pension flow (gen_policy, DTSX:3911; no gen_customeraccount). Also not stated: the operator must have at least one link (inner join).",
+      "evidence": "DTSX:13884-13889; DTSX:13041/13052 (CancelStatus = 6); DTSX:14164-14224; DTSX:3911; DTSX:849",
+      "wrongUnits": [
+        {
+          "unit": "[1] title_he 'ביטול ייפוי כוח מתפעל'; [2] short_he 'מקבל סטטוס 6 (\"בוטל\")'",
+          "problem": "The meaning of gen_poaoperator status 6 is stated as fact. The files label 6 only for gen_poaaccountoperator (SQL comment) and otherwise only through component and column names.",
+          "correct": "'מקבל סטטוס 6 (כנראה \"בוטל\" – השערה, באנלוגיה להערה \"-- cancelled\" על סטטוס הקישורים)'.",
+          "evidence": "DTSX:13889; DTSX:13041"
+        },
+        {
+          "unit": "[1]-[3] 'כל קישורי החשבון'",
+          "problem": "The query counts all gen_poaaccountoperator links of the operator, including policy links, and requires at least one link.",
+          "correct": "'שיש לו לפחות קישור gen_poaaccountoperator אחד (חשבון או פוליסה), וכל קישוריו בסטטוס 6'.",
+          "evidence": "DTSX:13884-13889; DTSX:3911"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Update Poa Operator Cancelled by Poa Account|short",
+      "hash": "a6399c0715b8",
+      "verdict": "WRONG",
+      "detail": "The tree matches the query (DTSX:13884-13889) and the SDK update (main.cs @DTSX:14164-14224). The same two problems as |title apply. Unit [4] says 'ייפוי הכוח המתפעל מסומן \"בוטל\"', which states the meaning of gen_poaoperator status 6 as fact; that label is only in the SQL comment about link status and in names. Units [1]-[2] say 'קישורי החשבון', but all gen_poaaccountoperator links count, including policy links (DTSX:3911).",
+      "evidence": "DTSX:13884-13889; DTSX:13041; DTSX:3911",
+      "wrongUnits": [
+        {
+          "unit": "[4] 'מסומן \"בוטל\"'",
+          "problem": "Unproven meaning of gen_poaoperator status 6.",
+          "correct": "'מקבל סטטוס 6 (כנראה \"בוטל\" – השערה)'.",
+          "evidence": "DTSX:13889"
+        },
+        {
+          "unit": "[1]-[2] 'כל קישורי החשבון'",
+          "problem": "Policy links are also counted.",
+          "correct": "'כל קישורי gen_poaaccountoperator שלו (חשבונות ופוליסות)'.",
+          "evidence": "DTSX:13884-13889; DTSX:3911"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Update Poa Operator Invalid by Poa Account|title",
+      "hash": "f9486ec539c3",
+      "verdict": "WRONG",
+      "detail": "The query is gen_poaoperator status 2 with all links at status 5 (DTSX:17694-17699). InvalidStatus = 5 (DTSX:17728/17739) is written through an SDK ExecuteMultiple update in batches of 500 (DTSX:17755). The title and short_he state the meaning of the gen_poaoperator status written ('\"לא תקין\"' for 5) as fact. The only label is '-- invalid', on the link-status test (DTSX:17699), plus names. 'כל קישורי החשבון' omits that policy links count too (DTSX:3911), and that at least one link is required.",
+      "evidence": "DTSX:17694-17699; DTSX:17728/17739; DTSX:17755; DTSX:3911",
+      "wrongUnits": [
+        {
+          "unit": "[1] title_he 'סימון ... \"לא תקין\"'; [2] short_he 'מקבל סטטוס 5 (\"לא תקין\")'",
+          "problem": "Unproven meaning of gen_poaoperator status 5, which is inconsistent with the hedge on status 2.",
+          "correct": "'מקבל סטטוס 5 (כנראה \"לא תקין\" – השערה, באנלוגיה להערה \"-- invalid\" על סטטוס הקישורים)'.",
+          "evidence": "DTSX:17699"
+        },
+        {
+          "unit": "[1]-[3] 'כל קישורי החשבון'",
+          "problem": "All gen_poaaccountoperator links count, policy links included, and at least one is required.",
+          "correct": "'לפחות קישור אחד, וכל קישורי gen_poaaccountoperator שלו (חשבונות ופוליסות) בסטטוס 5'.",
+          "evidence": "DTSX:17694-17699; DTSX:3911"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Update Poa Operator Invalid by Poa Account|short",
+      "hash": "f7f833c92f10",
+      "verdict": "WRONG",
+      "detail": "The tree matches DTSX:17694-17699 and the SDK update. Unit [4] states 'מסומן \"לא תקין\"' (gen_poaoperator status 5) as fact, without proof. Units [1]-[2] say 'קישורי החשבון', but policy links are counted too (DTSX:3911).",
+      "evidence": "DTSX:17694-17699; DTSX:17728; DTSX:3911",
+      "wrongUnits": [
+        {
+          "unit": "[4]",
+          "problem": "Unproven meaning of gen_poaoperator status 5.",
+          "correct": "'מקבל סטטוס 5 (כנראה \"לא תקין\" – השערה)'.",
+          "evidence": "DTSX:17699"
+        },
+        {
+          "unit": "[1]-[2]",
+          "problem": "Policy links are also counted.",
+          "correct": "'כל קישורי gen_poaaccountoperator שלו (חשבונות ופוליסות)'.",
+          "evidence": "DTSX:3911"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Update Poa Operator Expired By Poa Account|title",
+      "hash": "f5d01e1a92a9",
+      "verdict": "WRONG",
+      "detail": "The query is gen_poaoperator status 2 with all links at status 4 (DTSX:15802-15807). ExpiredStatus = 4 (DTSX:15722/15733) is written through an SDK ExecuteMultiple update in batches of 500 (DTSX:15836). 'מקבל סטטוס 4 (\"פג תוקף\")' / 'סימון ... \"פג תוקף\"' state the meaning of gen_poaoperator status 4 as fact. The only label is '-- expired', on the link-status test (DTSX:15807), plus names. 'כל קישורי החשבון' omits policy links (DTSX:3911) and the at-least-one-link requirement.",
+      "evidence": "DTSX:15802-15807; DTSX:15722/15733; DTSX:15836; DTSX:3911",
+      "wrongUnits": [
+        {
+          "unit": "[1] title_he; [2] short_he 'מקבל סטטוס 4 (\"פג תוקף\")'",
+          "problem": "Unproven meaning of gen_poaoperator status 4.",
+          "correct": "'מקבל סטטוס 4 (כנראה \"פג תוקף\" – השערה, באנלוגיה להערה \"-- expired\" על סטטוס הקישורים)'.",
+          "evidence": "DTSX:15807"
+        },
+        {
+          "unit": "[1]-[3] 'כל קישורי החשבון'",
+          "problem": "All gen_poaaccountoperator links count, policy links included, and at least one is required.",
+          "correct": "'לפחות קישור אחד, וכל קישורי gen_poaaccountoperator שלו (חשבונות ופוליסות) בסטטוס 4'.",
+          "evidence": "DTSX:15802-15807; DTSX:3911"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Update Poa Operator Expired By Poa Account|short",
+      "hash": "778da40dcb42",
+      "verdict": "WRONG",
+      "detail": "The tree matches DTSX:15802-15807 and the SDK update. Unit [4] states 'מסומן \"פג תוקף\"' (gen_poaoperator status 4) as fact, without proof. Units [1]-[2] say 'קישורי החשבון', but policy links are counted too.",
+      "evidence": "DTSX:15802-15807; DTSX:15722; DTSX:3911",
+      "wrongUnits": [
+        {
+          "unit": "[4]",
+          "problem": "Unproven meaning of gen_poaoperator status 4.",
+          "correct": "'מקבל סטטוס 4 (כנראה \"פג תוקף\" – השערה)'.",
+          "evidence": "DTSX:15807"
+        },
+        {
+          "unit": "[1]-[2]",
+          "problem": "Policy links are also counted.",
+          "correct": "'כל קישורי gen_poaaccountoperator שלו (חשבונות ופוליסות)'.",
+          "evidence": "DTSX:3911"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Update Poa Operator Cancelled|title",
+      "hash": "7227be783263",
+      "verdict": "WRONG",
+      "detail": "The query is gen_poaoperator status 2, inner join to links, having count(all links) = count(case when link status != 2 then 1) with the comment '-- not valid' (DTSX:11964-11969). CancelledStatus = 6 (DTSX:11121/11132) is written through an SDK ExecuteMultiple update (DTSX:11998). Problems. (1) '\"בוטל\"' for gen_poaoperator status 6 is stated as fact. Here there is not even an SQL comment for 6; the only labels are the names 'Cancelled Status' and 'Update Poa Operator Cancelled'. (2) NULL semantics. A link whose gen_poastatus is NULL is not counted by '!= 2' (NULL != 2 is UNKNOWN), so such a link blocks the update. 'אינם תקפים (סטטוס שונה מ-2)' does not say this. (3) 'קישורי החשבון' includes policy links (DTSX:3911), and at least one link is required. Minor, not counted alone: '(מעורב)' assumes the earlier flows (Constraints 2-5, DTSX:18796-18799) already moved the all-4, all-5 and all-6 operators. Uniform sets of other non-2 values also reach this flow, as do sets whose earlier ExecuteMultiple item failed; item faults are ignored (DTSX:14189-14205 in the by-account flow; same pattern in each update script).",
+      "evidence": "DTSX:11964-11969; DTSX:11121/11132; DTSX:11998; DTSX:3911; DTSX:18796-18799",
+      "wrongUnits": [
+        {
+          "unit": "[1] title_he 'ביטול ...'; [2] short_he 'מקבל סטטוס 6 (\"בוטל\")'",
+          "problem": "Unproven meaning of gen_poaoperator status 6; the only label is a component/column name.",
+          "correct": "'מקבל סטטוס 6 (כנראה \"בוטל\" – השערה; לפי שם הרכיב בלבד)'.",
+          "evidence": "DTSX:11121; DTSX:11969"
+        },
+        {
+          "unit": "[2] short_he / [3] flow_he[1] 'אינם תקפים (סטטוס שונה מ-2)'",
+          "problem": "NULL semantics are omitted. A link with a NULL status is not counted as '!= 2' and prevents the update.",
+          "correct": "'שלכל קישוריו (חשבונות ופוליסות; לפחות אחד) יש סטטוס מוגדר ושונה מ-2; קישור עם סטטוס ריק מונע את העדכון'.",
+          "evidence": "DTSX:11969"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Update Poa Operator Cancelled|short",
+      "hash": "8818b6895402",
+      "verdict": "WRONG",
+      "detail": "The tree matches DTSX:11964-11969 and the SDK update. Unit [4] states 'מסומן \"בוטל\"' for gen_poaoperator status 6 as fact; the only label is a component or column name. Unit [2] says 'אינם תקפים (סטטוס שונה מ-2)' without the NULL semantics: a NULL-status link is not counted and blocks the update. Units [1]-[2] say 'קישורי החשבון', but policy links count too.",
+      "evidence": "DTSX:11964-11969; DTSX:11121; DTSX:3911",
+      "wrongUnits": [
+        {
+          "unit": "[4]",
+          "problem": "Unproven meaning of gen_poaoperator status 6.",
+          "correct": "'מקבל סטטוס 6 (כנראה \"בוטל\" – השערה)'.",
+          "evidence": "DTSX:11121"
+        },
+        {
+          "unit": "[2]",
+          "problem": "NULL-status links are not 'שונה מ-2' in SQL and block the update.",
+          "correct": "'האם לכל קישוריו (חשבונות ופוליסות) יש סטטוס מוגדר שונה מ-2?'",
+          "evidence": "DTSX:11969"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Create POA Account Operator|title",
+      "hash": "0772f50317c6",
+      "verdict": "CONFIRMED",
+      "detail": "short_he and flow_he[1]-[4] match the code. Source: Gen_customeraccount CreatedOn > DATEADD(dd,-2,GETDATE()) joined through Account to gen_poaoperator status 2, hedged as hypothesis (DTSX:3081-3110). Existing-link Lookup on gen_customeraccount, with only No Match connected (DTSX:541-553). IS All Employees: !ISNULL(gen_applypoa) && gen_applypoa == 1 (DTSX:3204). Check If Employee Exist: gen_poaemployeeemployeroperator, gen_active = 1, keyed on Gen_customeridnumber and gen_poaoperatorId, with Match to create and No Match not connected (DTSX:483-499). The SDK Create sets gen_poastatus = VALID (2), and VALID is the code constant (DTSX:742, main.cs @DTSX:836-935), so 'תקף' for the link is attributed. 'חל על כל העובדים' describes the behaviour: with applypoa = 1, the per-employee list is bypassed.",
+      "evidence": "DTSX:3081-3110; DTSX:541-553; DTSX:3204; DTSX:483-499; DTSX:742; Create POA Account Operator @DTSX:589",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Create POA Account Operator|short",
+      "hash": "473c03562505",
+      "verdict": "CONFIRMED",
+      "detail": "[1] matches the source filters, with status 2 hedged. [2]-[6] match the existing-link Lookup (Match unconnected). [7]-[11] match IS All Employees and Check If Employee Exist (active list). [9] matches the Create with gen_poastatus = VALID, the POA dates (signature, start, receiving and end dates) and the permissions. [12] is the end of the create path.",
+      "evidence": "DTSX:3081-3110; DTSX:541-553; DTSX:3204; DTSX:483-499; main.cs @DTSX:836-935",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Create POA Account Operator|detailed",
+      "hash": "09fb889eaea0",
+      "verdict": "WRONG",
+      "detail": "Units [2]-[23] match the code. Lookups: DTSX:541-553 and 483-499. Split: DTSX:3204. Create fields: main.cs @DTSX:836-935, with gen_customername (contact), gen_customeraccount, gen_powerofattorenyoperator, the four dates, and gen_allpermissions true/false. In the else branch, 12 flags are copied only when true. The catch sends the row to ErrorBuffer, then Derived Column, Union All 1 and ETL Warning. Unit [1] says 'כל אחד מוצמד לכל ייפוי כוח מתפעל בסטטוס 2 (\"valid\") של המעסיק'. It states the meaning 'valid' for gen_poaoperator.gen_poastatus = 2 without a hedge. Every other claim of this package labels it a hypothesis ('כנראה \"תקף\" – השערה'), so this contradicts them. The files give 'valid' only for gen_poaaccountoperator (VALID = 2 at DTSX:742; '-- valid' at DTSX:10055). Minor label note, not counted: 'משוב והנחה בדמי ניהול' renders gen_feedbackforthediscountofmanagementfees ('feedback for the discount…') as two items.",
+      "evidence": "DTSX:3081-3110 (gen_poaoperator.gen_poastatus = 2); DTSX:742; DTSX:10055; main.cs @DTSX:836-935",
+      "wrongUnits": [
+        {
+          "unit": "[1] 'בסטטוס 2 (\"valid\")'",
+          "problem": "The meaning of gen_poaoperator status 2 is stated as fact, which contradicts the package's own hedge.",
+          "correct": "'בסטטוס 2 (כנראה \"תקף\" – השערה)'.",
+          "evidence": "DTSX:3109; DTSX:742; DTSX:10055"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Create POA Account Operator|decisions",
+      "hash": "19ab175341c2",
+      "verdict": "CONFIRMED",
+      "detail": "[1] matches the WHERE (DTSX:3108-3109), with the meaning hedged. [2] matches the Lookup on gen_customeraccount, with Match not connected (DTSX:541-553). [3] matches the split (DTSX:3204). [4] matches the Lookup with gen_active = 1 and the parameters Gen_customeridnumber and gen_poaoperatorId (DTSX:483-499). [5] matches the all-permissions branch (main.cs). No row-selection or write-deciding branch is missing.",
+      "evidence": "DTSX:3108-3109; DTSX:541-553; DTSX:3204; DTSX:483-499; main.cs @DTSX:836-935",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Create POA Account Operator|open",
+      "hash": "5921e648571b",
+      "verdict": "CONFIRMED",
+      "detail": "[1] matches the window and the status-2 hedge (attributed to VALID and '-- valid' for gen_poaaccountoperator). It also matches the coverage gates (gen_applypoa = 1, or Gen_customeridnumber with this operator in an active gen_poaemployeeemployeroperator), the existing-link gate, the missing date comparison, and the fact that no other supplied package creates gen_poaaccountoperator. [2] is correct: the Lookup is on gen_customeraccount only.",
+      "evidence": "DTSX:3081-3110; DTSX:3204; DTSX:483-499; DTSX:541-553; DTSX:742; DTSX:10055",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Create POA Account Operator - Pension|title",
+      "hash": "8dbf1c37a72d",
+      "verdict": "WRONG",
+      "detail": "The flow facts match. Get Policies: gen_policies CreatedOn > DATEADD(dd,-2,GETDATE()) joined through Account to gen_poaoperator status 2 (DTSX:6125-6154). Lookup on gen_policy (DTSX:3629-3641). Split (DTSX:6244). Employee Lookup keyed on gen_policies.Gen_identitynumber, gen_active = 1 (DTSX:3571-3587). Create sets gen_policy and VALID (DTSX:3803, 3911). The problem is that title_he and short_he say 'פוליסות פנסיה' / 'לפוליסת פנסיה'. The query has no filter on product or policy type; every gen_policies row created in the window is processed. 'פנסיה' comes only from the data-flow name 'Create POA Account Operator - Pension' and the warning title. Under the standard, a meaning taken from a data-flow name is not proof. No supplied file shows that gen_policies holds only pension policies. 0031 references gen_policies as gen_customerprogram and annotation objectid (0031 DTSX:6392, 7979).",
+      "evidence": "DTSX:6125-6154; DTSX:3566 (data-flow name); DTSX:5213 (warning title); 0031_PoaAccountUpdateDaily.dtsx:6392, 7979",
+      "wrongUnits": [
+        {
+          "unit": "[1] title_he 'לפוליסות פנסיה חדשות'; [2] short_he 'לפוליסת פנסיה'",
+          "problem": "'Pension' is a meaning taken from the data-flow name; the query selects all gen_policies.",
+          "correct": "'לפוליסות (gen_policies) חדשות' — 'פנסיה' only as 'לפי שם הזרימה (השערה)'.",
+          "evidence": "DTSX:6125-6154; DTSX:3566"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Create POA Account Operator - Pension|short",
+      "hash": "9425278b05d1",
+      "verdict": "WRONG",
+      "detail": "The tree matches the source, the Lookups, the split and the Create (DTSX:6125-6154, 3629-3641, 6244, 3571-3587, 3911). Unit [1] says 'נאספים פוליסות פנסיה'. The query has no pension filter; 'pension' comes only from the data-flow name.",
+      "evidence": "DTSX:6125-6154; DTSX:3566",
+      "wrongUnits": [
+        {
+          "unit": "[1] 'פוליסות פנסיה'",
+          "problem": "Meaning from the data-flow name stated as fact.",
+          "correct": "'נאספות פוליסות (gen_policies) שנוצרו ביומיים האחרונים ...'.",
+          "evidence": "DTSX:6125-6154"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Create POA Account Operator - Pension|detailed",
+      "hash": "ae915f95ddf8",
+      "verdict": "WRONG",
+      "detail": "Units [2]-[22] match the code. Lookup on gen_policy (DTSX:3629-3641). Split (DTSX:6244). Employee Lookup on gen_policies.Gen_identitynumber and the operator, gen_active = 1 (DTSX:3571-3587). Create: gen_poastatus = VALID, gen_customername, gen_policy = EntityReference('gen_policies'), the operator, the four dates, and gen_allpermissions or the 12 flags copied when true (main.cs @DTSX:3898-3995). Errors go to ETL Warning. Two problems. (1) Unit [1] says 'בסטטוס 2 (\"valid\")', which states the meaning of gen_poaoperator status 2 as fact. This contradicts the package's own hedge (the files give 'valid' only for gen_poaaccountoperator: DTSX:3803, 10055). (2) Unit [23] says 'פוליסות הפנסיה החדשות', with 'pension' taken from the data-flow name; the query has no pension filter (DTSX:6125-6154).",
+      "evidence": "DTSX:6125-6154; DTSX:3803; DTSX:10055; DTSX:3629-3641; DTSX:3571-3587; DTSX:6244; main.cs @DTSX:3898-3995",
+      "wrongUnits": [
+        {
+          "unit": "[1] 'בסטטוס 2 (\"valid\")'",
+          "problem": "Unhedged meaning of gen_poaoperator status 2.",
+          "correct": "'בסטטוס 2 (כנראה \"תקף\" – השערה)'.",
+          "evidence": "DTSX:6152; DTSX:3803; DTSX:10055"
+        },
+        {
+          "unit": "[23] 'פוליסות הפנסיה החדשות'",
+          "problem": "Meaning from the data-flow name.",
+          "correct": "'הפוליסות (gen_policies) החדשות ...'.",
+          "evidence": "DTSX:6125-6154"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Create POA Account Operator - Pension|decisions",
+      "hash": "100b0b1c2186",
+      "verdict": "CONFIRMED",
+      "detail": "[1] matches the WHERE (DTSX:6151-6152), with the meaning hedged. [2] matches the Lookup gen_policy = gen_policiesid, with Match not connected (DTSX:3629-3641). [3] matches the split (DTSX:6244). [4] matches the Lookup with gen_active = 1 and the parameters gen_policies.Gen_identitynumber and gen_poaoperatorId (DTSX:3571-3587). [5] matches the all-permissions branch. No missing branch. The table does not say 'pension'.",
+      "evidence": "DTSX:6151-6152; DTSX:3629-3641; DTSX:6244; DTSX:3571-3587; main.cs @DTSX:3898-3995",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Create POA Account Operator - Pension|open",
+      "hash": "3e91b7a254d3",
+      "verdict": "CONFIRMED",
+      "detail": "[1] matches the window, the hedged status 2, the coverage gates (gen_applypoa = 1, or gen_policies.Gen_identitynumber with this operator in an active gen_poaemployeeemployeroperator), the existing-link gate, the missing date comparison, and the fact that no other supplied package creates gen_poaaccountoperator. It says 'פוליסות' with no pension claim. [2] matches the Lookup on gen_poaaccountoperator.gen_policy only.",
+      "evidence": "DTSX:6125-6154; DTSX:6244; DTSX:3571-3587; DTSX:3629-3641",
+      "wrongUnits": []
+    }
+  ],
+  "missingWrites": [],
+  "notes": "L|summary was in the --open list and is judged above. Outside this re-check, already-confirmed claims of the other flows (for example Update POA Account Operator Out Of Date) were not re-opened."
+}

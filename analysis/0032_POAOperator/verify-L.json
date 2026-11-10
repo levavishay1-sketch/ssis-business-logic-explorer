@@ -1,0 +1,462 @@
+{
+  "verifier": "ssis-verifier",
+  "package": "0032_POAOperator",
+  "scope": "logic-claims all",
+  "checkedAt": "2026-11-07T11:32:33.912Z",
+  "checked": 54,
+  "results": [
+    {
+      "id": "L|summary",
+      "hash": "63d6c3ba75cc",
+      "verdict": "CONFIRMED",
+      "detail": "[1] Matches all 7 business flows: link expiry -> 4; operator status from links (all 6 -> 6, all 5 -> 5, all 4 -> 4, none valid -> 6); creation of gen_poaaccountoperator for customer accounts / gen_policies created in the last 2 days at an employer with a status-2 operator, when applypoa=1 or the employee is in the active list. [2] No DTS:Configuration in the package. ServerName/OrganizationName come from gen_etlvariable (Set Organization Variables ReadWriteVariables). [psql] DTSX:4-6 is used only by sources and lookups; there are no OLE DB Commands. ExecuteMultipleExtension is not defined in the script source, so it is external. Status meanings come from SQL comments (-- valid/cancelled/invalid/expired/not valid) and derived-column names.",
+      "evidence": "DTSX:4-6; 9175; 10053; 11964; 13884; 15802; 17694; 3081; 6125; component list (no OLEDBCommand)",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|exec",
+      "hash": "ab0ab1f1ecc1",
+      "verdict": "CONFIRMED",
+      "detail": "Constraints re-derived: 18794 GetOrgVars->CreateETL; 18795 ->Out Of Date; 18796 ->Cancelled by Poa Account; 18797 ->Invalid; 18798 ->Expired; 18799 ->Update Poa Operator Cancelled; 18801 ->Create POA Account Operator; 18802 ->Pension; 18800 Pension->End ETL. All are Success (no Value attribute), LogicalAnd=True, with no expressions. No disabled executables and no event handlers.",
+      "evidence": "DTSX:18794-18802",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|ignored",
+      "hash": "fd97bbf5d62b",
+      "verdict": "CONFIRMED",
+      "detail": "Get Organization Variables sets only OrganizationName/ServerName. Create/End ETL Process write only gen_etlprocess. All ETL Warning scripts create only gen_etlprocesswarning. The Derived Columns build only Warning* columns, and 'Union All 1' only merges error rows into ETL Warning. None of them writes business data or filters business rows. The business 'Union All' (which merges the two create paths) is correctly not listed.",
+      "evidence": "DTSX:9175; 28-477 main.cs gen_etlprocess; ETL Warning scripts (LogicalName gen_etlprocesswarning); Derived Column DTSX:2165, 11911",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|finding#1",
+      "hash": "381277a31bf9",
+      "verdict": "CONFIRMED",
+      "detail": "All five update scripts share the same ExecuteBulk code (only entity, ID and status column differ). For items with resultItem.Fault != null, the ErrorBuffer lines are commented out, so faulted records leave no trace.",
+      "evidence": "DTSX:10084 main.cs:139-163; DTSX:11998, 13918, 15836, 17755 (diff identical apart from entity/column names)",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|finding#2",
+      "hash": "afd640080016",
+      "verdict": "CONFIRMED",
+      "detail": "Both sources filter CreatedOn > DATEADD(dd,-2,GETDATE()). Older accounts/policies (e.g. those created before the operator POA, or missed when the package did not run for 2 days) are never selected.",
+      "evidence": "DTSX:3081; DTSX:6125",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|finding#3",
+      "hash": "73196a117573",
+      "verdict": "WRONG",
+      "detail": "Technical basis is correct: the 'exists' Lookup is keyed only on gen_customeraccount (or gen_policy in the pension flow), partial cache (CacheType=1) with NoMatchCachePercentage=0. The stated consequence 'two links will be created in the same run' is unconditional, but it holds only if (a) the account is covered by both operators (applypoa=1, or the employee is listed under each operator) and (b) the second row's Lookup executes before the first row's Create is committed. Rows in the same buffer are looked up before the asynchronous Union All hands them to the script; rows in different buffers may see the first link. The second sentence (a later run will not add a second operator) is correct.",
+      "evidence": "DTSX:541-553 (CacheType=1, NoMatchCachePercentage=0); 3629-3641; 3204/6244; 483/3571",
+      "wrongUnits": [
+        {
+          "unit": 1,
+          "problem": "Runtime consequence stated without the coverage and buffer-timing conditions.",
+          "correct": "If an employer has two valid operator POAs that both cover the employee, the same run can create two links for the account/policy. This happens when both rows are looked up before either link is created, which is typical when they fall in the same pipeline buffer. In later runs, no further operator is linked to an already-linked account/policy.",
+          "evidence": "DTSX:541-553; 3629-3641"
+        }
+      ]
+    },
+    {
+      "id": "L|finding#4",
+      "hash": "5db42ed7e5d6",
+      "verdict": "CONFIRMED",
+      "detail": "The three specific flows select operators whose links are all 6 / all 5 / all 4. They run before 'Update Poa Operator Cancelled', whose having-clause counts links with status != 2 and sets 6, so any remaining non-valid combination (including mixes) becomes 6. Each flow selects only gen_poaoperator.gen_poastatus = 2.",
+      "evidence": "DTSX:18796-18799; 13884; 17694; 15802; 11964",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|finding#5",
+      "hash": "c15dc48deb20",
+      "verdict": "CONFIRMED",
+      "detail": "SQL uses dateadd(HH,3, gen_enddate) < GETDATE(). The timezone interpretation is labelled השערה.",
+      "evidence": "DTSX:10053",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|finding#6",
+      "hash": "af1c2e90665d",
+      "verdict": "CONFIRMED",
+      "detail": "No OLE DB Command or Execute SQL DML in 0032; all CRM writes go through service.Create / ExecuteMultiple Update. No supplied DTSX outside 0032 references gen_poaoperator creation or gen_poaemployeeemployeroperator, and gen_poaaccountoperator appears only in 0032.",
+      "evidence": "0032 component list; grep across source/DailyProcess",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Update POA Account Operator Out Of Date|title",
+      "hash": "b688d640ef3d",
+      "verdict": "CONFIRMED",
+      "detail": "Source: gen_poaaccountoperator status 2 (-- valid) with dateadd(HH,3,gen_enddate) < GETDATE(). Expired Status = 4. Update via ExecuteMultiple in batches of 500, plus a final partial batch.",
+      "evidence": "DTSX:10053; 9973; 10084 main.cs:118-180",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Update POA Account Operator Out Of Date|short",
+      "hash": "e7d96b7d9531",
+      "verdict": "CONFIRMED",
+      "detail": "Matches the SQL and update.",
+      "evidence": "DTSX:10053; 10084",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Update POA Account Operator Out Of Date|detailed",
+      "hash": "4e8f3ac7da52",
+      "verdict": "WRONG",
+      "detail": "Units 1-8 and 10 are correct. Unit 9 says 'only exceptions while building the record reach the ETL warning'. This is not what the code does. ExecuteBulk() for a full batch (count == 500) is called inside the try, so an exception thrown by ExecuteMultipleRequest is also caught and sent to ErrorBuffer, tagged with only the 500th record's GUID; and because entitiesList.Clear() is skipped, the list never reaches exactly 500 again. The final partial batch is flushed in Input0_ProcessInput outside any try, so an exception there fails the data flow and stops the Success chain (later flows do not run). In addition, ErrorBuffer.Message is wstr(100); a longer ex.Message + GUID text throws inside the catch and fails the component.",
+      "evidence": "DTSX:10084 main.cs:118-138 (try incl. ExecuteBulk at 128-131), 139-164, 170-180; Error output Message wstr(100)",
+      "wrongUnits": [
+        {
+          "unit": 9,
+          "problem": "Misstates which failures reach the ETL warning.",
+          "correct": "Per-record faults returned inside the ExecuteMultiple response are ignored (ErrorBuffer lines commented out). An exception thrown by a full 500-record batch is caught and reported as one ETL warning carrying only the triggering row's GUID, if the message fits wstr(100); otherwise the component fails. An exception in the final partial-batch flush (outside the try) fails the data flow, and the following Success-chained flows do not run.",
+          "evidence": "main.cs:120-137, 139-164, 170-180 (DTSX:10084)"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Update POA Account Operator Out Of Date|detail",
+      "hash": "5dcffef30e3a",
+      "verdict": "CONFIRMED",
+      "detail": "Population, match by ID, decision, SDK ExecuteMultiple write verified. gen_poaaccountoperator is created only by this package among the supplied files; it is marked proven:false, which is acceptable since it may also be created outside the package.",
+      "evidence": "DTSX:10053; 9973; 10084; grep gen_poaaccountoperator",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Update POA Account Operator Out Of Date|decisions",
+      "hash": "3c6d378fa000",
+      "verdict": "CONFIRMED",
+      "detail": "WHERE condition verbatim; outcome 4.",
+      "evidence": "DTSX:10053; 9973",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Update POA Account Operator Out Of Date|crm",
+      "hash": "ddc06b1a127a",
+      "verdict": "CONFIRMED",
+      "detail": "ExecuteMultipleExtension(entitiesList, RequestType.Update) on gen_poaaccountoperator with gen_poastatus = OptionSetValue(4).",
+      "evidence": "DTSX:10084 main.cs:122-124, 141",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Update POA Account Operator Out Of Date|open",
+      "hash": "4512b7d6f53f",
+      "verdict": "CONFIRMED",
+      "detail": "No StringMap/OptionSet labels in the supplied files; meanings come only from SQL comments and column names. The +3h interpretation is correctly a hypothesis.",
+      "evidence": "DTSX:10053, 11964, 13884, 15802, 17694",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Update Poa Operator Cancelled by Poa Account|title",
+      "hash": "a2843cfe6784",
+      "verdict": "CONFIRMED",
+      "detail": "SQL selects status-2 operators whose links are all 6 (-- cancelled); CancelStatus = 6; ExecuteMultiple update with 500-record batches.",
+      "evidence": "DTSX:13884; 13041; 13918",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Update Poa Operator Cancelled by Poa Account|short",
+      "hash": "2fe4f576027b",
+      "verdict": "CONFIRMED",
+      "detail": "Matches.",
+      "evidence": "DTSX:13884; 13918",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Update Poa Operator Cancelled by Poa Account|detailed",
+      "hash": "1a405e5e796b",
+      "verdict": "CONFIRMED",
+      "detail": "Order (after Out Of Date, Constraint at 18796), inner join (at least one link), having clause, value 6, SDK ExecuteMultiple, and per-record faults not logged are all verified.",
+      "evidence": "DTSX:18795-18796; 13884; 13041; 13918",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Update Poa Operator Cancelled by Poa Account|detail",
+      "hash": "517b87c65adf",
+      "verdict": "CONFIRMED",
+      "detail": "Population, join key, decision and write verified. The creator of gen_poaoperator is not in the supplied files; correctly marked as a hypothesis.",
+      "evidence": "DTSX:13884; 13918",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Update Poa Operator Cancelled by Poa Account|decisions",
+      "hash": "5046fdbb5ec8",
+      "verdict": "CONFIRMED",
+      "detail": "Condition verbatim.",
+      "evidence": "DTSX:13884",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Update Poa Operator Cancelled by Poa Account|crm",
+      "hash": "f318712f5b81",
+      "verdict": "CONFIRMED",
+      "detail": "gen_poaoperator gen_poastatus = 6 via ExecuteMultiple Update.",
+      "evidence": "DTSX:13918 main.cs (sha ca727c9975c1)",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Update Poa Operator Invalid by Poa Account|title",
+      "hash": "f68cda2e4a07",
+      "verdict": "CONFIRMED",
+      "detail": "All links status 5 (-- invalid) -> InvalidStatus 5; ExecuteMultiple update.",
+      "evidence": "DTSX:17694; 17728; 17755",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Update Poa Operator Invalid by Poa Account|short",
+      "hash": "f3b066d0e98f",
+      "verdict": "CONFIRMED",
+      "detail": "Matches.",
+      "evidence": "DTSX:17694; 17755",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Update Poa Operator Invalid by Poa Account|detailed",
+      "hash": "adcdf980f3a9",
+      "verdict": "CONFIRMED",
+      "detail": "Order (Constraint at 18797), SQL, value 5 and SDK ExecuteMultiple verified.",
+      "evidence": "DTSX:18797; 17694; 17728; 17755",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Update Poa Operator Invalid by Poa Account|detail",
+      "hash": "f57a4794683d",
+      "verdict": "CONFIRMED",
+      "detail": "Verified.",
+      "evidence": "DTSX:17694; 17755",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Update Poa Operator Invalid by Poa Account|decisions",
+      "hash": "401dcfb91df0",
+      "verdict": "CONFIRMED",
+      "detail": "Condition verbatim.",
+      "evidence": "DTSX:17694",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Update Poa Operator Invalid by Poa Account|crm",
+      "hash": "1d352e16bd73",
+      "verdict": "CONFIRMED",
+      "detail": "gen_poaoperator gen_poastatus = 5 via ExecuteMultiple Update.",
+      "evidence": "DTSX:17755 main.cs (sha 2488c2fb3444)",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Update Poa Operator Expired By Poa Account|title",
+      "hash": "9eabfb04119f",
+      "verdict": "CONFIRMED",
+      "detail": "All links status 4 (-- expired) -> ExpiredStatus 4; the writer component is named 'Update Poa Operator Cancelled' but writes 4.",
+      "evidence": "DTSX:15802; 15722; 15836",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Update Poa Operator Expired By Poa Account|short",
+      "hash": "381321d430f2",
+      "verdict": "CONFIRMED",
+      "detail": "Matches.",
+      "evidence": "DTSX:15802; 15836",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Update Poa Operator Expired By Poa Account|detailed",
+      "hash": "5602ff78cb7e",
+      "verdict": "CONFIRMED",
+      "detail": "Order (Constraint at 18798), SQL, value 4 and SDK ExecuteMultiple verified.",
+      "evidence": "DTSX:18798; 15802; 15722; 15836",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Update Poa Operator Expired By Poa Account|detail",
+      "hash": "02c558277389",
+      "verdict": "CONFIRMED",
+      "detail": "Verified.",
+      "evidence": "DTSX:15802; 15836",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Update Poa Operator Expired By Poa Account|decisions",
+      "hash": "e7ade876fc26",
+      "verdict": "CONFIRMED",
+      "detail": "Condition verbatim.",
+      "evidence": "DTSX:15802",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Update Poa Operator Expired By Poa Account|crm",
+      "hash": "6e71661902cd",
+      "verdict": "CONFIRMED",
+      "detail": "gen_poaoperator gen_poastatus = 4 via ExecuteMultiple Update.",
+      "evidence": "DTSX:15836 main.cs (sha d7d9bfa12ea1)",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Update Poa Operator Cancelled|title",
+      "hash": "1971c6ba25eb",
+      "verdict": "CONFIRMED",
+      "detail": "Having count(links) = count(status != 2) (-- not valid); CancelledStatus = 6. This is the catch-all after the three specific flows.",
+      "evidence": "DTSX:11964; 11121; 11998",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Update Poa Operator Cancelled|short",
+      "hash": "0683761b5557",
+      "verdict": "CONFIRMED",
+      "detail": "Matches. A link with NULL status is not counted as != 2, so such an operator is not selected; this is consistent with the stated SQL semantics.",
+      "evidence": "DTSX:11964",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Update Poa Operator Cancelled|detailed",
+      "hash": "2c375a6386ff",
+      "verdict": "CONFIRMED",
+      "detail": "Runs last among the status flows (Constraint at 18799). SQL, value 6, SDK ExecuteMultiple and the unlogged faults are verified.",
+      "evidence": "DTSX:18799; 11964; 11121; 11998 main.cs (sha 9fcf7224bf31)",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Update Poa Operator Cancelled|detail",
+      "hash": "291f1d330469",
+      "verdict": "CONFIRMED",
+      "detail": "The catch-all interpretation follows from the order and the three uniform predicates.",
+      "evidence": "DTSX:11964; 18796-18799",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Update Poa Operator Cancelled|decisions",
+      "hash": "b4022020224a",
+      "verdict": "CONFIRMED",
+      "detail": "Condition verbatim.",
+      "evidence": "DTSX:11964",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Update Poa Operator Cancelled|crm",
+      "hash": "e89bf8338a7a",
+      "verdict": "CONFIRMED",
+      "detail": "gen_poaoperator gen_poastatus = 6 via ExecuteMultiple Update.",
+      "evidence": "DTSX:11998",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Create POA Account Operator|title",
+      "hash": "73fe7b896593",
+      "verdict": "CONFIRMED",
+      "detail": "Source join (customer account -> Account via Gen_employername -> gen_poaoperator status 2, CreatedOn within 2 days). Lookup on gen_poaaccountoperator.gen_customeraccount, with the Match output unconnected. IS All Employees (!ISNULL(gen_applypoa) && gen_applypoa == 1). Employee Lookup on active gen_poaemployeeemployeroperator by ID number + operator, with NoMatch unconnected. Create with VALID=2 and permissions.",
+      "evidence": "DTSX:3081; 541-553; 3204; 483-499; 589 main.cs:29,123-221",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Create POA Account Operator|short",
+      "hash": "4548c1c9c8dc",
+      "verdict": "CONFIRMED",
+      "detail": "Matches the paths: NoMatch -> split; All Employees -> Union All; Default -> Employee Lookup Match -> Union All -> Create.",
+      "evidence": "component list paths (Create POA Account Operator)",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Create POA Account Operator|detailed",
+      "hash": "babe6b86ee06",
+      "verdict": "CONFIRMED",
+      "detail": "All units verified against the SQL, Lookups (partial cache, parameter maps Gen_customeridnumber/gen_poaoperatorId), split expression, script fields (gen_customername contact, gen_customeraccount, gen_powerofattorenyoperator, gen_signaturedate from gen_employersignatorydate, start/receiving/end dates), all-permissions branch and the 12 individual flags (set only when true). Create errors go to ErrorBuffer (errorMessage wstr(3000)), then Derived Column, Union All 1 and ETL Warning.",
+      "evidence": "DTSX:3081; 541-553; 483-499; 3204; 589 main.cs:123-221",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Create POA Account Operator|detail",
+      "hash": "22e433b32e01",
+      "verdict": "CONFIRMED",
+      "detail": "Verified. 0005_Customer Account creates gen_customeraccount (new Entity at 0005:18341 etc.). Creators of the operator and employee list are not in the supplied files; labelled as hypotheses.",
+      "evidence": "DTSX:3081; 541; 483; 589; 0005_Customer Account.dtsx:18341",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Create POA Account Operator|decisions",
+      "hash": "213e044c6cd7",
+      "verdict": "CONFIRMED",
+      "detail": "All five decisions are verbatim and their outcomes match the paths.",
+      "evidence": "DTSX:3081; 541-553; 3204; 483-499; 589 main.cs:157-209",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Create POA Account Operator|crm",
+      "hash": "5c7978732b6c",
+      "verdict": "CONFIRMED",
+      "detail": "service.Create of gen_poaaccountoperator with gen_poastatus=2 plus permissions.",
+      "evidence": "DTSX:589 main.cs:130,212",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Create POA Account Operator|open",
+      "hash": "e5be1938071f",
+      "verdict": "CONFIRMED",
+      "detail": "[1] The 2-day window is correct, and no supplied package links older accounts (gen_poaaccountoperator appears only in 0032). [2] The exists-check is keyed on gen_customeraccount only, which is correct for this flow.",
+      "evidence": "DTSX:3081; 543-553; grep gen_poaaccountoperator",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Create POA Account Operator - Pension|title",
+      "hash": "e4f0eecb6bec",
+      "verdict": "CONFIRMED",
+      "detail": "Source gen_policies (Gen_accountname -> Account -> gen_poaoperator status 2, CreatedOn within 2 days). Lookup on gen_poaaccountoperator.gen_policy. Same split/employee logic (keyed on gen_policies.Gen_identitynumber). Create sets gen_policy instead of gen_customeraccount; the script otherwise matches the account flow. 'Pension' comes from the task name.",
+      "evidence": "DTSX:6125; 3629-3641; 6244; 3571-3587; 3677 main.cs (sha 46b5615a5841)",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Create POA Account Operator - Pension|short",
+      "hash": "9afac3e59d21",
+      "verdict": "CONFIRMED",
+      "detail": "Matches the paths.",
+      "evidence": "component list paths (Create POA Account Operator - Pension)",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Create POA Account Operator - Pension|detailed",
+      "hash": "c6d41991496f",
+      "verdict": "CONFIRMED",
+      "detail": "All units verified; the code differs from the account flow only in gen_policy / policyGuid.",
+      "evidence": "DTSX:6125; 3629-3641; 3571-3587; 6244; 3677",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Create POA Account Operator - Pension|detail",
+      "hash": "bbdd89beff8f",
+      "verdict": "CONFIRMED",
+      "detail": "Verified; no creator of gen_policies exists in the supplied files (grep).",
+      "evidence": "DTSX:6125; 3629; 3571; 3677",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Create POA Account Operator - Pension|decisions",
+      "hash": "f93f33b8b039",
+      "verdict": "CONFIRMED",
+      "detail": "Verbatim.",
+      "evidence": "DTSX:6125; 3632; 6244; 3576; 3677",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Create POA Account Operator - Pension|crm",
+      "hash": "50bc957a3270",
+      "verdict": "CONFIRMED",
+      "detail": "service.Create gen_poaaccountoperator, status 2 plus permissions, with gen_policy reference.",
+      "evidence": "DTSX:3677",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Create POA Account Operator - Pension|open",
+      "hash": "819585c3f60a",
+      "verdict": "WRONG",
+      "detail": "Unit 1 is correct. Unit 2 was copied from the account flow and says the exists-check is 'by account only' and that a second operator 'will not be linked to an account already linked'. In this flow the Lookup is keyed on gen_poaaccountoperator.gen_policy = gen_policiesid, not on the account.",
+      "evidence": "DTSX:3632 (where [refTable].[gen_policy] = ?), 3641",
+      "wrongUnits": [
+        {
+          "unit": 2,
+          "problem": "Wrong key entity (account instead of policy).",
+          "correct": "The exists-check is by policy only (gen_poaaccountoperator.gen_policy), not by operator. A second operator of the same employer will not be linked to a policy that was already linked in an earlier run.",
+          "evidence": "DTSX:3632-3641"
+        }
+      ]
+    }
+  ]
+}

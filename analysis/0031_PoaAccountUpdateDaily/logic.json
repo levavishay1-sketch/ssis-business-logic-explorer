@@ -1,0 +1,2023 @@
+{
+ "package": "0031_PoaAccountUpdateDaily",
+ "analyst": "ssis-business-logic",
+ "source": {
+  "file": "source/DailyProcess/0031_PoaAccountUpdateDaily.dtsx",
+  "sha256": "1D9C0A0A0D405ED3B7114736358E142BB091823AC3A452112B2187D69D554475",
+  "lines": 50437
+ },
+ "scopeNote_he": "ניתוח קוד המקור (C#) של רכיבי הסקריפט בלבד; ה-DLL לא פוענח. CRM.Proxy ו-Microsoft.Office.Interop.Excel הם אסמבלי חיצוני (external_unknown). אין קובץ תצורה בחבילה. המשתנים \"FromDB\" נטענים מ-gen_etlvariable. [CRM] = psql/ALTSHULER_MSCRM (DTSX:4) משמש לקריאה ולשני עדכוני SQL ישירים: Gen_powerofattorneyBase.gen_receivingdateofcancelpoa ו-Gen_powerofattorney.gen_SentToPrintOn (Unsupported). [SQL.GENERIX_STAGING] = psql/GENERIX_STAGING (DTSX:53) מחזיק את PowerOfAttorneySendEmails. שני קובצי CSV ([POA File], [Error POA File]) נכתבים לנתיבים מ-gen_etlvariable. החיבור [Kingsway Connection] (DTSX:23) מוגדר ואינו בשימוש. יש log provider ל-[SRS.SSIS_Logs]. ארבעת רכיבי שליחת המייל לסוכן מושבתים בקוד (\"In Comment due to 13366\").",
+ "summary_he": "תחזוקה של ייפויי כוח ברמת חשבון (gen_powerofattorney). ייפויי כוח בסטטוס 3 שהגיע מועדם מופעלים (המשמעות \"ממתין\": בחבילה זו רק לפי שם הזרימה Handle Wait Status; בחבילה 0029 הערך Gen_currentstate = 3 של Gen_powerofattorney מסומן בהערת ה-SQL \"-- waiting\", 0029_POA.dtsx:3889). כשבחשבון יש ייפוי כוח פעיל של סוכן אחר, נכתב בו שדה \"תאריך קבלת ייפוי כוח מבטל\": אם הנספח של הפעיל הישן הוא 2, 3 או 5, הערך הוא תאריך הקבלה של החדש בתוספת 3 שעות; אחרת השדה מתאפס ל-NULL. ייפויי כוח פעילים שפג תוקפם מבוטלים ומסומנים להעברה לבנק. עבור מכתבים לסוכנים נשמרים נתוני JSON בטבלת המכתבים ב-staging; החבילה הזו לא קוראת אותם. השורות מגיעות לבניית ה-JSON, ומשם להפעלה או לביטול, דרך רכיבי המייל שהקוד שלהם בהערה; לפי התנהגות SSIS המתועדת, לא מוצג בקבצים: לרכיבים אלה פלט סינכרוני, ולכן הם מעבירים כל שורה הלאה. בנפרד, שורות טבלת המכתבים שטרם עובדו (isProcessed = 0) מועשרות מה-CRM. שורה שלא נמצאו לה סוכן או סוכנות, ייפוי כוח, איש קשר, או תוכנית פנסיה או חשבון גמל, נעצרת: היא לא נכתבת לאף קובץ ונשארת לא מעובדת. שאר השורות נכתבות לקובץ דיוור CSV כשיש דוא\"ל לסוכן או לסוכנות, או לקובץ חריגים כשאין. בסוף זרימת Send Poa Emails (ב-PostExecute של Send Email) נשלח מייל סיכום שהנושא שלו הוא שם קובץ הדיוור בלי הסיומת; לפי התנהגות SSIS המתועדת, לא מוצג בקבצים: PostExecute נקרא בכל הרצה של הזרימה, גם כשאין שורות. סטטוס ייפוי הכוח הראשי מסונכרן לפי ייפויי הכוח שתחתיו. לחשבונות לקוח שנוצרו ב-CRM ביומיים האחרונים נוצרים ייפויי כוח מכוח ייפוי כוח ראשי מסוג נספח 2 (\"ב'1\" לפי הערת ה-SQL \"--appendix b1\") במצב 1 (\"פעיל\" לפי הערת ה-SQL \"--active\"), רק למוצר 4 כשבייפוי הכוח הראשי gen_exclludetrainingfunds = 2, או למוצר 1/2/5 כש-gen_excludeprovidentfunds = 2 (2 = \"לא\" לפי הערת הקוד \"//כן = 1, לא = 2\" בחבילה 0029, 0029_POA.dtsx:34045, 34054), ורק לחשבון שאין לו עדיין ייפוי כוח; לתוכניות פנסיה שנוצרו ב-CRM ביומיים האחרונים, רק למוצר 200003 כשבייפוי הכוח הראשי gen_includingcomprehensivepension = 1 או למוצר 200004 כש-gen_includinggeneralpension = 1 – תוכנית אחת לכל ייפוי כוח ראשי בכל ריצה (הסרת כפילויות לפי POA Main בלבד); תוכניות נוספות של אותו ייפוי כוח ראשי מטופלות רק בריצות הבאות, אם עדיין בטווח היומיים ועדיין אין להן ייפוי כוח. בשתי הזרימות ההערה (annotation) של ייפוי הכוח הראשי מועברת לחשבון או לתוכנית (SDK). (העמודה gen_currentstate בתנאי \"פעיל\" אינה מסויגת בשאילתות; שיוכה לייפוי הכוח הראשי מנומק בתיאור זרימות היצירה לפי כלל העמימות.)",
+ "executionOrder": [
+  {
+   "step": 1,
+   "refId": "Package\\Get Organization Variables",
+   "title_he": "טעינת משתני ארגון (מסגרת)",
+   "trigger": "start (no incoming constraint)"
+  },
+  {
+   "step": 2,
+   "refId": "Package\\Create ETL Process Record",
+   "title_he": "רשומת תהליך ETL (מסגרת)",
+   "trigger": "after Get Organization Variables · Success (DTSX:44824)"
+  },
+  {
+   "step": 3,
+   "refId": "Package\\Set Destinations Paths",
+   "title_he": "שמות ונתיבי קובצי הדיוור (שם קובץ הדיוור בלי הסיומת הוא נושא מייל הסיכום ב-CRM)",
+   "trigger": "after Create ETL Process Record · Success (DTSX:44825)"
+  },
+  {
+   "step": 4,
+   "refId": "Package\\Get Valid Optionsets Values",
+   "title_he": "ערכי OptionSet חוקיים",
+   "trigger": "after Set Destinations Paths · Success (DTSX:44833)"
+  },
+  {
+   "step": 5,
+   "refId": "Package\\Set Queue Id Variable",
+   "title_he": "מזהה תור מייל (מסגרת)",
+   "trigger": "after Get Valid Optionsets Values · Success (DTSX:44828)"
+  },
+  {
+   "step": 6,
+   "refId": "Package\\Get Base Fields Values",
+   "title_he": "מזהי משתמש וארגון (מסגרת)",
+   "trigger": "after Set Queue Id Variable · Success (DTSX:44834)"
+  },
+  {
+   "step": 7,
+   "refId": "Package\\Handle Wait Status",
+   "title_he": "הפעלת ייפויי כוח בסטטוס 3 (\"ממתין\" לפי שם הזרימה ולפי הערת ה-SQL \"-- waiting\" בחבילה 0029)",
+   "trigger": "after Get Base Fields Values · Success (DTSX:44832)"
+  },
+  {
+   "step": 8,
+   "refId": "Package\\Write To ETLProcessCounter - Wait Status",
+   "title_he": "מונים (מסגרת)",
+   "trigger": "after Handle Wait Status · Success (DTSX:44831)"
+  },
+  {
+   "step": 9,
+   "refId": "Package\\Handle Active Status",
+   "title_he": "ביטול ייפויי כוח שפג תוקפם",
+   "trigger": "after Write To ETLProcessCounter - Wait Status · Success (DTSX:44835)"
+  },
+  {
+   "step": 10,
+   "refId": "Package\\Write To ETLProcessCounter 2",
+   "title_he": "מונים (מסגרת)",
+   "trigger": "after Handle Active Status · Success (DTSX:44827)"
+  },
+  {
+   "step": 11,
+   "refId": "Package\\Send Poa Emails",
+   "title_he": "קובץ דיוור למכתבי ייפוי כוח",
+   "trigger": "after Write To ETLProcessCounter 2 · Success (DTSX:44837)"
+  },
+  {
+   "step": 12,
+   "refId": "Package\\Write To ETLProcessCounter 5",
+   "title_he": "מונים (מסגרת)",
+   "trigger": "after Send Poa Emails · Success (DTSX:44838)"
+  },
+  {
+   "step": 13,
+   "refId": "Package\\Update Power Of Attorney Main",
+   "title_he": "סנכרון סטטוס ייפוי כוח ראשי",
+   "trigger": "after Write To ETLProcessCounter 5 · Success (DTSX:44829)"
+  },
+  {
+   "step": 14,
+   "refId": "Package\\Write To ETLProcessCounter 3",
+   "title_he": "מונים (מסגרת)",
+   "trigger": "after Update Power Of Attorney Main · Success (DTSX:44830)"
+  },
+  {
+   "step": 15,
+   "refId": "Package\\Create Power Of Attorney",
+   "title_he": "ייפוי כוח לחשבונות חדשים",
+   "trigger": "after Write To ETLProcessCounter 3 · Success (DTSX:44839)"
+  },
+  {
+   "step": 16,
+   "refId": "Package\\Write To ETLProcessCounter 4",
+   "title_he": "מונים (מסגרת)",
+   "trigger": "after Create Power Of Attorney · Success (DTSX:44840)"
+  },
+  {
+   "step": 17,
+   "refId": "Package\\Create Power Of Attorney - Pension",
+   "title_he": "ייפוי כוח לתוכניות פנסיה חדשות",
+   "trigger": "after Write To ETLProcessCounter 4 · Success (DTSX:44841)"
+  },
+  {
+   "step": 18,
+   "refId": "Package\\Write To ETLProcessCounter End",
+   "title_he": "מונים (מסגרת)",
+   "trigger": "after Create Power Of Attorney - Pension · Success (DTSX:44836)"
+  },
+  {
+   "step": 19,
+   "refId": "Package\\End ETL Process Record",
+   "title_he": "סיום רשומת תהליך ETL (מסגרת)",
+   "trigger": "after Write To ETLProcessCounter End · Success (DTSX:44826)"
+  }
+ ],
+ "ignoredAsFramework": [
+  "Package\\Get Organization Variables",
+  "Package\\Create ETL Process Record",
+  "Package\\End ETL Process Record",
+  "Package\\Set Queue Id Variable",
+  "Package\\Get Base Fields Values",
+  "Package\\Write To ETLProcessCounter - Wait Status",
+  "Package\\Write To ETLProcessCounter 2",
+  "Package\\Write To ETLProcessCounter 3",
+  "Package\\Write To ETLProcessCounter 4",
+  "Package\\Write To ETLProcessCounter 5",
+  "Package\\Write To ETLProcessCounter End",
+  "Package\\Handle Wait Status\\Etl Warning",
+  "Package\\Handle Wait Status\\UnionErrors",
+  "Package\\Handle Wait Status\\EmailFormat1 - Error",
+  "Package\\Handle Wait Status\\EmailFormat2 - Error",
+  "Package\\Handle Wait Status\\Count - Activate In Crm",
+  "Package\\Handle Wait Status\\Count Error Rows",
+  "Package\\Handle Wait Status\\Count Pipe Rows",
+  "Package\\Handle Active Status\\Etl Warning",
+  "Package\\Handle Active Status\\Union Error",
+  "Package\\Handle Active Status\\Email Format3 - Error",
+  "Package\\Handle Active Status\\Email Format8 - Error",
+  "Package\\Handle Active Status\\Count - Camcel In Crm",
+  "Package\\Handle Active Status\\Count Error Rows",
+  "Package\\Handle Active Status\\Count Pipe Rows",
+  "Package\\Handle Active Status\\Set Task Name Variable",
+  "Package\\Send Poa Emails\\Set Task Name Variable",
+  "Package\\Send Poa Emails\\Pipe Count",
+  "Package\\Update Power Of Attorney Main\\ETL Warning",
+  "Package\\Update Power Of Attorney Main\\Set Error Columns",
+  "Package\\Update Power Of Attorney Main\\Set Task Name Variable",
+  "Package\\Update Power Of Attorney Main\\Count Error Rows",
+  "Package\\Update Power Of Attorney Main\\Count Filtered Rows",
+  "Package\\Update Power Of Attorney Main\\Count No Need To Update Rows",
+  "Package\\Update Power Of Attorney Main\\Count No Need To Update Rows 1",
+  "Package\\Update Power Of Attorney Main\\Count Pipe Rows",
+  "Package\\Update Power Of Attorney Main\\Count Updated Rows",
+  "Package\\Create Power Of Attorney\\Create ETL Warning",
+  "Package\\Create Power Of Attorney\\Add Error Description",
+  "Package\\Create Power Of Attorney\\Add Error Description 2",
+  "Package\\Create Power Of Attorney\\Union All",
+  "Package\\Create Power Of Attorney - Pension\\Create ETL Warning",
+  "Package\\Create Power Of Attorney - Pension\\Add Error Description",
+  "Package\\Create Power Of Attorney - Pension\\Add Error Description 2",
+  "Package\\Create Power Of Attorney - Pension\\Union All",
+  "LogProvider SRS.SSIS_Logs (DTSX:65)",
+  "ConnectionManager Kingsway Connection (DTSX:23, לא בשימוש)"
+ ],
+ "components": [
+  {
+   "refId": "Package\\Handle Wait Status",
+   "title_he": "הפעלת ייפויי כוח בסטטוס 3 שתאריך ההתחלה שלהם הגיע",
+   "techName": "Handle Wait Status",
+   "short_he": "ייפויי כוח ברמת חשבון בסטטוס 3 (\"ממתין\" לפי הערת ה-SQL \"-- waiting\" בחבילה 0029, 0029_POA.dtsx:3889) שתאריך ההתחלה שלהם הגיע הופכים לפעילים. כשבאותו חשבון יש ייפוי כוח פעיל של סוכן אחר, נכתב בו תאריך הקבלה של החדש בתוספת 3 שעות, אם הנספח של הישן הוא 2, 3 או 5; אחרת השדה הזה בו מתאפס. רק כשיש באותו חשבון או תוכנית ייפוי כוח פעיל של סוכן או סוכנות אחרים, והנספח של ייפוי הכוח החדש הוא 2, 3 או 5, נשמרים נתוני מכתב (JSON) בשורה קיימת בטבלת ה-staging שטרם עובדה ואין בה JSON. שורות אלה מגיעות לנתוני המכתב ולהפעלה דרך רכיבי המייל שהקוד שלהם בהערה; לפי התנהגות SSIS המתועדת, לא מוצג בקבצים, הרכיבים מעבירים כל שורה הלאה.",
+   "flow_he": [
+    "שליפת ייפויי כוח בסטטוס 3 שתאריך ההתחלה שלהם עבר.",
+    "חיפוש ייפוי כוח פעיל באותו חשבון או תוכנית.",
+    "אין פעיל, או חידוש לאותו סוכן → רק הפעלה.",
+    "סוכן אחר → SQL על ייפוי הכוח הפעיל הישן: gen_receivingdateofcancelpoa = תאריך הקבלה של החדש + 3 שעות אם נספח הישן 2/3/5, אחרת NULL. נספח החדש 2/3/5 → רכיבי המייל (קוד בהערה; לפי התנהגות SSIS המתועדת, לא מוצג בקבצים, הם מעבירים כל שורה הלאה) → JSON למכתב ב-staging.",
+    "הפעלה: gen_currentstate = 1 ב-SDK (בענף של סוכן אחר עם נספח חדש 2/3/5 – אחרי המעבר דרך רכיבי המייל; לפי התנהגות SSIS המתועדת, לא מוצג בקבצים)."
+   ],
+   "sourceTables": [
+    {
+     "table": "Gen_powerofattorney (+ Gen_powerofattorneymain, Account, Contact, Gen_programmain, Product, Gen_customeraccount)",
+     "db": "ALTSHULER_MSCRM",
+     "connection": "[CRM] DTSX:4",
+     "kind": "CRM",
+     "loadedBy_he": "טבלאות CRM. ייפויי הכוח נוצרים ב-0031 (Create Power Of Attorney) ובזרימות המושבתות של 0029.",
+     "proven": true
+    },
+    {
+     "table": "dbo.PowerOfAttorneySendEmails",
+     "db": "GENERIX_STAGING (psql)",
+     "connection": "[SQL.GENERIX_STAGING] DTSX:53",
+     "kind": "staging",
+     "loadedBy_he": "לא נטענת (INSERT) בחבילה זו: כאן יש רק UPDATE של emailDetailsJson / isProcessed. השערה: נטענת ב-0030_PoaAccountUpdateDailyTest, שבו יש OLE DB Destination \"Write To PowerOfAttorneySendEmails Table\" ב-Handle Wait Status - For Active וב-Handle Active Status - For Cancel, על אותו חיבור SQL.GENERIX_STAGING. לא ידוע אם 0030 רץ לפני 0031.",
+     "proven": false
+    }
+   ],
+   "short": {
+    "nodes": [
+     {
+      "type": "step",
+      "text": "נשלפים ייפויי כוח בסטטוס 3 (\"ממתין\" לפי הערת SQL בחבילה 0029) שתאריך ההתחלה שלהם הגיע."
+     },
+     {
+      "type": "decision",
+      "text": "האם לחשבון או לתוכנית כבר יש ייפוי כוח פעיל?",
+      "branches": [
+       {
+        "label": "לא",
+        "nodes": [
+         {
+          "type": "step",
+          "text": "ייפוי הכוח מועבר להפעלה."
+         }
+        ]
+       },
+       {
+        "label": "כן, לאותו סוכן או סוכנות (חידוש)",
+        "nodes": [
+         {
+          "type": "step",
+          "text": "ייפוי הכוח מועבר להפעלה."
+         }
+        ]
+       },
+       {
+        "label": "כן, לסוכן אחר",
+        "nodes": [
+         {
+          "type": "write",
+          "text": "בייפוי הכוח הפעיל הישן נכתב תאריך הקבלה של החדש בתוספת 3 שעות, אם הנספח של הישן הוא 2, 3 או 5; אחרת השדה הזה בו מתאפס. אם הנספח של ייפוי הכוח החדש הוא 2, 3 או 5, נשמרים נתוני מכתב לסוכן בטבלת ה-staging. השורות מגיעות לשם, ומשם להפעלה, דרך רכיבי המייל שהקוד שלהם בהערה; לפי התנהגות SSIS המתועדת, לא מוצג בקבצים, הרכיבים מעבירים כל שורה הלאה."
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "type": "write",
+      "text": "ייפוי הכוח (בסטטוס 3) הופך לפעיל (בענף של סוכן אחר עם נספח חדש 2, 3 או 5 – אחרי המעבר דרך רכיבי המייל; לפי התנהגות SSIS המתועדת, לא מוצג בקבצים)."
+     },
+     {
+      "type": "end",
+      "text": "ייפויי כוח בסטטוס 3 שהגיע מועדם מתעדכנים לפעילים, אלא אם העדכון ב-CRM נכשל. בייפוי כוח פעיל של סוכן אחר באותו חשבון או תוכנית נכתב תאריך הקבלה של החדש בתוספת 3 שעות, או שהשדה מתאפס, לפי הנספח של הישן. כשבנוסף הנספח של החדש הוא 2, 3 או 5, נשמרים נתוני מכתב ב-staging. החבילה הזו לא קוראת אותם, והקבצים שסופקו לא מראים איך הם משמשים לשליחה. בענף של סוכן אחר עם נספח חדש 2, 3 או 5, נתוני המכתב וההפעלה תלויים במעבר דרך רכיבי המייל שהקוד שלהם בהערה; לפי התנהגות SSIS המתועדת, לא מוצג בקבצים, הרכיבים מעבירים כל שורה הלאה."
+     }
+    ]
+   },
+   "detailed": {
+    "nodes": [
+     {
+      "type": "step",
+      "text": "נשלפים ייפויי כוח בסטטוס 3 (המשמעות \"ממתין\": בחבילה זו רק לפי שם הזרימה Handle Wait Status; בחבילה 0029 הערך Gen_currentstate = 3 של Gen_powerofattorney מסומן בהערת ה-SQL \"-- waiting\", 0029_POA.dtsx:3889) שתאריך ההתחלה שלהם הגיע. לכל אחד נאספים: ייפוי הכוח הראשי (מינוי סוכן, תאריך קבלה), הסוכן או הסוכנות (ת\"ז / מספר חשבון, דוא\"ל), החשבון או התוכנית (מספר, יתרה, מוצר), והלקוח.",
+      "tech": "OLE DB Source (DTSX:27221/27226): where (poa.Gen_startdate <= GETDATE() and poa.Gen_currentstate = 3); agentcyIdNumber = isnull(Contact.Gen_Identitynumber, Account.AccountNumber); CustomerAccountProgram = isnull(poa.Gen_CustomerAccount, gen_customerprogram) (DTSX:27240). העמודה gen_customerprogram בתוך ה-isnull אינה מסויגת בשם טבלה. לטבלה Gen_powerofattorney יש עמודה בשם זה: אותה שאילתה בוחרת poa.gen_customerprogram (DTSX:27233) ומצמידה pm.Gen_programmainId = poa.gen_customerprogram (DTSX:27261). אילו העמודה הייתה קיימת ביותר מאחת הטבלאות בשאילתה (Gen_powerofattorney, Gen_powerofattorneymain, Account, Contact, Gen_programmain, Product, Gen_customeraccount), השאילתה הייתה נכשלת; לפי המשתמש החבילה רצה בפרודקשן. לכן זו העמודה של ייפוי הכוח (poa)."
+     },
+     {
+      "type": "decision",
+      "text": "האם קיים ייפוי כוח פעיל באותו חשבון לקוח או באותה תוכנית?",
+      "tech": "Lookup Match PowerOfAttorney By CustomerAccount Or CustomerProgram (Full cache, DTSX:27079): Gen_powerofattorney where Gen_currentstate = 1, key isnull(pa.Gen_CustomerAccount, gen_customerprogram) (DTSX:27082). gen_customerprogram אינה מסויגת; בשאילתה יש הטבלאות Gen_powerofattorney (pa), Account ו-Contact. ל-Gen_powerofattorney יש עמודה בשם זה (poa.gen_customerprogram, DTSX:27233). אילו העמודה הייתה קיימת ביותר מאחת הטבלאות, השאילתה הייתה נכשלת; לפי המשתמש החבילה רצה בפרודקשן. לכן זו העמודה של ייפוי הכוח הפעיל (pa); אם יש כמה ייפויי כוח פעילים באותו מפתח, לפי התנהגות SSIS המתועדת, לא מוצג בקבצים, ה-Lookup מחזיר את ההתאמה הראשונה שנטענה ל-cache; הסדר אינו מוגדר (אין ORDER BY, DTSX:27081)",
+      "branches": [
+       {
+        "label": "לא",
+        "nodes": [
+         {
+          "type": "step",
+          "text": "ייפוי הכוח מועבר להפעלה.",
+          "tech": "Lookup No Match → Union All Data To Update Status"
+         }
+        ]
+       },
+       {
+        "label": "כן",
+        "nodes": [
+         {
+          "type": "decision",
+          "text": "האם ייפוי הכוח הפעיל שייך לאותו סוכן או סוכנות (אותו מזהה)?",
+          "tech": "Is Renewal (DTSX:27045): agentcyIdNumberPa == agentcyIdNumber — errorRowDisposition=FailComponent (DTSX:27056). לפי התנהגות SSIS המתועדת, לא מוצג בקבצים: תנאי שמחזיר NULL (ערך NULL באחד הצדדים) נחשב שגיאה, ועם FailComponent הזרימה נכשלת (השערה לגבי הופעת NULL)",
+          "branches": [
+           {
+            "label": "כן (חידוש)",
+            "nodes": [
+             {
+              "type": "step",
+              "text": "ייפוי הכוח מועבר להפעלה, בלי פעולה נוספת."
+             }
+            ]
+           },
+           {
+            "label": "לא (סוכן אחר)",
+            "nodes": [
+             {
+              "type": "write",
+              "text": "בייפוי הכוח הפעיל הישן נרשם \"תאריך קבלת ייפוי כוח מבטל\" = תאריך הקבלה של החדש בתוספת 3 שעות. זה קורה רק אם הנספח של הישן הוא 2, 3 או 5; אחרת השדה מתאפס ל-NULL.",
+              "tech": "Update NeedToSendMailBit (OLEDBCommand, [CRM], DTSX:31299): update Gen_powerofattorneyBase set gen_receivingdateofcancelpoa = case when Gen_appendixtype in (2,3,5) then ? end where Gen_powerofattorneyId = PowerOfAttorneyIdPa — SQL (Unsupported); Param_0 = Gen_receivingdatePoa = dateadd(HH,3,poa.gen_receivingdate) (DTSX:27244)"
+             },
+             {
+              "type": "decision",
+              "text": "האם הנספח של ייפוי הכוח החדש (בסטטוס 3) הוא 2, 3 או 5?",
+              "tech": "AppendixType (DTSX:22849): AppendixTypeNoMail = gen_appendixtype != 2 && != 3 && != 5; אחרת AppendixTypeNeedToSendMail — errorRowDisposition=FailComponent (DTSX:22859). לפי התנהגות SSIS המתועדת, לא מוצג בקבצים: כש-gen_appendixtype הוא NULL התנאי מחזיר NULL, שנחשב שגיאה, ועם FailComponent הזרימה נכשלת (השערה לגבי הופעת NULL)",
+              "branches": [
+               {
+                "label": "לא",
+                "nodes": [
+                 {
+                  "type": "step",
+                  "text": "ייפוי הכוח מועבר להפעלה."
+                 }
+                ]
+               },
+               {
+                "label": "כן",
+                "nodes": [
+                 {
+                  "type": "step",
+                  "text": "נבחר נוסח המכתב: 1 בלי מינוי סוכן, 2 עם מינוי סוכן. רכיבי שליחת המייל ב-CRM מושבתים בקוד (\"In Comment due to 13366\"), ולכן לא נשלח מייל. השורות ממשיכות לבניית נתוני המכתב ולהפעלה דרך רכיבי המייל האלה; לפי התנהגות SSIS המתועדת, לא מוצג בקבצים: לרכיבים פלט סינכרוני (Output 0 עם synchronousInputId), ולכן הם מעבירים כל שורה הלאה אף שהקוד שלהם בהערה.",
+                  "tech": "Check Format (DTSX:22882): ISNULL(gen_appointmentofagent) || gen_appointmentofagent == FALSE → EmailFormat 1; Email - Start Date Poa / … With Commission Appointment — Input0_ProcessInput בהערה"
+                 },
+                 {
+                  "type": "step",
+                  "text": "לכל ייפוי כוח ראשי נבנה JSON אחד, שכולל את כל ייפויי הכוח שלו שהגיעו לשלב הזה בריצה: תאריך קבלה, שם ות\"ז הלקוח, סוכן או סוכנות, דוא\"ל, מינוי סוכן, ורשימת חשבונות עם מספר, יתרה וסוג מוצר (4 = \"פנסיה כללית\", 3 = \"פנסיה מקיפה\"). ה-JSON מוצמד רק לייפוי הכוח הראשון של כל ייפוי כוח ראשי.",
+                  "tech": "Set Data For Start Date Poa Emails main.cs:44-121 @DTSX:27372 (JavaScriptSerializer). main.cs:88-96: isFirstPoaAccount = true רק לשורה הראשונה של כל genpowerofattorneymain; main.cs:56-65: שורת Custom Output לכל POA, ו-emailDetailsJson רק כש-IsFirst == true"
+                 },
+                 {
+                  "type": "step",
+                  "text": "ה-JSON נשמר בטבלת המכתבים ב-staging רק בשורה של ייפוי הכוח הראשון של כל ייפוי כוח ראשי בריצה הזו, ורק אם השורה קיימת, עדיין לא עובדה, ועדיין אין בה JSON. שורות המכתב של ייפויי הכוח האחרים תחת אותו ייפוי כוח ראשי לא מתעדכנות.",
+                  "tech": "Custom Output → Is emailDetailsJson Contains Data (ISNULL(emailDetailsJson) == FALSE) → Contains Data → Update Json To PowerOfAttorneySendEmails (DTSX:31253): update PowerOfAttorneySendEmails set emailDetailsJson = ? where PowerOfAttorneyId = ? and isProcessed = 0 and emailDetailsJson is null; לפלט No Data של הפיצול הזה אין path"
+                 },
+                 {
+                  "type": "step",
+                  "text": "ייפוי הכוח מועבר להפעלה (גם זה אחרי המעבר דרך רכיבי המייל; לפי התנהגות SSIS המתועדת, לא מוצג בקבצים)."
+                 }
+                ]
+               }
+              ]
+             }
+            ]
+           }
+          ]
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "type": "step",
+      "text": "כל השורות מתאחדות וממוינות לפי ייפוי כוח. שורות ה-JSON המשוכפלות מסוננות, וכל ייפוי כוח עובר להפעלה פעם אחת.",
+      "tech": "Union All Data To Update Status → Sort By PoaId (DTSX:28819, EliminateDuplicates=false) → Is emailDetailsJson Contains Data 1 (DTSX:27012): No Data → Multicast; Contains Data לא מחובר"
+     },
+     {
+      "type": "decision",
+      "text": "האם ייפוי הכוח עדיין אינו פעיל?",
+      "tech": "Update gen_powerofattorney ACTIVE main.cs:30-54 @DTSX:30214: gencurrentstate_IsNull || gencurrentstate != 1",
+      "branches": [
+       {
+        "label": "כן",
+        "nodes": [
+         {
+          "type": "write",
+          "text": "ייפוי הכוח מתעדכן לסטטוס 1 (\"פעיל\").",
+          "tech": "gen_powerofattorney.gen_currentstate = 1 · Update · SDK (proxy.Update)"
+         }
+        ]
+       },
+       {
+        "label": "לא",
+        "nodes": [
+         {
+          "type": "end",
+          "text": "אין צורך בעדכון."
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "type": "step",
+      "text": "אם עדכון ההפעלה ב-CRM נכשל, השורה עוברת לפלט השגיאה של רכיב העדכון. הפלט הזה לא מחובר לשום רכיב, ולכן לא נרשמת על כך אזהרת ETL. אזהרות ETL בזרימה הזו מגיעות רק מפלטי השגיאה של שני רכיבי המייל, שהקוד שלהם בהערה. שגיאת SQL בשני עדכוני ה-SQL (תאריך בייפוי הכוח הישן, JSON ב-staging) מכשילה את הזרימה.",
+      "tech": "Update gen_powerofattorney ACTIVE main.cs:46-49: catch → ErrorBuffer.AddRow(); Outputs[Error] (DTSX:31239) ללא path. UnionErrors ← EmailFormat1 - Error, EmailFormat2 - Error בלבד. Update NeedToSendMailBit / Update Json: errorRowDisposition=FailComponent (DTSX:31315, 31267)"
+     },
+     {
+      "type": "end",
+      "text": "ייפויי כוח בסטטוס 3 שתאריך ההתחלה שלהם הגיע פעילים, אלא אם העדכון נכשל. בייפוי כוח פעיל ישן של סוכן אחר נכתב תאריך הקבלה של החדש בתוספת 3 שעות (נספח הישן 2/3/5) או NULL (נספח אחר). כשבנוסף הנספח של החדש הוא 2/3/5, נתוני המכתב לסוכן נשמרו ב-staging בשורה של ייפוי הכוח הראשון של כל ייפוי כוח ראשי, אם השורה קיימת, טרם עובדה ואין בה JSON (השורות מגיעות לשם דרך רכיבי המייל שהקוד שלהם בהערה; לפי התנהגות SSIS המתועדת, לא מוצג בקבצים, הם מעבירים כל שורה הלאה)."
+     }
+    ]
+   },
+   "detail_he": [
+    {
+     "h": "מקור ואוכלוסייה",
+     "t": "Gen_powerofattorney עם Gen_currentstate = 3 ו-Gen_startdate <= GETDATE() (התאריך והשעה הנוכחיים של שרת ה-SQL; CRM)."
+    },
+    {
+     "h": "התאמה לרשומות קיימות",
+     "t": "ייפוי כוח פעיל (1) באותו isnull(Gen_CustomerAccount, gen_customerprogram) (gen_customerprogram אינה מסויגת; ל-Gen_powerofattorney יש עמודה בשם זה, poa.gen_customerprogram, DTSX:27233; אילו הייתה קיימת גם ב-Account או ב-Contact, שאילתת ה-Lookup הייתה נכשלת; לפי המשתמש החבילה רצה בפרודקשן; לכן זו העמודה של ייפוי הכוח), ‏Full cache; אם יש כמה התאמות – לפי התנהגות SSIS המתועדת, לא מוצג בקבצים – נלקחת הראשונה שנטענה (סדר לא מוגדר, אין ORDER BY). \"חידוש\" = אותו isnull(ת\"ז סוכן, מספר חשבון סוכנות)."
+    },
+    {
+     "h": "החלטות",
+     "t": "אין פעיל → הפעלה. חידוש → הפעלה. סוכן אחר → SQL על הפעיל הישן; בנספח החדש (סטטוס 3) 2/3/5 → JSON מכתב (נוסח 1/2 לפי מינוי סוכן; השורות עוברות דרך רכיבי המייל שהקוד שלהם בהערה – לפי התנהגות SSIS המתועדת, לא מוצג בקבצים, הפלט הסינכרוני שלהם מעביר אותן הלאה) → הפעלה; נספח אחר → הפעלה."
+    },
+    {
+     "h": "כתיבה ל-CRM",
+     "t": "gen_powerofattorney · Update gen_currentstate=1 · SDK. ‏Gen_powerofattorneyBase · Update gen_receivingdateofcancelpoa · SQL (Unsupported). ‏staging PowerOfAttorneySendEmails · Update emailDetailsJson."
+    },
+    {
+     "h": "תוצאה עסקית",
+     "t": "ייפוי כוח חדש נכנס לתוקף במועדו. אם באותו חשבון או תוכנית יש ייפוי כוח פעיל של סוכן אחר, נכתב בו \"תאריך קבלת ייפוי כוח מבטל\" (תאריך הקבלה של החדש + 3 שעות כשנספח הישן 2/3/5, אחרת NULL). ייפוי הכוח הישן לא מבוטל בזרימה הזו. בחבילה הזו השדה נקרא רק ב-Handle Active Status: הוא קובע אם לבנות נתוני מכתב ביטול כשתוקף הישן יפוג (ISNULL), וערכו הוא תאריך הקבלה (RecievingDate) בתוך ה-JSON של מכתב הביטול. אם השדה גורם לביטול במקום אחר — לא ידוע (השערה). כשיש ייפוי כוח פעיל של סוכן אחר והנספח של החדש 2/3/5, נתוני המכתב לסוכן נשמרים ב-staging, רק בשורה של ייפוי הכוח הראשון של כל ייפוי כוח ראשי."
+    }
+   ],
+   "decisions": [
+    {
+     "where": "OLE DB Source WHERE (DTSX:27226)",
+     "condition": "poa.Gen_startdate <= GETDATE() and poa.Gen_currentstate = 3",
+     "meaning_he": "סטטוס 3 שמועדו הגיע",
+     "outcome_he": "נשלף"
+    },
+    {
+     "where": "Lookup Match PowerOfAttorney… (DTSX:27079)",
+     "condition": "CustomerAccountProgram = isnull(pa.Gen_CustomerAccount, gen_customerprogram) where pa.Gen_currentstate = 1",
+     "meaning_he": "יש ייפוי כוח פעיל באותו חשבון",
+     "outcome_he": "Match → Is Renewal; NoMatch → הפעלה"
+    },
+    {
+     "where": "Is Renewal (DTSX:27045)",
+     "condition": "agentcyIdNumberPa == agentcyIdNumber",
+     "meaning_he": "אותו סוכן",
+     "outcome_he": "Renewal → הפעלה; Not Renewal → Update NeedToSendMailBit"
+    },
+    {
+     "where": "Update NeedToSendMailBit (DTSX:31299)",
+     "condition": "case when ((Gen_appendixtype = 2) or (Gen_appendixtype = 3) or (Gen_appendixtype = 5)) then ? end",
+     "meaning_he": "נספח הפעיל הישן",
+     "outcome_he": "gen_receivingdateofcancelpoa = תאריך הקבלה של החדש + 3 שעות; אחרת NULL"
+    },
+    {
+     "where": "AppendixType (DTSX:22849)",
+     "condition": "gen_appendixtype != 2 && gen_appendixtype != 3 && gen_appendixtype != 5",
+     "meaning_he": "נספח ייפוי הכוח החדש (סטטוס 3) אינו 2, 3 או 5 (פלט AppendixTypeNoMail)",
+     "outcome_he": "NoMail → הפעלה; אחרת → Check Format → רכיבי המייל (קוד בהערה; לפי התנהגות SSIS המתועדת, לא מוצג בקבצים, הפלט הסינכרוני מעביר את השורות) → נתוני מכתב → הפעלה"
+    },
+    {
+     "where": "Check Format (DTSX:22882)",
+     "condition": "ISNULL(gen_appointmentofagent) || gen_appointmentofagent == FALSE",
+     "meaning_he": "אין מינוי סוכן",
+     "outcome_he": "נוסח 1; אחרת נוסח 2 (שתי הקומפוננטות לא שולחות — קוד בהערה)"
+    },
+    {
+     "where": "Update Json To PowerOfAttorneySendEmails (DTSX:31253)",
+     "condition": "PowerOfAttorneyId = ? and isProcessed = 0 and emailDetailsJson is null",
+     "meaning_he": "שורת מכתב קיימת ולא עובדה",
+     "outcome_he": "עדכון JSON"
+    },
+    {
+     "where": "Update gen_powerofattorney ACTIVE main.cs:34",
+     "condition": "gencurrentstate_IsNull || gencurrentstate != 1",
+     "meaning_he": "עוד לא פעיל",
+     "outcome_he": "Update currentstate = 1; אחרת No Need Update"
+    }
+   ],
+   "crmEffects": [
+    {
+     "entity": "gen_powerofattorney",
+     "verb": "update gen_currentstate = 1",
+     "mechanism": "SDK",
+     "when_he": "סטטוס 3 שמועדו הגיע (כל הענפים; בענף של סוכן אחר עם נספח חדש 2/3/5 – אחרי המעבר דרך רכיבי המייל שהקוד שלהם בהערה, לפי התנהגות SSIS המתועדת, לא מוצג בקבצים)"
+    },
+    {
+     "entity": "gen_powerofattorney (Gen_powerofattorneyBase)",
+     "verb": "update gen_receivingdateofcancelpoa",
+     "mechanism": "SQL (Unsupported)",
+     "when_he": "יש פעיל של סוכן אחר באותו חשבון — על הפעיל הישן. הערך: תאריך הקבלה של החדש + 3 שעות אם נספח הישן 2/3/5, אחרת NULL"
+    },
+    {
+     "entity": "PowerOfAttorneySendEmails (staging, לא CRM)",
+     "verb": "update emailDetailsJson",
+     "mechanism": "SQL (staging)",
+     "when_he": "נספח 2/3/5 של סוכן אחר (השורות מגיעות לשם דרך רכיבי המייל שהקוד שלהם בהערה; לפי התנהגות SSIS המתועדת, לא מוצג בקבצים, הרכיבים מעבירים כל שורה הלאה)"
+    }
+   ],
+   "evidence": [
+    "DTSX:27221-27269 OLE DB Source",
+    "DTSX:27079 Lookup; DTSX:27045 Is Renewal; DTSX:31299 Update NeedToSendMailBit; DTSX:22849 AppendixType; DTSX:22882 Check Format",
+    "Email - Start Date Poa main.cs:44-74 (DTSX:22960) — בהערה \"In Comment due to 13366\"",
+    "DTSX:27372 Set Data For Start Date Poa Emails main.cs:44-121 (sha 6a6ff063c606)",
+    "DTSX:31253 Update Json; DTSX:28819-28821 Sort (EliminateDuplicates=false); DTSX:27012",
+    "DTSX:30214 Update gen_powerofattorney ACTIVE main.cs:30-54 (sha ea5addc3f307)"
+   ],
+   "openQuestions_he": [
+    "מי מבטל בפועל את ייפוי הכוח הפעיל הישן כשמופעל ייפוי כוח של סוכן אחר? כאן רק נרשם בו תאריך, וזרימת Handle Active Status מבטלת רק ייפויי כוח שתאריך הסיום שלהם עבר. לא ידוע (ייתכן תוסף CRM — external_unknown).",
+    "כשיש כמה ייפויי כוח פעילים באותו חשבון, ה-Lookup בוחר את הראשון. ההחלטה \"חידוש / סוכן אחר\" תלויה בו.",
+    "משמעות הערכים, לפי מה שמופיע בקבצים: gen_currentstate = 1 מסומן כפעיל (בקוד הקבוע ACTIVE = 1, DTSX:30447; הערה \"//ACTIVE\", DTSX:1936). בחבילה 0029 הערך Gen_currentstate = 3 של Gen_powerofattorney מסומן \"-- waiting\" (0029_POA.dtsx:3889). בשאילתה ב-0031 הערך Gen_powerofattorneymain.Gen_appendixtype = 2 מסומן \"--appendix b1\" (DTSX:3326) — זה שדה של ייפוי הכוח הראשי. משמעות נספחים 3 ו-5, ומשמעות ערכי gen_appendixtype בייפוי הכוח עצמו, לא מוגדרת בקבצים (StringMap לא סופק)."
+   ]
+  },
+  {
+   "refId": "Package\\Handle Active Status",
+   "title_he": "ביטול ייפויי כוח פעילים שתאריך הסיום שלהם עבר",
+   "techName": "Handle Active Status",
+   "short_he": "ייפויי כוח פעילים שתאריך הסיום שלהם עבר מבוטלים, ומסומנים \"ממתין להעברה לבנק\". אם נרשם בהם תאריך קבלה של ייפוי כוח מבטל, נבנים נתוני מכתב ביטול (JSON) ב-staging. שורות אלה מגיעות לנתוני המכתב ולביטול דרך רכיבי המייל שהקוד שלהם בהערה; לפי התנהגות SSIS המתועדת, לא מוצג בקבצים, הרכיבים מעבירים כל שורה הלאה.",
+   "flow_he": [
+    "שליפת ייפויי כוח בסטטוס 1 שתאריך הסיום שלהם עבר.",
+    "יש gen_receivingdateofcancelpoa → נוסח מכתב 3 או 8 (המייל עצמו בהערה; לפי התנהגות SSIS המתועדת, לא מוצג בקבצים, הרכיבים מעבירים כל שורה הלאה) → JSON ב-staging.",
+    "ביטול: gen_currentstate = 2 ו-gen_statustransfertobank = 2 ב-SDK (שורות עם gen_receivingdateofcancelpoa – אחרי המעבר דרך רכיבי המייל; לפי התנהגות SSIS המתועדת, לא מוצג בקבצים)."
+   ],
+   "sourceTables": [
+    {
+     "table": "Gen_powerofattorney (+ POA Main, Account, Contact, Gen_programmain, Product, Gen_customeraccount)",
+     "db": "ALTSHULER_MSCRM",
+     "connection": "[CRM]",
+     "kind": "CRM",
+     "loadedBy_he": "טבלאות CRM. gen_receivingdateofcancelpoa נקבע ב-Handle Wait Status בחבילה זו (SQL).",
+     "proven": true
+    },
+    {
+     "table": "dbo.PowerOfAttorneySendEmails",
+     "db": "GENERIX_STAGING (psql)",
+     "connection": "[SQL.GENERIX_STAGING] DTSX:53",
+     "kind": "staging",
+     "loadedBy_he": "לא נטענת (INSERT) בחבילה זו: כאן יש רק UPDATE של emailDetailsJson / isProcessed. השערה: נטענת ב-0030_PoaAccountUpdateDailyTest, שבו יש OLE DB Destination \"Write To PowerOfAttorneySendEmails Table\" ב-Handle Wait Status - For Active וב-Handle Active Status - For Cancel, על אותו חיבור SQL.GENERIX_STAGING. לא ידוע אם 0030 רץ לפני 0031.",
+     "proven": false
+    }
+   ],
+   "short": {
+    "nodes": [
+     {
+      "type": "step",
+      "text": "נשלפים ייפויי כוח פעילים שתאריך הסיום שלהם עבר."
+     },
+     {
+      "type": "decision",
+      "text": "האם נרשם בייפוי הכוח תאריך קבלה של ייפוי כוח מבטל (סוכן אחר)?",
+      "branches": [
+       {
+        "label": "כן",
+        "nodes": [
+         {
+          "type": "step",
+          "text": "נבנים נתוני מכתב ביטול לסוכן ונשמרים בטבלת המכתבים ב-staging. המייל עצמו לא נשלח מכאן: הקוד של רכיבי המייל בהערה, ולפי התנהגות SSIS המתועדת, לא מוצג בקבצים, הרכיבים מעבירים כל שורה הלאה לבניית נתוני המכתב ולביטול."
+         }
+        ]
+       },
+       {
+        "label": "לא",
+        "nodes": [
+         {
+          "type": "step",
+          "text": "אין מכתב."
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "type": "write",
+      "text": "ייפוי הכוח מבוטל ומסומן \"ממתין להעברה לבנק\" (בענף \"כן\" – אחרי המעבר דרך רכיבי המייל; לפי התנהגות SSIS המתועדת, לא מוצג בקבצים)."
+     },
+     {
+      "type": "end",
+      "text": "ייפויי כוח שפג תוקפם מבוטלים ומועברים לטיפול מול הבנק."
+     }
+    ]
+   },
+   "detailed": {
+    "nodes": [
+     {
+      "type": "step",
+      "text": "נשלפים ייפויי כוח בסטטוס 1 (\"פעיל\") שתאריך הסיום שלהם הגיע או עבר, עם נתוני הלקוח (טלפונים, שם), הסוכן או הסוכנות, החשבון או התוכנית, ותאריך הקבלה של ייפוי כוח מבטל.",
+      "tech": "OLE DB Source (DTSX:18166/18171): where (poa.Gen_enddate <= GETDATE() and poa.Gen_currentstate = 1)"
+     },
+     {
+      "type": "decision",
+      "text": "האם נרשם \"תאריך קבלת ייפוי כוח מבטל\"?",
+      "tech": "Is Need To Send Cancellation Mail (DTSX:18070): NoMail = ISNULL(gen_receivingdateofcancelpoa)",
+      "branches": [
+       {
+        "label": "לא",
+        "nodes": [
+         {
+          "type": "step",
+          "text": "ייפוי הכוח מועבר לביטול בלי מכתב."
+         }
+        ]
+       },
+       {
+        "label": "כן",
+        "nodes": [
+         {
+          "type": "step",
+          "text": "נבחר נוסח מכתב: 3 עם מינוי סוכן, 8 בלי. רכיבי שליחת המייל ב-CRM מושבתים בקוד (\"In Comment due to 13366\"). השורות ממשיכות לבניית נתוני מכתב הביטול ולביטול דרך רכיבי המייל האלה; לפי התנהגות SSIS המתועדת, לא מוצג בקבצים: לרכיבים פלט סינכרוני (Output 0 עם synchronousInputId), ולכן הם מעבירים כל שורה הלאה אף שהקוד שלהם בהערה.",
+          "tech": "Check Format (DTSX:13739): !ISNULL(gen_appointmentofagent) && gen_appointmentofagent == TRUE → EmailFormatTrue; Email - Cancel Poa To Perform Actions (DTSX:13817, קוד בהערה מ-DTSX:13989) ו-Email - Cancel Poa With Commission Appointment (DTSX:15478, קוד בהערה מ-DTSX:15683) — Input0_ProcessInput בהערה (\"In Comment due to 13366\")"
+         },
+         {
+          "type": "step",
+          "text": "לכל ייפוי כוח ראשי נבנה JSON אחד: \"תאריך קבלת ייפוי כוח מבטל\" (הערך שנכתב בייפוי הכוח, ב-Handle Wait Status הוא תאריך הקבלה של החדש + 3 שעות), פרטי הלקוח וטלפונים, סוכן או סוכנות, דוא\"ל, מינוי סוכן, ורשימת חשבונות עם יתרה ומוצר.",
+          "tech": "Set Data For Cancel Poa Emails main.cs:43-127 @DTSX:18330; RecievingDate = Row.genreceivingdateofcancelpoa (main.cs:99)"
+         },
+         {
+          "type": "step",
+          "text": "ה-JSON (אחד לכל ייפוי כוח ראשי, כולל את כל ייפויי הכוח שלו) נשמר רק בשורת המכתב של ייפוי הכוח הראשון של כל ייפוי כוח ראשי בריצה, אם השורה קיימת, בלי תנאי על מצב העיבוד ועל JSON קיים (דורס). שורות המכתב של שאר ייפויי הכוח תחת אותו ייפוי כוח ראשי לא מתעדכנות.",
+          "tech": "Update Json To PowerOfAttorneySendEmails (DTSX:22766): update PowerOfAttorneySendEmails set emailDetailsJson = ? where PowerOfAttorneyId = ?; Set Data For Cancel Poa Emails main.cs:60-64: emailDetailsJson רק כש-poa.IsFirst == true; Is emailDetailsJson Contains Data: רק Contains Data מחובר ל-Update Json, לפלט No Data אין path"
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "type": "step",
+      "text": "כל השורות מתאחדות וממוינות. שורות ה-JSON מסוננות, וכל ייפוי כוח עובר לביטול פעם אחת.",
+      "tech": "Union All Data → Sort By PoaId (DTSX:20667) → Is emailDetailsJson Contains Data 1 (DTSX:18037): No Data → Multicast"
+     },
+     {
+      "type": "decision",
+      "text": "האם ייפוי הכוח עדיין אינו מבוטל?",
+      "tech": "Update gen_powerofattorney CANCELED And Status Transfer To Bank main.cs:65-95 @DTSX:21671: gencurrentstate_IsNull || gencurrentstate != 2",
+      "branches": [
+       {
+        "label": "כן",
+        "nodes": [
+         {
+          "type": "write",
+          "text": "ייפוי הכוח מתעדכן לסטטוס 2 (\"בוטל\"). אם סטטוס ההעברה לבנק אינו 2 כבר, הוא נקבע ל-2 (\"ממתין להעברה לבנק\"). לשורות שבהן נרשם \"תאריך קבלת ייפוי כוח מבטל\", ההגעה לעדכון הזה עוברת דרך רכיבי המייל שהקוד שלהם בהערה (לפי התנהגות SSIS המתועדת, לא מוצג בקבצים).",
+          "tech": "gen_powerofattorney.gen_currentstate = 2; gen_statustransfertobank = 2 (WAITING_SENDING_TO_BANK) · Update · SDK"
+         }
+        ]
+       },
+       {
+        "label": "לא",
+        "nodes": [
+         {
+          "type": "end",
+          "text": "אין עדכון."
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "type": "step",
+      "text": "אם עדכון הביטול ב-CRM נכשל, השורה עוברת לפלט השגיאה של רכיב העדכון. הפלט הזה לא מחובר לשום רכיב, ולכן לא נרשמת על כך אזהרת ETL. אזהרות ETL בזרימה הזו מגיעות רק מפלטי השגיאה של שני רכיבי המייל, שהקוד שלהם בהערה.",
+      "tech": "Update gen_powerofattorney CANCELED And Status Transfer To Bank main.cs:86-89: catch → ErrorBuffer.AddRow(); Outputs[Error] (DTSX:22746) ללא path. Union Error ← Email Format3 - Error, Email Format8 - Error בלבד"
+     },
+     {
+      "type": "end",
+      "text": "ייפויי כוח פעילים שתאריך הסיום שלהם הגיע מתעדכנים לסטטוס 2, וסטטוס ההעברה לבנק נקבע ל-2 כשהוא שונה, אלא אם העדכון ב-CRM נכשל. הסיבה לביטול בזרימה הזו היא תמיד תאריך הסיום. כשנרשם בייפוי הכוח \"תאריך קבלת ייפוי כוח מבטל\", נבנים נתוני מכתב ביטול ונשמרים רק בשורת המכתב של ייפוי הכוח הראשון של כל ייפוי כוח ראשי (אם השורה קיימת). בחבילה הזו ערך בשדה הזה נכתב רק ב-Handle Wait Status, כשהופעל באותו חשבון או תוכנית ייפוי כוח של סוכן אחר והנספח של הישן הוא 2, 3 או 5."
+     }
+    ]
+   },
+   "detail_he": [
+    {
+     "h": "מקור ואוכלוסייה",
+     "t": "Gen_powerofattorney עם Gen_currentstate = 1 ו-Gen_enddate <= GETDATE() (התאריך והשעה הנוכחיים של שרת ה-SQL)."
+    },
+    {
+     "h": "התאמה לרשומות קיימות",
+     "t": "עדכון לפי Gen_powerofattorneyId. שורת המכתב ב-staging לפי PowerOfAttorneyId."
+    },
+    {
+     "h": "החלטות",
+     "t": "gen_receivingdateofcancelpoa ריק → בלי מכתב. אחרת → נוסח 3 (מינוי סוכן) או 8 → רכיבי המייל (הקוד בהערה; לפי התנהגות SSIS המתועדת, לא מוצג בקבצים, הפלט הסינכרוני שלהם מעביר את השורות הלאה) → JSON. סטטוס שונה מ-2 → ביטול."
+    },
+    {
+     "h": "כתיבה ל-CRM",
+     "t": "gen_powerofattorney · Update gen_currentstate=2, gen_statustransfertobank=2 · SDK. ‏staging: PowerOfAttorneySendEmails.emailDetailsJson."
+    },
+    {
+     "h": "תוצאה עסקית",
+     "t": "ייפויי כוח שתוקפם הסתיים יוצאים מתוקף ומועברים לטיפול מול הבנק."
+    }
+   ],
+   "decisions": [
+    {
+     "where": "OLE DB Source WHERE (DTSX:18171)",
+     "condition": "poa.Gen_enddate <= GETDATE() and poa.Gen_currentstate = 1",
+     "meaning_he": "פעיל שפג תוקפו",
+     "outcome_he": "נשלף"
+    },
+    {
+     "where": "Is Need To Send Cancellation Mail (DTSX:18070)",
+     "condition": "ISNULL(gen_receivingdateofcancelpoa)",
+     "meaning_he": "אין ייפוי כוח מבטל",
+     "outcome_he": "NoMail → ביטול; אחרת → Check Format → רכיבי המייל (קוד בהערה; לפי התנהגות SSIS המתועדת, לא מוצג בקבצים, הפלט הסינכרוני מעביר את השורות) → מכתב → ביטול"
+    },
+    {
+     "where": "Check Format (DTSX:13739)",
+     "condition": "!ISNULL(gen_appointmentofagent) && gen_appointmentofagent == TRUE",
+     "meaning_he": "מינוי סוכן",
+     "outcome_he": "נוסח 3; אחרת נוסח 8 (שליחה בהערה)"
+    },
+    {
+     "where": "Update … CANCELED main.cs:69 / 75",
+     "condition": "gencurrentstate != 2 ; genstatustransfertobank_IsNull || != 2",
+     "meaning_he": "עוד לא מבוטל ; סטטוס העברה לבנק שונה",
+     "outcome_he": "currentstate = 2 ; statustransfertobank = 2"
+    }
+   ],
+   "crmEffects": [
+    {
+     "entity": "gen_powerofattorney",
+     "verb": "update gen_currentstate = 2, gen_statustransfertobank = 2",
+     "mechanism": "SDK",
+     "when_he": "פעיל שתאריך הסיום שלו עבר (שורות עם gen_receivingdateofcancelpoa מגיעות לכאן דרך רכיבי המייל שהקוד שלהם בהערה; לפי התנהגות SSIS המתועדת, לא מוצג בקבצים)"
+    },
+    {
+     "entity": "PowerOfAttorneySendEmails (staging)",
+     "verb": "update emailDetailsJson",
+     "mechanism": "SQL (staging)",
+     "when_he": "יש gen_receivingdateofcancelpoa (השורות מגיעות לשם דרך רכיבי המייל שהקוד שלהם בהערה; לפי התנהגות SSIS המתועדת, לא מוצג בקבצים)"
+    }
+   ],
+   "evidence": [
+    "DTSX:18166-18215 OLE DB Source",
+    "DTSX:18070 Is Need To Send Cancellation Mail; DTSX:13739 Check Format",
+    "Email - Cancel Poa To Perform Actions / With Commission Appointment main.cs:42-74 — בהערה",
+    "DTSX:18330 Set Data For Cancel Poa Emails (sha 25d344511e90)",
+    "DTSX:22766 Update Json; DTSX:20667-20669 Sort",
+    "DTSX:21671 Update … CANCELED main.cs:65-95 (sha 4f88b5db5017)"
+   ],
+   "openQuestions_he": [
+    "ב-Set Data For Cancel Poa Emails (main.cs:107) שדה Gencontactname נקבע לפי בדיקת NULL של Genagentname. ייתכן שזו טעות (השערה).",
+    "ה-UPDATE של ה-JSON כאן אינו מסנן isProcessed = 0, בניגוד ל-Handle Wait Status. ייתכן שידרוס שורות שכבר עובדו."
+   ]
+  },
+  {
+   "refId": "Package\\Send Poa Emails",
+   "title_he": "הפקת קובץ דיוור למכתבי ייפוי כוח לסוכנים",
+   "techName": "Send Poa Emails",
+   "short_he": "שורות מכתב שטרם עובדו בטבלת ה-staging מועשרות מה-CRM בפרטי הסוכן, הלקוח, המוצר והיתרה. שורה שלא נמצאה לה התאמה בהעשרה נעצרת ונשארת לא מעובדת. שאר השורות נכתבות לקובץ דיוור (CSV), או לקובץ שגיאות כשאין דוא\"ל לסוכן. השורות שנכתבו לקבצים מסומנות כמעובדות, בייפוי הכוח נרשם \"נשלח להדפסה\", ונשלח מייל סיכום לתור ב-CRM (לפי שם המשתנה: צוות הדיוור, השערה).",
+   "flow_he": [
+    "קריאת PowerOfAttorneySendEmails עם isProcessed = 0.",
+    "העשרה: סוכן (אחרת סוכנות), ייפוי כוח, לקוח, מוצר פנסיה (אחרת גמל). שורה בלי התאמה נעצרת.",
+    "StatusAfterUpdate = 2 (שם הפלט Canceled; ב-0030, הטוען המשוער של הטבלה, הערך 2 נכתב לעמודה StatusAfterUpdate בזרימת הביטול – השערה שמשמעותו \"בוטל\") → תאריך הקבלה של ייפוי כוח פעיל (gen_currentstate = 1) של אותו לקוח ואותו חשבון/תוכנית; אם אין – תאריך הקבלה של ייפוי הכוח עצמו.",
+    "יש דוא\"ל לסוכן → קובץ דיוור; אין → קובץ שגיאות.",
+    "isProcessed = 1 ב-staging; gen_SentToPrintOn ב-SQL ב-CRM; מייל סיכום."
+   ],
+   "sourceTables": [
+    {
+     "table": "dbo.PowerOfAttorneySendEmails",
+     "db": "GENERIX_STAGING (psql)",
+     "connection": "[SQL.GENERIX_STAGING] DTSX:53",
+     "kind": "staging",
+     "loadedBy_he": "לא נטענת (INSERT) בחבילה זו: כאן יש רק UPDATE של emailDetailsJson / isProcessed. השערה: נטענת ב-0030_PoaAccountUpdateDailyTest, שבו יש OLE DB Destination \"Write To PowerOfAttorneySendEmails Table\" ב-Handle Wait Status - For Active וב-Handle Active Status - For Cancel, על אותו חיבור SQL.GENERIX_STAGING. לא ידוע אם 0030 רץ לפני 0031.",
+     "proven": false
+    }
+   ],
+   "short": {
+    "nodes": [
+     {
+      "type": "step",
+      "text": "נקראות שורות מכתב שטרם עובדו מטבלת המכתבים ב-staging, ומועשרות מה-CRM בפרטי הסוכן או הסוכנות, ייפוי הכוח, הלקוח, המוצר והיתרה. שורה שלא נמצאו לה סוכן או סוכנות, ייפוי כוח, לקוח, או תוכנית פנסיה או חשבון גמל, נעצרת ונשארת לא מעובדת."
+     },
+     {
+      "type": "decision",
+      "text": "האם לסוכן או לסוכנות יש כתובת דוא\"ל?",
+      "branches": [
+       {
+        "label": "כן",
+        "nodes": [
+         {
+          "type": "step",
+          "text": "השורה נכתבת לקובץ הדיוור."
+         }
+        ]
+       },
+       {
+        "label": "לא",
+        "nodes": [
+         {
+          "type": "step",
+          "text": "השורה נכתבת לקובץ השגיאות עם הסיבה \"לא עודכנה כתובת מייל\"."
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "type": "write",
+      "text": "השורות שנכתבו לאחד הקבצים מסומנות כמעובדות, ובייפוי הכוח נרשם מועד \"נשלח להדפסה\"."
+     },
+     {
+      "type": "write",
+      "text": "נשלח מייל סיכום מתור אחד לתור אחר ב-CRM. לפי שמות המשתנים אלה תור המערכת ותור צוות הדיוור (השערה)."
+     },
+     {
+      "type": "end",
+      "text": "נוצר קובץ דיוור (שם הקובץ כולל את התאריך והשעה של ההרצה) למכתבי ייפוי כוח לסוכנים, יחד עם קובץ חריגים."
+     }
+    ]
+   },
+   "detailed": {
+    "nodes": [
+     {
+      "type": "step",
+      "text": "נקראות מטבלת המכתבים ב-staging כל השורות שטרם עובדו: מזהה ייפוי כוח, גרסת מכתב (נספח), סטטוס אחרי עדכון, ת\"ז הלקוח (9 ספרות) ומספר החשבון או התוכנית.",
+      "tech": "Get Not Proceessed PowerOfAttorneySendEmails Data (DTSX:31808/31813, [SQL.GENERIX_STAGING]): select … from PowerOfAttorneySendEmails where isProcessed = 0"
+     },
+     {
+      "type": "decision",
+      "text": "האם לייפוי הכוח יש סוכן (איש קשר עם רשומת סוכן)?",
+      "tech": "Get Agent (Lookup no-cache, DTSX:31636)",
+      "branches": [
+       {
+        "label": "כן",
+        "nodes": [
+         {
+          "type": "step",
+          "text": "נלקחים שם הסוכן, ת\"ז והדוא\"ל לתפעול."
+         }
+        ]
+       },
+       {
+        "label": "לא",
+        "nodes": [
+         {
+          "type": "decision",
+          "text": "האם יש סוכנות?",
+          "tech": "Get Agencie (Lookup no-cache, DTSX:31557)",
+          "branches": [
+           {
+            "label": "כן",
+            "nodes": [
+             {
+              "type": "step",
+              "text": "נלקחים שם הסוכנות, מספר החשבון והדוא\"ל לתפעול."
+             }
+            ]
+           },
+           {
+            "label": "לא",
+            "nodes": [
+             {
+              "type": "end",
+              "text": "השורה נעצרת ונשארת לא מעובדת."
+             }
+            ]
+           }
+          ]
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "type": "step",
+      "text": "נלקחים מה-CRM תאריך הקבלה והסטטוס (טקסט) של ייפוי הכוח, מינוי הסוכן (טקסט) של ייפוי הכוח הראשי, וגם הטלפונים (\"לא קיים\" כשאין), ת\"ז ושם הלקוח. ללא התאמה, השורה נעצרת.",
+      "tech": "Get Power Of Attorney (DTSX:31861, StringMap LangId 1037); Get Contact (DTSX:31715-31726): select Gen_powerofattorneyid, isnull(mobilephone, N'לא קיים'), isnull(telephone2, …), isnull(telephone1, …), contact.Gen_identitynumber, Gen_contactnameName from Gen_powerofattorney join contact on gen_contactname = contactid. שיוך העמודות הלא מסויגות: אילו עמודה הייתה קיימת בשתי הטבלאות (Gen_powerofattorney, contact), השאילתה הייתה נכשלת; לפי המשתמש החבילה רצה בפרודקשן. ל-contact יש MobilePhone, Telephone1, Telephone2 (con.MobilePhone/Telephone1/Telephone2 כש-con = contact, DTSX:18195-18197, 18209) ו-ContactId (Contact.ContactId, DTSX:27260); ל-Gen_powerofattorney יש Gen_contactnameName (poa.Gen_contactnameName עם הערת ה-SQL \"-- שם לקוח\", DTSX:27249), Gen_contactname (poa.Gen_contactname, DTSX:27234) ו-Gen_powerofattorneyId (pa.Gen_powerofattorneyId, DTSX:27084). לכן הטלפונים הם של איש הקשר המקושר לייפוי הכוח ב-gen_contactname, והשם הוא העמודה Gen_contactnameName של ייפוי הכוח; gen_appointmentofagent = StringMap (objecttypecode 10101) של poamain.gen_agentappointment, left join Gen_powerofattorneymain poamain (DTSX:31863-31872)"
+     },
+     {
+      "type": "decision",
+      "text": "האם ייפוי הכוח שייך לתוכנית פנסיה?",
+      "tech": "Pension (Lookup, DTSX:32089)",
+      "branches": [
+       {
+        "label": "כן",
+        "nodes": [
+         {
+          "type": "step",
+          "text": "נלקחים סוג מוצר הפנסיה ויתרת הקרן."
+         }
+        ]
+       },
+       {
+        "label": "לא",
+        "nodes": [
+         {
+          "type": "decision",
+          "text": "האם הוא שייך לחשבון גמל?",
+          "tech": "Provident Fund (Lookup, DTSX:33900)",
+          "branches": [
+           {
+            "label": "כן",
+            "nodes": [
+             {
+              "type": "step",
+              "text": "נלקחים סוג המוצר, מספר החשבון והיתרה."
+             }
+            ]
+           },
+           {
+            "label": "לא",
+            "nodes": [
+             {
+              "type": "end",
+              "text": "השורה נעצרת ונשארת לא מעובדת."
+             }
+            ]
+           }
+          ]
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "type": "decision",
+      "text": "האם הסטטוס אחרי העדכון (StatusAfterUpdate) הוא 2?",
+      "tech": "Conditional Split (DTSX:31450): StatusAfterUpdate == 2 → Canceled. משמעות הערך: StatusAfterUpdate = 2 (שם הפלט Canceled; ב-0030, הטוען המשוער של הטבלה, הערך 2 נכתב לעמודה StatusAfterUpdate בזרימת הביטול – השערה שמשמעותו \"בוטל\").",
+      "branches": [
+       {
+        "label": "כן",
+        "nodes": [
+         {
+          "type": "step",
+          "text": "תאריך המכתב יהיה תאריך הקבלה של ייפוי הכוח הפעיל באותו לקוח ובאותו חשבון. אם אין כזה, תאריך הקבלה של ייפוי הכוח עצמו.",
+          "tech": "Get Reciving Date (DTSX:31964): Gen_powerofattorney Gen_currentstate = 1 by RIGHT(…Gen_identitynumber,9) and isnull(Gen_CustomerAccountName, gen_customerprogramName); NoMatchBehavior=0 + IgnoreFailure → NULL"
+         }
+        ]
+       },
+       {
+        "label": "לא",
+        "nodes": [
+         {
+          "type": "step",
+          "text": "תאריך המכתב = תאריך הקבלה של ייפוי הכוח."
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "type": "step",
+      "text": "נבנית שורת הדיוור: ת\"ז ומספר חשבון או קרן (חשבון גמל אם יש, אחרת ת\"ז), שם העמית, שם ומזהה הסוכן (הסוכנות גוברת), דוא\"ל, תאריך (yyyy-MM-dd), טלפונים, מוצר, יתרה, סטטוס ייפוי הכוח (התווית בעברית של gen_currentstate, LangId 1037), מינוי סוכן וגרסת מכתב.",
+      "tech": "Proccess Data main.cs:27-68 @DTSX:32186; העמודה Status מגיעה מ-Get Power Of Attorney (StringMap gen_currentstate, LangId 1037, DTSX:31863) ונכתבת ל-Create POA File (DTSX:31510)"
+     },
+     {
+      "type": "decision",
+      "text": "האם יש כתובת דוא\"ל לסוכן או לסוכנות?",
+      "tech": "Check If Exists Agent_cy Email Address (DTSX:31417): Not Exists = ISNULL(EmailSohen) || EmailSohen == \"\"",
+      "branches": [
+       {
+        "label": "כן",
+        "nodes": [
+         {
+          "type": "step",
+          "text": "השורה נכתבת לקובץ הדיוור (15 עמודות).",
+          "tech": "Create POA File (FlatFileDestination, DTSX:31510) → [POA File] = StatusYpuieKoahPath + StatusYpuieKoahFileName (_yyyy-MM-dd_HH_mm.csv)"
+         }
+        ]
+       },
+       {
+        "label": "לא",
+        "nodes": [
+         {
+          "type": "step",
+          "text": "השורה נכתבת לקובץ השגיאות עם הסיבה \"לא עודכנה כתובת מייל\".",
+          "tech": "Create Error POA File (DTSX:31483); Add Columns (DTSX:31390)"
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "type": "step",
+      "text": "בשני המקרים, שורת המכתב מסומנת כמעובדת ב-staging.",
+      "tech": "Update IsProcessed True (DTSX:36554): update PowerOfAttorneySendEmails set isProcessed = 1 where PowerOfAttorneyId = ?"
+     },
+     {
+      "type": "write",
+      "text": "בייפוי הכוח ב-CRM נרשם \"נשלח להדפסה\" = עכשיו (UTC), בעדכון SQL ישיר. זה קורה גם לשורות שנכתבו לקובץ השגיאות.",
+      "tech": "Update sentToPrintOn (OLEDBCommand, [CRM], DTSX:36592): update Gen_powerofattorney set gen_SentToPrintOn = GETUTCDATE() where Gen_powerofattorneyid = ? — SQL (Unsupported)"
+     },
+     {
+      "type": "write",
+      "text": "בסוף הזרימה נוצר ונשלח מייל ב-CRM מהתור שהמזהה שלו במשתנה User::LibaSystemQueueId אל התור שהמזהה שלו במשתנה User::MailingReportsCustomerTeamQueueId. שני המזהים נטענים מ-gen_etlvariable בזמן ריצה ואינם מופיעים בקבצים; שאלה הם תור \"Liba System\" ותור צוות דיוור הדוחות זו קריאה של שמות המשתנים (השערה). נושא המייל = שם קובץ הדיוור בלי הסיומת, ותוכן \"נוצר קובץ רשומות תקינות לדיוור…\". את שם הקובץ קובעת המשימה Set Destinations Paths בתחילת החבילה: שם הבסיס ממשתני הארגון, ועוד _yyyy-MM-dd_HH_mm.csv. היא גם קובעת את תיקיית הקובץ לפי שנה וחודש ויוצרת אותה. המייל נשלח ב-PostExecute בכל הרצה של הזרימה Send Poa Emails (שרצה רק אם המשימות שלפניה הצליחו); לפי התנהגות SSIS המתועדת, לא מוצג בקבצים: גם כשלא הגיעה אף שורה.",
+      "tech": "Send Email PostExecute main.cs:25-99 @DTSX:33987: email · Create · SDK; from = queue Guid.Parse(Variables.LibaSystemQueueId) (main.cs:55), to = queue Guid.Parse(Variables.MailingReportsCustomerTeamQueueId) (main.cs:59); SendEmail request · Execute · SDK; subject = StatusYpuieKoahFileName עד הנקודה האחרונה (main.cs:48-49); StatusYpuieKoahFileName = ערך + \"_\" + yyyy-MM-dd_HH_mm + \".csv\" ב-Set Destinations Paths (DTSX:36911)"
+     },
+     {
+      "type": "end",
+      "text": "נוצר קובץ דיוור למכתבי ייפוי כוח לסוכנים, וקובץ חריגים לשורות בלי דוא\"ל. השורות שנכתבו לקבצים סומנו כמעובדות; שורות שנעצרו בהעשרה נשארו לא מעובדות. נשלח מייל סיכום לתור שהמזהה שלו במשתנה MailingReportsCustomerTeamQueueId (לפי שם המשתנה: צוות הדיוור, השערה)."
+     }
+    ]
+   },
+   "detail_he": [
+    {
+     "h": "מקור ואוכלוסייה",
+     "t": "GENERIX_STAGING.dbo.PowerOfAttorneySendEmails where isProcessed = 0. הטבלה אינה נטענת בחבילה זו (השערה: נטענת ב-0030_PoaAccountUpdateDailyTest)."
+    },
+    {
+     "h": "התאמה לרשומות קיימות",
+     "t": "כל ה-Lookups לפי Gen_powerofattorneyid (no-cache). \"Get Reciving Date\" לפי ת\"ז ב-9 ספרות ושם החשבון או התוכנית מול ייפוי כוח פעיל."
+    },
+    {
+     "h": "החלטות",
+     "t": "סוכן, אחרת סוכנות, אחרת עצירה. פנסיה, אחרת גמל, אחרת עצירה. StatusAfterUpdate = 2 (שם הפלט Canceled; ב-0030, הטוען המשוער של הטבלה, הערך 2 נכתב לעמודה StatusAfterUpdate בזרימת הביטול – השערה שמשמעותו \"בוטל\") → תאריך הקבלה של ייפוי כוח פעיל של אותו לקוח וחשבון/תוכנית (אחרת של ייפוי הכוח עצמו). יש דוא\"ל → קובץ דיוור; אין → קובץ שגיאות."
+    },
+    {
+     "h": "כתיבה ל-CRM",
+     "t": "Gen_powerofattorney · Update gen_SentToPrintOn · SQL (Unsupported). ‏email · Create + SendEmail · SDK (מייל סיכום). ‏staging: isProcessed = 1. בנוסף שני קובצי CSV."
+    },
+    {
+     "h": "תוצאה עסקית",
+     "t": "קובץ דיוור (לכל הרצה, שם עם תאריך ושעה) למכתבי עדכון או ביטול ייפוי כוח לסוכנים, ומייל התראה לתור ב-CRM (לפי שם המשתנה: צוות הדיוור, השערה)."
+    }
+   ],
+   "decisions": [
+    {
+     "where": "Get Not Proceessed… (DTSX:31813)",
+     "condition": "isProcessed = 0",
+     "meaning_he": "שורה שטרם עובדה",
+     "outcome_he": "נקראת"
+    },
+    {
+     "where": "Get Agent / Get Agencie (DTSX:31636 / 31557)",
+     "condition": "Match לפי Gen_powerofattorneyid",
+     "meaning_he": "סוכן / סוכנות",
+     "outcome_he": "NoMatch בשניהם → אין נתיב (נשארת isProcessed = 0)"
+    },
+    {
+     "where": "Pension / Provident Fund (DTSX:32089 / 33900)",
+     "condition": "Match לפי Gen_powerofattorneyid",
+     "meaning_he": "פנסיה / גמל",
+     "outcome_he": "NoMatch בשניהם → אין נתיב"
+    },
+    {
+     "where": "Conditional Split (DTSX:31450)",
+     "condition": "StatusAfterUpdate == 2",
+     "meaning_he": "StatusAfterUpdate = 2 (שם הפלט Canceled; ב-0030, הטוען המשוער של הטבלה, הערך 2 נכתב לעמודה StatusAfterUpdate בזרימת הביטול – השערה שמשמעותו \"בוטל\")",
+     "outcome_he": "Get Reciving Date (ייפוי הכוח הפעיל)"
+    },
+    {
+     "where": "Check If Exists Agent_cy Email Address (DTSX:31417)",
+     "condition": "ISNULL(EmailSohen) || EmailSohen == \"\"",
+     "meaning_he": "אין דוא\"ל",
+     "outcome_he": "קובץ שגיאות; אחרת קובץ דיוור"
+    }
+   ],
+   "crmEffects": [
+    {
+     "entity": "gen_powerofattorney (view Gen_powerofattorney)",
+     "verb": "update gen_SentToPrintOn = GETUTCDATE()",
+     "mechanism": "SQL (Unsupported)",
+     "when_he": "כל שורה שנכתבה לאחד הקבצים"
+    },
+    {
+     "entity": "email",
+     "verb": "create + SendEmail",
+     "mechanism": "SDK",
+     "when_he": "פעם אחת בכל ריצה (PostExecute)"
+    }
+   ],
+   "evidence": [
+    "DTSX:31808-31824 Get Not Proceessed PowerOfAttorneySendEmails Data",
+    "DTSX:31636, 31557, 31861, 31715, 32089, 33900 Lookups",
+    "DTSX:31450 Conditional Split; DTSX:31964 Get Reciving Date",
+    "DTSX:32186 Proccess Data main.cs:27-68 (sha 5054e484e9c0)",
+    "DTSX:31417; DTSX:31510 Create POA File; DTSX:31483 Create Error POA File",
+    "DTSX:36554 Update IsProcessed True; DTSX:36592 Update sentToPrintOn",
+    "DTSX:33987 Send Email main.cs:25-99 (sha 2cf85a9d0ccf)",
+    "Set Destinations Paths ScriptMain.cs:17-34 (DTSX:36665) — שמות ונתיבי הקבצים"
+   ],
+   "openQuestions_he": [
+    "מי טוען את PowerOfAttorneySendEmails (INSERT)? בחבילה זו אין טעינה. השערה: 0030_PoaAccountUpdateDailyTest.",
+    "מי צורך את קובץ הדיוור (בית דפוס / מערכת דיוור)? לא ידוע."
+   ]
+  },
+  {
+   "refId": "Package\\Update Power Of Attorney Main",
+   "title_he": "עדכון סטטוס ייפוי הכוח הראשי לפי ייפויי הכוח שתחתיו",
+   "techName": "Update Power Of Attorney Main",
+   "short_he": "לכל ייפוי כוח ראשי שאחד מייפויי הכוח שתחתיו השתנה ב-36 השעות האחרונות, הסטטוס מחושב מחדש. כולם בוטלו → 3. כולם במצב 4 → 4. סטטוסים מעורבים בלי אף פעיל → 3. (השערה: 3 = \"בוטל\" ו-4 = \"שגוי\" בייפוי כוח ראשי; המשמעות נשענת רק על שמות הרכיבים.)",
+   "flow_he": [
+    "POA Main עם ייפוי כוח שהשתנה ב-36 השעות האחרונות.",
+    "ספירת הסטטוסים השונים של ייפויי הכוח שתחתיו.",
+    "סטטוס אחיד: 4 → 4; 2 → 3; אחר → ללא שינוי.",
+    "סטטוסים מעורבים: אין פעיל → 3; יש פעיל → ללא שינוי.",
+    "עדכון gen_currentstate ב-SDK אם שונה."
+   ],
+   "sourceTables": [
+    {
+     "table": "Gen_powerofattorneymain join Gen_powerofattorney",
+     "db": "ALTSHULER_MSCRM",
+     "connection": "[CRM]",
+     "kind": "CRM",
+     "loadedBy_he": "טבלאות CRM. POA Main נוצר ב-0029, ייפויי הכוח נוצרים ומתעדכנים ב-0031.",
+     "proven": true
+    }
+   ],
+   "short": {
+    "nodes": [
+     {
+      "type": "step",
+      "text": "נבדקים ייפויי כוח ראשיים שאחד מייפויי הכוח שתחתיהם השתנה ב-36 השעות האחרונות."
+     },
+     {
+      "type": "decision",
+      "text": "האם לכל ייפויי הכוח שתחתיו אותו סטטוס?",
+      "branches": [
+       {
+        "label": "כן — כולם בוטלו",
+        "nodes": [
+         {
+          "type": "write",
+          "text": "ייפוי הכוח הראשי מקבל סטטוס 3 (השערה: \"בוטל\")."
+         }
+        ]
+       },
+       {
+        "label": "כן — כולם במצב 4",
+        "nodes": [
+         {
+          "type": "write",
+          "text": "ייפוי הכוח הראשי מקבל סטטוס 4 (השערה: \"שגוי\", לפי שם הרכיב)."
+         }
+        ]
+       },
+       {
+        "label": "כן — סטטוס אחר",
+        "nodes": [
+         {
+          "type": "end",
+          "text": "אין שינוי."
+         }
+        ]
+       },
+       {
+        "label": "לא — ואין אף פעיל",
+        "nodes": [
+         {
+          "type": "write",
+          "text": "ייפוי הכוח הראשי מקבל סטטוס 3 (השערה: \"בוטל\")."
+         }
+        ]
+       },
+       {
+        "label": "לא — ויש פעיל",
+        "nodes": [
+         {
+          "type": "end",
+          "text": "אין שינוי."
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "type": "end",
+      "text": "סטטוס ייפוי הכוח הראשי משקף את מצב ייפויי הכוח שתחתיו."
+     }
+    ]
+   },
+   "detailed": {
+    "nodes": [
+     {
+      "type": "step",
+      "text": "נשלפים ייפויי כוח ראשיים, עם הסטטוס הנוכחי שלהם, שלפחות אחד מייפויי הכוח שתחתיהם השתנה ב-36 השעות האחרונות.",
+      "tech": "Get Power Of Attorney Main That Their Poa Modified On Last 36 Hours (DTSX:38949/38954): where poa.ModifiedOn >= dateadd(HH,-36,GETDATE())"
+     },
+     {
+      "type": "step",
+      "text": "לכל אחד נספר מספר הסטטוסים השונים בין ייפויי הכוח שתחתיו.",
+      "tech": "Get Related Power Of Attorney Count Of Statuses Types (Lookup Full cache, DTSX:38990): count(distinct gen_currentstate) group by Gen_powerofattorneymain"
+     },
+     {
+      "type": "decision",
+      "text": "האם לכל ייפויי הכוח אותו סטטוס?",
+      "tech": "If All Statuses Are Same (DTSX:39106): True = CountTypes == 1; False = CountTypes > 1; Default לא מחובר",
+      "branches": [
+       {
+        "label": "כן (סטטוס אחד)",
+        "nodes": [
+         {
+          "type": "decision",
+          "text": "מה הסטטוס המשותף?",
+          "tech": "Get The Related Current State (Lookup Full cache, DTSX:39049) → If Current State Is Canceled Or Wrong (DTSX:39147): gen_currentstate_related == 4 || == 2 → Is Wrong (DTSX:39232): == 4",
+          "branches": [
+           {
+            "label": "4 (\"שגוי\" לפי שם הרכיב)",
+            "nodes": [
+             {
+              "type": "step",
+              "text": "הסטטוס היעד של ייפוי הכוח הראשי הוא 4."
+             }
+            ]
+           },
+           {
+            "label": "2 (בוטל, לפי הקבוע CANCELED = 2 בקוד)",
+            "nodes": [
+             {
+              "type": "step",
+              "text": "הסטטוס היעד של ייפוי הכוח הראשי הוא 3 (הסטטוס של ייפוי הכוח + 1). השערה: 3 = \"בוטל\" בייפוי כוח ראשי, לפי שם הרכיב בלבד.",
+              "tech": "Set Related CurrentState To Canceled (DTSX:39361): gen_currentstate_related + 1"
+             }
+            ]
+           },
+           {
+            "label": "אחר",
+            "nodes": [
+             {
+              "type": "end",
+              "text": "אין שינוי (נספר בלבד)."
+             }
+            ]
+           }
+          ]
+         }
+        ]
+       },
+       {
+        "label": "לא (כמה סטטוסים)",
+        "nodes": [
+         {
+          "type": "decision",
+          "text": "האם יש לפחות ייפוי כוח פעיל אחד (1)?",
+          "tech": "If Exists Active (Lookup partial, DTSX:39180): Gen_powerofattorney where gen_currentstate = 1",
+          "branches": [
+           {
+            "label": "כן",
+            "nodes": [
+             {
+              "type": "end",
+              "text": "אין שינוי."
+             }
+            ]
+           },
+           {
+            "label": "לא",
+            "nodes": [
+             {
+              "type": "step",
+              "text": "הסטטוס היעד של ייפוי הכוח הראשי הוא 3 (השערה: \"בוטל\", לפי שם הרכיב בלבד).",
+              "tech": "Set Related Current State To Canceled (DTSX:39334): gen_currentstate_related = 3"
+             }
+            ]
+           }
+          ]
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "type": "decision",
+      "text": "האם הסטטוס הנוכחי של ייפוי הכוח הראשי שונה מסטטוס היעד?",
+      "tech": "Update Current State Poa Main main.cs:64-90 @DTSX:40252: gencurrentstatemain_IsNull || gencurrentstatemain != gencurrentstaterelated",
+      "branches": [
+       {
+        "label": "כן",
+        "nodes": [
+         {
+          "type": "write",
+          "text": "ייפוי הכוח הראשי מתעדכן לסטטוס היעד.",
+          "tech": "gen_powerofattorneymain.gen_currentstate · Update · SDK"
+         }
+        ]
+       },
+       {
+        "label": "לא",
+        "nodes": [
+         {
+          "type": "end",
+          "text": "אין צורך בעדכון."
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "type": "step",
+      "text": "כשלים נרשמים כאזהרות ETL.",
+      "tech": "Error → Set Error Columns → ETL Warning (מסגרת)"
+     },
+     {
+      "type": "end",
+      "text": "סטטוס ייפויי הכוח הראשיים מסונכרן עם ייפויי הכוח שתחתיהם."
+     }
+    ]
+   },
+   "detail_he": [
+    {
+     "h": "מקור ואוכלוסייה",
+     "t": "Gen_powerofattorneymain שיש לו Gen_powerofattorney עם ModifiedOn ב-36 השעות האחרונות."
+    },
+    {
+     "h": "התאמה לרשומות קיימות",
+     "t": "לפי Gen_powerofattorneymain (Lookups על Gen_powerofattorney)."
+    },
+    {
+     "h": "החלטות",
+     "t": "CountTypes == 1: סטטוס 4 → 4; 2 → 3; אחר → ללא שינוי. ‏CountTypes > 1: אין פעיל (1) → 3; יש → ללא שינוי."
+    },
+    {
+     "h": "כתיבה ל-CRM",
+     "t": "gen_powerofattorneymain · Update gen_currentstate · SDK."
+    },
+    {
+     "h": "תוצאה עסקית",
+     "t": "ייפוי כוח ראשי מקבל סטטוס 3 כשכל ייפויי הכוח שתחתיו בסטטוס 2, או כשיש תחתיו יותר מסטטוס אחד ואף אחד מהם אינו בסטטוס 1. כשכולם בסטטוס 4 הוא מקבל 4. בכל מצב אחר (למשל כשכולם בסטטוס 3 או כולם בסטטוס 1) הסטטוס שלו לא משתנה. (השערה: 3 = \"בוטל\".)"
+    }
+   ],
+   "decisions": [
+    {
+     "where": "If All Statuses Are Same (DTSX:39106)",
+     "condition": "CountTypes == 1 / CountTypes > 1",
+     "meaning_he": "סטטוס אחיד / מעורב",
+     "outcome_he": "Get The Related Current State / If Exists Active"
+    },
+    {
+     "where": "If Current State Is Canceled Or Wrong (DTSX:39147)",
+     "condition": "!ISNULL(gen_currentstate_related) && (gen_currentstate_related == 4 || gen_currentstate_related == 2)",
+     "meaning_he": "שגוי או בוטל",
+     "outcome_he": "Is Wrong; אחרת ללא שינוי"
+    },
+    {
+     "where": "Is Wrong (DTSX:39232)",
+     "condition": "gen_currentstate_related == 4",
+     "meaning_he": "שגוי",
+     "outcome_he": "POA Main = 4; אחרת (2) → +1 = 3"
+    },
+    {
+     "where": "If Exists Active (DTSX:39180)",
+     "condition": "gen_currentstate = 1 תחת אותו POA Main",
+     "meaning_he": "יש פעיל",
+     "outcome_he": "NoMatch → POA Main = 3"
+    },
+    {
+     "where": "Update Current State Poa Main main.cs:68",
+     "condition": "gencurrentstatemain != gencurrentstaterelated",
+     "meaning_he": "שינוי נדרש",
+     "outcome_he": "Update"
+    }
+   ],
+   "crmEffects": [
+    {
+     "entity": "gen_powerofattorneymain",
+     "verb": "update gen_currentstate (3 או 4)",
+     "mechanism": "SDK",
+     "when_he": "כל ייפויי הכוח בוטלו או שגויים, או סטטוסים מעורבים בלי פעיל"
+    }
+   ],
+   "evidence": [
+    "DTSX:38949-38962 source",
+    "DTSX:38990, 39049, 39180 Lookups; DTSX:39106, 39147, 39232 Conditional Splits",
+    "DTSX:39334, 39361 Derived Columns",
+    "DTSX:40252 Update Current State Poa Main main.cs:64-90 (sha cee3da6bb0c5)"
+   ],
+   "openQuestions_he": [
+    "המיפוי מניח שסטטוס \"בוטל\" של ייפוי כוח (2) ועוד 1 שווה ל\"בוטל\" של ייפוי כוח ראשי (3). זה עקבי עם 0029 (Canncel POA main קובע 3), אבל הערכים לא מוגדרים בחבילה.",
+    "סטטוסים מעורבים בלי פעיל, למשל ממתין ובוטל, מעבירים את ייפוי הכוח הראשי לסטטוס 3 גם כשיש תחתיו ייפוי כוח ממתין. (השערה: 3 = \"בוטל\", לפי שמות הרכיבים בלבד; השערה: התוצאה לא רצויה.)"
+   ]
+  },
+  {
+   "refId": "Package\\Create Power Of Attorney",
+   "title_he": "יצירת ייפוי כוח ברמת חשבון גמל או השתלמות חדש (לפי הערות ה-SQL) מכוח ייפוי כוח ראשי ב'1 (לפי הערת ה-SQL \"--appendix b1\")",
+   "techName": "Create Power Of Attorney",
+   "short_he": "לחשבונות גמל או השתלמות (קודי מוצר 1/2/5 או 4, לפי הערות ה-SQL \"--gemel , gemel to invest , Compensation\" ו-\"--training\") שנפתחו ביומיים האחרונים, ללקוח שיש לו ייפוי כוח ראשי מסוג נספח 2 (\"ב'1\" לפי הערת ה-SQL \"--appendix b1\") במצב 1 (\"פעיל\" לפי הערת ה-SQL \"--active\"; השדה שייך לייפוי הכוח הראשי לפי כלל העמימות, ראו התיאור המפורט) שבו ערך ההחרגה לסוג המוצר הוא 2 (\"לא\" לפי הערת הקוד \"//כן = 1, לא = 2\" בחבילה 0029, 0029_POA.dtsx:34045, 34054), נוצר ייפוי כוח פעיל ברמת החשבון. ההערה (annotation) של ייפוי הכוח הראשי מועברת לחשבון.",
+   "flow_he": [
+    "חשבונות לקוח שנוצרו ביומיים האחרונים × POA Main של הלקוח בנספח 2 (\"ב'1\" לפי הערת ה-SQL) ובמצב 1 (\"פעיל\" לפי הערת ה-SQL; שיוך השדה לייפוי הכוח הראשי מנומק בתיאור המפורט), שבו ערך ההחרגה למוצר הוא 2 (\"לא\" לפי הערת הקוד ב-0029_POA.dtsx:34045, 34054).",
+    "כבר יש ייפוי כוח לחשבון → דילוג.",
+    "העברת ההערה (annotation) מה-POA Main.",
+    "הסרת כפילויות לפי חשבון ו-POA Main.",
+    "יצירת gen_powerofattorney פעיל ב-SDK."
+   ],
+   "sourceTables": [
+    {
+     "table": "Gen_customeraccount join Gen_powerofattorneymain (+ Annotation)",
+     "db": "ALTSHULER_MSCRM",
+     "connection": "[CRM]",
+     "kind": "CRM",
+     "loadedBy_he": "טבלאות CRM. בחבילה 0005_Customer Account נוצרות רשומות gen_customeraccount ב-SDK (ExecuteMultiple, RequestType.Create) ברכיב Create or Update Customer Accounts\\Create Customer Account (0005_Customer Account.dtsx:18169, 18341, 18556; אין executable מושבת ב-0005). POA Main נוצר בחבילה 0029 (Create POA Main For Automated Joining\\Create POA Main, 0029_POA.dtsx:22327, 22758; המשימה אינה מושבתת).",
+     "proven": true
+    }
+   ],
+   "short": {
+    "nodes": [
+     {
+      "type": "step",
+      "text": "נאספים חשבונות גמל או השתלמות (לפי הערות ה-SQL לקודי המוצר) שנפתחו ביומיים האחרונים, ללקוח שיש לו ייפוי כוח ראשי מסוג נספח 2 (\"ב'1\" לפי הערת ה-SQL \"--appendix b1\") במצב 1 (\"פעיל\" לפי הערת ה-SQL \"--active\"; שיוך השדה לייפוי הכוח הראשי מנומק בתיאור המפורט) שבו ערך ההחרגה למוצר הוא 2 (\"לא\" לפי הערת הקוד ב-0029_POA.dtsx:34045, 34054)."
+     },
+     {
+      "type": "decision",
+      "text": "האם כבר קיים ייפוי כוח לחשבון?",
+      "branches": [
+       {
+        "label": "כן",
+        "nodes": [
+         {
+          "type": "end",
+          "text": "דילוג."
+         }
+        ]
+       },
+       {
+        "label": "לא",
+        "nodes": [
+         {
+          "type": "write",
+          "text": "ההערה (annotation) של ייפוי הכוח הראשי מועברת אל החשבון."
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "type": "write",
+      "text": "נוצר ייפוי כוח פעיל ברמת החשבון, עם פרטי ייפוי הכוח הראשי."
+     },
+     {
+      "type": "end",
+      "text": "ייפוי הכוח הראשי של הלקוח חל גם על החשבון החדש."
+     }
+    ]
+   },
+   "detailed": {
+    "nodes": [
+     {
+      "type": "step",
+      "text": "נשלפים חשבונות לקוח שנוצרו ביומיים האחרונים, מוצמדים לייפוי הכוח הראשי של הלקוח (לפי איש הקשר): נספח 2 (\"ב'1\" לפי הערת ה-SQL \"--appendix b1\", DTSX:3326), במצב 1 (\"פעיל\" לפי הערת ה-SQL \"--active\", DTSX:3327), ו(מוצר 4 [\"השתלמות\" לפי הערת ה-SQL \"--training\", DTSX:3330] עם gen_exclludetrainingfunds = 2) או (מוצר 1/2/5 [לפי הערת ה-SQL \"--gemel , gemel to invest , Compensation\", DTSX:3332: גמל, גמל להשקעה, פיצויים; ש-2 הוא \"gemel to invest\" מופיע גם בהערת הקוד בתנאי != 2, DTSX:1983; ההתאמה של 1 ו-5 לשמות לפי סדר ההערה היא השערה] עם gen_excludeprovidentfunds = 2); הערך 2 הוא \"לא\" לפי הערת הקוד \"//כן = 1, לא = 2\" בחבילה 0029 על gen_powerofattorneymain (0029_POA.dtsx:34045, 34054). לכל חשבון נלקח ייפוי הכוח הראשי עם תאריך החתימה המאוחר ביותר.",
+      "tech": "Get Customer Accounts (DTSX:3290/3295): Gen_customeraccount.CreatedOn > DATEADD(dd,-2,GETDATE()) and Gen_appendixtype = 2 and gen_currentstate = 1 and ((gen_productsubcustomeraccount = 4 and gen_exclludetrainingfunds = 2) or (gen_productsubcustomeraccount in (1,2,5) and gen_excludeprovidentfunds = 2)); rowNumber = 1 per gen_customeraccountid by Gen_signaturedate desc; left join Annotation. (בשאילתה התנאי \"and gen_currentstate = 1 --active\" (DTSX:3327) אינו מסויג בשם טבלה. ל-gen_powerofattorneymain יש שדה gen_currentstate (החבילה מעדכנת אותו ב-SDK, DTSX:40447-40449). אילו העמודה הייתה קיימת ביותר מאחת הטבלאות בשאילתה (Gen_customeraccount, Gen_powerofattorneymain, Annotation), השאילתה הייתה נכשלת; לפי המשתמש החבילה רצה בפרודקשן. לכן זה השדה של ייפוי הכוח הראשי.)"
+     },
+     {
+      "type": "decision",
+      "text": "האם כבר קיים ייפוי כוח כלשהו לחשבון?",
+      "tech": "Check If POA Account Agent Exist (Lookup partial, DTSX:858): Gen_powerofattorney.Gen_customeraccount = ?; Match לא מחובר",
+      "branches": [
+       {
+        "label": "כן",
+        "nodes": [
+         {
+          "type": "end",
+          "text": "דילוג."
+         }
+        ]
+       },
+       {
+        "label": "לא",
+        "nodes": [
+         {
+          "type": "step",
+          "text": "ממשיכים."
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "type": "decision",
+      "text": "האם לייפוי הכוח הראשי יש הערה (annotation)?",
+      "tech": "Move Annotation To Customer Account main.cs:122-141 @DTSX:3431. בשאילתה: left join Annotation on ObjectId = Gen_powerofattorneymain.Gen_powerofattorneymainId (DTSX:3323-3324), ו-AnnotationId נבחר (DTSX:3318); שתי העמודות בלי שם טבלה. ObjectId: לישות annotation יש שדה objectid (הסקריפט מעדכן annotation[\"objectid\"] ב-SDK, DTSX:3687); אילו העמודה הייתה קיימת ביותר מאחת הטבלאות בשאילתה (Gen_customeraccount, Gen_powerofattorneymain, Annotation), השאילתה הייתה נכשלת; לפי המשתמש החבילה רצה בפרודקשן; לכן זה השדה של Annotation. AnnotationId: הקבצים לא מראים איזו טבלה מחזיקה עמודה בשם זה (לא ידוע); הסקריפט משתמש בערך כמזהה רשומת ה-annotation שהוא מעדכן (annotation.Id = Row.AnnotationId, DTSX:3685)",
+      "branches": [
+       {
+        "label": "כן",
+        "nodes": [
+         {
+          "type": "write",
+          "text": "ההערה מועברת מייפוי הכוח הראשי אל החשבון (שינוי האובייקט שאליו היא שייכת, לא העתקה). ההעברה רצה לכל שורה בלי בדיקה אם כבר הועברה. לכן כשלאותו ייפוי כוח ראשי יש כמה חשבונות חדשים, ההערה נשארת אצל השורה האחרונה שעובדה, וסדר השורות אינו מוגדר (אין ORDER BY). ה-join להערות נמצא בתוך תת-השאילתה עם ROW_NUMBER ו-rowNumber = 1, ולכן רק הערה אחת לכל חשבון נלקחת.",
+          "tech": "annotation.objectid = EntityReference(\"gen_customeraccount\", gen_customeraccountid) · Update · SDK"
+         }
+        ]
+       },
+       {
+        "label": "לא",
+        "nodes": [
+         {
+          "type": "step",
+          "text": "אין העברה."
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "type": "step",
+      "text": "מוסרות כפילויות לפי חשבון וייפוי כוח ראשי.",
+      "tech": "Remove Duplicates (Sort, DTSX:4799-4801): keys gen_customeraccountid, Gen_powerofattorneymainId, EliminateDuplicates=true"
+     },
+     {
+      "type": "write",
+      "text": "נוצר ייפוי כוח פעיל ומקושר ללקוח, לייפוי הכוח הראשי ולחשבון. נכללים בו הסוכן והסוכנות, ת\"ז, תאריכי חתימה וקבלה (+3 שעות), תאריך סיום (תאריך הסיום של ייפוי הכוח הראשי + 3 שעות; אם הוא ריק, תאריך הקבלה + 3 שעות + 10 שנים; אם גם הוא ריק, לא נכתב תאריך סיום), ותאריך התחלה = עכשיו.",
+      "tech": "Create POA Account - Agent main.cs:131-228 @DTSX:1781: gen_powerofattorney · Create · SDK; gen_currentstate=1; gen_customeraccount; gen_agentname = EntityReference(\"gen_agents\", POA Main.Gen_agentname); gen_agencyname = EntityReference(\"gen_agencie\", …)"
+     },
+     {
+      "type": "step",
+      "text": "סוג הנספח, מקור ייפוי הכוח ו\"נספח ד'\" מועתקים רק אם הערך קיים ברשימת הערכים החוקיים של ייפוי כוח. אם לסטטוס ההעברה לבנק של ייפוי הכוח הראשי יש ערך חוקי, הוא נקבע ל-2 (\"ממתין להעברה לבנק\").",
+      "tech": "validOptionsetValues (Get Valid Optionsets Values); gen_appendixd = Genappendixtype; gen_statustransfertobank = WaitingTransferToBank(2)"
+     },
+     {
+      "type": "decision",
+      "text": "האם קוד המוצר אינו 2 (\"gemel to invest\" לפי הערת הקוד, DTSX:1983)?",
+      "tech": "main.cs:197: genproductsubcustomeraccount != 2",
+      "branches": [
+       {
+        "label": "כן",
+        "nodes": [
+         {
+          "type": "step",
+          "text": "מועתקים נתוני הייעוץ: חוזה סוכן, יועץ, סניף, תאריכי ייעוץ (+3 שעות) ומינוי סוכן."
+         }
+        ]
+       },
+       {
+        "label": "לא (גמל להשקעה)",
+        "nodes": [
+         {
+          "type": "step",
+          "text": "נתוני הייעוץ אינם מועתקים."
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "type": "step",
+      "text": "כשלים נרשמים כאזהרות ETL (\"Error Creating POA Account Agent\" / \"Error Updating Annotation ObjectId\").",
+      "tech": "Add Error Description / 2 → Union All → Create ETL Warning (מסגרת)"
+     },
+     {
+      "type": "end",
+      "text": "ייפוי הכוח הראשי של הלקוח הורחב לחשבון החדש, וההערה (annotation) של ייפוי הכוח הראשי הועברה אליו."
+     }
+    ]
+   },
+   "detail_he": [
+    {
+     "h": "מקור ואוכלוסייה",
+     "t": "Gen_customeraccount שנוצר ביומיים האחרונים, ללקוח שיש לו POA Main בנספח 2 (\"ב'1\" לפי הערת ה-SQL \"--appendix b1\", DTSX:3326) ובמצב 1 (\"פעיל\" לפי הערת ה-SQL \"--active\"; בשאילתה התנאי \"and gen_currentstate = 1 --active\" (DTSX:3327) אינו מסויג בשם טבלה. ל-gen_powerofattorneymain יש שדה gen_currentstate (החבילה מעדכנת אותו ב-SDK, DTSX:40447-40449). אילו העמודה הייתה קיימת ביותר מאחת הטבלאות בשאילתה (Gen_customeraccount, Gen_powerofattorneymain, Annotation), השאילתה הייתה נכשלת; לפי המשתמש החבילה רצה בפרודקשן. לכן זה השדה של ייפוי הכוח הראשי.) שבו ערך ההחרגה למוצר הוא 2 (\"לא\" לפי הערת הקוד \"//כן = 1, לא = 2\" בחבילה 0029, 0029_POA.dtsx:34045, 34054; 4 → השתלמות, לפי הערת ה-SQL \"--training\"; 1/2/5 → גמל, לפי הערת ה-SQL \"--gemel , gemel to invest , Compensation\"; DTSX:3330-3332)."
+    },
+    {
+     "h": "התאמה לרשומות קיימות",
+     "t": "POA Main לפי איש הקשר; האחרון לפי תאריך חתימה. דילוג אם כבר יש gen_powerofattorney לGen_customeraccount."
+    },
+    {
+     "h": "החלטות",
+     "t": "השתלמות/גמל לפי ערך ההחרגה 2 (\"לא\" לפי 0029_POA.dtsx:34045, 34054); גמל להשקעה (2) → בלי נתוני ייעוץ. ערכי OptionSet רק אם חוקיים."
+    },
+    {
+     "h": "כתיבה ל-CRM",
+     "t": "annotation · Update objectid · SDK; gen_powerofattorney · Create · SDK."
+    },
+    {
+     "h": "תוצאה עסקית",
+     "t": "חשבונות לקוח (Gen_customeraccount) שנוצרו ביומיים האחרונים מקבלים ייפוי כוח פעיל אוטומטית, כשללקוח יש ייפוי כוח ראשי ב'1 (לפי הערת ה-SQL \"--appendix b1\") פעיל (לפי הערת ה-SQL \"--active\") שבו ערך ההחרגה לסוג המוצר של החשבון הוא 2 (\"לא\" לפי הערת הקוד ב-0029_POA.dtsx:34045, 34054) (נלקח האחרון לפי תאריך חתימה), ואין עדיין ייפוי כוח לחשבון. תוכניות פנסיה מטופלות בזרימה נפרדת (Create Power Of Attorney - Pension)."
+    }
+   ],
+   "decisions": [
+    {
+     "where": "Get Customer Accounts WHERE (DTSX:3295)",
+     "condition": "CreatedOn > DATEADD(dd,-2,GETDATE()) and Gen_appendixtype = 2 and gen_currentstate = 1 and ((gen_productsubcustomeraccount = 4 and gen_exclludetrainingfunds = 2) or (gen_productsubcustomeraccount in (1,2,5) and gen_excludeprovidentfunds = 2)) and rowNumber = 1",
+     "meaning_he": "אוכלוסייה",
+     "outcome_he": "נשלף"
+    },
+    {
+     "where": "Check If POA Account Agent Exist (DTSX:858)",
+     "condition": "Gen_customeraccount = gen_customeraccountid",
+     "meaning_he": "כבר יש ייפוי כוח",
+     "outcome_he": "Match → אין נתיב (דילוג)"
+    },
+    {
+     "where": "Move Annotation To Customer Account main.cs:126",
+     "condition": "AnnotationId_IsNull || gencustomeraccountid_IsNull",
+     "meaning_he": "אין הערה",
+     "outcome_he": "return; אחרת Update annotation.objectid"
+    },
+    {
+     "where": "Create POA Account - Agent main.cs:138-154",
+     "condition": "validOptionsetValues[attr].Contains(value)",
+     "meaning_he": "ערך OptionSet חוקי",
+     "outcome_he": "מועתק"
+    },
+    {
+     "where": "Create POA Account - Agent main.cs:188-192",
+     "condition": "!genenddate_IsNull / else if !genreceivingdate_IsNull",
+     "meaning_he": "תאריך סיום",
+     "outcome_he": "enddate+3h / receiving+3h+10y"
+    },
+    {
+     "where": "Create POA Account - Agent main.cs:197",
+     "condition": "genproductsubcustomeraccount != 2",
+     "meaning_he": "לא גמל להשקעה",
+     "outcome_he": "העתקת נתוני ייעוץ"
+    }
+   ],
+   "crmEffects": [
+    {
+     "entity": "annotation",
+     "verb": "update objectid → gen_customeraccount",
+     "mechanism": "SDK",
+     "when_he": "יש הערה ל-POA Main"
+    },
+    {
+     "entity": "gen_powerofattorney",
+     "verb": "create",
+     "mechanism": "SDK",
+     "when_he": "לחשבון חדש בלי ייפוי כוח"
+    }
+   ],
+   "evidence": [
+    "DTSX:3290-3340 Get Customer Accounts",
+    "DTSX:858 Check If POA Account Agent Exist",
+    "DTSX:3431 Move Annotation To Customer Account (sha 6a1e02b939af)",
+    "DTSX:4799-4801 Remove Duplicates",
+    "DTSX:1781 Create POA Account - Agent main.cs:131-228 (sha 13fb42f94f44)"
+   ],
+   "openQuestions_he": [
+    "ה-EntityReference נשלחים כ-\"gen_agents\" / \"gen_agencie\", אבל המזהים הם של איש קשר / חשבון (ב-0029 POA Main נוצר עם gen_agentname = contact ו-gen_agencyname = account). אם ה-lookup ב-CRM מוגדר לישות אחרת, היצירה תיכשל לאזהרת ETL (השערה; לא אומת).",
+    "רק חשבונות שנוצרו ביומיים האחרונים מכוסים. אם החבילה לא רצה יומיים, חשבונות יוחמצו."
+   ]
+  },
+  {
+   "refId": "Package\\Create Power Of Attorney - Pension",
+   "title_he": "יצירת ייפוי כוח ברמת תוכנית פנסיה חדשה מכוח ייפוי כוח ראשי ב'1 (לפי הערת ה-SQL \"--appendix b1\")",
+   "techName": "Create Power Of Attorney - Pension",
+   "short_he": "לתוכניות פנסיה שנפתחו ביומיים האחרונים, ללקוח שיש לו ייפוי כוח ראשי מסוג נספח 2 (\"ב'1\" לפי הערת ה-SQL \"--appendix b1\") במצב 1 (\"פעיל\" לפי הערת ה-SQL \"--active\"; השדה שייך לייפוי הכוח הראשי לפי כלל העמימות, ראו התיאור המפורט) הכולל את סוג הפנסיה (מקיפה או כללית, לפי הערות ה-SQL \"--mekifa\" ו-\"--clalit\"), נוצר ייפוי כוח פעיל ברמת התוכנית – תוכנית אחת לכל ייפוי כוח ראשי בכל ריצה; תוכניות נוספות של אותו ייפוי כוח ראשי מטופלות רק בריצות הבאות, אם עדיין בטווח היומיים ועדיין אין להן ייפוי כוח. ההערה (annotation) של ייפוי הכוח הראשי מועברת לתוכנית.",
+   "flow_he": [
+    "תוכניות פנסיה (Gen_programmain) שנוצרו ביומיים האחרונים × POA Main של הלקוח בנספח 2 (\"ב'1\" לפי הערת ה-SQL) ובמצב 1 (\"פעיל\" לפי הערת ה-SQL; שיוך השדה לייפוי הכוח הראשי מנומק בתיאור המפורט), עם הכללת הפנסיה המתאימה.",
+    "כבר יש ייפוי כוח לתוכנית → דילוג.",
+    "העברת ההערה (annotation) מה-POA Main.",
+    "הסרת כפילויות לפי POA Main בלבד.",
+    "יצירת gen_powerofattorney פעיל ב-SDK."
+   ],
+   "sourceTables": [
+    {
+     "table": "Gen_programmain join Gen_powerofattorneymain join Product (+ Annotation)",
+     "db": "ALTSHULER_MSCRM",
+     "connection": "[CRM]",
+     "kind": "CRM",
+     "loadedBy_he": "טבלאות CRM. POA Main נוצר ב-0029. היוצר של Gen_programmain לא נמצא בחבילות שסופקו (השערה).",
+     "proven": false
+    }
+   ],
+   "short": {
+    "nodes": [
+     {
+      "type": "step",
+      "text": "נאספות תוכניות פנסיה שנפתחו ביומיים האחרונים, ללקוח שיש לו ייפוי כוח ראשי מסוג נספח 2 (\"ב'1\" לפי הערת ה-SQL \"--appendix b1\") במצב 1 (\"פעיל\" לפי הערת ה-SQL \"--active\"; שיוך השדה לייפוי הכוח הראשי מנומק בתיאור המפורט) הכולל את סוג הפנסיה."
+     },
+     {
+      "type": "decision",
+      "text": "האם כבר קיים ייפוי כוח לתוכנית?",
+      "branches": [
+       {
+        "label": "כן",
+        "nodes": [
+         {
+          "type": "end",
+          "text": "דילוג."
+         }
+        ]
+       },
+       {
+        "label": "לא",
+        "nodes": [
+         {
+          "type": "write",
+          "text": "ההערה (annotation) של ייפוי הכוח הראשי מועברת אל התוכנית."
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "type": "write",
+      "text": "נוצר ייפוי כוח פעיל ברמת התוכנית, עם פרטי ייפוי הכוח הראשי – לתוכנית אחת לכל ייפוי כוח ראשי בכל ריצה; תוכניות נוספות שלו מטופלות רק בריצות הבאות, אם עדיין בטווח היומיים ועדיין אין להן ייפוי כוח."
+     },
+     {
+      "type": "end",
+      "text": "ייפוי הכוח הראשי של הלקוח חל גם על התוכנית החדשה."
+     }
+    ]
+   },
+   "detailed": {
+    "nodes": [
+     {
+      "type": "step",
+      "text": "נשלפות תוכניות פנסיה שנוצרו ביומיים האחרונים, מוצמדות לייפוי הכוח הראשי של הלקוח (לפי איש הקשר): נספח 2 (\"ב'1\" לפי הערת ה-SQL \"--appendix b1\", DTSX:7621), במצב 1 (\"פעיל\" לפי הערת ה-SQL \"--active\", DTSX:7622), ו(מוצר 200003, \"מקיפה\" לפי הערת ה-SQL \"--mekifa\" (DTSX:7625), עם \"כולל מקיפה\" = 1) או (מוצר 200004, \"כללית\" לפי הערת ה-SQL \"--clalit\" (DTSX:7627), עם \"כולל כללית\" = 1). לכל תוכנית נלקח ייפוי הכוח הראשי עם תאריך החתימה המאוחר ביותר.",
+      "tech": "Get Policies (DTSX:7584/7589): Gen_programmain.CreatedOn > DATEADD(dd,-2,GETDATE()) and Gen_appendixtype = 2 and gen_currentstate = 1 and ((ProductTypeCode = 200003 and gen_includingcomprehensivepension = 1) or (ProductTypeCode = 200004 and gen_includinggeneralpension = 1)); rowNumber = 1 per Gen_programmainid by Gen_signaturedate desc; left join Annotation on ObjectId = POA Main. (בשאילתה התנאי \"and gen_currentstate = 1 --active\" (DTSX:7622) אינו מסויג בשם טבלה. ל-gen_powerofattorneymain יש שדה gen_currentstate (החבילה מעדכנת אותו ב-SDK, DTSX:40447-40449). אילו העמודה הייתה קיימת ביותר מאחת הטבלאות בשאילתה (Gen_programmain, Gen_powerofattorneymain, Product, Annotation), השאילתה הייתה נכשלת; לפי המשתמש החבילה רצה בפרודקשן. לכן זה השדה של ייפוי הכוח הראשי.)"
+     },
+     {
+      "type": "decision",
+      "text": "האם כבר קיים ייפוי כוח כלשהו לתוכנית?",
+      "tech": "Check If POA Account Agent (Lookup partial, DTSX:5182): Gen_powerofattorney.gen_customerprogram = ?; Match לא מחובר",
+      "branches": [
+       {
+        "label": "כן",
+        "nodes": [
+         {
+          "type": "end",
+          "text": "דילוג."
+         }
+        ]
+       },
+       {
+        "label": "לא",
+        "nodes": [
+         {
+          "type": "step",
+          "text": "ממשיכים."
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "type": "decision",
+      "text": "האם לייפוי הכוח הראשי יש הערה (annotation)?",
+      "tech": "Move Annotation To Policies main.cs:123-142 @DTSX:7722. בשאילתה: left join Annotation on ObjectId = Gen_powerofattorneymain.Gen_powerofattorneymainId (DTSX:7618-7619), ו-AnnotationId נבחר (DTSX:7611); שתי העמודות בלי שם טבלה. ObjectId: לישות annotation יש שדה objectid (הסקריפט מעדכן annotation[\"objectid\"] ב-SDK, DTSX:7979); אילו העמודה הייתה קיימת ביותר מאחת הטבלאות בשאילתה (Gen_programmain, Gen_powerofattorneymain, Product, Annotation), השאילתה הייתה נכשלת; לפי המשתמש החבילה רצה בפרודקשן; לכן זה השדה של Annotation. AnnotationId: הקבצים לא מראים איזו טבלה מחזיקה עמודה בשם זה (לא ידוע); הסקריפט משתמש בערך כמזהה רשומת ה-annotation שהוא מעדכן (annotation.Id = Row.AnnotationId, DTSX:7977)",
+      "branches": [
+       {
+        "label": "כן",
+        "nodes": [
+         {
+          "type": "write",
+          "text": "ההערה מועברת מייפוי הכוח הראשי אל התוכנית (שינוי האובייקט שאליו היא שייכת, לא העתקה). ההעברה רצה לכל שורה בלי בדיקה אם כבר הועברה. לכן כשלאותו ייפוי כוח ראשי יש כמה תוכניות חדשים, ההערה נשארת אצל השורה האחרונה שעובדה, וסדר השורות אינו מוגדר (אין ORDER BY). ה-join להערות נמצא בתוך תת-השאילתה עם ROW_NUMBER ו-rowNumber = 1, ולכן רק הערה אחת לכל תוכנית נלקחת.",
+          "tech": "annotation.objectid = EntityReference(\"gen_policies\", Gen_programmainid) · Update · SDK"
+         }
+        ]
+       },
+       {
+        "label": "לא",
+        "nodes": [
+         {
+          "type": "step",
+          "text": "אין העברה."
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "type": "step",
+      "text": "מוסרות כפילויות לפי ייפוי הכוח הראשי בלבד: אם כמה תוכניות חדשות שייכות לאותו ייפוי כוח ראשי, רק אחת ממשיכה ביצירה בריצה זו.",
+      "tech": "Remove Duplicates (Sort, DTSX:9066-9068): sort key Gen_powerofattorneymainId, EliminateDuplicates=true"
+     },
+     {
+      "type": "write",
+      "text": "נוצר ייפוי כוח פעיל ומקושר ללקוח, לייפוי הכוח הראשי ולתוכנית. נכללים בו הסוכן והסוכנות, ת\"ז, תאריכי חתימה וקבלה (+3 שעות), תאריך סיום (תאריך הסיום של ייפוי הכוח הראשי + 3 שעות; אם הוא ריק, תאריך הקבלה + 3 שעות + 10 שנים; אם גם הוא ריק, לא נכתב תאריך סיום), ותאריך התחלה = עכשיו.",
+      "tech": "Create POA Account - Agent main.cs:131-226 @DTSX:6102: gen_powerofattorney · Create · SDK; gen_currentstate=1; gen_customerprogram = EntityReference(\"gen_policies\"); gen_agentname = EntityReference(\"gen_agents\", POA Main.Gen_agentname); gen_agencyname = EntityReference(\"gen_agencie\", …)"
+     },
+     {
+      "type": "step",
+      "text": "סוג הנספח, מקור ייפוי הכוח ו\"נספח ד'\" מועתקים רק אם הערך קיים ברשימת הערכים החוקיים של ייפוי כוח. אם לסטטוס ההעברה לבנק של ייפוי הכוח הראשי יש ערך חוקי, הוא נקבע ל-2 (\"ממתין להעברה לבנק\").",
+      "tech": "validOptionsetValues (Get Valid Optionsets Values); gen_appendixd = Genappendixtype; gen_statustransfertobank = WaitingTransferToBank(2)"
+     },
+     {
+      "type": "step",
+      "text": "נתוני הייעוץ (חוזה סוכן, יועץ, סניף, תאריכי ייעוץ (+3 שעות), מינוי סוכן) מועתקים תמיד.",
+      "tech": "main.cs:198-217"
+     },
+     {
+      "type": "step",
+      "text": "כשלים נרשמים כאזהרות ETL (\"Error Creating POA Account  Agent (Pension)\" / \"Error Updating Annotation ObjectId (Pension)\").",
+      "tech": "Add Error Description / 2 → Union All → Create ETL Warning (מסגרת)"
+     },
+     {
+      "type": "end",
+      "text": "ייפוי הכוח הראשי של הלקוח הורחב לתוכנית הפנסיה החדשה, וההערה (annotation) של ייפוי הכוח הראשי הועברה אליו."
+     }
+    ]
+   },
+   "detail_he": [
+    {
+     "h": "מקור ואוכלוסייה",
+     "t": "Gen_programmain שנוצר ביומיים האחרונים, ללקוח שיש לו POA Main בנספח 2 (\"ב'1\" לפי הערת ה-SQL \"--appendix b1\", DTSX:7621) ובמצב 1 (\"פעיל\" לפי הערת ה-SQL \"--active\"; בשאילתה התנאי \"and gen_currentstate = 1 --active\" (DTSX:7622) אינו מסויג בשם טבלה. ל-gen_powerofattorneymain יש שדה gen_currentstate (החבילה מעדכנת אותו ב-SDK, DTSX:40447-40449). אילו העמודה הייתה קיימת ביותר מאחת הטבלאות בשאילתה (Gen_programmain, Gen_powerofattorneymain, Product, Annotation), השאילתה הייתה נכשלת; לפי המשתמש החבילה רצה בפרודקשן. לכן זה השדה של ייפוי הכוח הראשי.) עם הכללת סוג הפנסיה (200003 = מקיפה, 200004 = כללית, לפי הערות ה-SQL \"--mekifa\" ו-\"--clalit\", DTSX:7625-7627)."
+    },
+    {
+     "h": "התאמה לרשומות קיימות",
+     "t": "POA Main לפי איש הקשר; האחרון לפי תאריך חתימה. דילוג אם כבר יש gen_powerofattorney לgen_customerprogram."
+    },
+    {
+     "h": "החלטות",
+     "t": "מקיפה/כללית לפי הכללה; כפילות לפי POA Main. ערכי OptionSet רק אם חוקיים."
+    },
+    {
+     "h": "כתיבה ל-CRM",
+     "t": "annotation · Update objectid · SDK; gen_powerofattorney · Create · SDK."
+    },
+    {
+     "h": "תוצאה עסקית",
+     "t": "תוכניות פנסיה (Gen_programmain) שנוצרו ביומיים האחרונים מקבלות ייפוי כוח פעיל אוטומטית, כשללקוח יש ייפוי כוח ראשי ב'1 (לפי הערת ה-SQL \"--appendix b1\") פעיל (לפי הערת ה-SQL \"--active\") הכולל את סוג הפנסיה, ואין עדיין ייפוי כוח לתוכנית – תוכנית אחת לכל ייפוי כוח ראשי בכל ריצה (הסרת כפילויות לפי POA Main בלבד); תוכניות נוספות של אותו ייפוי כוח ראשי מטופלות רק בריצות הבאות, אם עדיין בטווח היומיים ועדיין אין להן ייפוי כוח. חשבונות לקוח מטופלים בזרימה Create Power Of Attorney."
+    }
+   ],
+   "decisions": [
+    {
+     "where": "Get Policies WHERE (DTSX:7589)",
+     "condition": "CreatedOn > DATEADD(dd,-2,GETDATE()) and Gen_appendixtype = 2 and gen_currentstate = 1 and ((ProductTypeCode = 200003 and gen_includingcomprehensivepension = 1) or (ProductTypeCode = 200004 and gen_includinggeneralpension = 1)) and rowNumber = 1",
+     "meaning_he": "אוכלוסייה",
+     "outcome_he": "נשלף"
+    },
+    {
+     "where": "Check If POA Account Agent (DTSX:5182)",
+     "condition": "gen_customerprogram = Gen_programmainid",
+     "meaning_he": "כבר יש ייפוי כוח",
+     "outcome_he": "Match → אין נתיב (דילוג)"
+    },
+    {
+     "where": "Move Annotation To Policies main.cs:127",
+     "condition": "AnnotationId_IsNull || Genprogrammainid_IsNull",
+     "meaning_he": "אין הערה",
+     "outcome_he": "return; אחרת Update annotation.objectid"
+    },
+    {
+     "where": "Create POA Account - Agent main.cs:138-154",
+     "condition": "validOptionsetValues[attr].Contains(value)",
+     "meaning_he": "ערך OptionSet חוקי",
+     "outcome_he": "מועתק"
+    },
+    {
+     "where": "Create POA Account - Agent main.cs:188-192",
+     "condition": "!genenddate_IsNull / else if !genreceivingdate_IsNull",
+     "meaning_he": "תאריך סיום",
+     "outcome_he": "enddate+3h / receiving+3h+10y"
+    }
+   ],
+   "crmEffects": [
+    {
+     "entity": "annotation",
+     "verb": "update objectid → gen_policies",
+     "mechanism": "SDK",
+     "when_he": "יש הערה ל-POA Main"
+    },
+    {
+     "entity": "gen_powerofattorney",
+     "verb": "create",
+     "mechanism": "SDK",
+     "when_he": "לתוכנית חדש בלי ייפוי כוח"
+    }
+   ],
+   "evidence": [
+    "DTSX:7584-7634 Get Policies",
+    "DTSX:5182 Check If POA Account Agent",
+    "DTSX:7722 Move Annotation To Policies (sha ae8b41b1a495)",
+    "DTSX:9066-9068 Remove Duplicates (EliminateDuplicates=true)",
+    "DTSX:6102 Create POA Account - Agent main.cs:131-226 (sha 334269e88007)"
+   ],
+   "openQuestions_he": [
+    "ה-EntityReference נשלחים כ-\"gen_agents\" / \"gen_agencie\" / \"gen_policies\", אבל המזהים הם של איש קשר / חשבון / Gen_programmain (ב-0029 POA Main נוצר עם gen_agentname = contact ו-gen_agencyname = account). אם ה-lookup ב-CRM מוגדר לישות אחרת, היצירה תיכשל לאזהרת ETL (השערה; לא אומת).",
+    "רק תוכניות שנוצרו ביומיים האחרונים מכוסים. אם החבילה לא רצה יומיים, תוכניות יוחמצו."
+   ]
+  },
+  {
+   "refId": "Package\\Get Valid Optionsets Values",
+   "title_he": "טעינת ערכי OptionSet חוקיים לייפוי כוח",
+   "techName": "Get Valid Optionsets Values",
+   "short_he": "נטענת רשימת הערכים החוקיים של חמשת שדות הבחירה של ייפוי כוח. ביצירת ייפוי כוח (שתי זרימות Create) ערכים מועתקים רק אם הם ברשימה.",
+   "flow_he": [
+    "קריאת StringMap של Gen_powerofattorney (langid 1033) לחמישה שדות.",
+    "בניית מילון לשדה → ערכים, ושמירתו במשתנה ValidOptionsetsValues."
+   ],
+   "sourceTables": [
+    {
+     "table": "StringMap, Entity (מטא-דאטה של CRM)",
+     "db": "ALTSHULER_MSCRM",
+     "connection": "[CRM]",
+     "kind": "CRM",
+     "loadedBy_he": "מטא-דאטה של CRM.",
+     "proven": true
+    }
+   ],
+   "short": {
+    "nodes": [
+     {
+      "type": "step",
+      "text": "נקראים הערכים המוגדרים ב-CRM לשדות: סוג נספח, מקור ייפוי כוח, נספח ד', סטטוס, וסטטוס העברה לבנק."
+     },
+     {
+      "type": "step",
+      "text": "הערכים נשמרים כרשימה לשימוש בהמשך החבילה."
+     },
+     {
+      "type": "end",
+      "text": "ביצירת ייפוי כוח מועתקים רק ערכי בחירה שקיימים ב-CRM."
+     }
+    ]
+   },
+   "detailed": {
+    "nodes": [
+     {
+      "type": "step",
+      "text": "נקראים מ-StringMap כל זוגות השדה והערך של הישות Gen_powerofattorney בשפה 1033, לחמשת השדות.",
+      "tech": "Get Valid Optionsets Values (OLEDBSource, DTSX:13693): where ObjectTypeCode = (select ObjectTypeCode from Entity where Name = 'Gen_powerofattorney') and langid = '1033' and AttributeName in ('gen_appendixtype','gen_powerofattorneysource','gen_appendixd','gen_currentstate','gen_statustransfertobank')"
+     },
+     {
+      "type": "step",
+      "text": "נבנה מילון: לכל שדה, רשימת הערכים החוקיים שלו.",
+      "tech": "Build Valid Values Dictionary main.cs:116-126"
+     },
+     {
+      "type": "step",
+      "text": "המילון נשמר במשתנה החבילה ValidOptionsetsValues.",
+      "tech": "PostExecute main.cs:100-103 → User::ValidOptionsetsValues"
+     },
+     {
+      "type": "step",
+      "text": "הזרימות Create Power Of Attorney ו-Create Power Of Attorney - Pension בודקות בו כל ערך בחירה לפני ההעתקה.",
+      "tech": "Create POA Account - Agent main.cs:138-154"
+     },
+     {
+      "type": "decision",
+      "text": "האם ערך שמגיע מייפוי הכוח הראשי קיים במילון?",
+      "tech": "validOptionsetValues[attr].Contains(value)",
+      "branches": [
+       {
+        "label": "כן",
+        "nodes": [
+         {
+          "type": "step",
+          "text": "הערך מועתק לייפוי הכוח החדש."
+         }
+        ]
+       },
+       {
+        "label": "לא",
+        "nodes": [
+         {
+          "type": "step",
+          "text": "השדה נשאר ריק."
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "type": "end",
+      "text": "אין כתיבה ל-CRM. זו טעינת נתוני ייחוס בלבד."
+     }
+    ]
+   },
+   "detail_he": [
+    {
+     "h": "מקור ואוכלוסייה",
+     "t": "StringMap עבור Gen_powerofattorney, langid 1033, חמישה שדות."
+    },
+    {
+     "h": "התאמה לרשומות קיימות",
+     "t": "אין."
+    },
+    {
+     "h": "החלטות",
+     "t": "אין. נבנה מילון בלבד."
+    },
+    {
+     "h": "כתיבה ל-CRM",
+     "t": "אין."
+    },
+    {
+     "h": "תוצאה עסקית",
+     "t": "מניעת כתיבה של ערכי בחירה לא חוקיים בייפוי הכוח החדש."
+    }
+   ],
+   "decisions": [
+    {
+     "where": "Create POA Account - Agent main.cs:138",
+     "condition": "validOptionsetValues.ContainsKey(attr) && validOptionsetValues[attr].Contains(value)",
+     "meaning_he": "ערך חוקי",
+     "outcome_he": "הוא מועתק"
+    }
+   ],
+   "crmEffects": [
+    {
+     "entity": "StringMap",
+     "verb": "read",
+     "mechanism": "SQL (SELECT)",
+     "when_he": "תחילת החבילה"
+    }
+   ],
+   "evidence": [
+    "DTSX:12855 Get Valid Optionsets Values (executable)",
+    "DTSX:13693 SqlCommand",
+    "Build Valid Values Dictionary main.cs:100-126"
+   ],
+   "openQuestions_he": []
+  }
+ ],
+ "findings_he": [
+  {
+   "severity": "high",
+   "text": "שני עדכוני SQL ישירים על ה-CRM (Unsupported): Gen_powerofattorneyBase.gen_receivingdateofcancelpoa (Handle Wait Status) ו-Gen_powerofattorney.gen_SentToPrintOn (Send Poa Emails). הם עוקפים את ה-SDK ואת התוספים.",
+   "evidence": "Update NeedToSendMailBit DTSX:31299; Update sentToPrintOn DTSX:36592; [CRM] DTSX:4"
+  },
+  {
+   "severity": "medium",
+   "text": "ב-Update NeedToSendMailBit יש CASE בלי ELSE. כשהנספח של ייפוי הכוח הפעיל הישן אינו 2, 3 או 5, השדה gen_receivingdateofcancelpoa נדרס ל-NULL ולא נשאר כמו שהוא.",
+   "evidence": "DTSX:31299-31306"
+  },
+  {
+   "severity": "medium",
+   "text": "ארבעת רכיבי המייל לסוכן (נוסחים 1, 2, 3, 8) מבוטלים בקוד (\"In Comment due to 13366\"). לא נשלח מייל ב-CRM לסוכן. במקומו נשמר JSON ב-staging (השורות מגיעות לשם דרך הרכיבים האלה; לפי התנהגות SSIS המתועדת, לא מוצג בקבצים, הם מעבירים כל שורה הלאה) ונבנה קובץ דיוור (השערה: זה המנגנון החלופי).",
+   "evidence": "Email - Start Date Poa main.cs:44-74 (DTSX:22960); Email - Cancel Poa … main.cs:42-74"
+  },
+  {
+   "severity": "medium",
+   "text": "מייל הסיכום (לתור שבמשתנה MailingReportsCustomerTeamQueueId; לפי שם המשתנה: צוות הדיוור, השערה) נשלח ב-PostExecute של Send Email בכל הרצה של זרימת Send Poa Emails. הזרימה רצה רק אם המשימות שלפניה הצליחו, כי כל האילוצים בחבילה הם Success. לפי התנהגות SSIS המתועדת, לא מוצג בקבצים: PostExecute נקרא גם כשלא הגיעה אף שורה, ולכן המייל נשלח גם כשלא נוצרה אף שורת דיוור.",
+   "evidence": "Send Email main.cs:25-28 (DTSX:33987)"
+  },
+  {
+   "severity": "medium",
+   "text": "שורות בלי דוא\"ל לסוכן, שנכתבו רק לקובץ השגיאות, מסומנות isProcessed = 1, ובייפוי הכוח נרשם gen_SentToPrintOn כאילו נשלחו להדפסה.",
+   "evidence": "Multicast 2 → Union All → Update IsProcessed True (DTSX:36554) → Update sentToPrintOn (DTSX:36592)"
+  },
+  {
+   "severity": "medium",
+   "text": "ביצירת ייפוי כוח נשלחים gen_agentname/gen_agencyname כ-EntityReference(\"gen_agents\"/\"gen_agencie\"), ו-gen_customerprogram כ-\"gen_policies\", אבל המזהים הם של contact / account / Gen_programmain. אם הישויות לא תואמות, כל היצירות ייכשלו לאזהרות ETL (השערה; לא אומת).",
+   "evidence": "Create POA Account - Agent main.cs:166-174 (DTSX:1781, DTSX:6102); 0029 Create POA Main main.cs:228-232"
+  },
+  {
+   "severity": "medium",
+   "text": "בפנסיה, הסרת הכפילויות היא לפי POA Main בלבד, ולכן רק תוכנית אחת לכל ייפוי כוח ראשי בכל ריצה. תוכניות נוספות יטופלו רק בריצות הבאות, ורק אם עדיין בטווח היומיים.",
+   "evidence": "Remove Duplicates DTSX:9066-9068 (sort key Gen_powerofattorneymainId)"
+  },
+  {
+   "severity": "medium",
+   "text": "סנכרון POA Main: סטטוסים מעורבים בלי אף ייפוי כוח פעיל מעבירים את ייפוי הכוח הראשי לסטטוס 3 (השערה: \"בוטל\"; המשמעות נשענת על שם הרכיב בלבד), גם כשיש תחתיו ייפוי כוח ממתין.",
+   "evidence": "If All Statuses Are Same DTSX:39106 → If Exists Active DTSX:39180 → DTSX:39334"
+  },
+  {
+   "severity": "low",
+   "text": "ההערה (annotation) מועברת (לא מועתקת) מייפוי הכוח הראשי, בעדכון לכל שורה בלי בדיקה אם כבר הועברה. כשיש כמה חשבונות או תוכניות חדשים לאותו ייפוי כוח ראשי, ההערה מסיימת אצל השורה האחרונה שעובדה, בסדר לא מוגדר (אין ORDER BY). ה-join להערות נמצא בתוך תת-השאילתה עם ROW_NUMBER (rowNumber = 1), ולכן לכל חשבון או תוכנית נלקחת רק הערה אחת, גם כשלייפוי הכוח הראשי יש כמה.",
+   "evidence": "Move Annotation To Customer Account main.cs:122-141 (DTSX:3431); Move Annotation To Policies main.cs:123-142 (DTSX:7722); Get Customer Accounts DTSX:3323/3336; Get Policies DTSX:7618/7630"
+  },
+  {
+   "severity": "medium",
+   "text": "בשני הפיצולים Is Renewal ו-AppendixType הגדרת השגיאה היא FailComponent. סיכון (השערה לגבי הופעת NULL בנתונים; לפי התנהגות SSIS המתועדת, לא מוצג בקבצים: תנאי שמחזיר NULL נחשב שגיאה, ועם FailComponent הזרימה נכשלת): ערך NULL ב-agentcyIdNumber או agentcyIdNumberPa (Is Renewal), או ב-gen_appendixtype (AppendixType), יכשיל את זרימת Handle Wait Status. Sort By PoaId הוא רכיב חוסם שלפני ההפעלה, ולכן במקרה כזה אף אחת מהפעלות הריצה לא תתבצע.",
+   "evidence": "Is Renewal DTSX:27045 (errorRowDisposition=FailComponent DTSX:27056); AppendixType DTSX:22849 (FailComponent DTSX:22859); Sort By PoaId DTSX:28819"
+  },
+  {
+   "severity": "info",
+   "text": "הטבלה PowerOfAttorneySendEmails אינה נטענת בחבילה זו. השערה: היא נטענת ב-0030_PoaAccountUpdateDailyTest (OLE DB Destination לאותה טבלה).",
+   "evidence": "DTSX:31813; 0030 evidence: \"Write To PowerOfAttorneySendEmails Table\""
+  }
+ ]
+}

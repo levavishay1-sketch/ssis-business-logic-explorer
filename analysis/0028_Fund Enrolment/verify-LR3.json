@@ -1,0 +1,206 @@
+{
+  "verifier": "ssis-verifier",
+  "package": "0028_Fund Enrolment",
+  "scope": "logic-claims re-check round 3",
+  "checkedAt": "2026-11-07T00:00:00Z",
+  "source": "source/DailyProcess/0028_Fund Enrolment.dtsx sha256 87DD97D507243E63D6B13EE4A556CC69891B1B15F2237AE362456304BB9FDA42",
+  "checked": 14,
+  "results": [
+    {
+      "id": "L|finding#2",
+      "hash": "50c8df2050fd",
+      "verdict": "WRONG",
+      "detail": "The facts check out. Check If Rejects Null 'No CreateRow' ends with '&& JoiningStatus != 2' (DTSX:1463-1485), and only the Create Row output has a path. The source has 'aj.gen_joiningstatus = 2' (DTSX:3417) and a no-FE Lookup (DTSX:3612-3638). The problem is the dead-code inference. It depends on JoiningStatus being aj.gen_joiningstatus. In the source, JoiningStatus is the UNQUALIFIED 'gen_joiningstatus AS JoiningStatus' (DTSX:3364) in a 4-source query (aj, tr, ac, productByCourse). The WHERE filters on the QUALIFIED aj.gen_joiningstatus. The text equates the two without stating or arguing ownership. The same applies to the unqualified 'gen_lastsyncdate' in the WHERE (DTSX:3415-3416), which the text calls the joining's sync date. Under reports/logic-verify-standard.md (Accepted forms), ownership of an unqualified column in a multi-table query is accepted only when it is stated as unknown or argued. The argument is available and should be written. aj has both columns (aj.gen_joiningstatus at DTSX:3417; aj.gen_lastsyncdate at DTSX:3361). If tr or ac also had them, the query would fail as ambiguous, and the user states the package runs in production. Note, not counted: 'נפתח Fund Enrolment לכל…' leaves out that a creation can fail (catch at main.cs:282-291). That is a runtime-failure detail, which the standard treats as plumbing.",
+      "evidence": "DTSX:3361, 3364, 3415-3417 (Get All joining reject From bank SqlCommand); DTSX:1463/1484 (Check If Rejects Null); DTSX:3612-3638",
+      "wrongUnits": [
+        {
+          "unit": "[1] 'התנאי דורש JoiningStatus != 2, אבל המקור שולף רק gen_joiningstatus = 2' / 'תאריך הסנכרון'",
+          "problem": "Treats the unqualified gen_joiningstatus (alias JoiningStatus) and gen_lastsyncdate as aj's columns without the ownership argument the standard requires.",
+          "correct": "Add the argument: JoiningStatus is the unqualified gen_joiningstatus (DTSX:3364) and the filter is aj.gen_joiningstatus (DTSX:3417). aj has both columns (DTSX:3361, 3417). If another joined table had them, the query would fail as ambiguous, and according to the user the package runs in production. So both refer to aj.",
+          "evidence": "DTSX:3361, 3364, 3415-3417"
+        }
+      ]
+    },
+    {
+      "id": "L|finding#3",
+      "hash": "6c40fd795404",
+      "verdict": "WRONG",
+      "detail": "The failure-handling facts are correct. Create gen_fundEnrolment catches SoapException and Exception and sends the row to CastingError (main.cs:282-291). The pension Create Fund Enrolment catches Exception and sends it to CustingError (main.cs:330-334). Neither output has a path (component --list for both flows). Update Reject Management's Failure output goes to 'Derived Column', which has 0 columns and no outgoing path. The re-fetch logic is also correct. The automated source has no Fund Enrolment condition. A retry needs status 2, the sync-date condition, and a Lookup no-match. A sibling row that succeeded blocks later runs, because the Lookup has no status filter (DTSX:3614-3622). For pension, the link is set only on the Result path (Upate Pension Joining, DTSX:8056), and the source requires gen_fundenrolmentid is null (DTSX:6934). The problem is 'ותאריך הסנכרון שלה'. It attributes the unqualified WHERE column gen_lastsyncdate (DTSX:3415-3416) to the joining without the ownership argument. This is the same issue as finding#2.",
+      "evidence": "Create gen_fundEnrolment main.cs:282-291 (DTSX:1505); Create Fund Enrolment main.cs:330-334 (DTSX:4758); Update Reject Management paths (Failure -> Derived Column, 0 cols); DTSX:3415-3417; DTSX:3612-3638; DTSX:6934-6937; DTSX:8056",
+      "wrongUnits": [
+        {
+          "unit": "[1] 'כל עוד היא בסטטוס 2 ותאריך הסנכרון שלה ריק או מוקדם מתאריך השינוי'",
+          "problem": "Ownership of the unqualified gen_lastsyncdate in the WHERE is asserted ('שלה') without the argument.",
+          "correct": "Either write 'gen_lastsyncdate (לא מסויג בשאילתה)' or add the ambiguity argument. aj.gen_lastsyncdate exists (DTSX:3361). If another joined table also had the column, the unqualified reference would fail, and the package runs in production.",
+          "evidence": "DTSX:3361, 3415-3416"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Create Fundenrolment|title",
+      "hash": "60662c169876",
+      "verdict": "WRONG",
+      "detail": "title_he and flow_he[2], [3], [5] and [6] are correct. Notes: main.cs:117-129. Lookup: full cache, Match not connected. SDK Create: main.cs:279. Update Owner: [CRM] DTSX:4696, OwnerIdType = 9. Staging insert: DTSX:3578. short_he is now conditional on success and covers the 1:N case. The 'no updater found' statement holds: a grep of all supplied DTSX finds 'lastsync' only in 0028, at DTSX:3361 and 3415-3416 plus column metadata. The problem is ownership. short_he and flow_he[1] say 'תאריך הסנכרון האחרון שלהן', which is the unqualified WHERE column gen_lastsyncdate. flow_he[4] says the split never filters because the condition needs status != 2. That needs the unqualified SELECT column gen_joiningstatus (alias JoiningStatus, DTSX:3364) to be aj's. Neither point is argued. Minor, not counted: flow_he[1] '(שורה לכל בקשת העברה של ההצטרפות)'. Because the join is a LEFT JOIN, a joining with no transfer request still gives one row.",
+      "evidence": "DTSX:3357-3417; DTSX:1463-1485; DTSX:3612-3638; main.cs:117-129 (DTSX:3704); main.cs:130-292 (DTSX:1505); DTSX:4696; DTSX:3578",
+      "wrongUnits": [
+        {
+          "unit": "[2] short_he / [3] flow_he[1] 'תאריך הסנכרון האחרון שלהן'; [6] flow_he[4] 'התנאי דורש סטטוס שונה מ-2'",
+          "problem": "Unqualified gen_lastsyncdate (WHERE) and gen_joiningstatus (SELECT alias JoiningStatus) are attributed to aj without the required ownership argument.",
+          "correct": "Add once, for example in short_he: 'gen_lastsyncdate ו-gen_joiningstatus אינם מסויגים בשאילתה; הם של gen_automatedjoining, כי aj.gen_lastsyncdate ו-aj.gen_joiningstatus מופיעים בה (DTSX:3361, 3417), ואילו העמודה הייתה קיימת גם בטבלה מצורפת השאילתה הייתה נכשלת; לפי המשתמש החבילה רצה בפרודקשן'.",
+          "evidence": "DTSX:3361, 3364, 3415-3417"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Create Fundenrolment|short",
+      "hash": "f03a98d8d1f8",
+      "verdict": "WRONG",
+      "detail": "The structure and facts are correct. Source: DTSX:3357-3417. The Lookup is full cache with only No Match connected (DTSX:3612-3638). The dead split is at DTSX:1463. The SDK Create is at main.cs:134-279. Update Owner sets OwnerIdType = 9 (DTSX:4696). The staging insert is at DTSX:3578. Unit 9 is conditional on success and covers the 1:N transfer-request case and silent failures. The ownership problem is the same as in |title. Unit [1] and unit [9] say the sync date is the joining's ('שלהן' / 'שלה'). That is the unqualified gen_lastsyncdate at DTSX:3415-3416. Unit [6] says the 'no rejects' check never filters. That depends on the unqualified SELECT gen_joiningstatus (alias JoiningStatus, DTSX:3364) being aj.gen_joiningstatus. Neither point is argued.",
+      "evidence": "DTSX:3357-3417; DTSX:1463-1485; DTSX:3612-3638; DTSX:4696; DTSX:3578",
+      "wrongUnits": [
+        {
+          "unit": "[1], [9] 'תאריך הסנכרון ... שלהן/שלה'; [6] 'בדיקת אין רג'קטים ... אינה מסננת בפועל'",
+          "problem": "Ownership of unqualified gen_lastsyncdate / gen_joiningstatus is asserted without the ambiguity argument.",
+          "correct": "Add the ambiguity argument. aj.gen_lastsyncdate (DTSX:3361) and aj.gen_joiningstatus (DTSX:3417) exist. An ambiguous reference would fail, and the package runs in production.",
+          "evidence": "DTSX:3361, 3364, 3415-3417"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Create Fundenrolment|detailed",
+      "hash": "a2ea2a5c13c6",
+      "verdict": "WRONG",
+      "detail": "Most units match the code. Source and joins: DTSX:3357-3417. Notes: main.cs:117-129, with a 'n: ' prefix for each non-null reason name, then note = left(gen_rejectwidedescription, 3000). Lookup: CacheType 0, NoMatchBehavior 1, Match not connected. Split condition: DTSX:1484. Field set: main.cs:140-237. Picklists: 241-247, using the constants ENROLMENT_STATUS_IN_PROCESS = 1 and ENROLMENT_SOURCE_SYSTEM = 100000000. Dates: CONVERT(...,103) of DATEADD(hh,3,...), with ParseExact 'dd/MM/yyyy' at 251-255. Money: 259-260. Document type: 263-277 (GEMEL = 1, STUDY_FUND = 2, GEMEL_INVEST = 4, CHILDSAVING = 5). try/catch: 282-291, CastingError not connected. RejectTeamId: Guid.Parse at 136. 'ממשתני התצורה' is acceptable: Set Organization Variables loads it from gen_etlvariable into a dictionary called systemConfigurations. Update Owner: DTSX:4696. Staging insert: DTSX:3578. Two problems. (1) Ownership. Units [1] and [29] attribute the sync date to the joining, and units [9]-[10] say the split 'cannot happen, because the source filters status 2'. These rest on the unqualified gen_lastsyncdate (WHERE, DTSX:3415-3416) and gen_joiningstatus (SELECT alias JoiningStatus, DTSX:3364), and ownership is not argued. In the productByCourse subquery, 'partition by gen_automatedjoining' and 'where gen_automatedjoining is not null' are also unqualified over gen_coursepartition JOIN product (DTSX:3409-3414). The text 'המוצר מחלוקת המסלולים הראשונה שנוצרה' presumes that column is gen_coursepartition's. (2) Unit [15] states as fact that gen_enrolmentid is the record name: 'שם העמית (גם כשם הרשומה)'. No supplied file shows that gen_enrolmentid is the primary-name attribute of gen_fundenrolment. It appears only as a target at main.cs:222 (DTSX:1851) and in the pension script (DTSX:5090).",
+      "evidence": "DTSX:3357-3417; DTSX:1484; DTSX:3612-3638; main.cs:117-129 @DTSX:3704; main.cs:130-292 @DTSX:1505 (sha a8e21b9ddb24); DTSX:1851; DTSX:4696; DTSX:3578; Set Organization Variables main.cs:18-38 @DTSX:12958",
+      "wrongUnits": [
+        {
+          "unit": "[1], [29] sync date 'שלהן/שלה'; [10] 'לא יכול לקרות, כי המקור מסנן סטטוס 2'",
+          "problem": "Relies on ownership of the unqualified gen_lastsyncdate / gen_joiningstatus without the argument. The productByCourse subquery's unqualified gen_automatedjoining is also presumed to be gen_coursepartition's.",
+          "correct": "Add the ambiguity argument for gen_lastsyncdate and gen_joiningstatus (aj.* exist at DTSX:3361/3417). For the subquery column, state the owner as not shown in the query, or argue it.",
+          "evidence": "DTSX:3361, 3364, 3409-3417"
+        },
+        {
+          "unit": "[15] 'שם העמית (גם כשם הרשומה)'",
+          "problem": "Meaning not proven: nothing in the files shows that gen_enrolmentid is the record's name attribute.",
+          "correct": "'שם העמית נכתב גם ל-gen_enrolmentid' (or label 'שם הרשומה' as השערה).",
+          "evidence": "main.cs:220-223 @DTSX:1849-1852"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Create Fundenrolment|detail",
+      "hash": "7281741d86bc",
+      "verdict": "WRONG",
+      "detail": "Units [2] and [4] are correct (Lookup DTSX:3612-3638; SDK create; SQL update on [CRM] DTSX:4696, Unsupported; staging insert DTSX:3578). Unit [6] is correct. A grep finds no creator of gen_automatedjoining. 0027_AutomatedJoining updates it through an SDK Update of gen_joiningstatus/gen_customeraccountid (0027 DTSX:1370-1377, 5935-5939). 0029_POA updates it in 'Create POA Main For Automated Joining' (enabled, 0029 DTSX:21361), component 'Update Automated Joining' (0029 DTSX:29486), with gen_testedtocreatepoa = true (0029 DTSX:29686-29691). It is correctly marked proven:false. The example 'תאריך … שאינו בפורמט dd/MM/yyyy' in [5] is marked as a possible example and is failure detail, so it is not counted. Problem: [1] and [5] say 'gen_automatedjoining ... כש-gen_lastsyncdate ריק' and 'תאריך הסנכרון שלה'. [3] says the 'no rejects' split never holds 'כי המקור מסנן gen_joiningstatus = 2'. Both rest on the ownership of unqualified columns (gen_lastsyncdate in the WHERE, gen_joiningstatus AS JoiningStatus in the SELECT), and ownership is not argued.",
+      "evidence": "DTSX:3357-3417; DTSX:1484; DTSX:3612-3638; DTSX:4696; DTSX:3578; 0027_AutomatedJoining.dtsx:1370-1377, 5935-5939; 0029_POA.dtsx:21361, 29486, 29686-29691",
+      "wrongUnits": [
+        {
+          "unit": "[1], [3], [5]",
+          "problem": "Ownership of unqualified gen_lastsyncdate / gen_joiningstatus is not argued.",
+          "correct": "Add the ambiguity argument. aj.gen_lastsyncdate (DTSX:3361) and aj.gen_joiningstatus (DTSX:3417) exist. If another joined table had the column, the query would fail, and the package runs in production.",
+          "evidence": "DTSX:3361, 3364, 3415-3417"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Create Fundenrolment|crm",
+      "hash": "9bf520a52310",
+      "verdict": "CONFIRMED",
+      "detail": "[1] gen_fundenrolment Create goes through IOrganizationService from CrmProxy (main.cs:104-105, 279). when_he gives the source conditions with the column names as written in the SQL ('gen_lastsyncdate ריק או מוקדם מ-ModifiedOn'), without asserting a table, plus the Lookup. [2] Update Owner is 'update Gen_fundenrolmentBase set OwnerId = ?, OwnerIdType = 9 where Gen_fundenrolmentId = ?'. Param_0 is RejectTeamId and Param_1 is FundEnrollmentId, on [CRM] (DTSX:4693-4700). It runs only on the Result output through the Multicast (Output 1), so after each successful create. [3] The reads match the source query tables and the Lookup query (DTSX:3357-3417, 3614). No other CRM write exists in this flow: the paths are Multicast Output 1 to Update Owner, Output 2 to the staging insert, and Output 3 unconnected.",
+      "evidence": "DTSX:1505 main.cs:104-105, 279; DTSX:4693-4700; DTSX:3357-3417; DTSX:3614; component --list Create Fundenrolment",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Create Fundenrolment|open",
+      "hash": "7df988754a87",
+      "verdict": "WRONG",
+      "detail": "[2], [3] and [4] are correct. [2] leaves the meaning of status 2 open. [3] is right that gen_lastsyncdate is not updated by any supplied package. [4] is right that RejectTeamId comes from gen_etlvariable through Set Organization Variables (DTSX:12917-12931, 12958). [1] states as fact that the reject check 'לעולם אינה מתקיימת'. That depends on the unqualified 'gen_joiningstatus AS JoiningStatus' (DTSX:3364) being aj.gen_joiningstatus (WHERE, DTSX:3417), and ownership is not argued. [1] also attributes the sync date to the joining.",
+      "evidence": "DTSX:3364, 3415-3417; DTSX:1484; DTSX:12917-12931; DTSX:12958",
+      "wrongUnits": [
+        {
+          "unit": "[1] 'כי בדיקת הרג'קטים לעולם אינה מתקיימת'",
+          "problem": "The dead-code conclusion rests on unargued ownership of the unqualified gen_joiningstatus (and gen_lastsyncdate).",
+          "correct": "Add the ambiguity argument. aj.gen_joiningstatus is in the WHERE (DTSX:3417). An unqualified reference to a column present in two joined tables would fail, and the package runs in production.",
+          "evidence": "DTSX:3364, 3417"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Create FundEnrolment For Pension|short",
+      "hash": "6c8a5fce3ea7",
+      "verdict": "WRONG",
+      "detail": "Units [2]-[8] match main.cs:136-151 and 153-325, and the Multicast paths (DTSX:8100, 8056, 7098). Unit [9] is conditional on success. Each pension joining yields one row, because the rm subquery is Row_Num = 1 and the other joins go to primary keys. The NULL-read caveat is marked as documented SSIS behaviour. The problem is unit [1]. It says the joinings 'have' a reject note ('ושיש להן ... הערה'), and that is the unqualified column gen_rejectreasonsnotes. In this query it appears only unqualified, in the SELECT 'cast(gen_rejectreasonsnotes as nvarchar(2000))' (DTSX:6912) and in the WHERE (DTSX:6937). The query has five sources: pj, Gen_agentcontract ac, gen_agents, gen_agencie, and the rm subquery. No supplied file references it qualified. A grep over all DTSX finds it only in 0028, and the Close query (DTSX:910, 917) also has it unqualified, over pj join Gen_fundenrolment. So the files do not show which table owns it, and it must be stated as unknown. The 'עברו בקרה עם רג'קט' condition is the unqualified 'gen_passedandreject = 1' in the WHERE (DTSX:6934). There the argument is available, because pj.gen_passedandreject is selected at DTSX:6909, but it is not written.",
+      "evidence": "Get Pension Joining SqlCommand DTSX:6872-6937 (6909, 6912, 6934-6937); Close Get Pension Joinings DTSX:909-917; main.cs:136-151 @DTSX:4758",
+      "wrongUnits": [
+        {
+          "unit": "[1] 'ושיש להן סיבת רג'קט, הערה או רשומת ניהול רג'קטים'; 'שעברו בקרה עם רג'קט'",
+          "problem": "Ownership of the unqualified gen_rejectreasonsnotes is not established by any supplied file, yet the text asserts it. For the unqualified gen_passedandreject, the ownership argument is not written.",
+          "correct": "'... או שיש הערת רג'קט (gen_rejectreasonsnotes, עמודה לא מסויגת; הטבלה שלה לא מוצגת בקבצים) ...'. For gen_passedandreject add: pj.gen_passedandreject is selected (DTSX:6909), so by the ambiguity rule the WHERE reference is pj's.",
+          "evidence": "DTSX:6909, 6912, 6934-6937"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Create FundEnrolment For Pension|detailed",
+      "hash": "5363850fefac",
+      "verdict": "WRONG",
+      "detail": "Units [2]-[36] match the code. Product subqueries: '200003' and '200004'. Set gen_note reads the five values in IsNullOrWhiteSpace without _IsNull and has no try (main.cs:115-131 @DTSX:7153). Owner and status branch: main.cs:136-151 (type 8 / 17, else type 9 / pj status copied). Product: 166-173. Fields: 153-255. gen_enrolmentstatus = 1 and gen_source = 100000000: 262-264. Receipt date, counter and money: 267-278. Newsletter, ispension and employersfile: 281-294. Underwriting: 296-325. catch: 330-334, with CustingError not connected. The unchecked reads in try are exactly 138 and 169/171, plus Guid.Parse. Update Fund Enrolment Owner parameters: OwnerId = Param_0, OwnerIdType = Param_1, FundEnrolmentId = Param_2 (DTSX:8100). Upate Pension Joining: Param_0 = FundEnrolmentId, Param_1 = gen_pensionjoiningid (DTSX:8056). Two problems. (1) Unit [1] asserts that the joinings 'have' a reject note, which is the unqualified gen_rejectreasonsnotes, whose owner is not shown in any supplied file. It also does not argue the unqualified gen_passedandreject. See |short. (2) Unit [16] says the record is linked 'לגוף המעביר'. The code sets gen_enrolmentfundfinancenumber = EntityReference('competitor', pj.gen_fundtype) (main.cs:175-176, DTSX:5058). Nothing in the files shows that pj.gen_fundtype, or this attribute, is the transferring body. That is a meaning stated as fact.",
+      "evidence": "DTSX:6872-6937; Set gen_note main.cs:115-131 @DTSX:7153; Create Fund Enrolment main.cs:130-335 @DTSX:4758 (sha 25ceb0f1ecbb), DTSX:5058; DTSX:8100; DTSX:8056; DTSX:7098",
+      "wrongUnits": [
+        {
+          "unit": "[1] 'הערת רג'קט' / 'מסומנות עבר בקרה ורג'קט'",
+          "problem": "Unqualified gen_rejectreasonsnotes has no proven owner, and the unqualified gen_passedandreject is not argued.",
+          "correct": "State that gen_rejectreasonsnotes is unqualified and that its table is not shown in the files. Add the ambiguity argument for gen_passedandreject (pj.gen_passedandreject at DTSX:6909).",
+          "evidence": "DTSX:6909, 6912, 6934-6937"
+        },
+        {
+          "unit": "[16] 'ומקושרת ... לגוף המעביר'",
+          "problem": "Meaning not proven: the code links gen_enrolmentfundfinancenumber to a 'competitor' record taken from pj.gen_fundtype.",
+          "correct": "'ומקושרת לרשומת competitor (gen_enrolmentfundfinancenumber) לפי gen_fundtype של ההצטרפות (השערה: הגוף המעביר)'.",
+          "evidence": "main.cs:175-176 @DTSX:5057-5058"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Create FundEnrolment For Pension|detail",
+      "hash": "663d70d0b934",
+      "verdict": "WRONG",
+      "detail": "Units [2]-[6] are correct. [2]: no Lookup, de-duplication through gen_fundenrolmentid is null plus the SQL update at DTSX:8056. [3]: main.cs:136-151, 166-173, 287-325. [4]: Unsupported SQL on [CRM] (DTSX:8100, 8056) and the staging insert (DTSX:7098). [5]: the failure caveats are marked as documented SSIS behaviour. [6]: no supplied package creates gen_pensionjoining. 0029_POA only updates gen_createpoamain (0029 DTSX:31614-31617) and runs an SQL update at DTSX:36944. The claim is labelled as a hypothesis. The problem is unit [1]. It lists the conditions under the heading 'gen_pensionjoining ב-CRM', so 'gen_passedandreject = 1' and 'הערת רג'קט' are presented as pj's columns. Both are unqualified in the query (DTSX:6934, 6937). gen_rejectreasonsnotes has no qualified reference in any supplied file, so its owner is unknown. For gen_passedandreject the argument (pj.gen_passedandreject at DTSX:6909) is not written.",
+      "evidence": "DTSX:6872-6937; DTSX:8056; DTSX:8100; DTSX:7098; 0029_POA.dtsx:31614-31617, 36944",
+      "wrongUnits": [
+        {
+          "unit": "[1] 'gen_pensionjoining ...: ... gen_passedandreject = 1; ויש ... הערת רג'קט'",
+          "problem": "Ownership of unqualified columns is asserted (one unprovable from the files, one with the argument not written).",
+          "correct": "Mark gen_rejectreasonsnotes as an unqualified column of an unknown table. Argue gen_passedandreject by the ambiguity rule (pj.gen_passedandreject at DTSX:6909).",
+          "evidence": "DTSX:6909, 6912, 6934-6937"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Create FundEnrolment For Pension|decisions",
+      "hash": "ee5b4ee9a21b",
+      "verdict": "CONFIRMED",
+      "detail": "[1] The condition is quoted as written in the SQL, with gen_passedandreject and gen_rejectreasonsnotes unqualified as in the source. The meaning 'אוכלוסיית ההצטרפויות לטיפול' does not attribute a table (DTSX:6934-6937). [2] main.cs:136-151 (type 8, status 17; else RejectTeamId type 9, pj status when not null). [3] main.cs:166-173. [4] main.cs:271-274. [5] main.cs:281-285. [6] main.cs:287-294, using the constants JOINING_STATUS_INSERT_FROM_FILE = 3 and JOINING_STATUS_INSERT_FROM_EMPLOER_INTERFACE = 4. [7] main.cs:296-325, with the code comments No/Yes and אושר/אושר בהחרגה/בתהליך, and FOLDER_NUMBER '123456'. [8] catch at 330-334, CustingError has no path, and the NULL-read caveat is marked as documented SSIS behaviour. No row-selection or write-deciding branch is missing.",
+      "evidence": "DTSX:6934-6937; Create Fund Enrolment main.cs:130-335 @DTSX:4758; component --list Create FundEnrolment For Pension",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Create FundEnrolment For Transfer Request|detailed",
+      "hash": "7e0d9cf9166d",
+      "verdict": "CONFIRMED",
+      "detail": "[1] DTS:Disabled=True (DTSX:8160). Constraints 5 and 6 (DTSX:15644-15645) are Success. Skipping is attributed to SSIS behaviour. [2] The WHERE (DTSX:10039-10042 of the SqlCommand at 9954) is (tr.gen_tanferinstatus = 2 and not (tr.gen_feedbackstatus in(3,4) and tc.gen_transferrequestId is not null)) and Gen_transferType = 5 and gen_fundenrolmentid is null and statecode = 0. tc is the active transfer courses whose gen_errordetails is like '%11879018%'. The NULL handling is right. If tc is null, the inner expression is FALSE and the row is kept. If tc is not null and the feedback status is NULL, the result is UNKNOWN and the row is excluded. [3] CASE requestsource = 2 picks the top-1 contract with broker '00000004000'. [4]-[8] main.cs:145-223: the contact city is commented out, and the account city is new Guid(gen_accountcity). [9] Constants: 136-142, 226-232, 273, 288, 315. [10] Update Fund Enrolment Owner (DTSX:11069): OwnerIdType = 9, Param_0 = RejectTeamId, Param_1 = FundEnrolmentId. Update Transfer Request (DTSX:11114): Param_0 = FundEnrolmentId, Param_1 = gen_transferrequestid. Both are Unsupported. [11] insert into ##TblFundEnrolments on [CRM] with errorRowDisposition = FailComponent (DTSX:10188-10199). It appears in no other supplied DTSX. Update FundEnrolment reads TblFundEnrolments on staging. [12] Set gen_note 1 reads gen_rejectdescription in IsNullOrWhiteSpace without _IsNull, and has no try. The reason names are guarded by _IsNull. The caveat is marked as documented SSIS behaviour.",
+      "evidence": "DTSX:8160; DTSX:15644-15645; Get Failed Transfer Request DTSX:9949-10046; Create Fund Enrolment main.cs:124-328 @DTSX:8166 (sha dc574d1f3918); Set gen_note 1 @DTSX:10246; DTSX:10188-10199; DTSX:11066-11072; DTSX:11111-11116",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Create FundEnrolment For Transfer Request|decisions",
+      "hash": "26509d1472e1",
+      "verdict": "INCOMPLETE",
+      "detail": "Rows [1], [2] and [4] are correct (DTSX:8160; WHERE with NULL/UNKNOWN handling; main.cs:145/183). Row [3] is correct about the CASE and top 1 without ORDER BY, but its outcome list is incomplete. It says the chosen contract yields 'מספר הברוקר, המפקח, הסוכן והסוכנות'. The chosen contract also determines the referent. gen_therapistreferentname = isnull(agencie.gen_operationpersonname, agents.gen_operationpersonname). agents and agencie are joined on gen_agentcontract.gen_agentname and gen_agentcontract.gen_agencyname, the contract chosen by the CASE (DTSX:9998, 10029-10030). That value is written to gen_referentname as a systemuser reference (main.cs:268-270). The flow is disabled, so this has no runtime effect.",
+      "evidence": "Get Failed Transfer Request SqlCommand DTSX:9954ff (isnull(agencie.gen_operationpersonname, agents.gen_operationpersonname) as gen_therapistreferentname; left join Gen_agents/Gen_agencie on gen_agentcontract.*); Create Fund Enrolment main.cs:268-270 @DTSX:8166",
+      "wrongUnits": []
+    }
+  ],
+  "missingWrites": [],
+  "notes": "Outside this re-check (claims not open): the same unargued-ownership pattern appears in already-confirmed claims. Create Fundenrolment|decisions [2] says 'בפועל לא יכול להתקיים, כי המקור מסנן gen_joiningstatus = 2'. finding#9 says 'gen_lastsyncdate של ההצטרפות הממוכנת'. Create FundEnrolment For Pension|title short_he/flow_he[1] say 'שיש לה ... הערה'. These confirmed verdicts would fail on the same basis if re-checked."
+}

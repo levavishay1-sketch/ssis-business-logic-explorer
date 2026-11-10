@@ -1,0 +1,94 @@
+{
+  "verifier": "ssis-verifier",
+  "package": "0019_StandingOrder",
+  "scope": "mapping-A.json",
+  "source": {
+    "file": "source/DailyProcess/0019_StandingOrder.dtsx",
+    "sha256": "63c5c7487c33de7314a248c3495d1f042d67d647deb54f2a0039846942cec653"
+  },
+  "checked": 11,
+  "results": [
+    {
+      "id": "update Standing Order|gen_standingorder|UPDATE|statuscode",
+      "verdict": "CONFIRMED",
+      "detail": "Re-check: write condition now gives both explicit branches ('= 2' DTSX:3999, '<> 2' DTSX:4006), states NULL gen_depositType is never updated, and explains ROW_NUMBER partition (amount, bankname, account number, branch, no Gen_standingorderId; earliest gen_ActualExecutionDate; ties arbitrary; one order per partition per run). Value 100000009 literal, statecode not set. All match DTSX.",
+      "evidence": "DTSX:3978, 3999, 4006, 4012; DTSX:4298, 4340",
+      "previousVerdict": "INCOMPLETE",
+      "previousDetail": "Value correct: const FIRST_TRANSACTION_RECEIVED = 100000009 -> fixed literal; statecode not set; service.Update per row inside try/catch, exceptions -> ErrorBuffer -> Set Warning columns -> ETL Warning; key standingOrder.Id = Row.GenstandingorderId. ROW_NUMBER description is accurate (partition ft.gen_transtotalamount, so.gen_bankname, so.gen_bankaccountnumber, so.gen_branch; ORDER BY ft.gen_ActualExecutionDate; RowNum = 1). Imprecise condition: the claim says 'gen_depositType = 2: ...; otherwise gen_chargeamount ...', but the SQL branch is 'so.gen_depositType <> 2', which is UNKNOWN for NULL - standing orders with NULL gen_depositType match neither branch and are never updated. Also should state the ROW_NUMBER consequence: the partition has no standing-order id, so of several standing orders sharing amount + bank + account number + branch only one is updated per run (others in later runs, ties in gen_ActualExecutionDate nondeterministic); for a single order all its candidate rows fall in one partition, so ROW_NUMBER also de-duplicates multiple matching transactions.",
+      "recheckedOn": "2026-11-06"
+    },
+    {
+      "id": "update Standing Order|gen_standingorder|UPDATE|gen_isfirsttransactionreceivied",
+      "verdict": "CONFIRMED",
+      "detail": "Re-check: same corrected write condition (NULL depositType excluded; ROW_NUMBER partition without order id). Value boolean literal true.",
+      "evidence": "DTSX:4341; 3978, 3999, 4006, 4012",
+      "previousVerdict": "INCOMPLETE",
+      "previousDetail": "Value correct: boolean literal true (fixed). Same write-condition imprecision as statuscode: NULL gen_depositType is excluded by 'so.gen_depositType <> 2' (claim says 'otherwise'); ROW_NUMBER partition consequence (one standing order per amount+bank-details partition per run) not spelled out.",
+      "recheckedOn": "2026-11-06"
+    },
+    {
+      "id": "LOGIC scopeNote_he",
+      "verdict": "CONFIRMED",
+      "detail": "No DTS:Configuration in this package; [Prod] psql/ALTSHULER_MSCRM used only by OLE DB Source and plumbing lookups; [SSIS_Logs] only by the SQL Server log provider. 3 data-flow script writers (update Standing Order, ETL Warning, ETL Record Finish) confirmed.",
+      "evidence": "DTSX:4-11, 15-21, 86-88; connection refs DTSX:2247, 2314, 4020"
+    },
+    {
+      "id": "LOGIC summary_he",
+      "verdict": "CONFIRMED",
+      "detail": "Re-check: 'active' removed; now states no statecode/statuscode filter, only gen_isfirsttransactionreceivied = 0 and gen_ispastrecord = 0; Gen_ftCurrentYear scope labelled השערה. Matches SQL.",
+      "evidence": "SQL DTSX:3986-3990",
+      "previousVerdict": "WRONG",
+      "previousDetail": "'הוראות קבע ... פעילות' (active) is not supported: the SQL has no statecode/statuscode filter; the population filter is only gen_isfirsttransactionreceivied = 0 AND gen_ispastrecord = 0. Inactive standing orders matching the transaction criteria are updated too. The rest of the summary matches the SQL ('monthly' from field name gen_monthlychargedate).",
+      "recheckedOn": "2026-11-06"
+    },
+    {
+      "id": "LOGIC executionOrder",
+      "verdict": "CONFIRMED",
+      "detail": "Get Organization Variables -> Create ETL -> Update Standing Order First Transaction Received -> End ETL; constraints without DTS:Value (Success); no event handlers, nothing disabled.",
+      "evidence": "DTSX:5079-5081"
+    },
+    {
+      "id": "LOGIC components[0]",
+      "verdict": "CONFIRMED",
+      "detail": "Re-check: short_he now 'בכל מצב', '53'/'02' = deposits labelled השערה, current-year labelled השערה; no residual 'פעילות'. Matches SQL.",
+      "evidence": "SQL DTSX:3980-3990",
+      "previousVerdict": "INCOMPLETE",
+      "previousDetail": "Detailed nodes, decisions (incl. ROW_NUMBER explanation in detailed.nodes[3]) and writes re-derived correctly. But short_he states as fact 'הוראות קבע פעילות' (no active-state filter exists) and 'תנועות הפקדה' (meaning of Gen_TransTypeID '53' / Gen_transgrouptypeid '02' is unproven - own openQuestions_he[0] labels it השערה); 'מהשנה הנוכחית' is from the table name Gen_ftCurrentYear only.",
+      "recheckedOn": "2026-11-06"
+    },
+    {
+      "id": "LOGIC findings_he[0]",
+      "verdict": "CONFIRMED",
+      "detail": "Settled ROW_NUMBER: PARTITION BY ft.gen_transtotalamount, so.gen_bankname, so.gen_bankaccountnumber, so.gen_branch ORDER BY ft.gen_ActualExecutionDate asc, WHERE RowNum = 1; Gen_standingorderId is not in the partition, so several orders (e.g. different customer accounts) with the same amount + bank details yield one update per run; after an order is marked it leaves the population and the next one surfaces in a later run (if its transaction is still in Gen_ftCurrentYear). Ties nondeterministic. Extra nuance: partition uses the raw (unpadded) so.gen_bankaccountnumber while matching uses the 12-digit padded form, so orders whose account numbers differ only in leading zeros fall in different partitions.",
+      "evidence": "DTSX:3978, 3992, 4012"
+    },
+    {
+      "id": "LOGIC findings_he[1]",
+      "verdict": "CONFIRMED",
+      "detail": "Exact equality on amount in both branches.",
+      "evidence": "DTSX:4000, 4007"
+    },
+    {
+      "id": "LOGIC findings_he[2]",
+      "verdict": "CONFIRMED",
+      "detail": "Re-check: now says current-year content is derived from the table name only (השערה) and no date filter exists in the package. Correct.",
+      "evidence": "DTSX:3980-3985",
+      "previousVerdict": "INCOMPLETE",
+      "previousDetail": "Account-wide fund match confirmed (join on so.gen_customeraccount = f.Gen_customeraccountname). 'Only current-year transactions' is inferred from the table name Gen_ftCurrentYear; the package contains no date-range filter proving it - mark as השערה.",
+      "recheckedOn": "2026-11-06"
+    },
+    {
+      "id": "LOGIC findings_he[3]",
+      "verdict": "CONFIRMED",
+      "detail": "NULL depositType fails both '= 2' and '<> 2'.",
+      "evidence": "DTSX:3999, 4006"
+    },
+    {
+      "id": "LOGIC findings_he[4]",
+      "verdict": "CONFIRMED",
+      "detail": "Only statuscode + flag set; per-row service.Update.",
+      "evidence": "DTSX:4340-4343"
+    }
+  ],
+  "missingWrites": []
+}

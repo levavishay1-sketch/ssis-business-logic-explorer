@@ -1,0 +1,85 @@
+{
+ "verifier": "ssis-verifier",
+ "package": "0024_AgentFundInformation",
+ "scope": "logic-claims re-check after fixes",
+ "checkedAt": "2026-11-07T12:00:12.497Z",
+ "checked": 7,
+ "results": [
+  {
+   "id": "L|summary",
+   "hash": "b02b2a923b4b",
+   "verdict": "WRONG",
+   "detail": "Most of unit 1 is verified: the INSERT adds new 5-key combinations (agent, agency, contact, account, fund) from state-1 POA rows and skips deceased contacts (DTSX:1970-2084, 2137-2214, 1906-1953). Delete Rows removes rows of deceased contacts and rows not re-derived (6-key lookup incl. POW_MAIN). Execute SQL Task deletes rows with gen_agencyname and gen_agentname both NULL (DTSX:4481). Unit 2 is verified: [CRM] {EC67FF20} = Psql/ALTSHULER_MSCRM, four writer components in three executables, EnableConfig=True plus DTSX:17. Problem 1: unit 1 says the table 'קובעת לאיזה סוכן או סוכנות מותר לראות מידע על איזו קופה'. That is a claim about an enforcement mechanism in CRM, taken from the table name. The package only writes rows. No supplied file reads Gen_allowedinformationforfund, and the package's own open question (Create Fund View Table|open unit 3) says it is unknown whether any plugin, view or report uses the table. So the claim must be labelled השערה. Problem 2 (minor): unit 2 says the source of 'רכיב הסקריפט' (singular) was analysed. The business path has two VB script components (Create system columns, and Set system variables, now classed as business), plus the VB 'Script Component' row generator.",
+   "evidence": "0024 open claim L|Package\\Create Fund View Table|open unit 3; grep: Gen_allowedinformationforfund appears only in 0024; writes = INSERT DTSX:608-643, DELETE DTSX:2529, 2566, 4481; script languages DTSX:1869, 6322, 7287",
+   "wrongUnits": [
+    {
+     "unit": 1,
+     "problem": "Function of the table (it determines what an agent may see) stated as fact",
+     "correct": "The package maintains rows in Gen_allowedinformationforfund (agent/agency x contact x account x fund). That the rows grant or restrict viewing in CRM is a hypothesis from the table name (השערה). The consumer is external_unknown.",
+     "evidence": "0024 open claim L|Package\\Create Fund View Table|open unit 3; grep: Gen_allowedinformationforfund appears only in 0024; writes = INSERT DTSX:608-643, DELETE DTSX:2529, 2566, 4481"
+    },
+    {
+     "unit": 2,
+     "problem": "'רכיב הסקריפט' singular",
+     "correct": "VB source of the script components (Create system columns, Set system variables) was analysed; compiled DLLs were not decompiled.",
+     "evidence": "DTSX:684/817-856, 6480, 7281"
+    }
+   ]
+  },
+  {
+   "id": "L|exec",
+   "hash": "173798e9a0b0",
+   "verdict": "CONFIRMED",
+   "detail": "Order is re-derived from the precedence constraints: Get Organization Variables (no incoming) -> Create ETL (7369) -> Get systemuser (7372) -> Create Fund View Table (7368) -> Delete Rows (7370) -> Execute SQL Task (7371) -> End ETL (7373). All are Success with LogicalAnd=True and no expressions. There are no event handlers and no disabled executables. Step 3 title is verified: Get System user id looks up SystemUser by DomainName = @[User::UserName] (DTSX:5385-5402, 7314). Create system columns sets OwningUser/CreatedBy/ModifiedBy = SystemUserId and OwningBusinessUnit = BusinessUnitId (main.vb:18-21 = DTSX:836-839). These map to OwnerId, CreatedBy, ModifiedBy and OwningBusinessUnit in the destination.",
+   "evidence": "DTSX:7368-7373, 5385-5402, 7314, 836-839, 608-643",
+   "wrongUnits": []
+  },
+  {
+   "id": "L|ignored",
+   "hash": "88705e575221",
+   "verdict": "CONFIRMED",
+   "detail": "Create ETL Process record (SDK create of gen_etlprocess), End ETL Process record (ETL status) and the SQL Server log provider (DTSX:20) are framework. Get Organization Variables loads gen_etlvariable (where gen_scope = 'global' OR = ?) into ConnStringSrsSsis_Logs, OrganizationName, ServerName and UserName (DTSX:5293). UserName indirectly selects the owning system user, but CLAUDE.md explicitly classes Organization Variables as plumbing, and the owner path is described in Create Fund View Table and exec step 3.",
+   "evidence": "DTSX:20, 131-600, 2751-4476, 4484-5322 (ReadWriteVariables 5293)",
+   "wrongUnits": []
+  },
+  {
+   "id": "L|Package\\Create Fund View Table|short",
+   "hash": "7ef7e0fa5764",
+   "verdict": "CONFIRMED",
+   "detail": "Order: Source -> Lookup (5-key exists check, No Match only) -> filtering customers dead (No Match only) -> Create system columns -> OLE DB Destination (paths DTSX:2211-2214). The population filter and the 'השערה' on Gen_existinfile are correct. Unit 11 correctly limits this step to inserts and says deletions happen in the later step (Success constraint DTSX:7370).",
+   "evidence": "DTSX:1906-1953, 1970-2084, 2137-2214, 608-643, 7370",
+   "wrongUnits": []
+  },
+  {
+   "id": "L|Package\\Create Fund View Table|detailed",
+   "hash": "174bb260bd62",
+   "verdict": "CONFIRMED",
+   "detail": "All units are re-derived from SQL DTSX:1970-2084: two active UNION ALL branches and two commented-out ones; left joins to gen_agents/gen_agencie; branch 2 uses ac1 via gen_brokernumber and ac2 via ac1.gen_agencycontractnumber, and requires (poa agent = fund agent OR poa agency = fund agency) AND ac1.Gen_isContractDataSharing = 1; ROW_NUMBER partitioned by FUND_NUMBER, CONTACT_NAME, ACCOUNT_NAME, AGENT_NAME, AGENCY_NAME ordered only by POW_START_DATE desc, with isnull(commission,0). The Lookup is Full cache (CacheType 0) on select * from Gen_allowedinformationforfundBase with 5 keys (no POW_MAIN) and Match unconnected (DTSX:2137-2214). The dead check is Full cache on Contact where gen_customeragename = N'נפטר', and a NULL contact does not match a non-NULL ContactId. main.vb:18-36 (DTSX:836-854) sets the owner fields, StateCode=0, StatusCode=1 and a new GUID. The destination is OpenRowset [dbo].[Gen_allowedinformationforfundBase] with AccessMode 0. The 0030 label is presented as such and verified: 0030 DTSX:4187 'Get Active Poa' ... poa.Gen_currentstate = 1)as ActivePoas.",
+   "evidence": "DTSX:1906-1953, 1970-2084, 2137-2214, 608-643, 836-854; 0030_PoaAccountUpdateDailyTest DTSX:4187-4222",
+   "wrongUnits": []
+  },
+  {
+   "id": "L|Package\\Create Fund View Table|detail",
+   "hash": "080308a48eec",
+   "verdict": "WRONG",
+   "detail": "Units 1-4 are verified. The Gen_existinfile reasoning holds: 0034 DTSX:15 selects it from Gen_fundmain alone, and an unqualified column that exists in gen_fundmain cannot also exist in another FROM table without an ambiguity error. Statecode 0 / statuscode 1 are at main.vb:30/27. The owner fields come from the step-3 user. The second sentence of unit 5 (ac2 conditions) matches the SQL. Problem: the first sentence of unit 5, 'סוכנים וסוכנויות מקבלים הרשאת צפייה בקופות', states a CRM effect as fact. The package only inserts and deletes rows in Gen_allowedinformationforfundBase. No supplied file consumes that table, and the same component's open question (unit 3) says it is unknown whether any permission mechanism uses it. The other business-outcome texts label their purpose as השערה (e.g. 0022).",
+   "evidence": "0024 open claim L|Package\\Create Fund View Table|open unit 3; grep: Gen_allowedinformationforfund appears only in 0024; writes = INSERT DTSX:608-643, DELETE DTSX:2529, 2566, 4481; 0034_SetMaxRevaluationDate DTSX:15; main.vb:27,30 (DTSX:845, 848)",
+   "wrongUnits": [
+    {
+     "unit": 5,
+     "problem": "'מקבלים הרשאת צפייה' asserts an enforcement effect that the files do not show and that contradicts open unit 3",
+     "correct": "Rows linking the agent/agency to the fund, contact and account are inserted into Gen_allowedinformationforfund. That this grants view access in CRM is a hypothesis from the table name (השערה; the consumer is external_unknown).",
+     "evidence": "0024 open claim L|Package\\Create Fund View Table|open unit 3; grep: Gen_allowedinformationforfund appears only in 0024; writes = INSERT DTSX:608-643, DELETE DTSX:2529, 2566, 4481"
+    }
+   ]
+  },
+  {
+   "id": "L|Package\\Create Fund View Table|open",
+   "hash": "943325a06994",
+   "verdict": "CONFIRMED",
+   "detail": "Unit 1: 0030 DTSX:4187/4222 verified, and the CRM option-set definition is not supplied. Unit 2: the NULL-key behaviour of a full-cache Lookup is SSIS runtime behaviour, not settled by the DTSX. Unit 3: no supplied package reads Gen_allowedinformationforfund. Unit 4: ORDER BY POW_START_DATE has no tie-breaker. The insert lookup ignores POW_MAIN but 'Check if valid allow' includes it, so the delete/re-add consequence is correctly labelled השערה.",
+   "evidence": "DTSX:1970-1974, 2137-2185, 2225-2463; 0030 DTSX:4187-4222; grep allowedinformation -> only 0024",
+   "wrongUnits": []
+  }
+ ]
+}

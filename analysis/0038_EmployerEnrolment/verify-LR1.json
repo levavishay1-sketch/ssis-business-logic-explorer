@@ -1,0 +1,38 @@
+{
+  "verifier": "ssis-verifier",
+  "package": "0038_EmployerEnrolment",
+  "scope": "logic-claims re-check after fixes",
+  "checkedAt": "2026-11-07T12:00:00.000Z",
+  "checked": 2,
+  "results": [
+    {
+      "id": "L|ignored",
+      "hash": "f94b69a2ada7",
+      "verdict": "CONFIRMED",
+      "detail": "Get Variables From Etl Varibles is no longer listed (correct: it sets User::GviaQueueId/MaasikimQueueId, DTSX:3283, which become the email from/to parties). Remaining items re-checked: Create ETL Process record only creates gen_etlprocess (gen_name, gen_etlname, gen_etlversion, gen_runinserver; it declares the queue variables as ReadOnly but never uses them, DTSX:40, 258-270); End ETL Process record updates gen_etlprocess (DTSX:903-911); Adding Error message 1 / 1 1 are Derived Columns on the Errors / Error outputs feeding ETL Warning 1 2 1 / 1 2 1 1 (paths); both ETL Warning scripts only create gen_etlprocesswarning (DTSX:4715-4727, 5487-5499) and differ only in AssemblyName. All are ETL plumbing.",
+      "evidence": "DTSX:37-40, 258-270, 644, 903-911, 4690-4740 vs 5462-5512, 3283, paths of Package\\Send Email",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Send Email|detail",
+      "hash": "900887bcf19a",
+      "verdict": "INCOMPLETE",
+      "detail": "Verified: [1] state 1, CreatedOn >= GETDATE()-7, ID match stripping leading zeros and spaces (PATINDEX('%[^0 ]%') both sides), Gen_existinfile = 1, gen_employerdepositdate <= fm.Gen_FundCreationDate, product pairs 1-1, 2-4, 3-2 (DTSX:6076-6112). [2] left join Gen_employers with AccountNumber = Gen_CorporateNumber; no existing-email check, no flag. [3] Check If To Send Mail main.cs:117-141 exactly as stated; deposit type 1 -> to Gvia, 2 -> to Maasikim, else nothing (main.cs:86-95). [4] email Create with regardingobjectid gen_employerenrolment, from/to activityparty on queue, directioncode true, then SendEmail IssueSend=true TrackingToken '' (main.cs:126-174); queue variables default empty (DTSX:20-25), ReadWrite in Get Variables (DTSX:3283); PostExecute throws when a ReadWrite variable is missing (DTSX:2656-2658); Success chain DTSX:7458-7459. Missing / imprecise: (a) unit 1 omits that the source query INNER JOINs Account on ee.gen_employersnumber = a.AccountId, so an enrolment with no (or no matching) employer account is never selected, including self-employed ones; (b) unit 4 says the queue ids come from 'gen_etlvariable' and that the step throws if a variable 'is not found in gen_etlvariable', but the query only reads rows WHERE gen_scope = 'global' OR gen_scope = ? with ? = System::PackageName (DTSX:2394-2398, ParameterMapping); a key stored under another scope also triggers the exception, and a duplicate key across those scopes makes Dictionary.Add throw in ProcessInputRow (case-insensitive dictionary) with the same Success-chain effect; (c) unit 4 lists the written email attributes but omits subject and description (the alert text, main.cs:133-134, 176-195).",
+      "evidence": "DTSX:6076-6112, 2394-2398 + ParameterMapping 'Parameter0:Input',System::PackageName, 2620-2680 (Dictionary OrdinalIgnoreCase, Add, PostExecute throw), main.cs 117-141 (DTSX:3658-3682), main.cs 71-195 (DTSX:6402-6526), DTSX:7458-7460",
+      "wrongUnits": [
+        {
+          "unit": 1,
+          "problem": "Population omits the mandatory INNER JOIN Account a ON ee.gen_employersnumber = a.AccountId.",
+          "correct": "Add: ההצטרפות נבחרת רק אם ee.gen_employersnumber מצביע על Account קיים (INNER JOIN); הצטרפות בלי מעסיק תואם, גם של עצמאי, לא נבחרת ולא נרשמת.",
+          "evidence": "DTSX:6076-6112 (JOIN Account as a on ee.gen_employersnumber = a.AccountId)"
+        },
+        {
+          "unit": 4,
+          "problem": "Source of the queue ids and the failure condition are stated without the scope filter; duplicate-key failure omitted; subject/description not listed among written attributes.",
+          "correct": "מזהי התורים נטענים מ-gen_etlvariable רק משורות שבהן gen_scope = 'global' או gen_scope = שם החבילה (System::PackageName). אם מפתח חסר בשורות אלה, PostExecute זורק חריגה; אם אותו מפתח מופיע פעמיים (ללא תלות באותיות), Dictionary.Add זורק חריגה; בשני המקרים שלבי ההמשך לא רצים. המייל נוצר גם עם subject ו-description (טקסט ההתראה).",
+          "evidence": "DTSX:2394-2398, 2656-2658, main.cs:133-134"
+        }
+      ]
+    }
+  ]
+}

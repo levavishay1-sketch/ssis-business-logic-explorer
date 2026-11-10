@@ -1,0 +1,1504 @@
+{
+ "changes": [
+  {
+   "claimId": "L|summary",
+   "field": "summary_he",
+   "before": "החבילה קולטת את קובץ ה-BY היומי של בנק לאומי (קובץ ברוחב קבוע, נטען לשתי טבלאות Staging לפי שתי פריסות) ומעדכנת לפיו את CRM: יוצרת קופות יעד (gen_fundmain) להעברות בין מסלולים, יוצרת בקשות העברה נכנסות (gen_transferin) – בין מסלולים ומגופים חיצוניים (כולל עדכון סטטוסים, ביטוח לאומי לחיסכון לילד ומסמכים מצורפים), יוצרת מסלולי חשבון ופיצולי מסלול להעברות פתוחות, מסנכרנת בקשות תנועה בקופה (gen_ftrequest) – יצירה/עדכון וסגירת בקשות שלא הופיעו בקובץ, יוצרת/מעדכנת בקשות העברה יוצאות (gen_customercare) ומעדכנת פרטי איש קשר אצל מעסיקים (account). חלק מהכתיבות ל-gen_ftrequest מבוצעות ב-SQL ישיר על מסד CRM (Unsupported); השאר דרך CRM SDK.",
+   "after": "החבילה קולטת את קובץ ה-BY היומי של בנק לאומי (קובץ ברוחב קבוע, נטען לשתי טבלאות Staging לפי שתי פריסות) ומעדכנת לפיו את CRM: יוצרת קופות יעד (gen_fundmain) להעברות בין מסלולים, יוצרת בקשות העברה נכנסות (gen_transferin) – בין מסלולים ומגופים חיצוניים (כולל עדכון סטטוסים, ביטוח לאומי לחיסכון לילד ומסמכים מצורפים לבקשות קיימות), יוצרת מסלולי חשבון ופיצולי מסלול להעברות פתוחות, ומסנכרנת בקשות תנועה בקופה (gen_ftrequest): יצירה/עדכון, יצירת איש קשר (contact) ללקוח שאינו קיים ב-CRM, וסגירת בקשות פעילות שלא סומנו מחדש \"קיימות בקובץ\" – כולל בקשות שמופיעות בקובץ אך לא עברו את סינון האוכלוסייה או שהמעסיק שלהן לא נמצא. בנוסף יוצרת/מעדכנת בקשות העברה יוצאות (gen_customercare) ומצרפת להן מסמכים (annotation), ומעדכנת פרטי איש קשר אצל מעסיקים (account). חלק מהכתיבות ל-gen_ftrequest מבוצעות ב-SQL ישיר על מסד CRM (Unsupported); השאר דרך CRM SDK.",
+   "why": "Summary omitted two active SDK writes (contact Create in the ftrequest flow, annotation Create on gen_customercare) and described closure as only \"requests not in the file\"; requests that are in the file but fail Case 1 or the employer lookup are not re-marked and are closed too.",
+   "evidence": "Create or update  Fund Trunsaction Request\\Create Contact 1 main.cs:129-133 (DTSX:50804); paths Check IF account Exist Match -> Check If Contact Exist No Match -> Multicast 1 -> Aggregate -> Create Contact; Create transferout\\Create Annotations main.cs:101-111 (DTSX:140234); DTSX:50704 (Case 1 Default unconnected), 47734 (No Match unconnected), 189416, 189422",
+   "verifierAccepted": true
+  },
+  {
+   "claimId": "L|summary",
+   "field": "executionNotes_he[0]",
+   "before": "כל האילוצים הם Success עם LogicalAnd – שרשרת סדרתית אחת; אין ענפים מקבילים ברמת ה-Control Flow. כשל של שלב עוצר את השלבים שאחריו (באותו קובץ). (DTSX:195311–195330, 198638–198642)",
+   "after": "כל האילוצים הם Success עם LogicalAnd – שרשרת סדרתית אחת; אין ענפים מקבילים ברמת ה-Control Flow ואין אילוצי Failure/Completion. אם שלב נכשל – השלבים שאחריו לא רצים לאותו קובץ, והקובץ לא מועבר לארכיון. ללולאה ולחבילה לא מוגדר MaximumErrorCount (אין DTS:MaxErrorCount, DTSX:723), ולכן לפי התנהגות SSIS המתועדת (ברירת מחדל 1, לא מוצג בקבצים) הכשל מכשיל גם את הלולאה – והקבצים הנותרים ברשימה לא מעובדים באותה ריצה. ה-OnError הריק של שלב בקשות התנועה מוגדר Propagate = -1, כלומר אינו עוצר את התפשטות הכשל. (DTSX:195311–195330, 198638–198642, 42831–42838)",
+   "why": "Failure effect understated: no Failure/Completion constraints, no MaxErrorCount on the loop or package, and the only inner OnError handler has Propagate=-1. By documented SSIS default (MaximumErrorCount=1) a failed task fails the Foreach container, so the remaining files are not processed. Runtime default is not in the file, so it is labelled as such.",
+   "evidence": "DTSX:723 (Foreach executable, no DTS:MaxErrorCount; grep finds no MaxErrorCount anywhere in the file); PCs DTSX:195311-195330 have no DTS:Value (Success); DTSX:42831-42838 Propagate=-1",
+   "verifierAccepted": true
+  },
+  {
+   "claimId": "L|finding#6",
+   "field": "findings_he[5].text",
+   "before": "השמטות שקטות: שורות נזרקות ללא אזהרה כשאין התאמה ב-Lookup ללא נתיב No Match – מוצר/קופה (יצירת קופה), חשבון לקוח (מסלולים), מתחרה/חשבון לקוח/קופה (חיצוני – יצירה), מעסיק (ftrequest), איש קשר/מתחרה (העברה יוצאת), account (מעסיק), העברה פתוחה/קופה (מסלולי חשבון). כמו כן שורות \"Old records\", מחוץ לחלון התאריכים, Seconed/Third/Duplicate.",
+   "after": "השמטות שקטות: שורות נזרקות ללא אזהרה כשאין התאמה ב-Lookup ללא נתיב No Match – מוצר/קופה (יצירת קופה), חשבון לקוח (מסלולים), חשבון לקוח/קופה (חיצוני – יצירה), מעסיק (ftrequest), איש קשר/מתחרה (העברה יוצאת), account (מעסיק), העברה פתוחה/קופה (מסלולי חשבון). המתחרה בהעברה נכנסת מגוף חיצוני נזרק במנגנון אחר: ה-Lookup \"Get source competitor ignore failue\" מוגדר להתעלם מכשל (IgnoreFailure), השורה ממשיכה עם CompetitorId ריק, ובמסלול היצירה היא נזרקת בפיצול \"Check if SourceCompetitor exists\" – יציאת CompetitorNotExists שלו אינה מחוברת. כמו כן נזרקות שורות \"Old records\", שורות מחוץ לחלון התאריכים ושורות Seconed/Third/Duplicate.",
+   "why": "Competitor drop in the external transfer-in create path is not a Lookup without No Match path: the lookup uses IgnoreFailure and the drop happens in Conditional Split \"Check if SourceCompetitor exists\" (CompetitorNotExists unconnected).",
+   "evidence": "DTSX:94465 (Get source competitor ignore failue: only Lookup Match Output connected, IgnoreFailure); DTSX:82586 (Check if SourceCompetitor exists: only Competitor Exists -> Multicast 4 connected)",
+   "verifierAccepted": true
+  },
+  {
+   "claimId": "L|finding#6",
+   "field": "findings_he[5].evidence",
+   "before": "נתיבי ה-Data Flow (reports/survey_BY.txt) – יציאות No Match/Default לא מחוברות",
+   "after": "נתיבי ה-Data Flow (reports/survey_BY.txt) – יציאות No Match/Default לא מחוברות; Get source competitor ignore failue (DTSX:94465, IgnoreFailure) → Check if SourceCompetitor exists (DTSX:82586, CompetitorNotExists לא מחובר)",
+   "why": "Evidence for the corrected competitor mechanism.",
+   "evidence": "DTSX:94465, 82586",
+   "verifierAccepted": true
+  },
+  {
+   "claimId": "L|finding#9",
+   "field": "findings_he[8].text",
+   "before": "חוסר עקביות בסוג ישות: Create gen_fundmain כותב gen_agentname כ-contact ו-gen_agencyname כ-account, ואילו SDK Create gen_coursepartition משתמש באותן עמודות Gen_fundmain כ-gen_agents ו-gen_agencie. אחד מהם כנראה שגוי ביחס למטא-דאטה של CRM (לא סופקה).",
+   "after": "חוסר עקביות בסוג ישות: Create gen_fundmain כותב gen_agentname כהפניה ל-contact ו-gen_agencyname כהפניה ל-account, ואילו SDK Create gen_coursepartition שולח את אותן עמודות Gen_fundmain (fm.gen_agentname / fm.gen_agencyname ב-get dest fund) כהפניות ל-gen_agents ול-gen_agencie. בקבצים שסופקו יש ראיה עקיפה לסוג העמודות: בחבילה 0030 מופיע Contact.ContactId = poa.Gen_agentname (הערה \"-- סוכן\") ו-Account.AccountId = poa.Gen_agencyname (הערה \"-- סוכנות\"), ובחבילה 0024 מושווים gen_powerofattorney.Gen_agentname = gen_fundmain.gen_agentname ו-Gen_agencyname = gen_fundmain.gen_agencyname. לפי זה gen_fundmain.gen_agentname מכיל מזהי contact ו-gen_agencyname מזהי account – כמו ב-Create gen_fundmain – וההפניה ב-gen_coursepartition היא החריגה. מטא-דאטה של CRM לא סופקה, ולכן זו מסקנה עקיפה. אם gen_agent/gen_agency ב-gen_coursepartition מוגדרים כהפניה ל-gen_agents/gen_agencie, הם מקבלים מזהים של contact/account; מה קורה בזמן ריצה לא נראה בקבצים.",
+   "why": "The open point \"which one is wrong is unknown\" can be narrowed from supplied packages 0030 and 0024 (indirect, SQL-level evidence). Kept as an inference, not a fact, because CRM metadata is not supplied.",
+   "evidence": "0030_PoaAccountUpdateDailyTest.dtsx:4218-4219; 0024_AgentFundInformation.dtsx:2078-2080; 0009 get dest fund SQL (DTSX:4693: fm.gen_agentname, fm.gen_agencyname); SDK Create gen_coursepartition 1 main.cs:120-124",
+   "verifierAccepted": true
+  },
+  {
+   "claimId": "L|finding#9",
+   "field": "findings_he[8].evidence",
+   "before": "Create gen_fundmain 1 main.cs:162–163; SDK Create gen_coursepartition 1 main.cs:120–124; get dest fund SQL (DTSX:4693)",
+   "after": "Create gen_fundmain 1 main.cs:162–163; SDK Create gen_coursepartition 1 main.cs:120–124; get dest fund SQL (DTSX:4693); 0030_PoaAccountUpdateDailyTest.dtsx:4218–4219; 0024_AgentFundInformation.dtsx:2078–2080",
+   "why": "Added the cross-package evidence.",
+   "evidence": "0030:4218-4219; 0024:2078-2080",
+   "verifierAccepted": true
+  },
+  {
+   "claimId": "L|finding#15",
+   "field": "findings_he[14].text",
+   "before": "Create Contact בולע חריגות (גוף ה-catch בהערה) – כשל ביצירת contact לא מדווח, ובקשת ftrequest תיווצר ללא איש קשר.",
+   "after": "Create Contact בולע חריגות (גוף ה-catch בהערה): אם יצירת איש קשר נכשלת, הכשל לא מדווח, והשורה ממשיכה (פלט סינכרוני, Merge Join מסוג Inner) עם ContactId ריק. Set Final Fields קורא את ContactId בלי בדיקת NULL (main.cs:130). לפי התנהגות SSIS המתועדת (לא מוצג בקבצים) קריאה של עמודה ריקה זורקת חריגה, ואז ה-Data Flow של בקשות התנועה נכשל – ולא נוצרת בקשה ללא איש קשר. התוצאה בפועל דורשת אימות בריצה (ראו גם ממצא 28).",
+   "why": "The stated consequence \"the ftrequest will be created without a contact\" is not supported and contradicted finding#28. Rewritten conditionally and aligned with finding#28.",
+   "evidence": "Create Contact 1 main.cs:123-143 (DTSX:50804, catch body commented out); Merge Join JoinType=2 (Inner) DTSX:56897; Set Final Fields main.cs:130 (DTSX:57945)",
+   "verifierAccepted": true
+  },
+  {
+   "claimId": "L|finding#15",
+   "field": "findings_he[14].evidence",
+   "before": "Create Contact 2 main.cs:136–141",
+   "after": "Create Contact 1 main.cs:136–142 (DTSX:50804); Merge Join JoinType = 2 (DTSX:56897); Set Final Fields main.cs:130 (DTSX:57945)",
+   "why": "Evidence for the conditional runtime path.",
+   "evidence": "DTSX:50804, 56897, 57945",
+   "verifierAccepted": true
+  },
+  {
+   "claimId": "L|Package\\Foreach Loop Container|detailed",
+   "field": "detailed.nodes[7].tech",
+   "before": "כל ה-Precedence Constraints בלולאה הם Success (DTSX:195311–195330)",
+   "after": "כל ה-Precedence Constraints בלולאה הם Success (DTSX:195311–195330); אין DTS:MaxErrorCount על הלולאה (DTSX:723)",
+   "why": "Add the evidence for the failure behaviour.",
+   "evidence": "DTSX:723, 195311-195330",
+   "verifierAccepted": true
+  },
+  {
+   "claimId": "L|Package\\Foreach Loop Container|detailed",
+   "field": "detailed.nodes[7].branches[0].nodes[0].text",
+   "before": "השלבים שאחריו לא רצים עבור הקובץ.",
+   "after": "השלבים שאחריו לא רצים לקובץ הזה, והקובץ לא מועבר לארכיון. לפי התנהגות SSIS המתועדת (MaximumErrorCount ברירת מחדל 1, לא מוצג בקבצים) הכשל מכשיל גם את הלולאה, והקבצים הנותרים ברשימה לא מעובדים באותה ריצה.",
+   "why": "Failure outcome was incomplete: with no MaxErrorCount and no failure constraint, a failed task fails the container by documented SSIS default, so the loop stops and remaining files are not processed.",
+   "evidence": "DTSX:723 (no DTS:MaxErrorCount); PCs DTSX:195311-195330 (all Success)",
+   "verifierAccepted": true
+  },
+  {
+   "claimId": "L|Package\\Foreach Loop Container\\Create fundmain for transferin|short",
+   "field": "short.nodes[1].branches[1].nodes[0].text",
+   "before": "נוצרת קופה חדשה במסלול היעד, כהעתק של קופת המקור עם יתרות אפס.",
+   "after": "אם נמצאו בבנק 10 מוצר למסלול היעד וקופת מקור המסומנת \"קיימת בקובץ\" – נוצרת קופה חדשה במסלול היעד, כהעתק של קופת המקור עם יתרות אפס; אחרת השורה מושמטת ללא הודעה.",
+   "why": "Creation also requires the target product (get dest fundtype) and the source fund (get source fund, bank 10, existinfile=1); otherwise the row is dropped silently.",
+   "evidence": "DTSX:38229 (get dest fundtype, No Match unconnected), DTSX:38292 (get source fund, No Match unconnected)",
+   "verifierAccepted": true
+  },
+  {
+   "claimId": "L|Package\\Foreach Loop Container\\Create fundmain for transferin|short",
+   "field": "short.nodes[2].text",
+   "before": "לפני פתיחת בקשת ההעברה בין המסלולים קיימת קופת יעד באותו חשבון.",
+   "after": "קופת יעד חסרה נוצרת לפני פתיחת בקשת ההעברה בין המסלולים, רק כשנמצאו מוצר היעד וקופת המקור והיצירה ב-CRM הצליחה.",
+   "why": "End state overclaimed that a target fund exists; creation is conditional.",
+   "evidence": "DTSX:38229, 38292; Create gen_fundmain 1 main.cs:246-250",
+   "verifierAccepted": true
+  },
+  {
+   "claimId": "L|Package\\Foreach Loop Container\\Create fundmain for transferin|detailed",
+   "field": "detailed.nodes[7].text",
+   "before": "לפני פתיחת בקשת ההעברה בין המסלולים קיימת קופת יעד באותו חשבון.",
+   "after": "קופת יעד חסרה נוצרת לפני פתיחת בקשת ההעברה בין המסלולים, רק כשנמצאו מוצר היעד וקופת המקור והיצירה ב-CRM הצליחה.",
+   "why": "Same overclaim in the detailed end node (rule 2: keep views consistent).",
+   "evidence": "DTSX:38229, 38292; Create gen_fundmain 1 main.cs:246-250",
+   "verifierAccepted": true
+  },
+  {
+   "claimId": "L|Package\\Foreach Loop Container\\Create fundmain for transferin|detail",
+   "field": "detail_he[4].t",
+   "before": "לפני יצירת בקשת ההעברה בין מסלולים (שלב 13) ומסלולי החשבון/פיצולי המסלול (שלב 17), מובטח שקיימת קופת יעד באותו חשבון.",
+   "after": "השלב יוצר קופת יעד חסרה לפני יצירת בקשת ההעברה בין מסלולים (שלב 13) ומסלולי החשבון/פיצולי המסלול (שלב 17), אבל אין בכך הבטחה שהקופה קיימת: אם מוצר היעד או קופת המקור (בנק 10, gen_existinfile = 1) לא נמצאו – השורה מושמטת בלי הודעה; אם בקשת היצירה ב-ExecuteMultiple מחזירה Fault – השורה עוברת לפלט השגיאה (main.cs:246–250); ושלב 13 עובד עם סינון שאינו זהה לזה שכאן (ראו ממצא 12).",
+   "why": "Overclaimed guarantee: silent drops when product/source fund not found, SDK faults routed to error, and step 13 filters a different population.",
+   "evidence": "DTSX:38229, 38292; Create gen_fundmain 1 main.cs:246-250 (DTSX:26886); finding#12",
+   "verifierAccepted": true
+  },
+  {
+   "claimId": "L|Package\\Foreach Loop Container\\Create fundmain for transferin|open",
+   "field": "openQuestions_he[0]",
+   "before": "סוג השדה gen_weightedmanagementfeepercentage ב-CRM (נשלח double 0.0) – לא ידוע.",
+   "after": "סוג השדה gen_weightedmanagementfeepercentage (נשלח double 0.0) – נענה מהקבצים: בחבילה 0004 העמודה Gen_fundmain.gen_weightedmanagementfeepercentage נקראת ממסד CRM כ-r8 (float) (0004_LeumiFile-MY.dtsx:60686), וחבילה 0008 שולחת לאותו שדה double 0.0 באותה צורה (0008_LeumiFile-PY.dtsx:23806). לפי מוסכמת האחסון של CRM (לא מוצגת בקבצים) עמודת float שייכת לשדה מסוג Floating Point, ולכן double 0.0 תואם.",
+   "why": "Open question answerable from supplied files: the lookup output type in 0004 is r8 (SQL float).",
+   "evidence": "0004_LeumiFile-MY.dtsx:60686; 0008_LeumiFile-PY.dtsx:23806",
+   "verifierAccepted": true
+  },
+  {
+   "claimId": "L|Package\\Foreach Loop Container\\Create transferin Maslulim|detail",
+   "field": "detail_he[0].t",
+   "before": "BY_FileData_1. gen_deliverydate ← Execution_Date_54, gen_requestidentifier ← Request_Id_73, gen_transferid ← Transaction_Id_91 (שינוי שם במקור, DTSX:126651). Childe Saving handel: אם Source_Fund_Type_16/Dest_Fund_Type_43 == \"5006\" → \"1025\" (main.cs:120–129).",
+   "after": "BY_FileData_1. gen_deliverydate ← Execution_Date_54, gen_requestidentifier ← Request_Id_73, Transaction_Id_91 נקרא בשם gen_transferid (DTSX:126651), אבל אינו עובר את ה-Merge Join (DTSX:126537) ואינו מגיע ל-CRM; gen_transferid ב-CRM נכתב ממספר החשבון Source_Account_Number_20 המרופד (SDK Create main.cs:109–110). Childe Saving handel: אם Source_Fund_Type_16/Dest_Fund_Type_43 == \"5006\" → \"1025\" (main.cs:120–129).",
+   "why": "Transaction_Id_91 (alias gen_transferid) is dropped at the Merge Join (output columns: gen_requestidentifier, gen_deliverydate, Appendix_D_Sended_153, gen_id, gen_bankaccountnumber); CRM gen_transferid comes from gen_bankaccountnumber.",
+   "evidence": "Merge Join DTSX:126537 output columns; SDK Create gen_TransferIn 1 main.cs:109-110",
+   "verifierAccepted": true
+  },
+  {
+   "claimId": "L|Package\\Foreach Loop Container\\Create transferin Maslulim|open",
+   "field": "hypotheses_he[0]",
+   "before": "gen_transfertype = 5 = \"העברה בין מסלולים\" – השערה לפי הקשר; תווית ה-optionset לא סופקה.",
+   "after": "gen_transfertype = 5: בחבילה 0029 מופיעה ליד \"tr.Gen_transferType = 5\" ההערה \"-- between courses\" (0029_POA.dtsx:40249), ובחבילה 0005 ההערה \"--בין מסלולים\" (0005_Customer Account.dtsx:70706, 77202). תווית ה-optionset עצמה לא סופקה.",
+   "why": "Hypothesis replaced by what the supplied files show (SQL comments in 0029 and 0005), labelled as comments.",
+   "evidence": "0029_POA.dtsx:40249; 0005_Customer Account.dtsx:70706, 77202",
+   "verifierAccepted": true
+  },
+  {
+   "claimId": "L|Package\\Foreach Loop Container\\Create transferin Maslulim|open",
+   "field": "hypotheses_he[1]",
+   "before": "המרת 5006→1025 קשורה לחיסכון לילד – השערה לפי שם הרכיב \"Childe Saving handel\".",
+   "after": "המרת 5006→1025: בחבילה 0008 מוגדרים הקבועים GEMEL_TO_INVEST_BY_BANK = \"5006\" ו-GEMEL_TO_INVEST_BY_CRM = \"1025\" (0008_LeumiFile-PY.dtsx:42754–42755) – לפי שמות הקבועים 5006 הוא קוד הבנק ו-1025 קוד ה-CRM של \"gemel to invest\" (קופת גמל להשקעה). הקשר לחיסכון לילד נשען רק על שם הרכיב \"Childe Saving handel\" (השערה).",
+   "why": "Hypothesis ignored the explicit constant names in 0008; the child-saving link remains only the component name.",
+   "evidence": "0008_LeumiFile-PY.dtsx:42754-42755; DTSX:123046",
+   "verifierAccepted": true
+  },
+  {
+   "claimId": "L|Package\\Foreach Loop Container\\Create transferin from outside source|title",
+   "field": "short_he",
+   "before": "לבקשות העברה נכנסת מקופה חיצונית: אם אין gen_transferin עם אותו מזהה בקשה – יוצר בקשה חדשה (סוג 1, \"בתהליך\") מקושרת לחשבון הלקוח, לקופה, למתחרה ולאיש התפעול; אם קיימת – מעדכן סטטוס לאומי, תאריכי נספח ד׳/ביטול, מספר מסלקה, ובקטינים גם סטטוס ביטוח לאומי/קבלת הפקדה. לבקשות קיימות מצרף גם מסמכים (annotation) מתיקיית הנספחים; לבקשות שנוצרו באותה ריצה לא נוצרים מסמכים.",
+   "after": "לבקשות העברה נכנסת מקופה חיצונית: אם אין gen_transferin עם אותו מזהה בקשה – יוצר בקשה חדשה (סוג 1, \"בתהליך\") המקושרת לחשבון הלקוח, לאיש הקשר, למתחרה (הקופה המעבירה), לבית ההשקעות ולאיש התפעול, בתנאי שסיבת הסטטוס ומדד אישור ההעברה ריקים או מספריים; אם קיימת – מעדכן סטטוס לאומי, תאריכי נספח ד׳/ביטול, מספר מסלקה, ובקטינים גם סטטוס ביטוח לאומי/קבלת הפקדה. לבקשות קיימות שעדכונן הצליח או שלא נדרש להן עדכון מצרף גם מסמכים (annotation) מתיקיית הנספחים; לבקשות שנוצרו באותה ריצה לא נוצרים מסמכים.",
+   "why": "Create writes no link to gen_fundmain (fund is only used to fetch extra data); the actual links are customer account, contact, competitor, invest house, operation person (and currency). Also the create path has an extra row gate (Convert gen_isActive) and annotations are only for successful/no-need updates.",
+   "evidence": "SDK Create gen_TransferIn 1 main.cs:154-173 (DTSX:96954); Convert gen_isActive from char to int main.cs:116-170 (DTSX:87181); its Error output has no path (DTSX:88172); create path order: If transferin Exists[To Create] -> ... -> remove duplications -> Remove 0's -> Convert gen_isActive -> Multicast 1 1 -> Add Row Number 1 -> SDK Create; Union All Inputs 1-2 (DTSX:108245)",
+   "verifierAccepted": true
+  },
+  {
+   "claimId": "L|Package\\Foreach Loop Container\\Create transferin from outside source|title",
+   "field": "flow_he[6]",
+   "before": "יצירה: נדרש מתחרה, חשבון לקוח יעד (לפי חשבון + סוג מוצר) וקופה של חשבון הלקוח; מופע ראשון לכל בקשה ולכל חשבון יעד",
+   "after": "יצירה: נדרש מתחרה, חשבון לקוח יעד (לפי חשבון + סוג מוצר) וקופה של חשבון הלקוח; מופע ראשון לכל בקשה ולכל חשבון יעד; סיבת הסטטוס ומדד אישור ההעברה חייבים להיות ריקים או מספריים (אחרת השורה מושמטת ללא הודעה)",
+   "why": "Create prerequisites omitted the Convert gen_isActive row gate.",
+   "evidence": "Convert gen_isActive from char to int main.cs:116-170 (DTSX:87181); its Error output has no path (DTSX:88172); create path order: If transferin Exists[To Create] -> ... -> remove duplications -> Remove 0's -> Convert gen_isActive -> Multicast 1 1 -> Add Row Number 1 -> SDK Create",
+   "verifierAccepted": true
+  },
+  {
+   "claimId": "L|Package\\Foreach Loop Container\\Create transferin from outside source|detailed",
+   "field": "detailed.nodes[6].branches[0].nodes[1].branches[1].nodes[0].text",
+   "before": "סטטוס הפעולה נקבע ל\"בקשת לקוח\" וסוג הדחייה ל\"חיסכון לילד\"; סיבת הדחייה המחושבת אינה נכתבת.",
+   "after": "סטטוס הפעולה נקבע ל\"בקשת לקוח\" וסוג הדחייה ל\"חיסכון לילד\". סיבת הדחייה המחושבת אינה נכתבת: אם ב-CRM כבר רשומה אותה סיבה – היא נמחקת; אם רשומה סיבה אחרת – היא נשארת; אם השדה ריק ב-CRM – לא נכתבת סיבה (ראו ממצא 2).",
+   "why": "Omitted that an existing equal reject reason is cleared (else-branch sets -1 and Update writes null).",
+   "evidence": "Compare Fields Before Update main.cs:158-168 (DTSX:82619); Update TransferIn 1 main.cs:134-139 (DTSX:114631)",
+   "verifierAccepted": true
+  },
+  {
+   "claimId": "L|Package\\Foreach Loop Container\\Create transferin from outside source|detailed",
+   "field": "detailed.nodes[6].branches[0].nodes[1].branches[1].nodes[0].tech",
+   "before": "gen_actionstatus = 3, gen_rejecttype = 4; סיבה 45/46/47 לא נכתבת (ראו ממצא)",
+   "after": "gen_actionstatus = 3, gen_rejecttype = 4; סיבה 45/46/47 נכתבת לשורה רק כשב-CRM יש סיבה אחרת, ו-Update TransferIn לא כותב אותה; סיבה זהה ב-CRM → -1 → gen_requestrejectreason = null (Compare main.cs:158–168; Update main.cs:134–135)",
+   "why": "Exact mechanism of the reject reason.",
+   "evidence": "Compare Fields Before Update main.cs:158-168; Update TransferIn 1 main.cs:134-139",
+   "verifierAccepted": true
+  },
+  {
+   "claimId": "L|Package\\Foreach Loop Container\\Create transferin from outside source|detailed",
+   "field": "detailed.nodes[6].branches[0].nodes[4].text",
+   "before": "מסמכים מצורפים שמופיעים בשורה (עד ארבעה) נקלטים מתיקיית הנספחים ונקשרים לבקשה, והקבצים מועברים לארכיון.",
+   "after": "לבקשות שעדכונן הצליח או שלא נדרש להן עדכון, מסמכים מצורפים שמופיעים בשורה (עד ארבעה) נקלטים מתיקיית הנספחים ונקשרים לבקשה, והקבצים מועברים לארכיון. בקשה שעדכונה נכשל (CastingError) לא מקבלת מסמכים.",
+   "why": "Annotations are created only for rows that reached Union All Input 1 (Update Result) or Input 2 (no need to update); rows whose update threw go to CastingError.",
+   "evidence": "Union All (DTSX:108245) inputs: Row Update Count (from Union All - result <- Update TransferIn n.Outputs[Result]) and No Need To Update Count; Update TransferIn n.Outputs[CastingError] -> Union All - casting error",
+   "verifierAccepted": true
+  },
+  {
+   "claimId": "L|Package\\Foreach Loop Container\\Create transferin from outside source|detailed",
+   "field": "detailed.nodes[6].branches[1 \"לא – יצירה\"].nodes[insert at 3]",
+   "before": null,
+   "after": {
+    "type": "decision",
+    "text": "האם סיבת הסטטוס ומדד אישור ההעברה ריקים או מספריים?",
+    "tech": "Convert gen_isActive from char to int main.cs:135–168 (DTSX:87181): int.TryParse על Transfer_Status_Reason_89 ו-Transfer_Approval_Index_122 כשאינם NULL; כישלון → Error, ללא נתיב (DTSX:88172). בנוסף int.Parse(Is_Active_92) (main.cs:123) זורק חריגה על ערך לא ריק שאינו מספרי ומכשיל את הרכיב.",
+    "branches": [
+     {
+      "label": "לא",
+      "nodes": [
+       {
+        "type": "end",
+        "text": "הבקשה לא נוצרת, ללא הודעה."
+       }
+      ]
+     },
+     {
+      "label": "כן",
+      "nodes": [
+       {
+        "type": "step",
+        "text": "השורה ממשיכה ליצירה."
+       }
+      ]
+     }
+    ]
+   },
+   "why": "Create branch omitted a row gate: Convert gen_isActive routes rows with non-numeric Transfer_Status_Reason_89 / Transfer_Approval_Index_122 to an unconnected Error output; int.Parse(Is_Active_92) can throw.",
+   "evidence": "Convert gen_isActive from char to int main.cs:116-170 (DTSX:87181); its Error output has no path (DTSX:88172); create path order: If transferin Exists[To Create] -> ... -> remove duplications -> Remove 0's -> Convert gen_isActive -> Multicast 1 1 -> Add Row Number 1 -> SDK Create",
+   "verifierAccepted": true
+  },
+  {
+   "claimId": "L|Package\\Foreach Loop Container\\Create transferin from outside source|detail",
+   "field": "detail_he[3].t",
+   "before": "SDK service.Create(gen_transferin) לשורה (main.cs:63–190): gen_transfertype = 1, gen_currentstate = 1, gen_transferincreationsource = 1, gen_clientstatus = Is_Active_92 (0→2; לא נכתב אם 0), gen_transferrequestsource = ISNULL(Gen_Reportbasedonstatisticalinfostampreceived) ? 2 : (==1 ? 2 : 1), gen_statusleumi = MapLeumiStatus(Request_Status_58), gen_appendixdreceived/gen_appendixdsent/gen_requestcancellationdate (ToLocalTime), gen_bankingreceiveddate = Appendix_D_Sended_153, gen_requestidentifier, gen_identitynumber (מאיש הקשר של הקופה), gen_transferid + gen_accountnumbersrctext + gen_sourcefundnumber = Source_Account_Number_20, gen_fundfinanceid = מזהה הקופה המעבירה (6 ספרות), gen_mislakanumber = Mislaka_Number_152, gen_currentdeposits = gen_sourceisfulltransfer, gen_actualtransferamount = gen_expectedtransferamount = 0.0, lookups: gen_operationpersonname, gen_customeraccountdest, gen_sourcefundtype (competitor), gen_investhousename, gen_contactname, transactioncurrencyid.",
+   "after": "SDK service.Create(gen_transferin) לשורה (main.cs:63–190). תנאי נוסף במסלול היצירה בלבד: Convert gen_isActive from char to int מנתב ל-Error שאינו מחובר שורה שבה Transfer_Status_Reason_89 או Transfer_Approval_Index_122 אינם NULL ואינם מספר – הבקשה לא נוצרת, ללא הודעה (main.cs:135–168, DTSX:87181, 88172). שדות: gen_transfertype = 1, gen_currentstate = 1, gen_transferincreationsource = 1, gen_clientstatus = Is_Active_92 כשאינו ריק: \"0\"→2, ספרה אחרת כמות שהיא; לא נכתב כש-Is_Active_92 ריק/NULL; ערך לא מספרי זורק חריגה ב-int.Parse ומכשיל את הרכיב (main.cs:121–131), gen_transferrequestsource = ISNULL(Gen_Reportbasedonstatisticalinfostampreceived) ? 2 : (==1 ? 2 : 1), gen_statusleumi = MapLeumiStatus(Request_Status_58), gen_appendixdreceived/gen_appendixdsent/gen_requestcancellationdate (ToLocalTime), gen_bankingreceiveddate = Appendix_D_Sended_153, gen_requestidentifier, gen_identitynumber (מאיש הקשר של הקופה), gen_transferid + gen_accountnumbersrctext + gen_sourcefundnumber = Source_Account_Number_20, gen_fundfinanceid = מזהה הקופה המעבירה (6 ספרות), gen_mislakanumber = Mislaka_Number_152, gen_currentdeposits = gen_sourceisfulltransfer, gen_actualtransferamount = gen_expectedtransferamount = 0.0, lookups: gen_operationpersonname, gen_customeraccountdest, gen_sourcefundtype (competitor), gen_investhousename, gen_contactname, transactioncurrencyid.",
+   "why": "gen_clientstatus wording was misleading (mapped value is never 0) and the create gate was missing.",
+   "evidence": "Convert gen_isActive from char to int main.cs:116-170 (DTSX:87181); its Error output has no path (DTSX:88172); create path order: If transferin Exists[To Create] -> ... -> remove duplications -> Remove 0's -> Convert gen_isActive -> Multicast 1 1 -> Add Row Number 1 -> SDK Create; SDK Create main.cs:78-79",
+   "verifierAccepted": true
+  },
+  {
+   "claimId": "L|Package\\Foreach Loop Container\\Create transferin from outside source|decisions",
+   "field": "decisions[13].condition",
+   "before": "if (!string.IsNullOrEmpty(Row.IsActive92)) { int isActive = int.Parse(Row.IsActive92); if (isActive == 0) { Row.genIsActive = isActive + 2; } else { Row.genIsActive = isActive; } }",
+   "after": "if (!string.IsNullOrEmpty(Row.IsActive92)) { int isActive = int.Parse(Row.IsActive92); if (isActive == 0) { Row.genIsActive = isActive + 2; } else { Row.genIsActive = isActive; } } … if (!Row.TransferStatusReason89_IsNull) { tryParse = int.TryParse(Row.TransferStatusReason89, out transferStatusReason); … else isValidRecord = false; } if (!Row.TransferApprovalIndex122_IsNull) { … else isValidRecord = false; } if (isValidRecord) Row.DirectRowToOutput0(); else Row.DirectRowToError();",
+   "why": "The component is also a row filter; quote the full condition.",
+   "evidence": "Convert gen_isActive from char to int main.cs:116-170 (DTSX:87181)",
+   "verifierAccepted": true
+  },
+  {
+   "claimId": "L|Package\\Foreach Loop Container\\Create transferin from outside source|decisions",
+   "field": "decisions[13].where",
+   "before": "Convert gen_isActive from char to int main.cs:121–131",
+   "after": "Convert gen_isActive from char to int main.cs:116–170 (DTSX:87181)",
+   "why": "Line range covers the filter part.",
+   "evidence": "DTSX:87181",
+   "verifierAccepted": true
+  },
+  {
+   "claimId": "L|Package\\Foreach Loop Container\\Create transferin from outside source|decisions",
+   "field": "decisions[13].meaning_he",
+   "before": "מיפוי סטטוס לקוח פעיל: 0→2, אחרת כמות שהוא",
+   "after": "מיפוי סטטוס לקוח פעיל (\"0\"→2, ספרה אחרת כמות שהיא) וסינון שורות שבהן סיבת הסטטוס או מדד אישור ההעברה אינם מספר",
+   "why": "Meaning extended to the row filter.",
+   "evidence": "main.cs:116-170",
+   "verifierAccepted": true
+  },
+  {
+   "claimId": "L|Package\\Foreach Loop Container\\Create transferin from outside source|decisions",
+   "field": "decisions[13].outcome_he",
+   "before": "gen_clientstatus (ביצירה לא נכתב אם 0)",
+   "after": "gen_clientstatus ביצירה – נכתב כש-Is_Active_92 אינו ריק, לא נכתב כשהוא ריק/NULL; ערך לא מספרי ב-Is_Active_92 זורק חריגה ומכשיל את הרכיב. שורה עם סיבת סטטוס או מדד אישור לא מספריים → Error שאינו מחובר (DTSX:88172) – הבקשה לא נוצרת.",
+   "why": "\"Not written if 0\" was vacuous (mapped value is never 0); the Error routing was missing.",
+   "evidence": "main.cs:116-170; SDK Create main.cs:78-79; DTSX:88172",
+   "verifierAccepted": true
+  },
+  {
+   "claimId": "L|Package\\Foreach Loop Container\\Create transferin from outside source|crm",
+   "field": "crmEffects[0].when_he",
+   "before": "אין בקשה עם אותו מזהה, הקופה המעבירה קיימת ב-Competitor, נמצאו חשבון לקוח יעד וקופה, מופע ראשון לבקשה ולחשבון",
+   "after": "אין בקשה עם אותו מזהה, הקופה המעבירה קיימת ב-Competitor, נמצאו חשבון לקוח יעד וקופה, מופע ראשון לבקשה ולחשבון, וסיבת הסטטוס ומדד אישור ההעברה ריקים או מספריים (Convert gen_isActive)",
+   "why": "Create condition omitted the Convert gen_isActive gate.",
+   "evidence": "Convert gen_isActive from char to int main.cs:116-170 (DTSX:87181); its Error output has no path (DTSX:88172); create path order: If transferin Exists[To Create] -> ... -> remove duplications -> Remove 0's -> Convert gen_isActive -> Multicast 1 1 -> Add Row Number 1 -> SDK Create",
+   "verifierAccepted": true
+  },
+  {
+   "claimId": "L|Package\\Foreach Loop Container\\Create transferin from outside source|open",
+   "field": "openQuestions_he[0]",
+   "before": "gen_actualtransferamount / gen_expectedtransferamount נשלחים כ-double 0.0 – אם השדות מסוג Money ב-CRM, היצירה עלולה להיכשל; סוג השדה לא ידוע.",
+   "after": "gen_actualtransferamount / gen_expectedtransferamount נשלחים ביצירה כ-double 0.0 (SDK Create gen_TransferIn main.cs:147–148). סוג השדות עולה מהקבצים: בחבילה 0015 שניהם נכתבים ל-gen_transferin כ-new Money(...) ונקראים ממסד CRM כעמודות cy (0015_TransferIn.dtsx:1097, 1138, 2587; 16184, 16197; 14229) – כלומר שדות Money. שאלה פתוחה: לפי התנהגות CRM SDK המתועדת (לא מוצג בקבצים) ערך double לשדה Money נדחה, ואז השורה הייתה עוברת ל-CastingError; איך היצירה מתבצעת בפועל דורש אימות בריצה.",
+   "why": "Field type is answered by supplied package 0015 (Money for both fields; verifier cited only gen_expectedtransferamount, but 0015 also writes gen_actualtransferamount on gen_transferin as Money). The runtime consequence stays open and conditional.",
+   "evidence": "0015_TransferIn.dtsx:1097, 1138, 2587 (expected), 16184/16197 (actual, Entity gen_transferin), 14229 (cy); 0009 SDK Create gen_TransferIn 1 main.cs:147-148 (DTSX:97225)",
+   "verifierAccepted": true
+  },
+  {
+   "claimId": "L|Package\\Foreach Loop Container\\Create transferin from outside source|short",
+   "field": "short.nodes[1].branches[1].nodes[0].text",
+   "before": "אם הקופה המעבירה, חשבון הלקוח והקופה שלו קיימים – נוצרת בקשת העברה נכנסת חדשה במצב \"בתהליך\".",
+   "after": "אם הקופה המעבירה, חשבון הלקוח והקופה שלו קיימים, וקודי סיבת הסטטוס ואישור ההעברה תקינים – נוצרת בקשת העברה נכנסת חדשה במצב \"בתהליך\".",
+   "why": "Short must not contradict detailed (rule 2): create also requires the Convert gen_isActive gate.",
+   "evidence": "Convert gen_isActive from char to int main.cs:116-170 (DTSX:87181); its Error output has no path (DTSX:88172); create path order: If transferin Exists[To Create] -> ... -> remove duplications -> Remove 0's -> Convert gen_isActive -> Multicast 1 1 -> Add Row Number 1 -> SDK Create",
+   "verifierAccepted": "short.nodes[1].branches[1].nodes[0].text"
+  },
+  {
+   "claimId": "L|Package\\Foreach Loop Container\\Create Acount Courses and course partition for transferin|title",
+   "field": "flow_he[3]",
+   "before": "כיוון 1 (מקור): קופת מקור (בנק 10) → אם אין מסלול חשבון להעברה+קופה → יצירת gen_accountcourses",
+   "after": "כל כיוון שאינו 2 (מקור – יציאת ברירת המחדל, כולל כיוון 1, ערך אחר או NULL): קופת מקור (בנק 10) → אם אין מסלול חשבון להעברה+קופה → יצירת gen_accountcourses",
+   "why": "Split Direction sends only Transaction_Direction_68 == \"2\" to destination; every other value (including NULL) goes to the source branch via the default output.",
+   "evidence": "Split Direction DTSX:20384 (Default Output \"Transfer Direction 1- Source\")",
+   "verifierAccepted": true
+  },
+  {
+   "claimId": "L|Package\\Foreach Loop Container\\Create Acount Courses and course partition for transferin|short",
+   "field": "short.nodes[2].text",
+   "before": "לכל העברה פתוחה נבנים המסלולים המועברים והמסלולים המקבלים, פעם אחת לכל קופה.",
+   "after": "לכל העברה פתוחה נבנים המסלולים המועברים והמסלולים המקבלים. רשומה נוצרת רק אם לא הייתה קיימת לפני תחילת השלב; שתי שורות לאותה העברה ולאותה קופה באותו קובץ ייצרו שתי רשומות.",
+   "why": "Full-cache lookups (CacheType 0) are loaded before rows flow (documented SSIS behaviour) and the data flow has no sort/aggregate/dedup, so records created in the same run are not seen; \"once per transfer+fund\" holds only against records that existed before the data flow started.",
+   "evidence": "Check for exist account courses CacheType=0 (DTSX:2952); Check if exist course partition CacheType=0 (DTSX:3045); component list has no Sort/Aggregate/dedup",
+   "verifierAccepted": true
+  },
+  {
+   "claimId": "L|Package\\Foreach Loop Container\\Create Acount Courses and course partition for transferin|detailed",
+   "field": "detailed.nodes[2].text",
+   "before": "נקבע סוג ההעברה לפי סוג הפעולה בקובץ: פעולה 2 או ריקה מקבלת ערך 1, וכל פעולה אחרת ערך 2.",
+   "after": "נקבע סוג ההעברה לפי סוג הפעולה בקובץ: פעולה 2 או ערך חסר (NULL) מקבלים ערך 1, וכל פעולה מספרית אחרת ערך 2. ערך שאינו מספרי או מחרוזת ריקה מכשילים את ה-Data Flow (ראו ממצא 27).",
+   "why": "Only NULL or numeric 2 gives 1; an empty or non-numeric string makes the (DT_I4) cast fail and the Derived Column error disposition is FailComponent.",
+   "evidence": "set additional fields DTSX:19532 (errorRowDisposition FailComponent)",
+   "verifierAccepted": true
+  },
+  {
+   "claimId": "L|Package\\Foreach Loop Container\\Create Acount Courses and course partition for transferin|detailed",
+   "field": "detailed.nodes[4].text",
+   "before": "לכל העברה פתוחה נבנים המסלולים המועברים והמסלולים המקבלים, פעם אחת לכל העברה וקופה.",
+   "after": "לכל העברה פתוחה נבנים המסלולים המועברים והמסלולים המקבלים. רשומה נוצרת רק אם לא הייתה קיימת לפני תחילת השלב; שתי שורות לאותה העברה ולאותה קופה באותו קובץ ייצרו שתי רשומות.",
+   "why": "Full-cache lookups (CacheType 0) are loaded before rows flow (documented SSIS behaviour) and the data flow has no sort/aggregate/dedup, so records created in the same run are not seen; \"once per transfer+fund\" holds only against records that existed before the data flow started.",
+   "evidence": "Check for exist account courses CacheType=0 (DTSX:2952); Check if exist course partition CacheType=0 (DTSX:3045); component list has no Sort/Aggregate/dedup",
+   "verifierAccepted": true
+  },
+  {
+   "claimId": "L|Package\\Foreach Loop Container\\Create Acount Courses and course partition for transferin|detail",
+   "field": "detail_he[4].t",
+   "before": "לכל העברה פתוחה נבנים ב-CRM המסלולים המועברים (מהמקור) והמסלולים המקבלים (ביעד) – פעם אחת לכל העברה+קופה.",
+   "after": "לכל העברה פתוחה נבנים ב-CRM המסלולים המועברים (מהמקור) והמסלולים המקבלים (ביעד). הבדיקה \"כבר קיים\" נעשית מול Lookups במטמון מלא (CacheType 0, DTSX:2952, 3045), שלפי התנהגות SSIS המתועדת נטען לפני מעבר השורות, ואין בשלב הסרת כפילויות – לכן רשומה אחת לכל העברה+קופה מובטחת רק מול רשומות שהיו קיימות לפני השלב; שתי שורות זהות באותו קובץ ייצרו שתי רשומות.",
+   "why": "Full-cache lookups (CacheType 0) are loaded before rows flow (documented SSIS behaviour) and the data flow has no sort/aggregate/dedup, so records created in the same run are not seen; \"once per transfer+fund\" holds only against records that existed before the data flow started.",
+   "evidence": "Check for exist account courses CacheType=0 (DTSX:2952); Check if exist course partition CacheType=0 (DTSX:3045); component list has no Sort/Aggregate/dedup",
+   "verifierAccepted": true
+  },
+  {
+   "claimId": "L|Package\\Foreach Loop Container\\Create Acount Courses and course partition for transferin|decisions",
+   "field": "decisions[3].outcome_he",
+   "before": "כיוון 2 → פיצול מסלול; אחרת (כיוון 1 – מקור) → מסלול חשבון",
+   "after": "כיוון 2 → פיצול מסלול; כל ערך אחר (כיוון 1, ערך אחר או NULL – יציאת ברירת המחדל) → מסלול חשבון",
+   "why": "Default output catches every Transaction_Direction_68 other than \"2\", not only direction 1.",
+   "evidence": "Split Direction DTSX:20384",
+   "verifierAccepted": true
+  },
+  {
+   "claimId": "L|Package\\Foreach Loop Container\\update gen_ftrequest,gen_status from 1(active) to 0|title",
+   "field": "short_he",
+   "before": "לפני עיבוד בקשות התנועה מהקובץ, מסמן את כל בקשות gen_ftrequest הפעילות (gen_status = 1) כ\"לא קיימות בקובץ\". הסימון יוחזר ל-1 לבקשות שיופיעו בקובץ (שלב 20), והשאר ייסגרו (שלב 21).",
+   "after": "לפני עיבוד בקשות התנועה מהקובץ, מסמן את כל בקשות gen_ftrequest הפעילות (gen_status = 1) כ\"לא קיימות בקובץ\". הסימון יוחזר ל-1 רק לבקשות שהשורה שלהן בקובץ עוברת את סינון האוכלוסייה (Case 1) ושהמעסיק שלהן קיים ב-CRM (שלב 20); שאר הבקשות הפעילות – גם כאלה שמופיעות בקובץ – ייסגרו (שלב 21).",
+   "why": "Only requests whose file row passes Case 1 and has an employer in CRM (and whose INSERT/UPDATE succeeds) are re-marked existinfile=1 in step 20; other active requests, including ones present in the file, keep 0 and are closed in step 21 (finding#5).",
+   "evidence": "DTSX:50704 (Case 1, Default unconnected), 47734 (Check IF account Exist, No Match unconnected), 189416 (reset), 189422 (close)",
+   "verifierAccepted": true
+  },
+  {
+   "claimId": "L|Package\\Foreach Loop Container\\update gen_ftrequest,gen_status from 1(active) to 0|short",
+   "field": "short.nodes[2].text",
+   "before": "בקשות שיופיעו בקובץ יסומנו שוב כקיימות, והשאר ייסגרו בסוף התהליך.",
+   "after": "בקשות שהשורה שלהן בקובץ עוברת את סינון האוכלוסייה ושהמעסיק שלהן קיים ב-CRM יסומנו שוב כקיימות; שאר הבקשות הפעילות, גם כאלה שמופיעות בקובץ, ייסגרו בסוף התהליך.",
+   "why": "Only requests whose file row passes Case 1 and has an employer in CRM (and whose INSERT/UPDATE succeeds) are re-marked existinfile=1 in step 20; other active requests, including ones present in the file, keep 0 and are closed in step 21 (finding#5).",
+   "evidence": "DTSX:50704 (Case 1, Default unconnected), 47734 (Check IF account Exist, No Match unconnected), 189416 (reset), 189422 (close)",
+   "verifierAccepted": true
+  },
+  {
+   "claimId": "L|Package\\Foreach Loop Container\\update gen_ftrequest,gen_status from 1(active) to 0|detailed",
+   "field": "detailed.nodes[5].text",
+   "before": "בקשות שיופיעו בקובץ יסומנו שוב כקיימות, והשאר ייסגרו בסוף התהליך.",
+   "after": "בקשות שהשורה שלהן בקובץ עוברת את סינון האוכלוסייה ושהמעסיק שלהן קיים ב-CRM יסומנו שוב כקיימות; שאר הבקשות הפעילות, גם כאלה שמופיעות בקובץ, ייסגרו בסוף התהליך.",
+   "why": "Only requests whose file row passes Case 1 and has an employer in CRM (and whose INSERT/UPDATE succeeds) are re-marked existinfile=1 in step 20; other active requests, including ones present in the file, keep 0 and are closed in step 21 (finding#5).",
+   "evidence": "DTSX:50704 (Case 1, Default unconnected), 47734 (Check IF account Exist, No Match unconnected), 189416 (reset), 189422 (close)",
+   "verifierAccepted": true
+  },
+  {
+   "claimId": "L|Package\\Foreach Loop Container\\Create or update  Fund Trunsaction Request|title",
+   "field": "short_he",
+   "before": "לבקשות פיצויים, ממשק מעסיקים והפקדות שמיועדות לקופות 0512/0513 של גוף מנהל 0015 ונוצרו מ-1/9/2018: מאתר את המעסיק (חובה) ואת הלקוח (יוצר איש קשר אם חסר), ואז יוצר בקשה חדשה ב-SQL ישיר או מעדכן קיימת ב-SDK – רק אם השתנה משהו; בכל מקרה מסמן gen_existinfile = 1.",
+   "after": "לבקשות מנושאים 68, 67 ו-53 (בקוד מסומנים pitzulim, memshak masikim, afkadot) שמיועדות לקופות 0512/0513 של גוף מנהל 0015 ונוצרו מ-1/9/2018: מאתר את המעסיק (חובה) ואת הלקוח (יוצר איש קשר אם חסר), ואז יוצר בקשה חדשה ב-SQL ישיר או מעדכן קיימת ב-SDK – רק אם השתנה משהו; בכל מקרה מסמן gen_existinfile = 1.",
+   "why": "\"פיצויים\" (compensation) is not supported. Code labels Subject 68 as \"pitzulim\", 67 \"memshak masikim\", 53 \"afkadot\"; written only as code labels.",
+   "evidence": "Set Final Fields main.cs:162-169 (DTSX:57945)",
+   "verifierAccepted": true
+  },
+  {
+   "claimId": "L|Package\\Foreach Loop Container\\Create or update  Fund Trunsaction Request|short",
+   "field": "short.nodes[0].text",
+   "before": "החבילה מאתרת בקובץ בקשות פיצויים, ממשק מעסיקים והפקדות לקופות 0512 ו-0513, שמקור ההפקדה שלהן נוצר מ-1/9/2018 ושהסטטוס שלהן מוגדר.",
+   "after": "החבילה מאתרת בקובץ בקשות מנושאים 68, 67 ו-53 (בקוד מסומנים pitzulim, memshak masikim, afkadot) לקופות 0512 ו-0513, שמקור ההפקדה שלהן נוצר מ-1/9/2018 ושהשילוב של נושא, פעולה וסטטוס שלהן מוגדר.",
+   "why": "\"פיצויים\" (compensation) is not supported. Code labels Subject 68 as \"pitzulim\", 67 \"memshak masikim\", 53 \"afkadot\"; written only as code labels.",
+   "evidence": "Set Final Fields main.cs:162-169 (DTSX:57945)",
+   "verifierAccepted": true
+  },
+  {
+   "claimId": "L|Package\\Foreach Loop Container\\Create or update  Fund Trunsaction Request|short",
+   "field": "short.nodes[3].text",
+   "before": "רשימת בקשות התנועה ב-CRM משקפת את הקובץ.",
+   "after": "בקשות שעברו את הסינון ושהמעסיק שלהן קיים נוצרות או מתעדכנות ומסומנות \"קיימות בקובץ\". בקשה פעילה שאינה מסומנת כך – גם אם הופיעה בקובץ ולא עברה את הסינון או את בדיקת המעסיק – תיסגר בשלב הבא.",
+   "why": "\"The list reflects the file\" is too strong: requests in the file that fail Case 1 or the employer lookup are not re-marked and get closed in step 21 (finding#5).",
+   "evidence": "DTSX:50704, 47734, 189416, 189422",
+   "verifierAccepted": true
+  },
+  {
+   "claimId": "L|Package\\Foreach Loop Container\\Create or update  Fund Trunsaction Request|detailed",
+   "field": "detailed.nodes[9].text",
+   "before": "רשימת בקשות התנועה ב-CRM משקפת את הקובץ, וכל בקשה שהופיעה ועברה את הבדיקות מסומנת כך שלא תיסגר בשלב הבא.",
+   "after": "בקשות שעברו את הסינון ושהמעסיק שלהן קיים נוצרות או מתעדכנות ומסומנות \"קיימות בקובץ\", כדי שלא ייסגרו בשלב הבא. בקשה פעילה שאינה מסומנת כך – גם אם הופיעה בקובץ ולא עברה את הסינון או את בדיקת המעסיק – תיסגר בשלב הבא.",
+   "why": "\"The list reflects the file\" is too strong: requests in the file that fail Case 1 or the employer lookup are not re-marked and get closed in step 21 (finding#5). Same overstatement in the detailed end node (rule 2).",
+   "evidence": "DTSX:50704, 47734, 189416, 189422",
+   "verifierAccepted": true
+  },
+  {
+   "claimId": "L|Package\\Foreach Loop Container\\Create or update  Fund Trunsaction Request|detail",
+   "field": "detail_he[5].t",
+   "before": "רשימת בקשות התנועה ב-CRM משקפת את הקובץ: חדשות נוצרות, משתנות מתעדכנות (כולל פתיחה מחדש של בקשה סגורה – gen_status = true), וכל מה שהופיע מסומן \"קיים בקובץ\" כדי שלא ייסגר בשלב 21.",
+   "after": "לבקשות שעברו את Case 1 ושהמעסיק שלהן נמצא: חדשות נוצרות, משתנות מתעדכנות (כולל פתיחה מחדש של בקשה סגורה – gen_status = true), וכל אלה מסומנות \"קיימות בקובץ\" כדי שלא ייסגרו בשלב 21. בקשה פעילה שהשורה שלה בקובץ לא עברה את Case 1 או את בדיקת המעסיק אינה מסומנת ונסגרת בשלב 21 (ממצא 5).",
+   "why": "\"The list reflects the file\" is too strong: requests in the file that fail Case 1 or the employer lookup are not re-marked and get closed in step 21 (finding#5). Same overstatement in detail_he (rule 2).",
+   "evidence": "DTSX:50704, 47734, 189416, 189422",
+   "verifierAccepted": true
+  },
+  {
+   "claimId": "L|Package\\Foreach Loop Container\\Create or update  Fund Trunsaction Request|crm",
+   "field": "crmEffects[3].when_he",
+   "before": "לא נמצא contact לת.ז. – פעם אחת לכל ת.ז. בריצה",
+   "after": "שורה שעברה Case 1, שהמעסיק שלה נמצא ב-CRM ושלא נמצא contact לת.ז. המרופדת – פעם אחת לכל ת.ז. בריצה (Aggregate)",
+   "why": "Contact/request writes happen only after Conditional Split Case 1 and Check IF account Exist (Match); Check If Contact Exist sits after them; Aggregate groups by identity number before Create Contact.",
+   "evidence": "Paths: Conditional Split.Outputs[Case 1] -> Check IF account Exist; Check IF account Exist Match -> Check If Contact Exist; No Match -> Multicast 1 -> Aggregate -> Add Row Number -> Create Contact 1-5 (DTSX:50704, 47734, 47794, 46816)",
+   "verifierAccepted": true
+  },
+  {
+   "claimId": "L|Package\\Foreach Loop Container\\Create or update  Fund Trunsaction Request|crm",
+   "field": "crmEffects[1].when_he",
+   "before": "בקשה קיימת ששדה אחד לפחות שונה מהקובץ",
+   "after": "בקשה קיימת, שעברה Case 1 ושהמעסיק שלה נמצא, ששדה אחד לפחות שונה מהקובץ",
+   "why": "Contact/request writes happen only after Conditional Split Case 1 and Check IF account Exist (Match); Check If Contact Exist sits after them; Aggregate groups by identity number before Create Contact.",
+   "evidence": "Paths: Conditional Split.Outputs[Case 1] -> Check IF account Exist; Check IF account Exist Match -> Check If Contact Exist; No Match -> Multicast 1 -> Aggregate -> Add Row Number -> Create Contact 1-5 (DTSX:50704, 47734, 47794, 46816)",
+   "verifierAccepted": true
+  },
+  {
+   "claimId": "L|Package\\Foreach Loop Container\\Create or update  Fund Trunsaction Request|crm",
+   "field": "crmEffects[2].when_he",
+   "before": "בקשה קיימת ללא שינוי",
+   "after": "בקשה קיימת, שעברה Case 1 ושהמעסיק שלה נמצא, ללא שינוי",
+   "why": "Contact/request writes happen only after Conditional Split Case 1 and Check IF account Exist (Match); Check If Contact Exist sits after them; Aggregate groups by identity number before Create Contact.",
+   "evidence": "Paths: Conditional Split.Outputs[Case 1] -> Check IF account Exist; Check IF account Exist Match -> Check If Contact Exist; No Match -> Multicast 1 -> Aggregate -> Add Row Number -> Create Contact 1-5 (DTSX:50704, 47734, 47794, 46816)",
+   "verifierAccepted": true
+  },
+  {
+   "claimId": "L|Package\\Foreach Loop Container\\Create transferout|detailed",
+   "field": "detailed.nodes[5].branches[1].nodes[0].branches[1].nodes[0].text",
+   "before": "הבקשה מתעדכנת בשדות שונים מ-CRM; תאריך הבקשה, מועד ההעברה, יום השימור ומספר האוצר נכתבים תמיד, ולכן כמעט כל בקשה כזו מתעדכנת בכל ריצה.",
+   "after": "הבקשה מתעדכנת בשדות שונים מ-CRM; תאריך הבקשה, מועד ההעברה, יום השימור ומספר האוצר נכתבים תמיד, ולכן כמעט כל בקשה כזו מתעדכנת בכל ריצה. המצב מחושב מחדש: 5 (ענף ללא חשבון לקוח) או 1, ו-4 רק כשהפעולה בקובץ \"02\" וסימון ההעברה המלאה ב-CRM שונה; הוא נכתב כשהוא שונה מהערך ב-CRM – כך שבקשה במצב 2, או במצב 4 שסימון ההעברה המלאה שלה כבר false, מוחזרת ל-1 (או 5).",
+   "why": "Update branch did not say how gen_currentstate is recomputed and written.",
+   "evidence": "Update TransferOut 1 main.cs:69-101 (DTSX:163786)",
+   "verifierAccepted": true
+  },
+  {
+   "claimId": "L|Package\\Foreach Loop Container\\Create transferout|detailed",
+   "field": "detailed.nodes[5].branches[1].nodes[0].branches[1].nodes[0].tech",
+   "before": "gen_customercare · Update · SDK (×5); ללא השוואה: Update TransferOut main.cs:114–125, 180–188; סטטוס הלקוח עלול להידרס בערך שגוי (main.cs:96–101, ראו fieldmap)",
+   "after": "gen_customercare · Update · SDK (×5); ללא השוואה: Update TransferOut main.cs:114–125, 180–188; currentstate = gencurrentstate ?? 1, 4 רק אם ActionType57 == \"02\" ו-gen_isfulltransfer ב-CRM שונה (main.cs:69–89); gen_customerstatus: שרשרת if/else-if שבה כל ענף כולל השוואה ל-CRM, ולכן Is_Active \"0\" כשב-CRM כבר 2 ממשיך לענף 3 או 1 (main.cs:94–101, ממצא 22)",
+   "why": "Exact state/customer-status logic instead of \"may be overwritten with a wrong value\".",
+   "evidence": "Update TransferOut 1 main.cs:69-101 (DTSX:163786)",
+   "verifierAccepted": true
+  },
+  {
+   "claimId": "L|Package\\Foreach Loop Container\\Create transferout|detail",
+   "field": "detail_he[4].t",
+   "before": "SDK service.Update (main.cs:62–204): כל שדה נכתב רק אם שונה מה-DB (isfulltransfer, currentstate, transferaction, bankadvisingreason, customerstatus, statusleumi, תאריכים לפי .Date, מתחרה, בית השקעות, איש קשר, חשבון, חשבון יעד) – למעט gen_requestdate, gen_deliverydate, gen_lastpreservationdate ו-gen_receivedfundtreasurynumber שנכתבים תמיד כשיש ערך בקובץ.",
+   "after": "SDK service.Update (main.cs:62–204): כל שדה נכתב רק אם שונה מה-DB (isfulltransfer, currentstate, transferaction, bankadvisingreason, customerstatus, statusleumi, תאריכים לפי .Date, מתחרה, בית השקעות, איש קשר, חשבון, חשבון יעד) – למעט gen_requestdate, gen_deliverydate, gen_lastpreservationdate ו-gen_receivedfundtreasurynumber שנכתבים תמיד כשיש ערך בקובץ. חישוב המצב בעדכון (main.cs:69–89): currentstate = 5 (ענף ללא חשבון לקוח) או 1; 4 רק כשהפעולה \"02\" ו-gen_isfulltransfer ב-CRM שונה. הערך נכתב כשהוא שונה מ-CRM, ולכן בקשה קיימת במצב שאינו 3 (למשל 2, או 4 כשסימון ההעברה המלאה כבר false) מוחזרת ל-1/5 בכל ריצה. gen_customerstatus (main.cs:94–101): Is_Active \"0\" כשב-CRM כבר 2 ממשיך לענף הבא – 3 (Is_Deposit_Funds_93 \"0\") או 1.",
+   "why": "Unit 5 listed currentstate as \"written only if different\" without the recomputation that resets it, and omitted the customer-status chain.",
+   "evidence": "Update TransferOut 1 main.cs:69-101 (DTSX:163786)",
+   "verifierAccepted": true
+  },
+  {
+   "claimId": "L|Package\\Foreach Loop Container\\Create transferout|decisions",
+   "field": "decisions[10] (appended)",
+   "before": null,
+   "after": {
+    "where": "Update TransferOut main.cs:69–101 (DTSX:163786)",
+    "condition": "int currentstate = !Row.gencurrentstate_IsNull ? Row.gencurrentstate : 1; if (!Row.ActionType57_IsNull && (Row.ActionType57 == \"01\" || Row.ActionType57 == \"02\")) { bool isFullTransfer = Row.ActionType57 == \"01\"; if (Row.genisfulltransferDB_IsNull || Row.genisfulltransferDB != isFullTransfer) { transferOut[\"gen_isfulltransfer\"] = isFullTransfer; if (!isFullTransfer) currentstate = 4; } } if (Row.gencurrentstateDB_IsNull || Row.gencurrentstateDB != currentstate) transferOut[\"gen_currentstate\"] = new OptionSetValue(currentstate); … if (Row.IsActive92 == \"0\" && (DB_IsNull || DB != 2)) 2; else if (IsDepositFunds93 == \"0\" && (DB_IsNull || DB != 3)) 3; else if (DB_IsNull || DB != 1) 1;",
+    "meaning_he": "בעדכון: המצב מחושב מחדש (5 בענף ללא חשבון לקוח, אחרת 1; 4 רק כשהפעולה \"02\" וסימון ההעברה המלאה ב-CRM שונה) ונכתב כשהוא שונה מ-CRM; סטטוס הלקוח נקבע בשרשרת שבה כל ענף כולל השוואה ל-CRM",
+    "outcome_he": "gen_currentstate של בקשה קיימת במצב שאינו 3 מוחזר ל-1/5 כשהוא שונה; gen_customerstatus: Is_Active \"0\" כשב-CRM כבר 2 נכתב 3 (Is_Deposit_Funds_93 \"0\") או 1"
+   },
+   "why": "No decision existed for the Update TransferOut state/customer-status logic that decides written values.",
+   "evidence": "Update TransferOut 1 main.cs:69-101 (DTSX:163786)",
+   "verifierAccepted": true
+  },
+  {
+   "claimId": "L|Package\\Foreach Loop Container\\Create transferout|crm",
+   "field": "crmEffects[0].when_he",
+   "before": "אין בקשה עם אותו מספר מסלקה, נמצא חשבון לקוח או איש קשר, ומתחרה קיים",
+   "after": "אין בקשה עם אותו מספר מסלקה, נמצא חשבון לקוח או איש קשר, מתחרה קיים, ומספר המסלקה בשורה אינו ריק (אחרת CastingError ללא יצירה)",
+   "why": "Create also requires a non-NULL, non-empty Mislaka_Number_152.",
+   "evidence": "Create TransferOut 1 main.cs:64-69 (DTSX:145167)",
+   "verifierAccepted": true
+  },
+  {
+   "claimId": "L|Package\\Foreach Loop Container\\Update Account|detailed",
+   "field": "detailed.nodes[1].text",
+   "before": "האם זו בקשת פיצויים (נושא 68, פעולה 01) מקובץ מקור 7844, בכיוון 1 או 2, עם טלפון מספרי?",
+   "after": "האם זו שורה מנושא 68 ופעולה 01, מקובץ מקור 7844, בכיוון 1 או 2, עם טלפון מספרי גדול מ-1?",
+   "why": "\"פיצויים\" is not proven for Subject 68 (code labels it \"pitzulim\" in the ftrequest flow); neutral wording. Same node as the verifier's unit 2.",
+   "evidence": "DTSX:179741; Set Final Fields main.cs:163",
+   "verifierAccepted": true
+  },
+  {
+   "claimId": "L|Package\\Foreach Loop Container\\Update Account|detailed",
+   "field": "detailed.nodes[1].branches",
+   "before": [
+    {
+     "label": "לא",
+     "nodes": [
+      {
+       "type": "end",
+       "text": "השורה לא מטופלת."
+      }
+     ]
+    },
+    {
+     "label": "כן",
+     "nodes": [
+      {
+       "type": "step",
+       "text": "השורה ממשיכה לשלב הבא."
+      }
+     ]
+    }
+   ],
+   "after": [
+    {
+     "label": "לא",
+     "nodes": [
+      {
+       "type": "end",
+       "text": "השורה לא מטופלת (כולל טלפון ריק או טלפון מספרי קטן מ-2)."
+      }
+     ]
+    },
+    {
+     "label": "טלפון לא מספרי",
+     "nodes": [
+      {
+       "type": "end",
+       "text": "ההמרה של הטלפון למספר נכשלת, והרכיב מוגדר להיכשל בשגיאה (FailComponent): ה-Data Flow של עדכון המעסיקים נכשל במקום לדלג על השורה, ולפי התנהגות SSIS המתועדת גם הלולאה נעצרת (ראו ממצא 18)."
+      }
+     ]
+    },
+    {
+     "label": "כן",
+     "nodes": [
+      {
+       "type": "step",
+       "text": "השורה ממשיכה לשלב הבא."
+      }
+     ]
+    }
+   ],
+   "why": "Unit 2 presented \"numeric phone\" as a simple filter; the (DT_I4) cast has errorRowDisposition FailComponent, so a non-numeric phone fails the data flow instead of skipping the row. Only NULL or numeric <= 1 falls to Default.",
+   "evidence": "Primary Conditions DTSX:179741-179760 (errorRowDisposition FailComponent, DTSX:179755)",
+   "verifierAccepted": true
+  },
+  {
+   "claimId": "L|Package\\Foreach Loop Container\\Update Account|title",
+   "field": "short_he",
+   "before": "לבקשות פיצויים (נושא 68, פעולה 01) ממקור 7844 עם טלפון: לכל מעסיק לוקח את פרטי איש הקשר מהשורה העדכנית ביותר בקובץ ומעדכן ב-account את שם, טלפון, נייד ודוא\"ל של \"חוזר תשלומים גמל\" – רק שדות ששונו ותקינים.",
+   "after": "לשורות מנושא 68 ופעולה 01 ממקור 7844 עם טלפון: לכל מעסיק לוקח את פרטי איש הקשר מהשורה העדכנית ביותר בקובץ ומעדכן ב-account את שם, טלפון, נייד ודוא\"ל של \"חוזר תשלומים גמל\" – רק שדות ששונו ותקינים.",
+   "why": "Same unproven label in the same component (rule 2).",
+   "evidence": "DTSX:179741",
+   "verifierAccepted": true
+  },
+  {
+   "claimId": "L|Package\\Foreach Loop Container\\Update Account|short",
+   "field": "short.nodes[0].text",
+   "before": "החבילה מאתרת בקובץ בקשות פיצויים ממקור 7844 שכוללות טלפון של איש הקשר אצל המעסיק.",
+   "after": "החבילה מאתרת בקובץ שורות מנושא 68 ופעולה 01 ממקור 7844 שכוללות טלפון של איש הקשר אצל המעסיק.",
+   "why": "Same unproven label in the same component (rule 2).",
+   "evidence": "DTSX:179741",
+   "verifierAccepted": true
+  },
+  {
+   "claimId": "L|summary",
+   "field": "executionNotes_he[0]",
+   "before": "כל האילוצים הם Success עם LogicalAnd – שרשרת סדרתית אחת; אין ענפים מקבילים ברמת ה-Control Flow ואין אילוצי Failure/Completion. אם שלב נכשל – השלבים שאחריו לא רצים לאותו קובץ, והקובץ לא מועבר לארכיון. ללולאה ולחבילה לא מוגדר MaximumErrorCount (אין DTS:MaxErrorCount, DTSX:723), ולכן לפי התנהגות SSIS המתועדת (ברירת מחדל 1, לא מוצג בקבצים) הכשל מכשיל גם את הלולאה – והקבצים הנותרים ברשימה לא מעובדים באותה ריצה. ה-OnError הריק של שלב בקשות התנועה מוגדר Propagate = -1, כלומר אינו עוצר את התפשטות הכשל. (DTSX:195311–195330, 198638–198642, 42831–42838)",
+   "after": "ברמת החבילה, האילוץ מאיתור הקבצים (Set Files) לשלב הבא הוא Success AND הביטוי @[User::isFileExist] (EvalOp 3, DTSX:198639). Set Files מדליק את המשתנה רק כשנמצא לפחות קובץ אחד (ScriptMain.cs:56, 82; ברירת מחדל 0, DTSX:664), ולכן אם לא נמצא קובץ BY – שום שלב אחרי Set Files לא רץ: אין לולאה ואין כתיבה ל-CRM. כל 24 האילוצים האחרים (ברמת החבילה ובתוך הלולאה) הם Success עם LogicalAnd ללא ביטוי – שרשרת סדרתית אחת; אין ענפים מקבילים ברמת ה-Control Flow ואין אילוצי Failure/Completion. אם שלב נכשל – השלבים שאחריו לא רצים לאותו קובץ, והקובץ לא מועבר לארכיון. ללולאה ולחבילה לא מוגדר MaximumErrorCount (אין DTS:MaxErrorCount, DTSX:723), ולכן לפי התנהגות SSIS המתועדת (ברירת מחדל 1, לא מוצג בקבצים) הכשל מכשיל גם את הלולאה – והקבצים הנותרים ברשימה לא מעובדים באותה ריצה. ה-OnError הריק של שלב בקשות התנועה מוגדר Propagate = -1, כלומר אינו עוצר את התפשטות הכשל. (DTSX:195311–195330, 198638–198642, 42831–42838)",
+   "why": "Omitted the package-level expression constraint: Set Files -> Get closer dates is EvalOp=3 with @[User::isFileExist]; when no file is found nothing after Set Files runs. The other 24 constraints carry no expression.",
+   "evidence": "DTSX:198639 (EvalOp=\"3\" Expression=\"@[User::isFileExist]\"); DTSX:664 (default 0); Set Files ScriptMain.cs:56,82; grep: 25 PrecedenceConstraint elements, one EvalOp/Expression",
+   "round": 2
+  },
+  {
+   "claimId": "L|summary",
+   "field": "summary_he",
+   "before": "החבילה קולטת את קובץ ה-BY היומי של בנק לאומי (קובץ ברוחב קבוע, נטען לשתי טבלאות Staging לפי שתי פריסות) ומעדכנת לפיו את CRM: יוצרת קופות יעד (gen_fundmain) להעברות בין מסלולים, יוצרת בקשות העברה נכנסות (gen_transferin) – בין מסלולים ומגופים חיצוניים (כולל עדכון סטטוסים, ביטוח לאומי לחיסכון לילד ומסמכים מצורפים לבקשות קיימות), יוצרת מסלולי חשבון ופיצולי מסלול להעברות פתוחות, ומסנכרנת בקשות תנועה בקופה (gen_ftrequest): יצירה/עדכון, יצירת איש קשר (contact) ללקוח שאינו קיים ב-CRM, וסגירת בקשות פעילות שלא סומנו מחדש \"קיימות בקובץ\" – כולל בקשות שמופיעות בקובץ אך לא עברו את סינון האוכלוסייה או שהמעסיק שלהן לא נמצא. בנוסף יוצרת/מעדכנת בקשות העברה יוצאות (gen_customercare) ומצרפת להן מסמכים (annotation), ומעדכנת פרטי איש קשר אצל מעסיקים (account). חלק מהכתיבות ל-gen_ftrequest מבוצעות ב-SQL ישיר על מסד CRM (Unsupported); השאר דרך CRM SDK.",
+   "after": "החבילה קולטת את קובץ ה-BY היומי של בנק לאומי (קובץ ברוחב קבוע, נטען לשתי טבלאות Staging לפי שתי פריסות) ומעדכנת לפיו את CRM: יוצרת קופות יעד (gen_fundmain) להעברות בין מסלולים, יוצרת בקשות העברה נכנסות (gen_transferin) – בין מסלולים ומגופים חיצוניים (כולל עדכון סטטוסים, סטטוס פעולה לקטינים בבקשות מסוג 1 – לפי שמות המתודות והקבועים בקוד: אישור/דחיית ביטוח לאומי, חיסכון לילד, \"הצטרפות והעברה\" – ומסמכים מצורפים לבקשות קיימות), יוצרת מסלולי חשבון ופיצולי מסלול להעברות פתוחות, ומסנכרנת בקשות תנועה בקופה (gen_ftrequest): יצירה/עדכון, יצירת איש קשר (contact) ללקוח שאינו קיים ב-CRM, וסגירת בקשות פעילות שלא סומנו מחדש \"קיימות בקובץ\" – כולל בקשות שמופיעות בקובץ אך לא עברו את סינון האוכלוסייה או שהמעסיק שלהן לא נמצא. בנוסף יוצרת/מעדכנת בקשות העברה יוצאות (gen_customercare) ומצרפת להן מסמכים (annotation), ומעדכנת פרטי איש קשר אצל מעסיקים (account). חלק מהכתיבות ל-gen_ftrequest מבוצעות ב-SQL ישיר על מסד CRM (Unsupported); השאר דרך CRM SDK.",
+   "why": "Verifier noted the national-insurance / child-savings meaning was stated as fact; it is now attributed to the code method/constant names.",
+   "evidence": "Compare Fields Before Update main.cs:27-35 (constants), 265-313 (IsNationalInsuranceApproval/Reject)",
+   "round": 2
+  },
+  {
+   "claimId": "L|Package\\Foreach Loop Container\\Create transferin Maslulim|detail",
+   "field": "detail_he[4].t",
+   "before": "בקשת ההעברה בין מסלולים נפתחת ב-CRM; בשלב 17 ייווצרו לה מסלולי חשבון ופיצולי מסלול (המצב 1 תואם את סינון get tranferin שם).",
+   "after": "בקשת ההעברה בין מסלולים נפתחת ב-CRM במצב 1 (תואם את סינון get tranferin בשלב 17). מסלולי חשבון ופיצולי מסלול לבקשה נוצרים בשלב 17 רק בתנאים: מסלול חשבון – אם נמצאת קופת מקור בבנק 10 לפי Source_Course_Id_17 ו-Source_Account_Number_20 (get source fund, DTSX:4850) ואין עדיין מסלול חשבון לבקשה ולקופה; פיצול מסלול – אם נמצאת קופת יעד בבנק 10 עם איש קשר וחוזה סוכן (חיבורים פנימיים ב-get dest fund, DTSX:4691) לפי Dest_Account_Number_47 ו-Dest_Course_Id_44 ואין עדיין פיצול לבקשה ולקופה (DTSX:2940, 3033). אם הקופה לא נמצאת – לא נוצר דבר ולא נכתבת הודעה.",
+   "why": "Step-17 creation was stated unconditionally; it depends on finding the bank-10 source fund / destination fund (with contact and agent contract) and on no existing record.",
+   "evidence": "DTSX:4850 (get source fund SQL, gen_banknumber = 10), DTSX:4691 (get dest fund SQL, inner joins Contact/Gen_agentcontract, gen_banknumber = 10), DTSX:2940, 3033",
+   "round": 2
+  },
+  {
+   "claimId": "L|Package\\Foreach Loop Container\\Create transferin Maslulim|detailed",
+   "field": "detailed.nodes[8].text",
+   "before": "בקשת ההעברה בין המסלולים פתוחה ב-CRM, ובשלב מסלולי החשבון ייווצרו לה מסלולים ופיצולי מסלול.",
+   "after": "בקשת ההעברה בין המסלולים פתוחה ב-CRM. בשלב מסלולי החשבון ייווצרו לה מסלולים ופיצולי מסלול רק אם יימצאו שם קופות המקור והיעד המתאימות בבנק 10 ורשומות כאלה עוד לא קיימות.",
+   "why": "Same fact as detail[5]: step-17 creation is conditional.",
+   "evidence": "DTSX:4850, 4691, 2940, 3033",
+   "round": 2
+  },
+  {
+   "claimId": "L|Package\\Foreach Loop Container\\Update Account|title",
+   "field": "short_he",
+   "before": "לשורות מנושא 68 ופעולה 01 ממקור 7844 עם טלפון: לכל מעסיק לוקח את פרטי איש הקשר מהשורה העדכנית ביותר בקובץ ומעדכן ב-account את שם, טלפון, נייד ודוא\"ל של \"חוזר תשלומים גמל\" – רק שדות ששונו ותקינים.",
+   "after": "לשורות מנושא 68 ופעולה 01 ממקור 7844 עם טלפון: לכל מעסיק לוקח את פרטי איש הקשר מהשורה העדכנית ביותר בקובץ ומעדכן ב-account את הטלפון (אם שונה), הנייד והדוא\"ל (אם שונו ותקינים) של \"חוזר תשלומים גמל\". השם הפרטי ושם המשפחה אינם מתעדכנים מהקובץ, כי הם לא נטענים ל-Staging (ממצא 24).",
+   "why": "Name is not updated from the file (staging insert maps no first/last name, finding 24); validity check applies only to mobile and e-mail.",
+   "evidence": "DTSX:189841 Insert To BY_FileData_2 (only Employer_Details_Phone_121/Email_122/Mobile_Phone_123 have externalMetadataColumnId inputs; ExternalColumns Employer_Details_First_Name_119/Last_Name_120 at DTSX:190107-190108 have none); Update Account 1 main.cs:48-67; finding 24",
+   "round": 2
+  },
+  {
+   "claimId": "L|Package\\Foreach Loop Container\\Update Account|detail",
+   "field": "detail_he[3].t",
+   "before": "SDK ExecuteMultiple Update account (main.cs:41–88): gen_hozertashlumimgemelfirstname / lastname / telephone – אם שונה; gen_hozertashlumimgemelmobilephone – אם שונה ומספר נקי ממקפים באורך 10 שמתחיל ב-\"05\"; gen_hozertashlumimgemelemailaddresss – אם שונה ועובר Regex; ואם השתנה משהו – gen_hozertashlumimgemelupdatedate = DateTime.Now.",
+   "after": "SDK ExecuteMultiple Update account (main.cs:41–88): gen_hozertashlumimgemeltelephone – אם אינו NULL ושונה (ללא בדיקת תקינות); gen_hozertashlumimgemelmobilephone – אם שונה ומספר נקי ממקפים באורך 10 שמתחיל ב-\"05\"; gen_hozertashlumimgemelemailaddresss – אם שונה ועובר Regex; ואם נוסף שדה כלשהו – gen_hozertashlumimgemelupdatedate = DateTime.Now. הקוד כותב גם gen_hozertashlumimgemelfirstname / lastname כשאינם NULL ושונים (main.cs:48–55), אבל עמודות השם ב-Staging אינן מקבלות נתון מהקובץ (Insert To BY_FileData_2, DTSX:189841 – ממצא 24), ולכן השם אינו מתעדכן מהקובץ (אלא אם קיימת ברירת מחדל בטבלה – DDL לא סופק).",
+   "why": "Name written only when not NULL and the staging name columns receive no file data (finding 24).",
+   "evidence": "DTSX:189841 Insert To BY_FileData_2 (only Employer_Details_Phone_121/Email_122/Mobile_Phone_123 have externalMetadataColumnId inputs; ExternalColumns Employer_Details_First_Name_119/Last_Name_120 at DTSX:190107-190108 have none); Update Account 1 main.cs:48-67; finding 24",
+   "round": 2
+  },
+  {
+   "claimId": "L|Package\\Foreach Loop Container\\Update Account|detail",
+   "field": "detail_he[4].t",
+   "before": "פרטי איש הקשר במעסיק ב-CRM מתעדכנים לפי הנתון העדכני בקובץ.",
+   "after": "הטלפון, הנייד והדוא\"ל של איש הקשר במעסיק ב-CRM מתעדכנים לפי הנתון העדכני בקובץ; השם אינו מתעדכן מהקובץ (ממצא 24).",
+   "why": "Same fact (finding 24).",
+   "evidence": "DTSX:189841 Insert To BY_FileData_2 (only Employer_Details_Phone_121/Email_122/Mobile_Phone_123 have externalMetadataColumnId inputs; ExternalColumns Employer_Details_First_Name_119/Last_Name_120 at DTSX:190107-190108 have none); Update Account 1 main.cs:48-67; finding 24",
+   "round": 2
+  },
+  {
+   "claimId": "L|Package\\Foreach Loop Container\\Update Account|decisions",
+   "field": "decisions[4].outcome_he",
+   "before": "רק שדות ששונו ותקינים נכתבים; אם אין – אין עדכון; אחרת גם gen_hozertashlumimgemelupdatedate = DateTime.Now",
+   "after": "רק שדות ששונו נכתבים (נייד ודוא\"ל – רק אם גם תקינים); אם אין – אין עדכון; אחרת גם gen_hozertashlumimgemelupdatedate = DateTime.Now. תנאי השם קיים בקוד, אבל עמודות השם ב-Staging אינן מקבלות נתון מהקובץ (ממצא 24), ולכן בפועל השם לא מתעדכן מהקובץ.",
+   "why": "Same fact (finding 24).",
+   "evidence": "DTSX:189841 Insert To BY_FileData_2 (only Employer_Details_Phone_121/Email_122/Mobile_Phone_123 have externalMetadataColumnId inputs; ExternalColumns Employer_Details_First_Name_119/Last_Name_120 at DTSX:190107-190108 have none); Update Account 1 main.cs:48-67; finding 24",
+   "round": 2
+  },
+  {
+   "claimId": "L|Package\\Foreach Loop Container\\Update Account|crm",
+   "field": "crmEffects[0].when_he",
+   "before": "מעסיק שנמצא ב-CRM ולפחות אחד מפרטי איש הקשר השתנה ותקין",
+   "after": "מעסיק שנמצא ב-CRM ולפחות אחד מהטלפון, הנייד או הדוא\"ל השתנה (נייד ודוא\"ל – גם תקינים)",
+   "why": "Same fact (finding 24).",
+   "evidence": "DTSX:189841 Insert To BY_FileData_2 (only Employer_Details_Phone_121/Email_122/Mobile_Phone_123 have externalMetadataColumnId inputs; ExternalColumns Employer_Details_First_Name_119/Last_Name_120 at DTSX:190107-190108 have none); Update Account 1 main.cs:48-67; finding 24",
+   "round": 2
+  },
+  {
+   "claimId": "L|Package\\Foreach Loop Container\\Update Account|short",
+   "field": "short.nodes[2].branches[1].nodes[0].text",
+   "before": "השם, הטלפון, הנייד והדוא\"ל של איש הקשר מתעדכנים אם השתנו ואם הם תקינים.",
+   "after": "הטלפון, הנייד והדוא\"ל של איש הקשר מתעדכנים אם השתנו – הנייד והדוא\"ל רק אם הם תקינים. השם אינו מתעדכן, כי הוא לא נטען מהקובץ.",
+   "why": "Name is not updated from the file (finding 24).",
+   "evidence": "DTSX:189841 Insert To BY_FileData_2 (only Employer_Details_Phone_121/Email_122/Mobile_Phone_123 have externalMetadataColumnId inputs; ExternalColumns Employer_Details_First_Name_119/Last_Name_120 at DTSX:190107-190108 have none); Update Account 1 main.cs:48-67; finding 24",
+   "round": 2
+  },
+  {
+   "claimId": "L|Package\\Foreach Loop Container\\Update Account|short",
+   "field": "short.nodes[3].text",
+   "before": "פרטי איש הקשר אצל המעסיקים ב-CRM מתעדכנים לפי הנתון העדכני בקובץ.",
+   "after": "הטלפון, הנייד והדוא\"ל של איש הקשר אצל המעסיקים ב-CRM מתעדכנים לפי הנתון העדכני בקובץ.",
+   "why": "Outcome limited to the fields actually supplied by the file.",
+   "evidence": "DTSX:189841 Insert To BY_FileData_2 (only Employer_Details_Phone_121/Email_122/Mobile_Phone_123 have externalMetadataColumnId inputs; ExternalColumns Employer_Details_First_Name_119/Last_Name_120 at DTSX:190107-190108 have none); Update Account 1 main.cs:48-67; finding 24",
+   "round": 2
+  },
+  {
+   "claimId": "L|Package\\Foreach Loop Container\\Update Account|detailed",
+   "field": "detailed.nodes[1].branches[0].nodes[0]",
+   "before": "{\"type\":\"end\",\"text\":\"השורה לא מטופלת (כולל טלפון ריק או טלפון מספרי קטן מ-2).\"}",
+   "after": "{\"type\":\"end\",\"text\":\"השורה לא מטופלת – למשל שורה ללא טלפון (NULL) או עם טלפון מספרי קטן מ-2.\"}",
+   "why": "Only a NULL phone (or numeric <= 1) is simply not selected; an empty/blank phone fails the cast like a non-numeric one.",
+   "evidence": "DTSX:179741-179758",
+   "round": 2
+  },
+  {
+   "claimId": "L|Package\\Foreach Loop Container\\Update Account|detailed",
+   "field": "detailed.nodes[1].branches[1]",
+   "before": "{\"label\":\"טלפון לא מספרי\",\"nodes\":[{\"type\":\"end\",\"text\":\"ההמרה של הטלפון למספר נכשלת, והרכיב מוגדר להיכשל בשגיאה (FailComponent): ה-Data Flow של עדכון המעסיקים נכשל במקום לדלג על השורה, ולפי התנהגות SSIS המתועדת גם הלולאה נעצרת (ראו ממצא 18).\"}]}",
+   "after": "{\"label\":\"טלפון ריק או לא מספרי\",\"nodes\":[{\"type\":\"end\",\"text\":\"טלפון ריק, רווחים בלבד או לא מספרי אינו ניתן להמרה למספר. אם ההמרה מבוצעת לשורה כזו (סדר הערכת הביטוי אינו מוצג בקבצים), הרכיב מוגדר להיכשל, וה-Data Flow של עדכון המעסיקים נכשל; לפי התנהגות SSIS המתועדת, שאינה מוצגת בקבצים, גם הלולאה נעצרת. זו השערה – ראו ממצא 18.\",\"tech\":\"(DT_I4)Employer_Details_Phone_121; errorRowDisposition = FailComponent (DTSX:179755–179758); ממצא 18 (basis: hypothesis)\"}]}",
+   "why": "Empty/blank phone belongs with non-numeric (cast failure); failure is conditional on the cast being evaluated, consistent with finding 18.",
+   "evidence": "DTSX:179741-179758; finding 18",
+   "round": 2
+  },
+  {
+   "claimId": "L|Package\\Foreach Loop Container\\Update Account|detailed",
+   "field": "detailed.nodes[5]",
+   "before": "{\"type\":\"decision\",\"text\":\"האם אחד מפרטי איש הקשר שונה מהערך ב-CRM ותקין?\",\"tech\":\"Update Account main.cs:48–67; נייד: 10 ספרות שמתחיל ב-05 אחרי הסרת מקפים (main.cs:140–149); דוא\\\"ל: Regex (main.cs:134–138)\",\"branches\":[{\"label\":\"לא\",\"nodes\":[{\"type\":\"end\",\"text\":\"לא נעשה דבר.\"}]},{\"label\":\"כן\",\"nodes\":[{\"type\":\"write\",\"text\":\"פרטי איש הקשר שהשתנו מתעדכנים במעסיק, יחד עם תאריך עדכון הפרטים.\",\"tech\":\"account · Update · SDK (ExecuteMultiple, מנות של 10, ×5); gen_hozertashlumimgemel*, gen_hozertashlumimgemelupdatedate = DateTime.Now\"}]}]}",
+   "after": "{\"type\":\"decision\",\"text\":\"האם הטלפון, הנייד או הדוא\\\"ל שונים מהערך ב-CRM (ונייד ודוא\\\"ל – גם תקינים)?\",\"tech\":\"Update Account main.cs:56–67; נייד: 10 ספרות שמתחיל ב-05 אחרי הסרת מקפים (main.cs:140–149); דוא\\\"ל: Regex (main.cs:134–138). תנאי השם (main.cs:48–55) קיים בקוד, אבל לשם אין נתון מהקובץ (ממצא 24).\",\"branches\":[{\"label\":\"לא\",\"nodes\":[{\"type\":\"end\",\"text\":\"לא נעשה דבר.\"}]},{\"label\":\"כן\",\"nodes\":[{\"type\":\"write\",\"text\":\"הפרטים שהשתנו (טלפון, נייד, דוא\\\"ל) מתעדכנים במעסיק, יחד עם תאריך עדכון הפרטים.\",\"tech\":\"account · Update · SDK (ExecuteMultiple, מנות של 10, ×5); gen_hozertashlumimgemel*, gen_hozertashlumimgemelupdatedate = DateTime.Now\"}]}]}",
+   "why": "Name is not updated from the file (finding 24).",
+   "evidence": "DTSX:189841 Insert To BY_FileData_2 (only Employer_Details_Phone_121/Email_122/Mobile_Phone_123 have externalMetadataColumnId inputs; ExternalColumns Employer_Details_First_Name_119/Last_Name_120 at DTSX:190107-190108 have none); Update Account 1 main.cs:48-67; finding 24",
+   "round": 2
+  },
+  {
+   "claimId": "L|Package\\Foreach Loop Container\\Update Account|detailed",
+   "field": "detailed.nodes[6].text",
+   "before": "פרטי איש הקשר אצל המעסיקים ב-CRM מתעדכנים לפי הנתון העדכני בקובץ.",
+   "after": "הטלפון, הנייד והדוא\"ל של איש הקשר אצל המעסיקים ב-CRM מתעדכנים לפי הנתון העדכני בקובץ.",
+   "why": "Outcome limited to the fields actually supplied by the file.",
+   "evidence": "DTSX:189841 Insert To BY_FileData_2 (only Employer_Details_Phone_121/Email_122/Mobile_Phone_123 have externalMetadataColumnId inputs; ExternalColumns Employer_Details_First_Name_119/Last_Name_120 at DTSX:190107-190108 have none); Update Account 1 main.cs:48-67; finding 24",
+   "round": 2
+  },
+  {
+   "claimId": "L|Package\\Foreach Loop Container\\Create transferin from outside source|detailed",
+   "field": "detailed.nodes[6].branches[0].nodes[1]",
+   "before": "{\"type\":\"decision\",\"text\":\"אצל לקוח קטין בבקשת \\\"הצטרפות והעברה\\\" – מה מצב ביטוח לאומי וההפקדה?\",\"tech\":\"IsNationalInsuranceApproval / IsNationalInsuranceReject / DepositRecivingCondition (Compare Fields Before Update main.cs:238–313)\",\"branches\":[{\"label\":\"אושר\",\"nodes\":[{\"type\":\"step\",\"text\":\"סטטוס הפעולה נקבע ל\\\"ממתין להפקדה\\\".\",\"tech\":\"gen_actionstatus = 11\"}]},{\"label\":\"נדחה\",\"nodes\":[{\"type\":\"step\",\"text\":\"סטטוס הפעולה נקבע ל\\\"בקשת לקוח\\\" וסוג הדחייה ל\\\"חיסכון לילד\\\". סיבת הדחייה המחושבת אינה נכתבת: אם ב-CRM כבר רשומה אותה סיבה – היא נמחקת; אם רשומה סיבה אחרת – היא נשארת; אם השדה ריק ב-CRM – לא נכתבת סיבה (ראו ממצא 2).\",\"tech\":\"gen_actionstatus = 3, gen_rejecttype = 4; סיבה 45/46/47 נכתבת לשורה רק כשב-CRM יש סיבה אחרת, ו-Update TransferIn לא כותב אותה; סיבה זהה ב-CRM → -1 → gen_requestrejectreason = null (Compare main.cs:158–168; Update main.cs:134–135)\"}]},{\"label\":\"התקבלה הפקדה\",\"nodes\":[{\"type\":\"step\",\"text\":\"סטטוס הפעולה נקבע ל\\\"התקבלה הפקדה\\\" ותאריך ההעברה המתוקן לתאריך ההפקדה הראשונה.\",\"tech\":\"gen_actionstatus = 12, gen_fixtransferdate = gen_valuedateDB\"}]},{\"label\":\"אחר\",\"nodes\":[{\"type\":\"step\",\"text\":\"סטטוס הפעולה לא משתנה.\"}]}]}",
+   "after": "{\"type\":\"decision\",\"text\":\"האם תאריך הלידה של הלקוח קיים ותקין (בפורמט יום/חודש/שנה)?\",\"tech\":\"!gencustomerdateofbirth_IsNull && DateTime.TryParseExact(gencustomerdateofbirth, \\\"dd/MM/yyyy\\\") (Compare Fields Before Update main.cs:133–137)\",\"branches\":[{\"label\":\"לא\",\"nodes\":[{\"type\":\"step\",\"text\":\"בדיקות האישור, הדחייה וההפקדה לא מתבצעות, ולכן סטטוס הפעולה, סוג הדחייה, סיבת הדחייה ותאריך ההעברה המתוקן לא נקבעים בשורה זו.\"}]},{\"label\":\"כן\",\"nodes\":[{\"type\":\"step\",\"text\":\"שלוש בדיקות מתבצעות זו אחר זו – אישור, דחייה והפקדה. כל בדיקה שמתקיימת קובעת את סטטוס הפעולה ודורסת את מה שנקבע לפניה, ולכן כשתנאי ההפקדה מתקיים הוא שקובע את הסטטוס. בדיקת האישור ובדיקת הדחייה אינן יכולות להתקיים יחד (מדד אישור 1 מול 0).\",\"tech\":\"שלושה if נפרדים בסדר IsNationalInsuranceApproval → IsNationalInsuranceReject → DepositRecivingCondition, כל אחד מציב genactionstatus (main.cs:139–182). שמות הסטטוסים לפי שמות הקבועים בקוד (main.cs:27–35).\"},{\"type\":\"decision\",\"text\":\"האם הבקשה אושרה: מדד אישור 1, בקשה מסוג \\\"הצטרפות והעברה\\\" במצב \\\"בתהליך\\\", סטטוס פעולה קיים ב-CRM שאינו \\\"ממתין להפקדה\\\", ולקוח מתחת לגיל 18?\",\"tech\":\"IsNationalInsuranceApproval (main.cs:265–284): gentransferApprovalIndex == 1, gentransfertypeDB == 1, gencurrentstate == 1, genactionstatusDB אינו NULL ו-!= 11, גיל < 18\",\"branches\":[{\"label\":\"כן\",\"nodes\":[{\"type\":\"step\",\"text\":\"סטטוס הפעולה נקבע ל\\\"ממתין להפקדה\\\", אלא אם בהמשך מתקיים גם תנאי ההפקדה. לבקשה מאושרת חלקו הראשון של תנאי ההפקדה מתקיים תמיד, ולכן היא נשארת \\\"ממתין להפקדה\\\" רק כשלא נמצאה הפקדה ראשונה בקופת היעד.\",\"tech\":\"genactionstatus = 11 (main.cs:139–145); נדרס ל-12 כש-genvaluedateDB אינו NULL (main.cs:240–252)\"}]},{\"label\":\"לא\",\"nodes\":[{\"type\":\"step\",\"text\":\"ממשיכים לבדיקה הבאה.\"}]}]},{\"type\":\"decision\",\"text\":\"האם הבקשה נדחתה: מדד אישור 0, סטטוס בקשה 195, סיבה 7876/7877/7878, בקשה מסוג \\\"הצטרפות והעברה\\\" במצב \\\"בתהליך\\\", ולקוח מתחת לגיל 18?\",\"tech\":\"IsNationalInsuranceReject (main.cs:291–313)\",\"branches\":[{\"label\":\"כן\",\"nodes\":[{\"type\":\"step\",\"text\":\"סטטוס הפעולה נקבע ל\\\"בקשת לקוח\\\", אלא אם בהמשך מתקיים גם תנאי ההפקדה (סטטוס הפעולה ב-CRM \\\"ממתין להפקדה\\\" ונמצאה הפקדה ראשונה). סוג הדחייה נקבע ל\\\"חיסכון לילד\\\" אם הוא שונה ב-CRM, גם כשההפקדה דורסת את הסטטוס. סיבת הדחייה המחושבת אינה נכתבת: אם ב-CRM כבר רשומה אותה סיבה – היא נמחקת; אם רשומה סיבה אחרת – היא נשארת; אם השדה ריק ב-CRM – לא נכתבת סיבה (ראו ממצא 2).\",\"tech\":\"gen_actionstatus = 3 (main.cs:147–151), gen_rejecttype = 4 אם שונה (main.cs:153–157); סיבה 45/46/47 נכתבת לשורה רק כשב-CRM יש סיבה אחרת, ו-Update TransferIn לא שולח אותה; סיבה זהה ב-CRM → -1 → gen_requestrejectreason = null (Compare main.cs:158–168; Update main.cs:134–135)\"}]},{\"label\":\"לא\",\"nodes\":[{\"type\":\"step\",\"text\":\"ממשיכים לבדיקה הבאה.\"}]}]},{\"type\":\"decision\",\"text\":\"האם התקבלה הפקדה: סטטוס הפעולה ב-CRM \\\"ממתין להפקדה\\\" או שהבקשה אושרה בקובץ, הבקשה מסוג \\\"הצטרפות והעברה\\\", הלקוח מתחת לגיל 18, ונמצאה הפקדה ראשונה בקופת היעד?\",\"tech\":\"DepositRecivingCondition (main.cs:238–256): (genactionstatusDB == 11 || gentransferApprovalIndex == 1) && gentransfertypeDB == 1 && גיל < 18 && genvaluedateDB אינו NULL\",\"branches\":[{\"label\":\"כן\",\"nodes\":[{\"type\":\"step\",\"text\":\"סטטוס הפעולה נקבע ל\\\"התקבלה הפקדה\\\" – גם אם קודם נקבע \\\"ממתין להפקדה\\\" או \\\"בקשת לקוח\\\". תאריך ההעברה המתוקן נקבע לתאריך ההפקדה הראשונה אם הוא ריק או שונה ב-CRM.\",\"tech\":\"genactionstatus = 12 (main.cs:171–176); gen_fixtransferdate = genvaluedateDB (main.cs:177–181)\"}]},{\"label\":\"לא\",\"nodes\":[{\"type\":\"step\",\"text\":\"הסטטוס נשאר כפי שנקבע בבדיקות הקודמות, אם נקבע.\"}]}]},{\"type\":\"decision\",\"text\":\"האם נקבע סטטוס פעולה והוא שונה מהערך ב-CRM?\",\"tech\":\"genactionstatus != null && (genactionstatusDB_IsNull || genactionstatusDB != genactionstatus) (main.cs:184–188)\",\"branches\":[{\"label\":\"כן\",\"nodes\":[{\"type\":\"step\",\"text\":\"הסטטוס האחרון שנקבע יעודכן בבקשה.\"}]},{\"label\":\"לא\",\"nodes\":[{\"type\":\"step\",\"text\":\"סטטוס הפעולה לא משתנה.\"}]}]}]}]}",
+   "why": "Approval, reject and deposit were shown as exclusive branches. They are sequential independent ifs; each overwrites genactionstatus, so deposit (12) overrides approval (11) and reject (3); reject side effects still apply. Added the birth-date gate and the write-if-different rule.",
+   "evidence": "Compare Fields Before Update main.cs:133-188, 238-313; constants main.cs:27-35",
+   "round": 2
+  },
+  {
+   "claimId": "L|Package\\Foreach Loop Container\\Create transferin from outside source|detailed",
+   "field": "detailed.nodes[6].branches[0].nodes[3].branches[0].nodes[0].tech",
+   "before": "gen_transferin · Update · SDK (service.Update לשורה, ×5 זהים). (השערה) עדכון שבו סיבת הדחייה ריקה עלול להיכשל – ראו ממצא",
+   "after": "gen_transferin · Update · SDK (service.Update לשורה, ×5 זהים). (השערה) עדכון שבו סיבת הדחייה ריקה עלול להיכשל – ראו ממצא 2",
+   "why": "Finding reference was missing its number.",
+   "evidence": "findings_he[1]",
+   "round": 2
+  },
+  {
+   "claimId": "L|Package\\Foreach Loop Container\\Create transferin from outside source|decisions",
+   "field": "decisions[14].outcome_he",
+   "before": "gen_actionstatus = 11 (ACTION_STATUS_WATING_FOR_DEPOSIT)",
+   "after": "gen_actionstatus = 11 (ACTION_STATUS_WATING_FOR_DEPOSIT) – אלא אם DepositRecivingCondition מתקיים גם הוא: הוא נבדק אחריו ודורס, ובקשה מאושרת עומדת תמיד בחלקו הראשון, ולכן כשנמצאה הפקדה ראשונה (genvaluedateDB אינו NULL) נקבע 12. שלוש הבדיקות (15–17) רצות רק כשתאריך הלידה קיים ותקין בפורמט dd/MM/yyyy (main.cs:133–137), והסטטוס הסופי נכתב רק אם שונה מ-CRM (main.cs:184–188).",
+   "why": "Deposit check overrides approval (sequential ifs).",
+   "evidence": "Compare main.cs:133-188, 240-252",
+   "round": 2
+  },
+  {
+   "claimId": "L|Package\\Foreach Loop Container\\Create transferin from outside source|decisions",
+   "field": "decisions[15].outcome_he",
+   "before": "gen_actionstatus = 3 (ACTION_STATUS_CUSTOMER_APPLICATION), gen_rejecttype = 4 (REJECT_TYPE_CHILD_SAVINGS) אם שונה; סיבת דחייה 7876→45, 7877→46, 7878→47 (ראה ממצא על אי-כתיבתה)",
+   "after": "gen_actionstatus = 3 (ACTION_STATUS_CUSTOMER_APPLICATION) – אלא אם DepositRecivingCondition מתקיים גם הוא (סטטוס הפעולה ב-CRM 11 ונמצאה הפקדה ראשונה), ואז 12; gen_rejecttype = 4 (REJECT_TYPE_CHILD_SAVINGS) אם שונה, וטיפול סיבת הדחייה – חלים גם כשההפקדה דורסת את הסטטוס; סיבת דחייה 7876→45, 7877→46, 7878→47 (ראה ממצא 3 על אי-כתיבתה)",
+   "why": "Deposit check overrides reject status; reject side effects remain.",
+   "evidence": "Compare main.cs:147-187",
+   "round": 2
+  },
+  {
+   "claimId": "L|Package\\Foreach Loop Container\\Create transferin from outside source|decisions",
+   "field": "decisions[16].outcome_he",
+   "before": "gen_actionstatus = 12 (ACTION_STATUS_DEPOSIT_RECIVED); gen_fixtransferdate = תאריך ערך ההפקדה הראשונה אם שונה",
+   "after": "gen_actionstatus = 12 (ACTION_STATUS_DEPOSIT_RECIVED) – נבדק אחרון ודורס 11 או 3 שנקבעו בבדיקות הקודמות; gen_fixtransferdate = תאריך ערך ההפקדה הראשונה אם ריק או שונה",
+   "why": "Precedence stated.",
+   "evidence": "Compare main.cs:171-187",
+   "round": 2
+  },
+  {
+   "claimId": "L|Package\\Foreach Loop Container\\Create transferin from outside source|detail",
+   "field": "detail_he[4].t",
+   "before": "SDK service.Update(gen_transferin) לשורה (Update TransferIn main.cs:122–190), רק שדות שחושבו: gen_actionstatus, gen_rejecttype, gen_requestrejectreason (רק ניקוי ל-null), gen_fixtransferdate, gen_appendixdreceived, gen_appendixdsent, gen_requestcancellationdate, gen_mislakanumber, gen_statusleumi, וכן gen_bankingreceiveddate = Appendix_D_Sended_153 תמיד כשקיים.",
+   "after": "SDK service.Update(gen_transferin) לשורה (Update TransferIn main.cs:122–190), רק לשורות שסומנו needToUpdate. נשלחים: gen_actionstatus ו-gen_rejecttype כשחושבו (אינם NULL ואינם 0); gen_requestrejectreason בשני מקרים – כש-Compare קבע -1 (סיבה קיימת ב-CRM לניקוי) נשלח null (main.cs:134–135), וכשעמודת הסיבה המחושבת ריקה (NULL) – כלומר בכל שורה מחוץ לענף הדחייה, ובענף הדחייה כשאין סיבה ב-CRM – הקוד מציב בשדה את ערך העמודה הריקה (ענף else if, main.cs:136–139; ההשלכה בזמן ריצה – ממצא 2); סיבה מחושבת 45/46/47 אינה נשלחת. בנוסף gen_fixtransferdate, gen_appendixdreceived, gen_appendixdsent, gen_requestcancellationdate (כשקיימים ומ-1900 ואילך), gen_mislakanumber (כשאינו ריק), gen_statusleumi (כשאינו 0), וכן gen_bankingreceiveddate = Appendix_D_Sended_153 תמיד כשקיים.",
+   "why": "Added the else-if branch (NULL computed reason -> attribute assigned from the NULL column) as a business rule; runtime effect referenced to finding 2 only.",
+   "evidence": "Update TransferIn 1/3 main.cs:128-168; Compare main.cs:131,158-168",
+   "round": 2
+  },
+  {
+   "claimId": "L|finding#3",
+   "field": "findings_he[2].text",
+   "before": "סיבת דחייה (gen_requestrejectreason) לעולם לא נכתבת עם ערך: Compare מציב 45/46/47 רק כשיש ערך שונה ב-DB, ומציב -1 (ניקוי) כשה-DB לא ריק אחרת – כולל כשהוא כבר שווה לערך המחושב; Update TransferIn כותב רק את המקרה -1 (null). ערך חדש 45/46/47 אינו נכתב.",
+   "after": "סיבת דחייה (gen_requestrejectreason) לעולם לא נכתבת עם ערך: Compare מציב 45/46/47 רק כשיש ערך שונה ב-DB, ומציב -1 (ניקוי) כשה-DB לא ריק אחרת – כולל כשהוא כבר שווה לערך המחושב; Update TransferIn שולח את השדה רק כשהערך המחושב הוא -1 (null) או ריק (ענף else if – ראו ממצא 2). ערך חדש 45/46/47 אינו נכתב.",
+   "why": "Consistency with the else-if branch at Update TransferIn main.cs:136-139.",
+   "evidence": "Update TransferIn 3 main.cs:134-139",
+   "round": 2
+  },
+  {
+   "claimId": "L|Package\\Foreach Loop Container\\Create transferout|detail",
+   "field": "detail_he[3].t",
+   "before": "SDK service.Create(gen_customercare) (main.cs:62–181): חובה מספר מסלקה (אחרת CastingError). gen_isfulltransfer = (פעולה \"01\"), רק לפעולות 01/02; gen_currentstate = 5 (אין חשבון לקוח) / 1, ובפעולה \"02\" (חלקית) – 4; gen_transferaction = 2; gen_bankadvisingreason = 10; gen_customerstatus: Is_Active_92 \"0\"→2, אחרת Is_Deposit_Funds_93 \"0\"→3, אחרת 1; gen_statusleumi = MapLeumiStatus (77→1, 117→2, 6606→3, 120→4, 119→5, 118→6, 81→7, 82→8, 80→9, 424→10, 83→11, 5458→12, 6017→13, 5631→14, 5457→15, 78→16, 79→17, 8190→18); gen_requestdate = Registration_Date_75, gen_deliverydate = +10 ימי עבודה (CalendarRule, עם תיקון BlackHole), gen_lastpreservationdate = יום עבודה לפני מועד ההעברה; gen_fixtransferdate, gen_signingmemberdate, gen_reportedreceivingdate, gen_receivingfundrejectdate, gen_originalreceiveddate (Revaluation_Date_1); gen_competitorfundname, gen_investhousename, gen_contactname (מחשבון הלקוח), gen_customeraccount, gen_destbankaccountnumber, gen_clearinghousenumber = מספר מסלקה, gen_receivedfundtreasurynumber (ללא אפסים מובילים).",
+   "after": "SDK service.Create(gen_customercare) (main.cs:62–181): חובה מספר מסלקה (אחרת CastingError). gen_isfulltransfer = (פעולה \"01\"), רק לפעולות 01/02; gen_currentstate = 5 (אין חשבון לקוח) / 1, ובפעולה \"02\" (חלקית) – 4; gen_transferaction = 2; gen_bankadvisingreason = 10; gen_customerstatus – רק כש-Is_Active_92 אינו NULL: \"0\"→2, אחרת Is_Deposit_Funds_93 \"0\"→3, אחרת 1; כש-Is_Active_92 הוא NULL השדה לא נשלח (main.cs:93–100); gen_statusleumi – כש-Request_Status_58 אינו NULL נשלח MapLeumiStatus(Request_Status_58), וקוד שאינו בטבלה או אינו מספרי מחזיר null שנשלח כמו שהוא (main.cs:101–102, 215–244); הטבלה: (77→1, 117→2, 6606→3, 120→4, 119→5, 118→6, 81→7, 82→8, 80→9, 424→10, 83→11, 5458→12, 6017→13, 5631→14, 5457→15, 78→16, 79→17, 8190→18); gen_requestdate = Registration_Date_75, gen_deliverydate = +10 ימי עבודה (CalendarRule, עם תיקון BlackHole), gen_lastpreservationdate = יום עבודה לפני מועד ההעברה; gen_fixtransferdate, gen_signingmemberdate, gen_reportedreceivingdate, gen_receivingfundrejectdate, gen_originalreceiveddate (Revaluation_Date_1); gen_competitorfundname, gen_investhousename, gen_contactname (מחשבון הלקוח), gen_customeraccount, gen_destbankaccountnumber, gen_clearinghousenumber = מספר מסלקה, gen_receivedfundtreasurynumber (ללא אפסים מובילים).",
+   "why": "gen_customerstatus guarded by Is_Active_92 not NULL; unmapped Leumi status sends null on create.",
+   "evidence": "Create TransferOut 1 main.cs:93-102, 215-244",
+   "round": 2
+  },
+  {
+   "claimId": "L|Package\\Foreach Loop Container\\Create transferout|detail",
+   "field": "detail_he[4].t",
+   "before": "SDK service.Update (main.cs:62–204): כל שדה נכתב רק אם שונה מה-DB (isfulltransfer, currentstate, transferaction, bankadvisingreason, customerstatus, statusleumi, תאריכים לפי .Date, מתחרה, בית השקעות, איש קשר, חשבון, חשבון יעד) – למעט gen_requestdate, gen_deliverydate, gen_lastpreservationdate ו-gen_receivedfundtreasurynumber שנכתבים תמיד כשיש ערך בקובץ. חישוב המצב בעדכון (main.cs:69–89): currentstate = 5 (ענף ללא חשבון לקוח) או 1; 4 רק כשהפעולה \"02\" ו-gen_isfulltransfer ב-CRM שונה. הערך נכתב כשהוא שונה מ-CRM, ולכן בקשה קיימת במצב שאינו 3 (למשל 2, או 4 כשסימון ההעברה המלאה כבר false) מוחזרת ל-1/5 בכל ריצה. gen_customerstatus (main.cs:94–101): Is_Active \"0\" כשב-CRM כבר 2 ממשיך לענף הבא – 3 (Is_Deposit_Funds_93 \"0\") או 1.",
+   "after": "SDK service.Update (main.cs:62–204): כל שדה נכתב רק אם שונה מה-DB (isfulltransfer, currentstate, transferaction, bankadvisingreason, customerstatus, statusleumi, תאריכים לפי .Date, מתחרה, בית השקעות, איש קשר, חשבון, חשבון יעד) – למעט gen_requestdate, gen_deliverydate, gen_lastpreservationdate ו-gen_receivedfundtreasurynumber שנכתבים תמיד כשיש ערך בקובץ. חישוב המצב בעדכון (main.cs:69–89): currentstate = 5 (ענף ללא חשבון לקוח) או 1; 4 רק כשהפעולה \"02\" ו-gen_isfulltransfer ב-CRM שונה. הערך נכתב כשהוא שונה מ-CRM, ולכן בקשה קיימת במצב שאינו 3 (למשל 2, או 4 כשסימון ההעברה המלאה כבר false) מוחזרת ל-1/5 בכל ריצה. gen_customerstatus – כל השרשרת רצה רק כש-Is_Active_92 אינו NULL; אחרת השדה לא נשלח (main.cs:94–102). gen_statusleumi – קוד לא ממופה מחזיר null ואז השדה לא נשלח (main.cs:103–108). בתוך שרשרת סטטוס הלקוח: Is_Active \"0\" כשב-CRM כבר 2 ממשיך לענף הבא – 3 (Is_Deposit_Funds_93 \"0\") או 1.",
+   "why": "Same Is_Active_92 NULL guard in update; update skips null Leumi status.",
+   "evidence": "Update TransferOut 1 main.cs:94-108",
+   "round": 2
+  },
+  {
+   "claimId": "L|Package\\Foreach Loop Container\\Create transferout|decisions",
+   "field": "decisions[10].outcome_he",
+   "before": "gen_currentstate של בקשה קיימת במצב שאינו 3 מוחזר ל-1/5 כשהוא שונה; gen_customerstatus: Is_Active \"0\" כשב-CRM כבר 2 נכתב 3 (Is_Deposit_Funds_93 \"0\") או 1",
+   "after": "gen_currentstate של בקשה קיימת במצב שאינו 3 מוחזר ל-1/5 כשהוא שונה; gen_customerstatus: Is_Active \"0\" כשב-CRM כבר 2 נכתב 3 (Is_Deposit_Funds_93 \"0\") או 1 (שרשרת gen_customerstatus רצה רק כש-Is_Active_92 אינו NULL, main.cs:94)",
+   "why": "Is_Active_92 NULL guard (consistency).",
+   "evidence": "Update TransferOut 1 main.cs:94",
+   "round": 2
+  },
+  {
+   "claimId": "L|Package\\Foreach Loop Container\\Create transferout|detailed",
+   "field": "detailed.nodes[5].branches[0].nodes[0].branches[1].nodes[0].tech",
+   "before": "gen_customercare · Create · SDK (service.Create לשורה, ×5 זהים); gen_transferaction = 2, gen_bankadvisingreason = 10; AddWorkingDays(10) לפי CalendarRule",
+   "after": "gen_customercare · Create · SDK (service.Create לשורה, ×5 זהים); gen_transferaction = 2, gen_bankadvisingreason = 10; AddWorkingDays(10) לפי CalendarRule; gen_customerstatus רק כש-Is_Active_92 אינו NULL (main.cs:93–100); gen_statusleumi = MapLeumiStatus – קוד לא ממופה שולח null (main.cs:101–102)",
+   "why": "Is_Active_92 guard and unmapped-status behaviour (consistency).",
+   "evidence": "Create TransferOut 1 main.cs:93-102",
+   "round": 2
+  },
+  {
+   "claimId": "L|Package\\Foreach Loop Container\\Create transferout|detailed",
+   "field": "detailed.nodes[5].branches[1].nodes[0].branches[1].nodes[0].tech",
+   "before": "gen_customercare · Update · SDK (×5); ללא השוואה: Update TransferOut main.cs:114–125, 180–188; currentstate = gencurrentstate ?? 1, 4 רק אם ActionType57 == \"02\" ו-gen_isfulltransfer ב-CRM שונה (main.cs:69–89); gen_customerstatus: שרשרת if/else-if שבה כל ענף כולל השוואה ל-CRM, ולכן Is_Active \"0\" כשב-CRM כבר 2 ממשיך לענף 3 או 1 (main.cs:94–101, ממצא 22)",
+   "after": "gen_customercare · Update · SDK (×5); ללא השוואה: Update TransferOut main.cs:114–125, 180–188; currentstate = gencurrentstate ?? 1, 4 רק אם ActionType57 == \"02\" ו-gen_isfulltransfer ב-CRM שונה (main.cs:69–89); gen_customerstatus (רק כש-Is_Active_92 אינו NULL): שרשרת if/else-if שבה כל ענף כולל השוואה ל-CRM, ולכן Is_Active \"0\" כשב-CRM כבר 2 ממשיך לענף 3 או 1 (main.cs:94–101, ממצא 22)",
+   "why": "Is_Active_92 guard (consistency).",
+   "evidence": "Update TransferOut 1 main.cs:94",
+   "round": 2
+  },
+  {
+   "claimId": "L|Package\\Foreach Loop Container\\Update Account|detailed",
+   "field": "detailed.nodes[5].branches[1].nodes[0].tech",
+   "before": "account · Update · SDK (ExecuteMultiple, מנות של 10, ×5); gen_hozertashlumimgemel*, gen_hozertashlumimgemelupdatedate = DateTime.Now",
+   "after": "account · Update · SDK (ExecuteMultiple, מנות של 10, ×5); gen_hozertashlumimgemeltelephone / gen_hozertashlumimgemelmobilephone / gen_hozertashlumimgemelemailaddresss, gen_hozertashlumimgemelupdatedate = DateTime.Now",
+   "why": "Wildcard implied the name attributes are written; only phone, mobile and e-mail receive file data (finding 24).",
+   "evidence": "DTSX:189841; Update Account 1 main.cs:56-67",
+   "round": 2
+  },
+  {
+   "claimId": "L|summary",
+   "field": "summary_he",
+   "before": "החבילה קולטת את קובץ ה-BY היומי של בנק לאומי (קובץ ברוחב קבוע, נטען לשתי טבלאות Staging לפי שתי פריסות) ומעדכנת לפיו את CRM: יוצרת קופות יעד (gen_fundmain) להעברות בין מסלולים, יוצרת בקשות העברה נכנסות (gen_transferin) – בין מסלולים ומגופים חיצוניים (כולל עדכון סטטוסים, סטטוס פעולה לקטינים בבקשות מסוג 1 – לפי שמות המתודות והקבועים בקוד: אישור/דחיית ביטוח לאומי, חיסכון לילד, \"הצטרפות והעברה\" – ומסמכים מצורפים לבקשות קיימות), יוצרת מסלולי חשבון ופיצולי מסלול להעברות פתוחות, ומסנכרנת בקשות תנועה בקופה (gen_ftrequest): יצירה/עדכון, יצירת איש קשר (contact) ללקוח שאינו קיים ב-CRM, וסגירת בקשות פעילות שלא סומנו מחדש \"קיימות בקובץ\" – כולל בקשות שמופיעות בקובץ אך לא עברו את סינון האוכלוסייה או שהמעסיק שלהן לא נמצא. בנוסף יוצרת/מעדכנת בקשות העברה יוצאות (gen_customercare) ומצרפת להן מסמכים (annotation), ומעדכנת פרטי איש קשר אצל מעסיקים (account). חלק מהכתיבות ל-gen_ftrequest מבוצעות ב-SQL ישיר על מסד CRM (Unsupported); השאר דרך CRM SDK.",
+   "after": "החבילה קולטת את קובץ ה-BY היומי של בנק לאומי (קובץ ברוחב קבוע, נטען לשתי טבלאות Staging לפי שתי פריסות) ומעדכנת לפיו את CRM: יוצרת קופות יעד (gen_fundmain) להעברות בין מסלולים, יוצרת בקשות העברה נכנסות (gen_transferin) – בין מסלולים ומגופים חיצוניים (כולל עדכון סטטוסים, סטטוס פעולה לקטינים בבקשות מסוג 1 – לפי שמות המתודות והקבועים בקוד: אישור/דחיית ביטוח לאומי, חיסכון לילד, \"הצטרפות והעברה\" – ומסמכים מצורפים לבקשות קיימות), יוצרת מסלולי חשבון ופיצולי מסלול להעברות פתוחות, ומסנכרנת בקשות תנועה בקופה (gen_ftrequest): יצירה/עדכון, יצירת איש קשר (contact) ללקוח שאינו קיים ב-CRM, וסגירה (gen_treatmentstatus = 4, gen_status = 0) של בקשות עם gen_status = 1 או NULL ו-gen_existinfile = 0 – בקשות עם gen_status = 1 מאופסות ל-gen_existinfile = 0 לפני העיבוד, ולכן נסגרות אם לא סומנו מחדש \"קיימות בקובץ\" (\"פעילה\" – השערה לפי שם המשימה \"1(active)\") – כולל בקשות שמופיעות בקובץ אך לא עברו את סינון האוכלוסייה או שהמעסיק שלהן לא נמצא. בנוסף יוצרת/מעדכנת בקשות העברה יוצאות (gen_customercare) ומצרפת להן מסמכים (annotation), ומעדכנת פרטי איש קשר אצל מעסיקים (account). חלק מהכתיבות ל-gen_ftrequest מבוצעות ב-SQL ישיר על מסד CRM (Unsupported); השאר דרך CRM SDK.",
+   "why": "Unit 1: \"active\" came from the task name only; the closing SQL also covers gen_status IS NULL.",
+   "evidence": "DTSX:189412 (task name), 189416, 189422",
+   "round": 3
+  },
+  {
+   "claimId": "L|summary",
+   "field": "sideOutputs_he[1].t",
+   "before": "שורות שעברו את חלון התאריכים / חיסכון לילד.",
+   "after": "שורות שעברו את חלון התאריכים, או שחשבון היעד שלהן (Dest_Account_Number_47) נמצא ב-gen_customeraccount עם gen_productsubcustomeraccount = 3 (\"חיסכון לילד\" – השערה לפי שם הרכיב Lookup Child Saving).",
+   "why": "Unit 7: child-savings meaning comes only from the component name.",
+   "evidence": "DTSX:94908-94915; paths Lookup Child Saving Match -> Union All 2 Input 2, window -> Input 1, Union All 2 -> Multicast 2 -> last working date",
+   "round": 3
+  },
+  {
+   "claimId": "L|summary",
+   "field": "sideOutputs_he[7].t",
+   "before": "כל קבצי ה-txt הם עקבות אבחון (3–4 עמודות מזהות, Overwrite = true – נדרסים בכל ריצה/קובץ), תיקייה FolderForTextFiles מ-gen_etlvariable. אינם משפיעים על CRM.",
+   "after": "קבצי ה-txt נכתבים בלבד (3–4 עמודות מזהות, Overwrite = true – נדרסים בכל ריצה/קובץ), לתיקייה FolderForTextFiles מ-gen_etlvariable. אף רכיב בחבילות שסופקו אינו קורא אותם: שמות הקבצים מופיעים רק ב-0009, ומקורות הקבצים היחידים ב-0009 הם שני מקורות קובץ ה-BY.",
+   "why": "Unit 13: removed the unproven purpose (\"עקבות אבחון\") and the claim about CRM effect; stated only that no supplied package reads them.",
+   "evidence": "grep of the 7 txt file names over source/DailyProcess/*.dtsx: only 0009_LeumiFile-BY.dtsx; 2 FlatFileSource components in 0009",
+   "round": 3
+  },
+  {
+   "claimId": "L|summary",
+   "field": "sideOutputs_he[7].evidence",
+   "before": "evidence: FlatFileDestination properties Overwrite=true",
+   "after": "FlatFileDestination properties Overwrite=true; grep שמות הקבצים ב-source/DailyProcess/*.dtsx – רק 0009_LeumiFile-BY.dtsx; FlatFileSource ב-0009: 2 (מקורות BY)",
+   "why": "Evidence for unit 13.",
+   "evidence": "see why",
+   "round": 3
+  },
+  {
+   "claimId": "L|exec",
+   "field": "executionOrder[18].title_he",
+   "before": "[בתוך הלולאה] איפוס \"קיים בקובץ\" לבקשות פעילות",
+   "after": "[בתוך הלולאה] איפוס \"קיים בקובץ\" לבקשות עם gen_status = 1",
+   "why": "Same \"active\" fact as summary unit 1 (task name only).",
+   "evidence": "DTSX:189416",
+   "round": 3
+  },
+  {
+   "claimId": "L|Package\\Foreach Loop Container\\update gen_ftrequest,gen_status from 1(active) to 0|title",
+   "field": "components[10].title_he",
+   "before": "איפוס דגל \"קיים בקובץ\" לבקשות תנועה פעילות",
+   "after": "איפוס דגל \"קיים בקובץ\" לבקשות תנועה עם gen_status = 1",
+   "why": "Active = task name only.",
+   "evidence": "DTSX:189412, 189416",
+   "round": 3
+  },
+  {
+   "claimId": "L|Package\\Foreach Loop Container\\update gen_ftrequest,gen_status from 1(active) to 0|title",
+   "field": "components[10].short_he",
+   "before": "לפני עיבוד בקשות התנועה מהקובץ, מסמן את כל בקשות gen_ftrequest הפעילות (gen_status = 1) כ\"לא קיימות בקובץ\". הסימון יוחזר ל-1 רק לבקשות שהשורה שלהן בקובץ עוברת את סינון האוכלוסייה (Case 1) ושהמעסיק שלהן קיים ב-CRM (שלב 20); שאר הבקשות הפעילות – גם כאלה שמופיעות בקובץ – ייסגרו (שלב 21).",
+   "after": "לפני עיבוד בקשות התנועה מהקובץ, מסמן את כל בקשות gen_ftrequest עם gen_status = 1 (\"פעילה\" – השערה לפי שם המשימה \"1(active)\") כ\"לא קיימות בקובץ\". הסימון יוחזר ל-1 רק לבקשות שהשורה שלהן בקובץ עוברת את סינון האוכלוסייה (Case 1) ושהמעסיק שלהן קיים ב-CRM (שלב 20); שאר הבקשות הפעילות – גם כאלה שמופיעות בקובץ – ייסגרו (שלב 21).",
+   "why": "Active = task name only.",
+   "evidence": "DTSX:189412, 189416",
+   "round": 3
+  },
+  {
+   "claimId": "L|Package\\Foreach Loop Container\\update gen_ftrequest,gen_status from 1(active) to 0|title",
+   "field": "components[10].short_he",
+   "before": "לפני עיבוד בקשות התנועה מהקובץ, מסמן את כל בקשות gen_ftrequest עם gen_status = 1 (\"פעילה\" – השערה לפי שם המשימה \"1(active)\") כ\"לא קיימות בקובץ\". הסימון יוחזר ל-1 רק לבקשות שהשורה שלהן בקובץ עוברת את סינון האוכלוסייה (Case 1) ושהמעסיק שלהן קיים ב-CRM (שלב 20); שאר הבקשות הפעילות – גם כאלה שמופיעות בקובץ – ייסגרו (שלב 21).",
+   "after": "לפני עיבוד בקשות התנועה מהקובץ, מסמן את כל בקשות gen_ftrequest עם gen_status = 1 (\"פעילה\" – השערה לפי שם המשימה \"1(active)\") כ\"לא קיימות בקובץ\". הסימון יוחזר ל-1 רק לבקשות שהשורה שלהן בקובץ עוברת את סינון האוכלוסייה (Case 1) ושהמעסיק שלהן קיים ב-CRM (שלב 20); שאר הבקשות שאופסו – גם כאלה שמופיעות בקובץ – ייסגרו (שלב 21: gen_treatmentstatus = 4, gen_status = 0).",
+   "why": "Active = task name only.",
+   "evidence": "DTSX:189422",
+   "round": 3
+  },
+  {
+   "claimId": "L|Package\\Foreach Loop Container\\update gen_ftrequest,gen_status from 1(active) to 0|decisions",
+   "field": "components[10].decisions[0].meaning_he",
+   "before": "רק בקשות פעילות",
+   "after": "רק בקשות עם gen_status = 1 (\"פעילה\" – השערה לפי שם המשימה \"1(active)\")",
+   "why": "Active = task name only.",
+   "evidence": "DTSX:189412, 189416",
+   "round": 3
+  },
+  {
+   "claimId": "L|Package\\Foreach Loop Container\\update gen_ftrequest,gen_status from 1(active) to 0|short",
+   "field": "components[10].short.nodes[0].text",
+   "before": "לפני עיבוד בקשות התנועה מהקובץ, כל בקשות התנועה הפעילות מסומנות \"לא קיימות בקובץ\".",
+   "after": "לפני עיבוד בקשות התנועה מהקובץ, כל בקשות התנועה שהסטטוס שלהן 1 (\"פעילה\" – השערה לפי שם המשימה \"1(active)\") מסומנות \"לא קיימות בקובץ\".",
+   "why": "Active = task name only.",
+   "evidence": "DTSX:189416",
+   "round": 3
+  },
+  {
+   "claimId": "L|Package\\Foreach Loop Container\\update gen_ftrequest,gen_status from 1(active) to 0|short",
+   "field": "components[10].short.nodes[2].text",
+   "before": "בקשות שהשורה שלהן בקובץ עוברת את סינון האוכלוסייה ושהמעסיק שלהן קיים ב-CRM יסומנו שוב כקיימות; שאר הבקשות הפעילות, גם כאלה שמופיעות בקובץ, ייסגרו בסוף התהליך.",
+   "after": "בקשות שהשורה שלהן בקובץ עוברת את סינון האוכלוסייה ושהמעסיק שלהן קיים ב-CRM יסומנו שוב כקיימות; שאר הבקשות שאופסו, גם כאלה שמופיעות בקובץ, ייסגרו בסוף התהליך.",
+   "why": "Active = task name only.",
+   "evidence": "DTSX:189416, 189422",
+   "round": 3
+  },
+  {
+   "claimId": "L|Package\\Foreach Loop Container\\update gen_ftrequest,gen_status from 1(active) to 0|detailed",
+   "field": "components[10].detailed.nodes[1].text",
+   "before": "האם בקשת התנועה פעילה?",
+   "after": "האם הסטטוס של בקשת התנועה הוא 1 (\"פעילה\" – השערה לפי שם המשימה \"1(active)\")?",
+   "why": "Active = task name only.",
+   "evidence": "DTSX:189416",
+   "round": 3
+  },
+  {
+   "claimId": "L|Package\\Foreach Loop Container\\update gen_ftrequest,gen_status from 1(active) to 0|detailed",
+   "field": "components[10].detailed.nodes[5].text",
+   "before": "בקשות שהשורה שלהן בקובץ עוברת את סינון האוכלוסייה ושהמעסיק שלהן קיים ב-CRM יסומנו שוב כקיימות; שאר הבקשות הפעילות, גם כאלה שמופיעות בקובץ, ייסגרו בסוף התהליך.",
+   "after": "בקשות שהשורה שלהן בקובץ עוברת את סינון האוכלוסייה ושהמעסיק שלהן קיים ב-CRM יסומנו שוב כקיימות; שאר הבקשות שאופסו, גם כאלה שמופיעות בקובץ, ייסגרו בסוף התהליך.",
+   "why": "Active = task name only.",
+   "evidence": "DTSX:189416, 189422",
+   "round": 3
+  },
+  {
+   "claimId": "L|Package\\Foreach Loop Container\\Create or update  Fund Trunsaction Request|detail",
+   "field": "components[11].detail_he[5].t",
+   "before": "לבקשות שעברו את Case 1 ושהמעסיק שלהן נמצא: חדשות נוצרות, משתנות מתעדכנות (כולל פתיחה מחדש של בקשה סגורה – gen_status = true), וכל אלה מסומנות \"קיימות בקובץ\" כדי שלא ייסגרו בשלב 21. בקשה פעילה שהשורה שלה בקובץ לא עברה את Case 1 או את בדיקת המעסיק אינה מסומנת ונסגרת בשלב 21 (ממצא 5).",
+   "after": "לבקשות שעברו את Case 1 ושהמעסיק שלהן נמצא: חדשות נוצרות, משתנות מתעדכנות (כולל פתיחה מחדש של בקשה סגורה – gen_status = true), וכל אלה מסומנות \"קיימות בקובץ\" כדי שלא ייסגרו בשלב 21. בקשה עם gen_status = 1 (\"פעילה\" – השערה לפי שם המשימה \"1(active)\") שהשורה שלה בקובץ לא עברה את Case 1 או את בדיקת המעסיק אינה מסומנת ונסגרת בשלב 21 (ממצא 5).",
+   "why": "Active = task name only.",
+   "evidence": "DTSX:189416, 189422",
+   "round": 3
+  },
+  {
+   "claimId": "L|Package\\Foreach Loop Container\\Create or update  Fund Trunsaction Request|short",
+   "field": "components[11].short.nodes[1].branches[0].nodes[0].text",
+   "before": "הבקשה לא מטופלת, ואם היא פעילה ב-CRM – תיסגר בסוף התהליך.",
+   "after": "הבקשה לא מטופלת, ואם הסטטוס שלה ב-CRM הוא 1 – תיסגר בסוף התהליך.",
+   "why": "Active = task name only.",
+   "evidence": "DTSX:189416, 189422",
+   "round": 3
+  },
+  {
+   "claimId": "L|Package\\Foreach Loop Container\\Create or update  Fund Trunsaction Request|short",
+   "field": "components[11].short.nodes[3].text",
+   "before": "בקשות שעברו את הסינון ושהמעסיק שלהן קיים נוצרות או מתעדכנות ומסומנות \"קיימות בקובץ\". בקשה פעילה שאינה מסומנת כך – גם אם הופיעה בקובץ ולא עברה את הסינון או את בדיקת המעסיק – תיסגר בשלב הבא.",
+   "after": "בקשות שעברו את הסינון ושהמעסיק שלהן קיים נוצרות או מתעדכנות ומסומנות \"קיימות בקובץ\". בקשה עם סטטוס 1 שאינה מסומנת כך – גם אם הופיעה בקובץ ולא עברה את הסינון או את בדיקת המעסיק – תיסגר בשלב הבא.",
+   "why": "Active = task name only.",
+   "evidence": "DTSX:189416, 189422",
+   "round": 3
+  },
+  {
+   "claimId": "L|Package\\Foreach Loop Container\\Create or update  Fund Trunsaction Request|detailed",
+   "field": "components[11].detailed.nodes[3].branches[0].nodes[0].text",
+   "before": "השורה לא מטופלת, ובקשה פעילה שלה תיסגר בסוף התהליך.",
+   "after": "השורה לא מטופלת, ובקשה שלה עם סטטוס 1 תיסגר בסוף התהליך.",
+   "why": "Active = task name only.",
+   "evidence": "DTSX:189416, 189422",
+   "round": 3
+  },
+  {
+   "claimId": "L|Package\\Foreach Loop Container\\Create or update  Fund Trunsaction Request|detailed",
+   "field": "components[11].detailed.nodes[4].branches[0].nodes[0].text",
+   "before": "השורה מושמטת ללא הודעה, ובקשה פעילה שלה תיסגר בסוף התהליך.",
+   "after": "השורה מושמטת ללא הודעה, ובקשה שלה עם סטטוס 1 תיסגר בסוף התהליך.",
+   "why": "Active = task name only.",
+   "evidence": "DTSX:189416, 189422",
+   "round": 3
+  },
+  {
+   "claimId": "L|Package\\Foreach Loop Container\\Create or update  Fund Trunsaction Request|detailed",
+   "field": "components[11].detailed.nodes[8].branches[0].nodes[0].text",
+   "before": "נוצרת בקשת תנועה חדשה בעדכון ישיר של מסד הנתונים, עם משתמש המערכת כבעלים, סטטוס פעיל, סוג סוכן (חיצוני אם לא נמצא) וסימון \"קיימת בקובץ\".",
+   "after": "נוצרת בקשת תנועה חדשה בעדכון ישיר של מסד הנתונים, עם משתמש המערכת כבעלים, סטטוס (gen_status) true, סוג סוכן (חיצוני אם לא נמצא) וסימון \"קיימת בקובץ\".",
+   "why": "Active = task name only; the code sets gen_status = true.",
+   "evidence": "Set Final Fields main.cs:262",
+   "round": 3
+  },
+  {
+   "claimId": "L|Package\\Foreach Loop Container\\Create or update  Fund Trunsaction Request|detailed",
+   "field": "components[11].detailed.nodes[9].text",
+   "before": "בקשות שעברו את הסינון ושהמעסיק שלהן קיים נוצרות או מתעדכנות ומסומנות \"קיימות בקובץ\", כדי שלא ייסגרו בשלב הבא. בקשה פעילה שאינה מסומנת כך – גם אם הופיעה בקובץ ולא עברה את הסינון או את בדיקת המעסיק – תיסגר בשלב הבא.",
+   "after": "בקשות שעברו את הסינון ושהמעסיק שלהן קיים נוצרות או מתעדכנות ומסומנות \"קיימות בקובץ\", כדי שלא ייסגרו בשלב הבא. בקשה עם סטטוס 1 שאינה מסומנת כך – גם אם הופיעה בקובץ ולא עברה את הסינון או את בדיקת המעסיק – תיסגר בשלב הבא.",
+   "why": "Active = task name only.",
+   "evidence": "DTSX:189416, 189422",
+   "round": 3
+  },
+  {
+   "claimId": "L|Package\\Foreach Loop Container\\Update treatment status to 4 (done)|title",
+   "field": "components[12].short_he",
+   "before": "אחרי עיבוד הקובץ, כל בקשת gen_ftrequest פעילה (או ללא סטטוס) שלא סומנה \"קיימת בקובץ\" נסגרת: gen_treatmentstatus = 4 (טופל) ו-gen_status = 0.",
+   "after": "אחרי עיבוד הקובץ, כל בקשת gen_ftrequest עם gen_status = 1 או NULL ו-gen_existinfile = 0 (לא סומנה \"קיימת בקובץ\") נסגרת: gen_treatmentstatus = 4 (\"טופל\" לפי שם המשימה) ו-gen_status = 0.",
+   "why": "Active/done = task names only.",
+   "evidence": "DTSX:189422; task name \"Update treatment status to 4 (done)\"",
+   "round": 3
+  },
+  {
+   "claimId": "L|Package\\Foreach Loop Container\\Update treatment status to 4 (done)|detail",
+   "field": "components[12].detail_he[1].t",
+   "before": "בקשה שנעלמה מהקובץ – או שלא עברה את סינוני שלב 20 (Case 1, מעסיק לא נמצא) – נחשבת כמטופלת ונסגרת.",
+   "after": "בקשה שנעלמה מהקובץ – או שלא עברה את סינוני שלב 20 (Case 1, מעסיק לא נמצא) – נסגרת (gen_treatmentstatus = 4, gen_status = 0) אם ה-gen_status שלה 1 או NULL וה-gen_existinfile שלה 0.",
+   "why": "Meaning \"treated\" from task name only; exact condition.",
+   "evidence": "DTSX:189422",
+   "round": 3
+  },
+  {
+   "claimId": "L|Package\\Foreach Loop Container\\Update treatment status to 4 (done)|decisions",
+   "field": "components[12].decisions[0].meaning_he",
+   "before": "פעילה/ללא סטטוס ולא נמצאה בקובץ",
+   "after": "gen_status = 1 או NULL (\"פעילה\" – השערה לפי שם המשימה \"1(active)\") ולא סומנה \"קיימת בקובץ\"",
+   "why": "Active = task name only.",
+   "evidence": "DTSX:189422",
+   "round": 3
+  },
+  {
+   "claimId": "L|Package\\Foreach Loop Container\\Update treatment status to 4 (done)|short",
+   "field": "components[12].short.nodes[0].text",
+   "before": "אחרי עיבוד הקובץ נבדקות כל בקשות התנועה הפעילות או ללא סטטוס.",
+   "after": "אחרי עיבוד הקובץ נבדקות כל בקשות התנועה שהסטטוס שלהן 1 או ריק (NULL).",
+   "why": "Active = task name only.",
+   "evidence": "DTSX:189422",
+   "round": 3
+  },
+  {
+   "claimId": "L|Package\\Foreach Loop Container\\Update treatment status to 4 (done)|short",
+   "field": "components[12].short.nodes[1].branches[0].nodes[0].text",
+   "before": "הבקשה נסגרת: סטטוס הטיפול נקבע ל\"טופל\" והבקשה מסומנת לא פעילה.",
+   "after": "הבקשה נסגרת: סטטוס הטיפול נקבע ל-4 (\"טופל\" לפי שם המשימה) והסטטוס ל-0.",
+   "why": "Meanings from task names only.",
+   "evidence": "DTSX:189422",
+   "round": 3
+  },
+  {
+   "claimId": "L|Package\\Foreach Loop Container\\Update treatment status to 4 (done)|short",
+   "field": "components[12].short.nodes[2].text",
+   "before": "בקשות שלא הופיעו בקובץ נחשבות כמטופלות ונסגרות.",
+   "after": "בקשות עם סטטוס 1 או ריק שלא סומנו \"קיימות בקובץ\" נסגרות (סטטוס טיפול 4, סטטוס 0).",
+   "why": "Exact condition instead of meaning.",
+   "evidence": "DTSX:189422",
+   "round": 3
+  },
+  {
+   "claimId": "L|Package\\Foreach Loop Container\\Update treatment status to 4 (done)|detailed",
+   "field": "components[12].detailed.nodes[1].text",
+   "before": "האם הבקשה פעילה או ללא סטטוס, ולא סומנה \"קיימת בקובץ\"?",
+   "after": "האם הסטטוס של הבקשה הוא 1 או ריק (NULL), והיא לא סומנה \"קיימת בקובץ\"?",
+   "why": "Active = task name only.",
+   "evidence": "DTSX:189422",
+   "round": 3
+  },
+  {
+   "claimId": "L|Package\\Foreach Loop Container\\Update treatment status to 4 (done)|detailed",
+   "field": "components[12].detailed.nodes[5].text",
+   "before": "בקשות שלא הופיעו בקובץ נחשבות כמטופלות ונסגרות.",
+   "after": "בקשות עם סטטוס 1 או ריק שלא סומנו \"קיימות בקובץ\" נסגרות (סטטוס טיפול 4, סטטוס 0).",
+   "why": "Exact condition instead of meaning.",
+   "evidence": "DTSX:189422",
+   "round": 3
+  },
+  {
+   "claimId": "L|Package\\Foreach Loop Container\\Create fundmain for transferin|title",
+   "field": "components[6].flow_he[2]",
+   "before": "החרגת מסלול פיננסי (TransferBetweenCoursesType_208 = 8776)",
+   "after": "החרגת שורות עם Action_Type_56 = \"57\" ו-TransferBetweenCoursesType_208 = \"8776\" (\"מסלול פיננסי\" – השערה לפי שם הרכיב Filter Financial Course)",
+   "why": "Financial course = component name only.",
+   "evidence": "DTSX:38093",
+   "round": 3
+  },
+  {
+   "claimId": "L|Package\\Foreach Loop Container\\Create fundmain for transferin|detail",
+   "field": "components[6].detail_he[0].t",
+   "before": "BY_FileData_2 (פריסה 2). CheckLastRow ← Revaluation_Date_1, gen_bankaccountnumber ← Source_Fund_AccountNumber_20, gen_fundtypenumber ← Target_Fund_course_44 (שינויי שם בעמודות המקור, DTSX:38685). אוכלוסייה: שורות שעוברות את Filter for transfer between courses ואינן \"Financial Course\".",
+   "after": "BY_FileData_2 (פריסה 2). CheckLastRow ← Revaluation_Date_1, gen_bankaccountnumber ← Source_Fund_AccountNumber_20, gen_fundtypenumber ← Target_Fund_course_44 (שינויי שם בעמודות המקור, DTSX:38685). אוכלוסייה: שורות שעוברות את Filter for transfer between courses ואינן עונות על Action_Type_56 == \"57\" && TransferBetweenCoursesType_208 == \"8776\" (יציאת \"Financial Course\"; \"מסלול פיננסי\" – השערה לפי שם הרכיב Filter Financial Course).",
+   "why": "Financial course = component name only.",
+   "evidence": "DTSX:38093",
+   "round": 3
+  },
+  {
+   "claimId": "L|Package\\Foreach Loop Container\\Create fundmain for transferin|decisions",
+   "field": "components[6].decisions[2].meaning_he",
+   "before": "מסלול פיננסי",
+   "after": "\"מסלול פיננסי\" – השערה לפי שם הרכיב Filter Financial Course; אין לכך הוכחה בקוד",
+   "why": "Financial course = component name only.",
+   "evidence": "DTSX:38093",
+   "round": 3
+  },
+  {
+   "claimId": "L|Package\\Foreach Loop Container\\Create fundmain for transferin|detailed",
+   "field": "components[6].detailed.nodes[2].text",
+   "before": "האם מדובר במסלול פיננסי?",
+   "after": "האם השורה עונה על תנאי \"Financial Course\" (קוד 57 וסוג העברה 8776; \"מסלול פיננסי\" – השערה לפי שם הרכיב Filter Financial Course)?",
+   "why": "Financial course = component name only.",
+   "evidence": "DTSX:38093",
+   "round": 3
+  },
+  {
+   "claimId": "L|Package\\Foreach Loop Container\\Create transferin Maslulim|title",
+   "field": "components[7].flow_he[2]",
+   "before": "החרגת מסלול פיננסי (8776)",
+   "after": "החרגת שורות עם Subject_56 = \"57\" ו-TransferBetweenCoursesType_208 = \"8776\" (\"מסלול פיננסי\" – השערה לפי שם הרכיב Filter Financial Course)",
+   "why": "Financial course = component name only.",
+   "evidence": "DTSX:125614",
+   "round": 3
+  },
+  {
+   "claimId": "L|Package\\Foreach Loop Container\\Create transferin Maslulim|decisions",
+   "field": "components[7].decisions[2].meaning_he",
+   "before": "מסלול פיננסי",
+   "after": "\"מסלול פיננסי\" – השערה לפי שם הרכיב Filter Financial Course; אין לכך הוכחה בקוד",
+   "why": "Financial course = component name only.",
+   "evidence": "DTSX:125614",
+   "round": 3
+  },
+  {
+   "claimId": "L|Package\\Foreach Loop Container\\Create transferin Maslulim|detailed",
+   "field": "components[7].detailed.nodes[3].text",
+   "before": "האם מדובר במסלול פיננסי?",
+   "after": "האם השורה עונה על תנאי \"Financial Course\" (קוד 57 וסוג העברה 8776; \"מסלול פיננסי\" – השערה לפי שם הרכיב Filter Financial Course)?",
+   "why": "Unit 8: financial course = component name only.",
+   "evidence": "DTSX:125614",
+   "round": 3
+  },
+  {
+   "claimId": "L|Package\\Foreach Loop Container\\Create transferin from outside source|detail",
+   "field": "components[8].detail_he[0].t",
+   "before": "BY_FileData_1, שורות \"transfer in\" שאינן מסלול פיננסי, שנוצרו אחרי 22/02/2020 ושלפחות אחד מ-Transfer_Approval_Index_122 / Transfer_Status_Reason_89 / Request_Status_58 ניתן להמרה למספר (Convert Data Types main.cs:117–138; שגיאה → Derived Column ללא המשך = נזרק).",
+   "after": "BY_FileData_1, שורות \"transfer in\" שאינן עונות על Subject_56 == \"57\" && TransferBetweenCoursesType_208 == \"8776\" (סינון חסר השפעה אחרי סינון Subject_56 == \"56\"; \"מסלול פיננסי\" – השערה לפי שם הרכיב Filter Financial Course), שנוצרו אחרי 22/02/2020 ושלפחות אחד מ-Transfer_Approval_Index_122 / Transfer_Status_Reason_89 / Request_Status_58 ניתן להמרה למספר (Convert Data Types main.cs:117–138; שגיאה → Derived Column ללא המשך = נזרק).",
+   "why": "Unit 1: financial course = component name only.",
+   "evidence": "DTSX:94024",
+   "round": 3
+  },
+  {
+   "claimId": "L|Package\\Foreach Loop Container\\Create transferin from outside source|decisions",
+   "field": "components[8].decisions[2].meaning_he",
+   "before": "מסלול פיננסי",
+   "after": "\"מסלול פיננסי\" – השערה לפי שם הרכיב Filter Financial Course; אין לכך הוכחה בקוד",
+   "why": "Unit 3: financial course = component name only.",
+   "evidence": "DTSX:94024",
+   "round": 3
+  },
+  {
+   "claimId": "L|Package\\Foreach Loop Container\\Create transferin from outside source|title",
+   "field": "components[8].flow_he[4]",
+   "before": "חשבון חיסכון לילד → ממשיך תמיד; אחרת – חלון תאריך יצירה סביב יום העבודה האחרון: ±10 ימים לבקשה חדשה או למתחרה מוחרג, ±120 לבקשה קיימת",
+   "after": "חשבון יעד שנמצא ב-gen_customeraccount עם gen_productsubcustomeraccount = 3 (\"חיסכון לילד\" – השערה לפי שם הרכיב Lookup Child Saving) → ממשיך תמיד; אחרת – חלון תאריך יצירה סביב יום העבודה האחרון: ±10 ימים לבקשה חדשה או למתחרה מוחרג, ±120 לבקשה קיימת",
+   "why": "Child savings = component name only.",
+   "evidence": "DTSX:94908-94915",
+   "round": 3
+  },
+  {
+   "claimId": "L|Package\\Foreach Loop Container\\Create transferin from outside source|detail",
+   "field": "components[8].detail_he[1].t",
+   "before": "מתחרה: Competitor לפי RIGHT('000000'+Gen_FundFinanceID,6) = Source_Curator_Course_Id_18. בקשה קיימת: Gen_transferin לפי gen_requestidentifier = Request_Id_73 (כל מצב). שני ה-Lookups עם NoMatchBehavior 0 + errorRowDisposition IgnoreFailure – שורה ללא התאמה ממשיכה עם NULL (DTSX:94506, 94616). חשבון חיסכון לילד: gen_customeraccount WHERE gen_productsubcustomeraccount = 3 לפי Dest_Account_Number_47. ביצירה: Gen_customeraccount JOIN gen_customeraccounttype לפי Gen_bankaccountnumber = Dest_Account_Number_47 ו-gen_id = ProductTypeId (5006→1025); ואז Gen_fundmain לפי Gen_customeraccountname = חשבון הלקוח (איש קשר, ת.ז., איש תפעול, מקור הדיווח).",
+   "after": "מתחרה: Competitor לפי RIGHT('000000'+Gen_FundFinanceID,6) = Source_Curator_Course_Id_18. בקשה קיימת: Gen_transferin לפי gen_requestidentifier = Request_Id_73 (כל מצב). שני ה-Lookups עם NoMatchBehavior 0 + errorRowDisposition IgnoreFailure – שורה ללא התאמה ממשיכה עם NULL (DTSX:94506, 94616). Lookup Child Saving (\"חיסכון לילד\" – השערה לפי שם הרכיב Lookup Child Saving): gen_customeraccount WHERE gen_productsubcustomeraccount = 3 לפי Dest_Account_Number_47. ביצירה: Gen_customeraccount JOIN gen_customeraccounttype לפי Gen_bankaccountnumber = Dest_Account_Number_47 ו-gen_id = ProductTypeId (5006→1025); ואז Gen_fundmain לפי Gen_customeraccountname = חשבון הלקוח (איש קשר, ת.ז., איש תפעול, מקור הדיווח).",
+   "why": "Unit 2: child savings = component name only.",
+   "evidence": "DTSX:94908-94915",
+   "round": 3
+  },
+  {
+   "claimId": "L|Package\\Foreach Loop Container\\Create transferin from outside source|decisions",
+   "field": "components[8].decisions[4].meaning_he",
+   "before": "חשבון היעד הוא חשבון חיסכון לילד",
+   "after": "Dest_Account_Number_47 נמצא ב-gen_customeraccount עם gen_productsubcustomeraccount = 3 (\"חיסכון לילד\" – השערה לפי שם הרכיב Lookup Child Saving)",
+   "why": "Unit 5: child savings = component name only.",
+   "evidence": "DTSX:94908-94915",
+   "round": 3
+  },
+  {
+   "claimId": "L|Package\\Foreach Loop Container\\Create transferin from outside source|short",
+   "field": "components[8].short.nodes[0].text",
+   "before": "החבילה מאתרת בקובץ בקשות העברה נכנסת מגופים חיצוניים שנוצרו אחרי 22/02/2020; פרט לחיסכון לילד, רק בקשות שנוצרו בטווח תאריכים סביב יום העבודה האחרון.",
+   "after": "החבילה מאתרת בקובץ בקשות העברה נכנסת מגופים חיצוניים שנוצרו אחרי 22/02/2020; פרט לבקשות שחשבון היעד שלהן רשום ב-CRM עם gen_productsubcustomeraccount = 3 (\"חיסכון לילד\" – השערה לפי שם הרכיב Lookup Child Saving), רק בקשות שנוצרו בטווח תאריכים סביב יום העבודה האחרון.",
+   "why": "Child savings = component name only.",
+   "evidence": "DTSX:94908-94915",
+   "round": 3
+  },
+  {
+   "claimId": "L|Package\\Foreach Loop Container\\Create transferin from outside source|detailed",
+   "field": "components[8].detailed.nodes[5].text",
+   "before": "האם חשבון היעד הוא חשבון חיסכון לילד?",
+   "after": "האם חשבון היעד רשום ב-CRM עם gen_productsubcustomeraccount = 3 (\"חיסכון לילד\" – השערה לפי שם הרכיב Lookup Child Saving)?",
+   "why": "Unit 18: child savings = component name only.",
+   "evidence": "DTSX:94908-94915",
+   "round": 3
+  },
+  {
+   "claimId": "L|Package\\Foreach Loop Container\\Create transferin from outside source|detailed",
+   "field": "components[8].detailed.nodes[6].branches[0].nodes[1].branches[1].nodes[2].branches[0].nodes[0].text",
+   "before": "סטטוס הפעולה נקבע ל\"בקשת לקוח\", אלא אם בהמשך מתקיים גם תנאי ההפקדה (סטטוס הפעולה ב-CRM \"ממתין להפקדה\" ונמצאה הפקדה ראשונה). סוג הדחייה נקבע ל\"חיסכון לילד\" אם הוא שונה ב-CRM, גם כשההפקדה דורסת את הסטטוס. סיבת הדחייה המחושבת אינה נכתבת: אם ב-CRM כבר רשומה אותה סיבה – היא נמחקת; אם רשומה סיבה אחרת – היא נשארת; אם השדה ריק ב-CRM – לא נכתבת סיבה (ראו ממצא 2).",
+   "after": "סטטוס הפעולה נקבע ל\"בקשת לקוח\", אלא אם בהמשך מתקיים גם תנאי ההפקדה (סטטוס הפעולה ב-CRM \"ממתין להפקדה\" ונמצאה הפקדה ראשונה). סוג הדחייה נקבע ל-4 (\"חיסכון לילד\" לפי שם הקבוע REJECT_TYPE_CHILD_SAVINGS בקוד) אם הוא שונה ב-CRM, גם כשההפקדה דורסת את הסטטוס. סיבת הדחייה המחושבת אינה נכתבת: אם ב-CRM כבר רשומה אותה סיבה – היא נמחקת; אם רשומה סיבה אחרת – היא נשארת; אם השדה ריק ב-CRM – לא נכתבת סיבה (ראו ממצא 2).",
+   "why": "Attribute the label to the code constant.",
+   "evidence": "DTSX:82782 (const int REJECT_TYPE_CHILD_SAVINGS = 4), 82905-82907",
+   "round": 3
+  },
+  {
+   "claimId": "L|finding#4",
+   "field": "findings_he[3].text",
+   "before": "Set lastWorkingDate: בשגיאה ה-catch מציב Failure אבל השורה הבאה מציבה Success – החבילה ממשיכה עם LastWorkingDay = 12/4/2008 (ברירת מחדל). אז חלון ±10/±120 ימים בהעברה נכנסת מגוף חיצוני ידחה כל שורה שאינה חיסכון לילד (נגזר מהביטוי).",
+   "after": "Set lastWorkingDate: בשגיאה ה-catch מציב Failure אבל השורה הבאה מציבה Success – החבילה ממשיכה עם LastWorkingDay = 12/4/2008 (ברירת מחדל). אז חלון ±10/±120 ימים בהעברה נכנסת מגוף חיצוני ידחה כל שורה שחשבון היעד שלה לא נמצא ב-Lookup Child Saving (gen_productsubcustomeraccount = 3; \"חיסכון לילד\" – השערה לפי שם הרכיב Lookup Child Saving) (נגזר מהביטוי).",
+   "why": "Child savings = component name only.",
+   "evidence": "DTSX:94908-94915",
+   "round": 3
+  },
+  {
+   "claimId": "L|Package\\Foreach Loop Container\\Create transferin Maslulim|title",
+   "field": "components[7].short_he",
+   "before": "לבקשות העברה בין מסלולים (נושא 57) באותו חשבון ובאותו סוג קופה, שעדיין אין להן gen_transferin ותאריך הביצוע שלהן בחודשיים האחרונים – נוצרת ב-CRM בקשת העברה נכנסת מסוג 5 במצב \"בתהליך\", מקושרת לחשבון הלקוח.",
+   "after": "לבקשות העברה בין מסלולים (נושא 57) באותו חשבון ובאותו סוג קופה, שעדיין אין להן gen_transferin ותאריך הביצוע שלהן מאוחר מהזמן הנוכחי (UTC) פחות חודשיים (כולל תאריכים עתידיים) – נוצרת ב-CRM בקשת העברה נכנסת מסוג 5 במצב \"בתהליך\", מקושרת לחשבון הלקוח.",
+   "why": "Filter passes every date later than UtcNow-2 months, including future.",
+   "evidence": "Filter Last Two Month main.cs:31-37 (DTSX:125687)",
+   "round": 3
+  },
+  {
+   "claimId": "L|Package\\Foreach Loop Container\\Create transferin Maslulim|title",
+   "field": "components[7].flow_he[5]",
+   "before": "רק תאריך ביצוע (Execution_Date_54) בחודשיים האחרונים",
+   "after": "רק תאריך ביצוע (Execution_Date_54) מאוחר מהזמן הנוכחי (UTC) פחות חודשיים (כולל תאריכים עתידיים); ריק (NULL) או לא ניתן לפענוח – נזרק",
+   "why": "Same.",
+   "evidence": "Filter Last Two Month main.cs:31-37",
+   "round": 3
+  },
+  {
+   "claimId": "L|Package\\Foreach Loop Container\\Create transferin Maslulim|decisions",
+   "field": "components[7].decisions[6].meaning_he",
+   "before": "תאריך ביצוע בחודשיים האחרונים",
+   "after": "תאריך ביצוע (פענוח he-IL) מאוחר מ-DateTime.UtcNow פחות חודשיים, כולל תאריכים עתידיים; NULL או לא ניתן לפענוח – לא מנותב",
+   "why": "Same.",
+   "evidence": "Filter Last Two Month main.cs:31-37",
+   "round": 3
+  },
+  {
+   "claimId": "L|Package\\Foreach Loop Container\\Create transferin Maslulim|crm",
+   "field": "components[7].crmEffects[0].when_he",
+   "before": "בקשה חדשה (לא קיימת לפי מזהה) עם שורות מקור ויעד, תאריך ביצוע בחודשיים האחרונים וחשבון לקוח קיים",
+   "after": "בקשה חדשה (לא קיימת לפי מזהה) עם שורות מקור ויעד, תאריך ביצוע מאוחר מהזמן הנוכחי (UTC) פחות חודשיים (כולל תאריכים עתידיים) וחשבון לקוח קיים",
+   "why": "Same.",
+   "evidence": "Filter Last Two Month main.cs:31-37",
+   "round": 3
+  },
+  {
+   "claimId": "L|Package\\Foreach Loop Container\\Create transferin Maslulim|short",
+   "field": "components[7].short.nodes[2].text",
+   "before": "האם תאריך הביצוע בחודשיים האחרונים ונמצא חשבון הלקוח?",
+   "after": "האם תאריך הביצוע מאוחר מהיום פחות חודשיים (כולל תאריך עתידי) ונמצא חשבון הלקוח?",
+   "why": "Same.",
+   "evidence": "Filter Last Two Month main.cs:31-37",
+   "round": 3
+  },
+  {
+   "claimId": "L|Package\\Foreach Loop Container\\Create transferin Maslulim|detailed",
+   "field": "components[7].detailed.nodes[6].text",
+   "before": "האם תאריך הביצוע של הבקשה בחודשיים האחרונים?",
+   "after": "האם תאריך הביצוע של הבקשה מאוחר מהזמן הנוכחי (UTC) פחות חודשיים? גם תאריכים עתידיים עוברים; תאריך ריק (NULL) או שאינו ניתן לפענוח נזרק.",
+   "why": "Unit 19.",
+   "evidence": "Filter Last Two Month main.cs:31-37",
+   "round": 3
+  },
+  {
+   "claimId": "L|finding#26",
+   "field": "findings_he[25].text",
+   "before": "השמטות שקטות בסינוני קוד (Script) – בנוסף להשמטות ב-Lookups: (1) העברה נכנסת מגוף חיצוני – Convert Data Types שולח ל-Error שורה שאף אחד משלושת הקודים (אישור העברה, סיבת סטטוס, סטטוס בקשה) אינו מספר, וה-Error מסתיים ב-Derived Column ללא המשך; (2) Convert gen_isActive from char to int – שורה שסיבת הסטטוס או אישור ההעברה בה לא ניתנים להמרה עוברת ל-Error שאינו מחובר, ולכן הבקשה לא נוצרת; (3) העברה בין מסלולים – Filter Last Two Month מעביר רק שורות שתאריך הביצוע שלהן מתפענח ונמצא בחודשיים האחרונים, והשאר אינן מנותבות ונזרקות. (השערה) כיוון שה-Staging נטען עם RetainNulls=false ו-Trim משאיר \"\" ולא NULL, שדה ריק עלול להיחשב לא תקין ולהיזרק.",
+   "after": "השמטות שקטות בסינוני קוד (Script) – בנוסף להשמטות ב-Lookups: (1) העברה נכנסת מגוף חיצוני – Convert Data Types שולח ל-Error שורה שאף אחד משלושת הקודים (אישור העברה, סיבת סטטוס, סטטוס בקשה) אינו מספר, וה-Error מסתיים ב-Derived Column ללא המשך; (2) Convert gen_isActive from char to int – שורה שסיבת הסטטוס או אישור ההעברה בה לא ניתנים להמרה עוברת ל-Error שאינו מחובר, ולכן הבקשה לא נוצרת; (3) העברה בין מסלולים – Filter Last Two Month מעביר רק שורות שתאריך הביצוע שלהן מתפענח ומאוחר מהזמן הנוכחי (UTC) פחות חודשיים (כולל תאריכים עתידיים), והשאר אינן מנותבות ונזרקות. (השערה) כיוון שה-Staging נטען עם RetainNulls=false ו-Trim משאיר \"\" ולא NULL, שדה ריק עלול להיחשב לא תקין ולהיזרק.",
+   "why": "Same.",
+   "evidence": "Filter Last Two Month main.cs:31-37",
+   "round": 3
+  },
+  {
+   "claimId": "L|Package\\Foreach Loop Container\\Create transferin from outside source|title",
+   "field": "components[8].short_he",
+   "before": "לבקשות העברה נכנסת מקופה חיצונית: אם אין gen_transferin עם אותו מזהה בקשה – יוצר בקשה חדשה (סוג 1, \"בתהליך\") המקושרת לחשבון הלקוח, לאיש הקשר, למתחרה (הקופה המעבירה), לבית ההשקעות ולאיש התפעול, בתנאי שסיבת הסטטוס ומדד אישור ההעברה ריקים או מספריים; אם קיימת – מעדכן סטטוס לאומי, תאריכי נספח ד׳/ביטול, מספר מסלקה, ובקטינים גם סטטוס ביטוח לאומי/קבלת הפקדה. לבקשות קיימות שעדכונן הצליח או שלא נדרש להן עדכון מצרף גם מסמכים (annotation) מתיקיית הנספחים; לבקשות שנוצרו באותה ריצה לא נוצרים מסמכים.",
+   "after": "לבקשות העברה נכנסת מקופה חיצונית: אם אין gen_transferin עם אותו מזהה בקשה – יוצר בקשה חדשה (סוג 1, \"בתהליך\") המקושרת לחשבון הלקוח, לאיש הקשר, למתחרה (הקופה המעבירה), לבית ההשקעות ולאיש התפעול, בתנאי שסיבת הסטטוס ומדד אישור ההעברה הם NULL או מספר (מחרוזת ריקה אינה עוברת); אם קיימת – מעדכן סטטוס לאומי, תאריכי נספח ד׳/ביטול, מספר מסלקה, ובקטינים גם סטטוס ביטוח לאומי/קבלת הפקדה. לבקשות קיימות שעדכונן הצליח או שלא נדרש להן עדכון מצרף גם מסמכים (annotation) מתיקיית הנספחים; לבקשות שנוצרו באותה ריצה לא נוצרים מסמכים.",
+   "why": "Only NULL passes; \"\" fails int.TryParse.",
+   "evidence": "Convert gen_isActive from char to int main.cs:135-168 (DTSX:87181)",
+   "round": 3
+  },
+  {
+   "claimId": "L|Package\\Foreach Loop Container\\Create transferin from outside source|title",
+   "field": "components[8].flow_he[6]",
+   "before": "יצירה: נדרש מתחרה, חשבון לקוח יעד (לפי חשבון + סוג מוצר) וקופה של חשבון הלקוח; מופע ראשון לכל בקשה ולכל חשבון יעד; סיבת הסטטוס ומדד אישור ההעברה חייבים להיות ריקים או מספריים (אחרת השורה מושמטת ללא הודעה)",
+   "after": "יצירה: נדרש מתחרה, חשבון לקוח יעד (לפי חשבון + סוג מוצר) וקופה של חשבון הלקוח; מופע ראשון לכל בקשה ולכל חשבון יעד; סיבת הסטטוס ומדד אישור ההעברה חייבים להיות NULL או מספר (int.TryParse; מחרוזת ריקה \"\" נכשלת) (אחרת השורה מושמטת ללא הודעה)",
+   "why": "Same.",
+   "evidence": "main.cs:135-168",
+   "round": 3
+  },
+  {
+   "claimId": "L|Package\\Foreach Loop Container\\Create transferin from outside source|crm",
+   "field": "components[8].crmEffects[0].when_he",
+   "before": "אין בקשה עם אותו מזהה, הקופה המעבירה קיימת ב-Competitor, נמצאו חשבון לקוח יעד וקופה, מופע ראשון לבקשה ולחשבון, וסיבת הסטטוס ומדד אישור ההעברה ריקים או מספריים (Convert gen_isActive)",
+   "after": "אין בקשה עם אותו מזהה, הקופה המעבירה קיימת ב-Competitor, נמצאו חשבון לקוח יעד וקופה, מופע ראשון לבקשה ולחשבון, וסיבת הסטטוס ומדד אישור ההעברה NULL או מספר (Convert gen_isActive; \"\" נכשל)",
+   "why": "Same.",
+   "evidence": "main.cs:135-168",
+   "round": 3
+  },
+  {
+   "claimId": "L|Package\\Foreach Loop Container\\Create transferin from outside source|detailed",
+   "field": "components[8].detailed.nodes[6].branches[1].nodes[3].text",
+   "before": "האם סיבת הסטטוס ומדד אישור ההעברה ריקים או מספריים?",
+   "after": "האם כל אחד מסיבת הסטטוס וממדד אישור ההעברה הוא NULL או מספר שלם? ערך ריק (\"\") נכשל בהמרה.",
+   "why": "Unit 74.",
+   "evidence": "main.cs:135-168; Trim All Input Columns main.cs:44-48",
+   "round": 3
+  },
+  {
+   "claimId": "L|finding#26",
+   "field": "findings_he[25].text",
+   "before": "השמטות שקטות בסינוני קוד (Script) – בנוסף להשמטות ב-Lookups: (1) העברה נכנסת מגוף חיצוני – Convert Data Types שולח ל-Error שורה שאף אחד משלושת הקודים (אישור העברה, סיבת סטטוס, סטטוס בקשה) אינו מספר, וה-Error מסתיים ב-Derived Column ללא המשך; (2) Convert gen_isActive from char to int – שורה שסיבת הסטטוס או אישור ההעברה בה לא ניתנים להמרה עוברת ל-Error שאינו מחובר, ולכן הבקשה לא נוצרת; (3) העברה בין מסלולים – Filter Last Two Month מעביר רק שורות שתאריך הביצוע שלהן מתפענח ומאוחר מהזמן הנוכחי (UTC) פחות חודשיים (כולל תאריכים עתידיים), והשאר אינן מנותבות ונזרקות. (השערה) כיוון שה-Staging נטען עם RetainNulls=false ו-Trim משאיר \"\" ולא NULL, שדה ריק עלול להיחשב לא תקין ולהיזרק.",
+   "after": "השמטות שקטות בסינוני קוד (Script) – בנוסף להשמטות ב-Lookups: (1) העברה נכנסת מגוף חיצוני – Convert Data Types שולח ל-Error שורה שאף אחד משלושת הקודים (אישור העברה, סיבת סטטוס, סטטוס בקשה) אינו מספר, וה-Error מסתיים ב-Derived Column ללא המשך; (2) Convert gen_isActive from char to int – שורה שסיבת הסטטוס או אישור ההעברה בה אינם NULL ואינם ניתנים להמרה ב-int.TryParse (גם מחרוזת ריקה \"\" נכשלת) עוברת ל-Error שאינו מחובר, ולכן הבקשה לא נוצרת; (3) העברה בין מסלולים – Filter Last Two Month מעביר רק שורות שתאריך הביצוע שלהן מתפענח ומאוחר מהזמן הנוכחי (UTC) פחות חודשיים (כולל תאריכים עתידיים), והשאר אינן מנותבות ונזרקות. (השערה) כיוון שה-Staging נטען עם RetainNulls=false ו-Trim משאיר \"\" ולא NULL, שדה ריק עלול להיחשב לא תקין ולהיזרק.",
+   "why": "Same.",
+   "evidence": "main.cs:135-168",
+   "round": 3
+  },
+  {
+   "claimId": "L|Package\\Foreach Loop Container\\Update Account|decisions",
+   "field": "components[14].decisions[4].meaning_he",
+   "before": "השוואה לפני עדכון; נייד: ללא מקפים, 10 ספרות, מתחיל ב-\"05\" (main.cs:140–149); דוא\"ל: Regex (main.cs:134–138)",
+   "after": "השוואה לפני עדכון; נייד: אחרי הסרת '-' – אורך 10 תווים ומתחיל ב-\"05\" (אין בדיקה שהתווים ספרות; נכתב הערך המקורי מהקובץ, כולל מקפים) (main.cs:140–149); דוא\"ל: Regex (main.cs:134–138)",
+   "why": "Unit 5: only length and prefix are checked.",
+   "evidence": "Update Account 1 main.cs:60-62, 140-149",
+   "round": 3
+  },
+  {
+   "claimId": "L|Package\\Foreach Loop Container\\Update Account|detailed",
+   "field": "components[14].detailed.nodes[5].tech",
+   "before": "Update Account main.cs:56–67; נייד: 10 ספרות שמתחיל ב-05 אחרי הסרת מקפים (main.cs:140–149); דוא\"ל: Regex (main.cs:134–138). תנאי השם (main.cs:48–55) קיים בקוד, אבל לשם אין נתון מהקובץ (ממצא 24).",
+   "after": "Update Account main.cs:56–67; נייד: אחרי הסרת '-' – אורך 10 תווים ומתחיל ב-\"05\", ללא בדיקת ספרות; נכתב הערך המקורי כולל מקפים (main.cs:140–149); דוא\"ל: Regex (main.cs:134–138). תנאי השם (main.cs:48–55) קיים בקוד, אבל לשם אין נתון מהקובץ (ממצא 24).",
+   "why": "Unit 16: only length and prefix are checked.",
+   "evidence": "Update Account 1 main.cs:60-62, 140-149",
+   "round": 3
+  },
+  {
+   "claimId": "L|summary",
+   "field": "summary_he",
+   "before": "החבילה קולטת את קובץ ה-BY היומי של בנק לאומי (קובץ ברוחב קבוע, נטען לשתי טבלאות Staging לפי שתי פריסות) ומעדכנת לפיו את CRM: יוצרת קופות יעד (gen_fundmain) להעברות בין מסלולים, יוצרת בקשות העברה נכנסות (gen_transferin) – בין מסלולים ומגופים חיצוניים (כולל עדכון סטטוסים, סטטוס פעולה לקטינים בבקשות מסוג 1 – לפי שמות המתודות והקבועים בקוד: אישור/דחיית ביטוח לאומי, חיסכון לילד, \"הצטרפות והעברה\" – ומסמכים מצורפים לבקשות קיימות), יוצרת מסלולי חשבון ופיצולי מסלול להעברות פתוחות, ומסנכרנת בקשות תנועה בקופה (gen_ftrequest): יצירה/עדכון, יצירת איש קשר (contact) ללקוח שאינו קיים ב-CRM, וסגירה (gen_treatmentstatus = 4, gen_status = 0) של בקשות עם gen_status = 1 או NULL ו-gen_existinfile = 0 – בקשות עם gen_status = 1 מאופסות ל-gen_existinfile = 0 לפני העיבוד, ולכן נסגרות אם לא סומנו מחדש \"קיימות בקובץ\" (\"פעילה\" – השערה לפי שם המשימה \"1(active)\") – כולל בקשות שמופיעות בקובץ אך לא עברו את סינון האוכלוסייה או שהמעסיק שלהן לא נמצא. בנוסף יוצרת/מעדכנת בקשות העברה יוצאות (gen_customercare) ומצרפת להן מסמכים (annotation), ומעדכנת פרטי איש קשר אצל מעסיקים (account). חלק מהכתיבות ל-gen_ftrequest מבוצעות ב-SQL ישיר על מסד CRM (Unsupported); השאר דרך CRM SDK.",
+   "after": "החבילה קולטת את קובץ ה-BY היומי של בנק לאומי (קובץ ברוחב קבוע, נטען לשתי טבלאות Staging לפי שתי פריסות) ומעדכנת לפיו את CRM: יוצרת קופות יעד (gen_fundmain) להעברות בין מסלולים, יוצרת בקשות העברה נכנסות (gen_transferin) – בין מסלולים ומגופים חיצוניים (כולל עדכון סטטוסים, סטטוס פעולה לקטינים בבקשות מסוג 1 – לפי שמות המתודות והקבועים בקוד: אישור/דחיית ביטוח לאומי, חיסכון לילד, \"הצטרפות והעברה\" – ומסמכים מצורפים לבקשות קיימות), יוצרת מסלולי חשבון ופיצולי מסלול להעברות פתוחות, ומסנכרנת בקשות תנועה בקופה (gen_ftrequest): יצירה/עדכון, יצירת איש קשר (contact) ללקוח שאינו קיים ב-CRM, וסגירה (gen_treatmentstatus = 4, gen_status = 0) של בקשות עם gen_status = 1 או NULL ו-gen_existinfile = 0 – בקשות עם gen_status = 1 מאופסות ל-gen_existinfile = 0 לפני העיבוד, ולכן נסגרות אם לא סומנו מחדש \"קיימות בקובץ\" (הפירוש של gen_status = 1 כ\"פעילה\" נשען רק על שם המשימה \"1(active)\" – השערה) – כולל בקשות שמופיעות בקובץ אך לא עברו את סינון האוכלוסייה או שהמעסיק שלהן לא נמצא. בנוסף יוצרת/מעדכנת בקשות העברה יוצאות (gen_customercare) ומצרפת להן מסמכים (annotation), ומעדכנת פרטי איש קשר אצל מעסיקים (account). חלק מהכתיבות ל-gen_ftrequest מבוצעות ב-SQL ישיר על מסד CRM (Unsupported); השאר דרך CRM SDK.",
+   "why": "Wording: make the hypothesis label refer explicitly to gen_status = 1.",
+   "evidence": "DTSX:189412",
+   "round": 3
+  },
+  {
+   "claimId": "L|finding#26",
+   "field": "findings_he[25].text",
+   "before": "השמטות שקטות בסינוני קוד (Script) – בנוסף להשמטות ב-Lookups: (1) העברה נכנסת מגוף חיצוני – Convert Data Types שולח ל-Error שורה שאף אחד משלושת הקודים (אישור העברה, סיבת סטטוס, סטטוס בקשה) אינו מספר, וה-Error מסתיים ב-Derived Column ללא המשך; (2) Convert gen_isActive from char to int – שורה שסיבת הסטטוס או אישור ההעברה בה אינם NULL ואינם ניתנים להמרה ב-int.TryParse (גם מחרוזת ריקה \"\" נכשלת) עוברת ל-Error שאינו מחובר, ולכן הבקשה לא נוצרת; (3) העברה בין מסלולים – Filter Last Two Month מעביר רק שורות שתאריך הביצוע שלהן מתפענח ומאוחר מהזמן הנוכחי (UTC) פחות חודשיים (כולל תאריכים עתידיים), והשאר אינן מנותבות ונזרקות. (השערה) כיוון שה-Staging נטען עם RetainNulls=false ו-Trim משאיר \"\" ולא NULL, שדה ריק עלול להיחשב לא תקין ולהיזרק.",
+   "after": "השמטות שקטות בסינוני קוד (Script) – בנוסף להשמטות ב-Lookups: (1) העברה נכנסת מגוף חיצוני – Convert Data Types שולח ל-Error שורה שאף אחד משלושת הקודים (אישור העברה, סיבת סטטוס, סטטוס בקשה) אינו מספר, וה-Error מסתיים ב-Derived Column ללא המשך; (2) Convert gen_isActive from char to int – שורה שסיבת הסטטוס או אישור ההעברה בה אינם NULL ואינם ניתנים להמרה ב-int.TryParse (גם מחרוזת ריקה \"\" נכשלת) עוברת ל-Error שאינו מחובר, ולכן הבקשה לא נוצרת; (3) העברה בין מסלולים – Filter Last Two Month מעביר רק שורות שתאריך הביצוע שלהן מתפענח ומאוחר מהזמן הנוכחי (UTC) פחות חודשיים (כולל תאריכים עתידיים), והשאר אינן מנותבות ונזרקות. בבדיקה (2) מחרוזת ריקה \"\" נכשלת (רק NULL עובר), ו-Trim משאיר \"\" כ-\"\" ולא ממיר ל-NULL. (השערה) כיוון שה-Staging נטען עם RetainNulls=false, שדה ריק בקובץ מגיע כ-\"\" ולא כ-NULL, ולכן נזרק בבדיקה (2).",
+   "why": "Separate the proven fact (\"\" fails TryParse) from the hypothesis about how blanks arrive.",
+   "evidence": "Convert gen_isActive main.cs:135-168 (DTSX:87181); Trim All Input Columns main.cs:44-48; RetainNulls=false (DTSX:190133)",
+   "round": 3
+  },
+  {
+   "round": "c1",
+   "date": "2026-11-10T06:32:54.972Z",
+   "claimId": "L|Package\\Foreach Loop Container\\Create transferin from outside source|title",
+   "field": "components[8].short_he",
+   "before": "לבקשות העברה נכנסת מקופה חיצונית: אם אין gen_transferin עם אותו מזהה בקשה – יוצר בקשה חדשה (סוג 1, \"בתהליך\") המקושרת לחשבון הלקוח, לאיש הקשר, למתחרה (הקופה המעבירה), לבית ההשקעות ולאיש התפעול, בתנאי שסיבת הסטטוס ומדד אישור ההעברה הם NULL או מספר (מחרוזת ריקה אינה עוברת); אם קיימת – מעדכן סטטוס לאומי, תאריכי נספח ד׳/ביטול, מספר מסלקה, ובקטינים גם סטטוס ביטוח לאומי/קבלת הפקדה. לבקשות קיימות שעדכונן הצליח או שלא נדרש להן עדכון מצרף גם מסמכים (annotation) מתיקיית הנספחים; לבקשות שנוצרו באותה ריצה לא נוצרים מסמכים.",
+   "after": "לבקשות העברה נכנסת מקופה חיצונית: אם אין gen_transferin עם אותו מזהה בקשה – יוצר בקשה חדשה (סוג 1, \"בתהליך\") המקושרת לחשבון הלקוח, לאיש הקשר, למתחרה (הקופה המעבירה), לבית ההשקעות ולאיש התפעול, בתנאי שסיבת הסטטוס ומדד אישור ההעברה הם NULL או מספר (מחרוזת ריקה אינה עוברת); אם קיימת – מעדכן סטטוס לאומי, תאריכי נספח ד׳/ביטול, מספר מסלקה, ובקטינים גם שדות סטטוס שלפי שמות המתודות והקבועים בקוד מייצגים אישור/דחיית ביטוח לאומי וקבלת הפקדה (השערה; תוויות CRM לא סופקו). לבקשות קיימות שעדכונן הצליח או שלא נדרש להן עדכון מצרף גם מסמכים (annotation) מתיקיית הנספחים; לבקשות שנוצרו באותה ריצה לא נוצרים מסמכים.",
+   "why": "National-insurance / deposit meanings come only from method and constant names; labelled as hypothesis, consistent with open item [4].",
+   "evidence": "Compare Fields Before Update main.cs:27-35, 139-188 (IsNationalInsuranceApproval/Reject, ACTION_STATUS_DEPOSIT_RECIVED)"
+  },
+  {
+   "round": "c1",
+   "date": "2026-11-10T06:32:54.972Z",
+   "claimId": "L|Package\\Foreach Loop Container\\Create transferin from outside source|short",
+   "field": "components[8].short.nodes[1].branches[0].nodes[0].text",
+   "before": "אם השתנו סטטוס לאומי, תאריכי נספח ד׳ או ביטול, או מספר המסלקה – הבקשה מתעדכנת; אצל קטינים מתעדכנים גם אישור או דחיית ביטוח לאומי וקבלת ההפקדה.",
+   "after": "אם השתנו סטטוס לאומי, תאריכי נספח ד׳ או ביטול, או מספר המסלקה – הבקשה מתעדכנת; אצל קטינים מתעדכנים גם שדות סטטוס שלפי שמות המתודות והקבועים בקוד מייצגים אישור או דחיית ביטוח לאומי וקבלת הפקדה (השערה).",
+   "why": "Same name-based meaning stated as fact; labelled as hypothesis.",
+   "evidence": "Compare Fields Before Update main.cs:27-35, 139-188"
+  },
+  {
+   "round": "c1",
+   "date": "2026-11-10T06:32:54.972Z",
+   "claimId": "L|Package\\Foreach Loop Container\\Create transferin from outside source|detail",
+   "field": "components[8].detail_he[6].t",
+   "before": "בקשות העברה נכנסות מגופים חיצוניים נפתחות ב-CRM ומתעדכנות יומית לפי הסטטוס בלאומי; לקטינים (גיל < 18) בהעברה מסוג \"הצטרפות והעברה\" מנוהל סטטוס אישור/דחיית ביטוח לאומי וקבלת הפקדה.",
+   "after": "בקשות העברה נכנסות מגופים חיצוניים נפתחות ב-CRM ומתעדכנות יומית לפי הסטטוס בלאומי; לקטינים (גיל < 18) בבקשות מסוג 1 מנוהל סטטוס פעולה – לפי שמות המתודות והקבועים בקוד: \"הצטרפות והעברה\", אישור/דחיית ביטוח לאומי וקבלת הפקדה (השערה; תוויות CRM לא סופקו).",
+   "why": "Name-based meanings (national insurance, deposit received, and the type-1 constant name in the same sentence) stated as fact; attributed and labelled as hypothesis.",
+   "evidence": "Compare Fields Before Update main.cs:27-35, 139-188"
+  },
+  {
+   "round": "c1",
+   "date": "2026-11-10T06:32:54.972Z",
+   "claimId": "L|Package\\Foreach Loop Container\\Create transferin from outside source|decisions",
+   "field": "components[8].decisions[17].outcome_he",
+   "before": "needToUpdate = true והתאריך ייכתב (ToLocalTime)",
+   "after": "אם המחרוזת מתפענחת (DateTime.TryParse, main.cs:195/204/214) – needToUpdate = true והתאריך (ToLocalTime) נשלח בעדכון כשהוא מ-1900 ואילך (Update TransferIn main.cs:144–156); אם אינה מתפענחת – השדה אינו מוצב ו-needToUpdate אינו נקבע בגללו.",
+   "why": "Outcome is conditional on DateTime.TryParse and the update sends the date only when >= 1900-01-01.",
+   "evidence": "Compare Fields Before Update main.cs:192-219; Update TransferIn 1 main.cs:144-156"
+  },
+  {
+   "round": "c1",
+   "date": "2026-11-10T06:32:54.972Z",
+   "claimId": "L|Package\\Foreach Loop Container\\Create transferin from outside source|crm",
+   "field": "components[8].crmEffects[0].when_he",
+   "before": "אין בקשה עם אותו מזהה, הקופה המעבירה קיימת ב-Competitor, נמצאו חשבון לקוח יעד וקופה, מופע ראשון לבקשה ולחשבון, וסיבת הסטטוס ומדד אישור ההעברה NULL או מספר (Convert gen_isActive; \"\" נכשל)",
+   "after": "אין בקשה עם אותו מזהה, הקופה המעבירה קיימת ב-Competitor, נמצאו חשבון לקוח יעד וקופה, מופע ראשון לבקשה ולחשבון, וסיבת הסטטוס ומדד אישור ההעברה NULL או מספר (Convert gen_isActive; \"\" נכשל); וכן תאריך היצירה בטווח ±10 ימים (DATEDIFF \"dd\") מיום העבודה האחרון, או שחשבון היעד נמצא ב-Lookup Child Saving (gen_productsubcustomeraccount = 3) ואז החלון אינו נבדק",
+   "why": "Create when_he omitted the creation-date window (new request => DaysCount 10) and the Child Saving bypass.",
+   "evidence": "DTSX:104469 (Set Date Range), 94094 (window filter), 94908 (Lookup Child Saving); paths Lookup Child Saving Match -> Union All 2, window filter -> Union All 2 -> Multicast 2 -> If transferin Exists"
+  },
+  {
+   "round": "c1",
+   "date": "2026-11-10T06:32:54.972Z",
+   "claimId": "L|Package\\Foreach Loop Container\\Create transferin from outside source|crm",
+   "field": "components[8].crmEffects[1].when_he",
+   "before": "קיימת בקשה ו-needToUpdate = true",
+   "after": "קיימת בקשה, תאריך היצירה בטווח ±120 ימים (DATEDIFF \"dd\") מיום העבודה האחרון – ±10 כשלמתחרה gen_excludedtransfernotice = TRUE – או שחשבון היעד נמצא ב-Lookup Child Saving (gen_productsubcustomeraccount = 3), ו-needToUpdate = true",
+   "why": "Update when_he omitted the creation-date window and the Child Saving bypass.",
+   "evidence": "DTSX:104469, 94094, 94908"
+  },
+  {
+   "round": "c1",
+   "date": "2026-11-10T06:32:54.972Z",
+   "claimId": "L|Package\\Foreach Loop Container\\Create transferin from outside source|crm",
+   "field": "components[8].crmEffects[2].when_he",
+   "before": "לכל DocN עם קוד ושם קובץ שנמצא בתיקיית הנספחים – רק לבקשות קיימות (עודכנו או שלא נדרש להן עדכון); לא לבקשות שנוצרו באותה ריצה",
+   "after": "לכל DocN עם קוד ושם קובץ שנמצא בתיקיית הנספחים – רק לבקשות קיימות שעברו את חלון תאריך היצירה (±120 ימים, או ±10 כשלמתחרה gen_excludedtransfernotice = TRUE) או את עקיפת Lookup Child Saving (עודכנו או שלא נדרש להן עדכון); לא לבקשות שנוצרו באותה ריצה",
+   "why": "Annotation when_he omitted the same window that gates existing requests.",
+   "evidence": "DTSX:104469, 94094, 94908, 108245"
+  },
+  {
+   "round": "c1",
+   "date": "2026-11-10T06:32:54.972Z",
+   "claimId": "L|Package\\Foreach Loop Container\\update gen_ftrequest,gen_status from 1(active) to 0|detailed",
+   "field": "components[10].detailed.nodes[3].text",
+   "before": "שם המשימה מדבר על שינוי סטטוס, אבל בפועל משתנה רק הסימון \"קיים בקובץ\".",
+   "after": "שם המשימה מדבר על שינוי סטטוס, אבל gen_status אינו משתנה; משתנים רק הסימון \"קיים בקובץ\" (ל-0) ותאריך השינוי (ModifiedOn).",
+   "why": "The UPDATE also sets ModifiedOn = GETUTCDATE(); \"only existinfile changes\" was literally false.",
+   "evidence": "DTSX:189416"
+  },
+  {
+   "round": "c1",
+   "date": "2026-11-10T06:32:54.972Z",
+   "claimId": "L|Package\\Foreach Loop Container\\Create or update  Fund Trunsaction Request|detailed",
+   "field": "components[11].detailed.nodes[8].branches[1].nodes[0].branches[0].nodes[0].text",
+   "before": "הבקשה מתעדכנת דרך CRM בכל הפרטים מהקובץ, נפתחת מחדש אם הייתה סגורה, ומסומנת \"קיימת בקובץ\".",
+   "after": "הבקשה מתעדכנת דרך CRM בכל הפרטים מהקובץ, gen_status מוחזר ל-true (gen_treatmentstatus אינו משתנה – בקשה שנסגרה בשלב 21 נשארת עם gen_treatmentstatus = 4), ומסומנת \"קיימת בקובץ\".",
+   "why": "Not a reopening: only gen_status returns to true; gen_treatmentstatus (set to 4 at closure) is written nowhere else.",
+   "evidence": "Update Fund Transaction Request 1 main.cs:188-191; DTSX:189422 (only writer of gen_treatmentstatus)"
+  },
+  {
+   "round": "c1",
+   "date": "2026-11-10T06:32:54.972Z",
+   "claimId": "L|Package\\Foreach Loop Container\\Create or update  Fund Trunsaction Request|detail",
+   "field": "components[11].detail_he[5].t",
+   "before": "לבקשות שעברו את Case 1 ושהמעסיק שלהן נמצא: חדשות נוצרות, משתנות מתעדכנות (כולל פתיחה מחדש של בקשה סגורה – gen_status = true), וכל אלה מסומנות \"קיימות בקובץ\" כדי שלא ייסגרו בשלב 21. בקשה עם gen_status = 1 (\"פעילה\" – השערה לפי שם המשימה \"1(active)\") שהשורה שלה בקובץ לא עברה את Case 1 או את בדיקת המעסיק אינה מסומנת ונסגרת בשלב 21 (ממצא 5).",
+   "after": "לבקשות שעברו את Case 1 ושהמעסיק שלהן נמצא: חדשות נוצרות, משתנות מתעדכנות (gen_status מוחזר ל-true; gen_treatmentstatus אינו מתעדכן ונשאר כפי שהיה, למשל 4 אחרי סגירה בשלב 21), וכל אלה מסומנות \"קיימות בקובץ\" כדי שלא ייסגרו בשלב 21. בקשה עם gen_status = 1 (\"פעילה\" – השערה לפי שם המשימה \"1(active)\") שהשורה שלה בקובץ לא עברה את Case 1 או את בדיקת המעסיק אינה מסומנת ונסגרת בשלב 21 (ממצא 5).",
+   "why": "Same \"reopening\" error.",
+   "evidence": "Update Fund Transaction Request 1 main.cs:188-191; DTSX:189422"
+  },
+  {
+   "round": "c1",
+   "date": "2026-11-10T06:32:54.972Z",
+   "claimId": "L|Package\\Foreach Loop Container\\Update Account|detailed",
+   "field": "components[14].detailed.nodes[1].branches[0].nodes[0].text",
+   "before": "השורה לא מטופלת – למשל שורה ללא טלפון (NULL) או עם טלפון מספרי קטן מ-2.",
+   "after": "השורה לא מטופלת – למשל שורה עם טלפון מספרי קטן מ-2, או שורה שאינה עונה על אחד מתנאי הנושא, הפעולה, קובץ המקור או הכיוון. שורה ללא טלפון (NULL) שעונה על שאר התנאים אינה בהכרח מדולגת: לפי התנהגות SSIS המתועדת, לא מוצג בקבצים, תוצאת תנאי NULL היא שגיאה, והרכיב מוגדר FailComponent – השערה.",
+   "why": "NULL-phone outcome was stated as \"skipped\" without mark; with the other conditions TRUE the expression is NULL and the output is FailComponent.",
+   "evidence": "DTSX:179741 (expression), 179755 (errorRowDisposition FailComponent)"
+  }
+ ]
+}

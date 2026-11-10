@@ -1,0 +1,216 @@
+{
+  "verifier": "ssis-verifier",
+  "package": "0023_Employers",
+  "scope": "logic-claims re-check round 2",
+  "checkedAt": "2026-11-07",
+  "checked": 11,
+  "results": [
+    {
+      "id": "L|summary",
+      "hash": "c7fc6e6de3a3",
+      "verdict": "WRONG",
+      "detail": "Correct: the SDK Update of gen_employers with gen_mf* fields that are not NULL; the Pension/Study column choice; the validity rule; triggers (2) through OR constraints 8058/8059; the all-accounts LEFT JOIN query; the direct SQL UPDATE dbo.AccountBase (Unsupported) gated by Check if to update; the NULL-fee FailComponent path; the MF hypothesis label. The scopeNote is correct (DTSX:33 config with an override caveat, [CRM] DTSX:4). WRONG (1), file identity: '(1) כשמגיע קובץ \"הטבות מעסיקים\" … הטבות המעסיק מהקובץ' and '(2) … אחרי קליטה וארכוב מוצלחים של הקובץ' treat the checked/archived file and the read file as one file. The trigger and archive use MFBenefitFilePath\\MFBenefitFile, whose values come from gen_etlvariable or the config and are unknown (Check File Existence ScriptMain.cs:36-53; Move FileTo Archive DTSX:3693). The rows are read through the MF Source connection, whose design-time path is fixed with no Expression (DTSX:9). The package's own finding says they may differ. WRONG (2), unqualified-column ownership is stated without argument: 'רשומות gen_employers שלו (לפי מספר תאגיד) שמקושרות למוצר' rests on the unqualified gen_corporatenumber / gen_fundtypename / productid in Get Employer Nunmer (DTSX:5689-5695). 'הערכים השמורים בחשבון' and 'קופות … המשויכות לרשומות המעסיק שלו' rest on the unqualified Gen_employeesweightedmanagementfee / Gen_EmployeesFundsValue / Gen_employersId / accountid in get employers (DTSX:7796-7808). The ownership is provable, but per the standard it must be argued explicitly.",
+      "evidence": "Check File Existence ScriptMain.cs:36-55 @DTSX:273; DTSX:3693; DTSX:9-11; DTSX:5689-5695; DTSX:7796-7808; DTSX:7991; 0004_LeumiFile-MY.dtsx:37558,37568,37617,70147-70153",
+      "wrongUnits": [
+        {
+          "unit": 1,
+          "problem": "The checked/archived file (MFBenefitFile) and the read file (MF Source) are presented as the same 'הטבות מעסיקים' file; this is not proven and contradicts the package's own file-path finding.",
+          "correct": "'(1) כשהקובץ MFBenefitFile קיים בתיקייה MFBenefitFilePath (ערכים מ-gen_etlvariable או מקובץ התצורה): ההטבות נקראות מהקובץ שבחיבור MF Source (נתיב קבוע בזמן התכנון, \"הטבות מעסיקים.csv\"; לא הוכח שזה אותו קובץ – ראו ממצא), … (2) כשהקובץ MFBenefitFile אינו קיים, או אחרי קליטה מוצלחת והעברת MFBenefitFile לארכיון: …'",
+          "evidence": "ScriptMain.cs:36-53 @DTSX:273; DTSX:9, 3693"
+        },
+        {
+          "unit": 1,
+          "problem": "Ownership of unqualified columns is stated as fact without the ambiguity argument.",
+          "correct": "Add the argument: 'העמודות בשאילתות ללא קידומת טבלה; אילו עמודה הייתה קיימת ביותר מטבלה אחת השאילתה הייתה נכשלת; לפי המשתמש החבילה רצה בפרודקשן. gen_corporatenumber ו-gen_fundtypename נכתבים לישות gen_employers בחבילה 0004 (0004:37558,37568,37617; Gen_employers.gen_fundtypename = Product.ProductId ב-0004:70153). ל-AccountBase יש העמודות Gen_EmployeesFundsValue ו-Gen_employeesweightedmanagementfee (DTSX:7991).'",
+          "evidence": "DTSX:5689-5695, 7796-7808, 7991; 0004_LeumiFile-MY.dtsx:37558-37617, 70147-70153"
+        }
+      ]
+    },
+    {
+      "id": "L|finding#7",
+      "hash": "49e93a691b83",
+      "verdict": "WRONG",
+      "detail": "The arithmetic is correct: CASE WHEN SUM(ISNULL(bal,0)) = 0 THEN 0 ELSE SUM(ISNULL(bal,0)*pct)/SUM(ISNULL(bal,0)). A NULL-rate fund counts in the denominator only. The data-dependent outcomes are correctly conditional. All rates NULL with a non-zero sum gives NULL. With both stored values present, Update3 (NULL != x) hits FailComponent (DTSX:7731; Update/Update2 at orders 0-1 come first). Accounts without employers/funds get 0. WRONG: 'שני הערכים השמורים בחשבון' (and 'הערך השמור') attribute the unqualified Gen_employeesweightedmanagementfee / Gen_EmployeesFundsValue in a 3-table query (account, gen_employers, gen_fundmain) to the account, with no argument.",
+      "evidence": "get employers SQL DTSX:7796-7808; Check if to update DTSX:7731-7771; Update Account DTSX:7991",
+      "wrongUnits": [
+        {
+          "unit": 1,
+          "problem": "Ownership of the stored-value columns is stated as fact without argument.",
+          "correct": "Add: '(העמודות שנשלפות כערכים שמורים אינן מסויגות בשאילתה; ל-AccountBase יש עמודות בשמות אלה (DTSX:7991), ואילו היו קיימות גם ב-gen_employers או ב-gen_fundmain השאילתה הייתה נכשלת; לפי המשתמש החבילה רצה בפרודקשן.)'",
+          "evidence": "DTSX:7796-7808, 7991"
+        }
+      ]
+    },
+    {
+      "id": "L|Package (control flow)|title",
+      "hash": "b1630df75269",
+      "verdict": "WRONG",
+      "detail": "flow_he[1]-[5] match DTSX:8053-8059 and Check File Existence ScriptMain.cs:36-55. The path is MFBenefitFilePath (with '\\' added if missing) + MFBenefitFile, and Archive\\yyyy.MM.dd is created only when the file exists. The population 'כל חשבון ב-CRM, כולל חשבונות בלי רשומות מעסיק' is correct. WRONG: short_he 'אם קובץ הטבות המעסיקים קיים, ההטבות נקלטות לרשומות המעסיק והקובץ מועבר לארכיון' asserts that the file that is checked and archived (MFBenefitFile) is the file the benefits are read from (MF Source, fixed design-time path, DTSX:9). This is not proven; the package's own finding says they may differ.",
+      "evidence": "ScriptMain.cs:36-55 @DTSX:273; DTSX:9-11, 3689-3693, 8053-8059",
+      "wrongUnits": [
+        {
+          "unit": 2,
+          "problem": "The checked/archived file and the read file are presented as the same file.",
+          "correct": "'אם הקובץ MFBenefitFile קיים, נקלטות לרשומות המעסיק ההטבות מהקובץ שבחיבור MF Source (לא הוכח שזה אותו קובץ), והקובץ MFBenefitFile מועבר לארכיון. …'",
+          "evidence": "DTSX:9, 3693; ScriptMain.cs:36-53 @DTSX:273"
+        }
+      ]
+    },
+    {
+      "id": "L|Package (control flow)|short",
+      "hash": "f93b2fe7d88b",
+      "verdict": "WRONG",
+      "detail": "Branches are correct. Constraint 4 (8057) leads to Set MF. Constraint 2 (8055) leads Set MF -> Move. 8058 (!isFileExist) and 8059 (Move Success) are OR into Update employer amount. A failure of Set MF or Move blocks the calculation. Unit 7's population and write condition are correct. WRONG: units 1 and 4 call the checked file (MFBenefitFile) 'קובץ הטבות המעסיקים' and say the benefits are ingested 'מהקובץ' and 'הקובץ מועבר לארכיון'. That presents the checked/archived file and the MF Source read file as one file, which is not proven (package finding on the file path). Unit 8, '(end) … נתוני ההיקף של המעסיקים ב-CRM מעודכנים', narrows the calculation to employers. It writes to every account, including accounts with no gen_employers, which get 0 (unit 7 says so itself), and 'ההיקף' is an unlabelled interpretation.",
+      "evidence": "DTSX:8053-8059; ScriptMain.cs:36-55 @DTSX:273; DTSX:9, 3693; get employers DTSX:7796-7808",
+      "wrongUnits": [
+        {
+          "unit": 1,
+          "problem": "The checked file is labelled as the benefits file (from the variable name MFBenefitFile).",
+          "correct": "'החבילה בודקת אם הקובץ MFBenefitFile קיים בתיקייה MFBenefitFilePath (ערכים מטבלת ההגדרות או מקובץ התצורה).'",
+          "evidence": "ScriptMain.cs:36-45 @DTSX:273"
+        },
+        {
+          "unit": 4,
+          "problem": "Ingest from the read file and archive of the checked file are presented as the same file.",
+          "correct": "'הטבות המעסיקים נקלטות מהקובץ שבחיבור MF Source (לא הוכח שזה הקובץ שנבדק), והקובץ MFBenefitFile מועבר לארכיון יומי.'",
+          "evidence": "DTSX:9, 3693"
+        },
+        {
+          "unit": 8,
+          "problem": "The end state narrows the account update to employers; the calculation covers all accounts.",
+          "correct": "'(end) רשומות המעסיק שעברו את הבדיקות מחזיקות את הטבות הקובץ, ובכל החשבונות ב-CRM שווי קופות העובדים ודמי הניהול המשוקללים מעודכנים כשהערך השמור ריק או שונה מהמחושב.'",
+          "evidence": "DTSX:7796-7808, 7731"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Set MF on employers|title",
+      "hash": "99112c463663",
+      "verdict": "WRONG",
+      "detail": "flow_he[1]-[6] are correct. TRIM only trims; convert turns NULL or \"\" into NULL and casts to DT_DBTIMESTAMP/DT_R8 (FailComponent). Merge Join is JoinType=1, 1 key, TreatNullsAsEqual. Check if employer exist -> warning. Check Fund type 200001/1 and 200000/2; DE Output has no path; NULL -> FailComponent. Check If Date Valid as stated. Create = ExecuteMultiple RequestType.Update with non-NULL fields. The MF hypothesis is labelled. WRONG: short_he and flow_he[2] state as fact that the matched records are gen_employers records found by their corporate number and linked to a product. In Get Employer Nunmer (`select gen_corporatenumber, Gen_employersid, product.ProductTypeCode from Gen_employers join product on productid = gen_fundtypename`), gen_corporatenumber, Gen_employersid, productid and gen_fundtypename are unqualified, and no ownership argument is given.",
+      "evidence": "DTSX:5689-5695; 0004_LeumiFile-MY.dtsx:37558,37568,37617,70147-70153",
+      "wrongUnits": [
+        {
+          "unit": 2,
+          "problem": "Ownership of the unqualified join/key columns is stated as fact without argument.",
+          "correct": "Add: '(העמודות gen_corporatenumber, gen_fundtypename ו-productid אינן מסויגות; אילו עמודה הייתה קיימת בשתי הטבלאות השאילתה הייתה נכשלת, ולפי המשתמש החבילה רצה בפרודקשן. בחבילה 0004 gen_corporatenumber ו-gen_fundtypename נכתבים לישות gen_employers (0004:37558,37568,37617), ושם Gen_employers.gen_fundtypename = Product.ProductId (0004:70153).)'",
+          "evidence": "DTSX:5689-5695; 0004_LeumiFile-MY.dtsx:37558-37617, 70153"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Set MF on employers|short",
+      "hash": "b3e141f78639",
+      "verdict": "WRONG",
+      "detail": "Branches [6]-[11] are correct: the Pension/Study column choice, the skip for other codes, NULL -> FailComponent, the validity rule, the warnings and the write. WRONG: decision [2] 'רשומת מעסיק עם מספר התאגיד שמקושרת למוצר' and [4] rest on the ownership of the unqualified gen_corporatenumber / gen_fundtypename / productid (DTSX:5689-5695), which is not argued. Minor: [9] 'והמעסיק אינו מתעדכן' should say the specific employer record. Other records of the same corporate number (another product type) may still pass.",
+      "evidence": "DTSX:5689-5695, 3743, 6033; 0004_LeumiFile-MY.dtsx:37558-37617, 70153",
+      "wrongUnits": [
+        {
+          "unit": 2,
+          "problem": "Ownership of unqualified columns is stated without argument.",
+          "correct": "Keep the decision and add the ownership argument (ambiguity rule + 0004:37568/37617/70153 showing gen_corporatenumber and gen_fundtypename on gen_employers, ProductId on Product).",
+          "evidence": "DTSX:5689-5695"
+        },
+        {
+          "unit": 9,
+          "problem": "'המעסיק אינו מתעדכן' overstates; the check is per gen_employers record.",
+          "correct": "'נרשמת אזהרה על תאריך לא תקין, ורשומת המעסיק הזו אינה מתעדכנת.'",
+          "evidence": "Check If Date Valid DTSX:3743 (per row after Merge Join)"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Set MF on employers|detailed",
+      "hash": "e6aff0d8178c",
+      "verdict": "WRONG",
+      "detail": "Verified: the header names (DTSX:13-20); TRIM trims only (main.cs:51-58) and RetainNulls=false; convert expressions and FailComponent. Sort is blocking after convert, so a conversion failure means no row reaches Create. Merge Join left outer with 1 key; Check if employer exist; warning texts (Set Warning columns 1 / 1 1 / 1 2); Check Fund type conditions, EvaluationOrder 0/1, FailComponent on both, DE Output with no path; NULL fails the data flow and blocks Move (8055) and Update (8058 false, 8059 not satisfied). Pension/Study derived columns; Check If Date Valid conditions and order 0/1 (NULL-safe because of the && with ISNULL). Create sends the 5 non-NULL fields as Update (ExecuteMultiple, 1000); the Error output becomes a 'נכשל בקליטת הנתונים' warning. WRONG (a) unit 1: the tech names the read path 'conn MF Source = C:\\Banks Source Files\\Leumi Source Files\\הטבות מעסיקים.csv' as the source read, without saying that the unsupplied config (DTSX:33) may override it. That is the design-time value. WRONG (b) units 3 and 5: 'רשומות המעסיק … נשלפות … רק רשומות מעסיק שמקושרות למוצר' / 'רשומת מעסיק שמקושרת למוצר' state the ownership of the unqualified gen_corporatenumber / gen_fundtypename / productid without argument.",
+      "evidence": "DTSX:9-24, 33; TRIM main.cs:33-58 @DTSX:6368; convert DTSX:3820; DTSX:5689-5695, 5730, 3702-3790; Create main.cs:121-182 @DTSX:3885; DTSX:8055, 8058, 8059",
+      "wrongUnits": [
+        {
+          "unit": 1,
+          "problem": "The connection-string path is given as the read target with no config caveat.",
+          "correct": "Add: 'זהו ערך זמן התכנון; קובץ התצורה החיצוני C:\\Generix\\SSISConfigFile.dtsConfig (DTSX:33), שלא סופק, עשוי לדרוס אותו.'",
+          "evidence": "DTSX:9, 33"
+        },
+        {
+          "unit": 3,
+          "problem": "Ownership of the unqualified columns in Get Employer Nunmer is stated without argument.",
+          "correct": "Add the ambiguity-rule argument with evidence: 0004:37558/37568/37617 (gen_corporatenumber, gen_fundtypename on gen_employers), 0004:70153 (Gen_employers.gen_fundtypename = Product.ProductId).",
+          "evidence": "DTSX:5689-5695"
+        },
+        {
+          "unit": 5,
+          "problem": "Same unargued ownership in the decision wording.",
+          "correct": "Same argument (or refer to it explicitly).",
+          "evidence": "DTSX:5689-5695, 3787"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Set MF on employers|detail",
+      "hash": "a32bb7076dd1",
+      "verdict": "WRONG",
+      "detail": "Units 1, 3, 4 and 5 are correct (Delimited, header, CodePage 1255; decisions; 5 fields, only non-NULL; hypothesis labelled). WRONG unit 2: 'gen_corporatenumber בקובץ מול gen_employers.gen_corporatenumber' and '(gen_fundtypename → product.ProductTypeCode)' qualify columns that are unqualified in the SQL (`select gen_corporatenumber, Gen_employersid, product.ProductTypeCode from Gen_employers join product on productid = gen_fundtypename`). No ambiguity argument is given.",
+      "evidence": "DTSX:5689-5695; 0004_LeumiFile-MY.dtsx:37558,37568,37617,70153",
+      "wrongUnits": [
+        {
+          "unit": 2,
+          "problem": "Explicit table qualification of unqualified columns without argument.",
+          "correct": "Add: '(בשאילתה העמודות אינן מסויגות; אילו עמודה הייתה קיימת בשתי הטבלאות השאילתה הייתה נכשלת, ולפי המשתמש החבילה רצה בפרודקשן; ב-0004 gen_corporatenumber ו-gen_fundtypename נכתבים לישות gen_employers (0004:37558,37568,37617) ו-Gen_employers.gen_fundtypename = Product.ProductId (0004:70153).)'",
+          "evidence": "DTSX:5689-5695"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Set MF on employers|decisions",
+      "hash": "a3b1a9c3bedf",
+      "verdict": "WRONG",
+      "detail": "Conditions [3]-[9] match the DTSX exactly (Check Fund type orders 0/1 + DE Output; Check If Date Valid orders 0/1 + Default; warning texts; Create main.cs:127-136). WRONG: [1] outcome 'רק רשומות שמקושרות למוצר – join פנימי' and [2] meaning 'אין רשומת מעסיק עם מספר התאגיד שמקושרת למוצר' rest on the ownership of the unqualified gen_corporatenumber / gen_fundtypename / productid in Get Employer Nunmer, which is not argued.",
+      "evidence": "DTSX:5689-5695, 5730, 3787; 0004_LeumiFile-MY.dtsx:37558-37617, 70153",
+      "wrongUnits": [
+        {
+          "unit": 1,
+          "problem": "Unargued ownership of the unqualified join columns.",
+          "correct": "Add the ambiguity-rule argument with the 0004 evidence (37568, 37617, 70153).",
+          "evidence": "DTSX:5689-5695"
+        },
+        {
+          "unit": 2,
+          "problem": "Unargued ownership of gen_corporatenumber (the employer's corporate number).",
+          "correct": "Same argument (or an explicit reference to it).",
+          "evidence": "DTSX:5689-5695, 3787"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Update employer amount|detailed",
+      "hash": "d0eb8ef16d79",
+      "verdict": "WRONG",
+      "detail": "Verified: LEFT JOINs and GROUP BY; SUM(ISNULL(bal,0)); the CASE expression; NULL when all rates are NULL; Check if to update conditions Update/Update2/Update3/Update4, EvaluationOrder 0-3, all FailComponent; Union All -> Update Account with Param_0 = Gen_EmployeesFundsValue, Param_1 = Gen_employeesweightedmanagementfee, Param_2 = accountid, matching 'SET … = ?, … = ? where accountid = ?'. Both columns are written. The NULL-fee overwrite case [11] is correct. Default Output has no path. The zero-account case [16] is correct. Success 8056. The [CRM] design-time string and config caveat are given. WRONG: [8] 'הערכים השמורים כיום בחשבון נשלפים' and [1] 'רשומות המעסיק שלהם ועם כל הקופות … שמשויכות לרשומות המעסיק' attribute the unqualified Gen_employeesweightedmanagementfee, Gen_EmployeesFundsValue, Gen_employersId and accountid (FROM account LEFT JOIN gen_employers LEFT JOIN gen_fundmain) to specific tables without argument.",
+      "evidence": "get employers DTSX:7791-7812; Check if to update DTSX:7731-7771; Update Account DTSX:7988-7991; DTSX:8056; 0004_LeumiFile-MY.dtsx:70147",
+      "wrongUnits": [
+        {
+          "unit": 8,
+          "problem": "The stored values are attributed to the account without the ownership argument.",
+          "correct": "Add: '(העמודות אינן מסויגות בשאילתה; ל-AccountBase יש עמודות בשמות אלה (UPDATE dbo.AccountBase, DTSX:7991); אילו היו קיימות גם ב-gen_employers או ב-gen_fundmain השאילתה הייתה נכשלת; לפי המשתמש החבילה רצה בפרודקשן.)'",
+          "evidence": "DTSX:7796-7808, 7991"
+        },
+        {
+          "unit": 1,
+          "problem": "Gen_employersId (join to gen_fundmain) and accountid are unqualified; the employer-record and account ownership is not argued.",
+          "correct": "Add the ambiguity argument: Gen_employersId is the gen_employers key (Gen_employers.Gen_employersId, 0004:70147), and accountid is the account key (AccountBase … where accountid, DTSX:7991).",
+          "evidence": "DTSX:7796-7808; 0004_LeumiFile-MY.dtsx:70147"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Update employer amount|open",
+      "hash": "2ebd7c4988a0",
+      "verdict": "CONFIRMED",
+      "detail": "[1] uses the qualified gen_fundmain.Gen_managementFeePercentage; the data-dependent outcomes are correctly conditional and consistent with the CASE expression (DTSX:7796-7801). [2] is a genuine open question with qualified columns. Note: supplied package 0004 writes gen_employers.gen_corporatename as EntityReference(\"account\", …) (0004_LeumiFile-MY.dtsx:37613-37614), which partly answers the target-entity part. Whether every record points to the employer's account remains unknown, so the question stays valid.",
+      "evidence": "DTSX:7796-7808; 0004_LeumiFile-MY.dtsx:37613-37614",
+      "wrongUnits": []
+    }
+  ],
+  "missingWrites": []
+}

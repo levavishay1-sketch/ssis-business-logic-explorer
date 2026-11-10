@@ -1,0 +1,126 @@
+# 0024_AgentFundInformation.dtsx · 659C8F355B506D3D1772DC5A1165E80E3574B31C18BBCD1F2E43A836ADF6E2C4
+
+## Connection managers
+- [CRM] OLEDB Data Source=Psql;Initial Catalog=ALTSHULER_MSCRM;Integrated Security=SSPI;  
+- [SRS.SSIS_Logs] OLEDB  EXPR ConnectionString=@[User::ConnStringSrsSsis_Logs] 
+
+## Executables (disabled marked !)
+-   Create ETL Process record | Microsoft.ScriptTask  
+-   Create Fund View Table | Microsoft.Pipeline  
+-   Delete Rows | Microsoft.Pipeline  
+-   End ETL Process record | Microsoft.Pipeline  
+-   Execute SQL Task | Microsoft.ExecuteSQLTask  | SQL: delete from Gen_allowedinformationforfundBase where gen_agencyname is null and gen_agentname is null 
+-   Get Organization Variables | Microsoft.Pipeline  
+-   Get systemuser organisationname and curency | Microsoft.Pipeline  
+
+## Precedence
+- Get systemuser organisationname and curency -> Create Fund View Table | Success Constraint   
+- Get Organization Variables -> Create ETL Process record | Success Constraint   
+- Create Fund View Table -> Delete Rows | Success Constraint   
+- Delete Rows -> Execute SQL Task | Success Constraint   
+- Create ETL Process record -> Get systemuser organisationname and curency | Success Constraint   
+- Execute SQL Task -> End ETL Process record | Success Constraint   
+
+## DataFlow Create Fund View Table
+  - Create Allowed Info Fund extensionbase | OLEDBDestination  | conn [CRM] | table [dbo].[Gen_allowedinformationforfundBase] | in 16 out 0
+  - Create system columns | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 0 out 20
+  - filtering customers dead | Lookup  | conn [CRM]  | in 1 out 1
+  - Get Agent Or Agency Detail From Fund | OLEDBSource  | conn [CRM]  | in 0 out 9
+  - Lookup | Lookup  | conn [CRM]  | in 5 out 0
+     path Lookup.Outputs[Lookup No Match Output] => filtering customers dead.Inputs[Lookup Input]
+     path filtering customers dead.Outputs[Lookup No Match Output] => Create system columns.Inputs[Input 0]
+     path Get Agent Or Agency Detail From Fund.Outputs[OLE DB Source Output] => Lookup.Inputs[Lookup Input]
+     path Create system columns.Outputs[Output 0] => Create Allowed Info Fund extensionbase.Inputs[OLE DB Destination Input]
+
+## DataFlow Delete Rows
+  - Check if valid allow | Lookup  | conn [CRM]  | in 6 out 0
+  - Delete  Row of customer dead | OLEDBCommand  | conn [CRM]  | in 1 out 0
+  - Delete Not Valid Row | OLEDBCommand  | conn [CRM]  | in 1 out 0
+  - get allow information | OLEDBSource  | conn [CRM]  | in 0 out 7
+  - Get customers dead | Lookup  | conn [CRM]  | in 1 out 1
+  - Multicast | Multicast  | conn   | in 0 out 0
+     path Get customers dead.Outputs[Lookup Match Output] => Delete  Row of customer dead.Inputs[OLE DB Command Input]
+     path Check if valid allow.Outputs[Lookup No Match Output] => Delete Not Valid Row.Inputs[OLE DB Command Input]
+     path Multicast.Outputs[Multicast Output 2] => Get customers dead.Inputs[Lookup Input]
+     path Multicast.Outputs[Multicast Output 3] => Check if valid allow.Inputs[Lookup Input]
+     path get allow information.Outputs[OLE DB Source Output] => Multicast.Inputs[Multicast Input 1]
+
+## DataFlow End ETL Process record
+  - ETL Record Finish | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 2 out 0
+  - Get gen_etlprocessid | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 0 out 1
+  - Lookup | Lookup  | conn [CRM]  | in 1 out 1
+     path Lookup.Outputs[Lookup Match Output] => ETL Record Finish.Inputs[Input 0]
+     path Get gen_etlprocessid.Outputs[Output 0] => Lookup.Inputs[Lookup Input]
+
+## DataFlow Get Organization Variables
+  - OLE DB Source | OLEDBSource  | conn [CRM]  | in 0 out 2
+  - Set Organization Variables | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 2 out 0
+     path OLE DB Source.Outputs[OLE DB Source Output] => Set Organization Variables.Inputs[Input 0]
+
+## DataFlow Get systemuser organisationname and curency
+  - Get organization id | Lookup  | conn [CRM]  | in 1 out 1
+  - Get System user id | Lookup  | conn [CRM]  | in 1 out 2
+  - Get Transaction Currency id | Lookup  | conn [CRM]  | in 1 out 1
+  - Script Component | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 0 out 1
+  - Set system variables | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 4 out 0
+  - System User Domain Name | DerivedColumn  | conn   | in 1 out 3
+     path System User Domain Name.Outputs[Derived Column Output] => Get System user id.Inputs[Lookup Input]
+     path Get organization id.Outputs[Lookup Match Output] => Set system variables.Inputs[Input 0]
+     path Get Transaction Currency id.Outputs[Lookup Match Output] => Get organization id.Inputs[Lookup Input]
+     path Get System user id.Outputs[Lookup Match Output] => Get Transaction Currency id.Inputs[Lookup Input]
+     path Script Component.Outputs[Output 0] => System User Domain Name.Inputs[Derived Column Input]
+
+## SQL statements
+- Create Fund View Table\filtering customers dead | Microsoft.Lookup.SqlCommand | [CRM] 
+    select ContactId from Contact where gen_customeragename =N'נפטר'
+- Create Fund View Table\filtering customers dead | Microsoft.Lookup.SqlCommandParam | [CRM] 
+    select * from (select ContactId from Contact where gen_customeragename =N'נפטר') [refTable] where [refTable].[ContactId] = ?
+- Create Fund View Table\Get Agent Or Agency Detail From Fund | Microsoft.OLEDBSource.SqlCommand | [CRM] 
+    select * from ( select ROW_NUMBER() over(partition by FUND_NUMBER, CONTACT_NAME, ACCOUNT_NAME, AGENT_NAME, AGENCY_NAME order by POW_START_DATE desc) as RowNum, FUND_NUMBER, CONTACT_NAME, ACCOUNT_NAME, AGENT_NAME, AGENCY_NAME, POW_MAIN, FUND_GUID, IS_COMMISSION_AGENT from (--Agents with contract and no POA -- SELECT -- gen_fundnumber FUND_NUMBER, -- gen_fundmainid as FUND_GUID, -- gen_fundmain.gen_
+- Create Fund View Table\Lookup | Microsoft.Lookup.SqlCommand | [CRM] 
+    select * from [dbo].[Gen_allowedinformationforfundBase]
+- Create Fund View Table\Lookup | Microsoft.Lookup.SqlCommandParam | [CRM] 
+    select * from (select * from [dbo].[Gen_allowedinformationforfundBase]) [refTable] where [refTable].[Gen_agentname] = ? and [refTable].[Gen_agencyname] = ? and [refTable].[Gen_contactname] = ? and [refTable].[Gen_accountname] = ? and [refTable].[Gen_fundname] = ?
+- Delete Rows\Check if valid allow | Microsoft.Lookup.SqlCommand | [CRM] 
+    select * from ( select ROW_NUMBER() over(partition by FUND_NUMBER, CONTACT_NAME, ACCOUNT_NAME, AGENT_NAME, AGENCY_NAME order by POW_START_DATE desc) as RowNum, FUND_NUMBER, CONTACT_NAME, ACCOUNT_NAME, AGENT_NAME, AGENCY_NAME, POW_MAIN, FUND_GUID, IS_COMMISSION_AGENT from (--Agents with contract and no POA -- SELECT -- gen_fundnumber FUND_NUMBER, -- gen_fundmainid as FUND_GUID, -- gen_fundmain.gen_
+- Delete Rows\Check if valid allow | Microsoft.Lookup.SqlCommandParam | [CRM] 
+    select * from (select * from ( select ROW_NUMBER() over(partition by FUND_NUMBER, CONTACT_NAME, ACCOUNT_NAME, AGENT_NAME, AGENCY_NAME order by POW_START_DATE desc) as RowNum, FUND_NUMBER, CONTACT_NAME, ACCOUNT_NAME, AGENT_NAME, AGENCY_NAME, POW_MAIN, FUND_GUID, IS_COMMISSION_AGENT from (--Agents with contract and no POA -- SELECT -- gen_fundnumber FUND_NUMBER, -- gen_fundmainid as FUND_GUID, -- ge
+- Delete Rows\Delete  Row of customer dead | Microsoft.OLEDBCommand.SqlCommand | [CRM] 
+    delete Gen_allowedinformationforfundBase where Gen_allowedinformationforfundid = ?
+- Delete Rows\Delete Not Valid Row | Microsoft.OLEDBCommand.SqlCommand | [CRM] 
+    delete Gen_allowedinformationforfundBase where Gen_allowedinformationforfundid = ?
+- Delete Rows\get allow information | Microsoft.OLEDBSource.SqlCommand | [CRM] 
+    select Gen_agencyname, Gen_agentname, Gen_fundname, Gen_contactname, Gen_powerofattorneymainname, Gen_accountname, Gen_allowedinformationforfundid from Gen_allowedinformationforfund
+- Delete Rows\Get customers dead | Microsoft.Lookup.SqlCommand | [CRM] 
+    select ContactId from Contact where gen_customeragename =N'נפטר'
+- Delete Rows\Get customers dead | Microsoft.Lookup.SqlCommandParam | [CRM] 
+    select * from (select ContactId from Contact where gen_customeragename =N'נפטר') [refTable] where [refTable].[ContactId] = ?
+- End ETL Process record\Lookup | Microsoft.Lookup.SqlCommand | [CRM] 
+    select p.gen_etlprocessid , case when pw.gen_etlprocessid is null then 0 else 1 end as isWarningExist from gen_etlprocess p left join (select distinct gen_etlprocessId from gen_etlprocesswarning ) as pw on p.gen_etlprocessId = pw.gen_etlprocessId
+- End ETL Process record\Lookup | Microsoft.Lookup.SqlCommandParam | [CRM] 
+    select * from (select p.gen_etlprocessid , case when pw.gen_etlprocessid is null then 0 else 1 end as isWarningExist from gen_etlprocess p left join (select distinct gen_etlprocessId from gen_etlprocesswarning ) as pw on p.gen_etlprocessId = pw.gen_etlprocessId) [refTable] where [refTable].[gen_etlprocessid] = ?
+- Execute SQL Task | ExecuteSQLTask | [CRM] 
+    delete from Gen_allowedinformationforfundBase where gen_agencyname is null and gen_agentname is null 
+- Get Organization Variables\OLE DB Source | Microsoft.OLEDBSource.SqlCommand | [CRM] 
+    select gen_key, gen_value from gen_etlvariable WITH (NOLOCK) where (gen_scope = 'global' OR gen_scope = ?)
+- Get systemuser organisationname and curency\Get organization id | Microsoft.Lookup.SqlCommand | [CRM] 
+    SELECT [Name], OrganizationId FROM OrganizationBase
+- Get systemuser organisationname and curency\Get organization id | Microsoft.Lookup.SqlCommandParam | [CRM] 
+    select * from (SELECT [Name], OrganizationId FROM OrganizationBase) [refTable] where [refTable].[Name] = ?
+- Get systemuser organisationname and curency\Get System user id | Microsoft.Lookup.SqlCommand | [CRM] 
+    SELECT DomainName, SystemUserId, BusinessUnitId FROM SystemUser
+- Get systemuser organisationname and curency\Get System user id | Microsoft.Lookup.SqlCommandParam | [CRM] 
+    select * from (SELECT DomainName, SystemUserId, BusinessUnitId FROM SystemUser) [refTable] where [refTable].[DomainName] = ?
+- Get systemuser organisationname and curency\Get Transaction Currency id | Microsoft.Lookup.SqlCommand | [CRM] 
+    SELECT CurrencyName, TransactionCurrencyId FROM TransactionCurrency
+- Get systemuser organisationname and curency\Get Transaction Currency id | Microsoft.Lookup.SqlCommandParam | [CRM] 
+    select * from (SELECT CurrencyName, TransactionCurrencyId FROM TransactionCurrency) [refTable] where [refTable].[CurrencyName] = ?
+
+## Code write candidates (per owner)
+- Create ETL Process record {"crm-entity":1,"crm-sdk-create":1,"variables-write":1}
+- End ETL Process record\ETL Record Finish {"sql-command":2,"crm-entity":3,"output-buffer":1,"crm-sdk-update":1}
+- End ETL Process record\Get gen_etlprocessid {"sql-command":2,"output-buffer":2}
+- Get Organization Variables\Set Organization Variables {"sql-command":2}
+- Get systemuser organisationname and curency\Script Component {"output-buffer":2}
+
+## External refs (non-framework) CRM2015.Proxy

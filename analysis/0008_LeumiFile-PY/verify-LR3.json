@@ -1,0 +1,185 @@
+{
+  "verifier": "ssis-verifier",
+  "package": "0008_LeumiFile-PY",
+  "scope": "logic-claims re-check",
+  "checkedAt": "2026-11-10",
+  "checked": 16,
+  "results": [
+    {
+      "id": "L|summary",
+      "hash": "3ee827ded798",
+      "verdict": "INCOMPLETE",
+      "detail": "executionNotes [2]-[5] verified: 17 PrecedenceConstraints at DTSX:89153-89169, all Success/LogicalAnd, one serial chain (Get Organization Variables -> ... -> FT -> Step1 -> Create fundmain -> Step2 -> Create transferin Maslulim -> Step3 -> Create Acount Courses -> Step4 -> Move File -> End); Constraint 1 (DTSX:89154) EvalOp=3 '@[User::isFileExist]==TRUE'; no DTS:Disabled; OnError -> Error ETL Process record (DTSX:89179). [6] order correct; get tranferin in the courses flow is Partial cache, so requests created by Create transferin Maslulim can be matched (they also match pre-existing requests - 'נבנים על' reads as exclusive; 'יכולים להיבנות גם על' would be exact). summary_he facts are correct (Gen_ftCurrentYearBase INSERT via SQL, ContactBase / gen_demislikamonthsalary updates with meanings labelled, SDK gen_fundmain + gen_transferin for action 57 same account/fund type, courses/partitions with get tranferin on Request_ID_74 + Target_Fund_AccountNumber_47 via gen_customeraccountdest, no state/origin filter). Missing row-selection: the sentence 'לכל שורה ש...תואמים gen_transferin קיים ב-CRM' states the courses/partitions creation condition as complete, but a record is created only if, in addition, (a) a bank-10 gen_fundmain exists for Target_Fund_AccountNumber_47 + Source_Fund_Course_17 (source side, direction != 2) or for Target_Fund_AccountNumber_47 + Target_Fund_course_44 with Contact and Gen_agentcontract inner-joined (destination side), and (b) no gen_accountcourses (gen_transferin + gen_fundnumber) / gen_coursepartition (gen_transferin + gen_fundnumberdest) exists yet. Rows failing these are dropped (No Match outputs unconnected / Match unconnected).",
+      "evidence": "0008_LeumiFile-PY.dtsx:89153-89169, 89179; Courses flow: get tranferin DTSX:5916 (CacheType 1), get source fund 5782, get dest fund 5635, Check for exist account courses 3282, Check if exist course partition 3375; paths in Package\\Create Acount Courses and course partition for transferin",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|finding#2",
+      "hash": "ffa8b0e10318",
+      "verdict": "CONFIRMED",
+      "detail": "Get fund main id Match -> Multicast 3; Output 1 -> group type ... -> insert ftCurrentYearBase 1-5 (RedirectRow, DTSX:63150 etc.) and Output 3 -> Set SalaryMonthDate -> Check Type And Year -> Ft Month And Year -> Get DemiSlikaMonthSalary -> Update Dmei Slika Month Salary. The demislika update does not depend on the insert result; insert failures go to Union All Error 2 -> ETL warning. Conditional wording, not framed as a bug.",
+      "evidence": "0008:62760, 67244, 57393, 61754, 61917, 82516, 63150; FT paths (Multicast 3 outputs)",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Write PY File To Staging|title",
+      "hash": "0638c3812300",
+      "verdict": "CONFIRMED",
+      "detail": "PY source CM: RaggedRight, CodePage 1255, 174 columns (DTSX:9-190); Read \"PY\" File outputs 171 (FILLER_132, Filler_162_195, FillerEnd not output); Insert To PY_FileData maps 153 into [dbo].[PY_FileData] on SRS.GENERIX_STAGING (Psrs/GENERIX_STAGING, DTSX:192-196; SRS_STAGING configuration C:\\Generix\\SSISConfigFileSrs.dtsConfig DTSX:200, EnableConfig=True). Remap: FILLER1_29_BankTransactionId (CM position 29) -> ext BankTransaction_ID_91, Filler_83_RelatedActionId (position 83) -> ext Related_Action_ID_98, both after Remove Leading Zero. Not loaded (18): BankTransaction_ID_91 (#91), Related_Action_ID_98 (#98), 146-148, 150-156, 158, 159, 202-204 (column names; CM positions 169-171), Filler_205_211 - matches the text.",
+      "evidence": "0008:9-196, 200, 85616-85631, 85978, 87203",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Write PY File To Staging|detailed",
+      "hash": "e93945b52484",
+      "verdict": "CONFIRMED",
+      "detail": "[1] Truncate precedes the load (Constraint 16). [2] RaggedRight, cp1255, 174 columns. [3] REPLACE(LTRIM(REPLACE(x,\"0\",\" \")),\" \",\"0\") semantics described exactly (leading zeros and spaces removed, inner zeros kept, all-zero -> empty string, remaining spaces -> 0, no right trim). [4] no filter, 153 of 171, remap 29->BankTransaction_ID_91 and 83->Related_Action_ID_98; FT INSERT maps Param_26 -> Gen_transferid (input gen_transferid <- staging BankTransaction_ID_91) and Param_72 -> gen_relatedactionidentifier (Related_Action_ID_98; FT later trims it and turns \"\" into NULL in Set trans additional fields). [5]-[6] correct.",
+      "evidence": "0008:85603, 85616, 87203, 63118 (column list) + insert ftCurrentYearBase 1 input mapping; FT source DTSX:65865 (gen_transferid <- BankTransaction_ID_91); Set trans additional fields DTSX:68823",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\FT|title",
+      "hash": "f7ad0a422b3b",
+      "verdict": "WRONG",
+      "detail": "Flow units otherwise verified (last row '@', split gen_TranstypeId != \"58\" && Transfer_Type_2 == \"2\", Full-cache existence key, /100 money, direction 1/2, product -> warning, competitor, fund (No Match dropped), group/provision type, trans type (warning, continues), overpayment, salary, tax, financial module way, 5 inserts, ContactBase update on success, parallel demislika branch). Two unproven meanings stated as fact.",
+      "evidence": "0008:15 (CM column Transfer_Type_2, width 1, no description), 69975, 57393 (output name FtCurrentOrPrevDepositCondition), 70009; grep over all supplied DTSX: no code/SQL comment or constant gives a meaning for Transfer_Type_2 or for Action_Type_56 = 53",
+      "wrongUnits": [
+        {
+          "unit": "short_he: '(סוג רשומה 2, פעולה שאינה 58)'",
+          "problem": "The filter is Transfer_Type_2 == \"2\". The field is named Transfer_Type; no supplied file (CM column, code comment, SQL comment, other package) says it is a record type. 'סוג רשומה' is an unproven meaning.",
+          "correct": "Transfer_Type_2 = \"2\" (or label the meaning השערה).",
+          "evidence": "0008:15, 69975"
+        },
+        {
+          "unit": "short_he: 'ובהפקדות (53)'; flow_he[8]: 'הפקדה 53'",
+          "problem": "Action_Type_56 = 53 is stated to be a deposit. No code comment, constant or SQL comment in the supplied files says so; the only hint is the conditional-split output name 'FtCurrentOrPrevDepositCondition' (a component name, not proof under the standard).",
+          "correct": "Action_Type_56 = 53 (השערה: הפקדה, לפי שם היציאה FtCurrentOrPrevDepositCondition).",
+          "evidence": "0008:57393"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\FT|short",
+      "hash": "4997b5b5982d",
+      "verdict": "WRONG",
+      "detail": "Steps [2]-[13], [15] verified (Full-cache existence check, product warning vs silent fund drop, insert, ContactBase after success, in-file duplicates both inserted). Wrong: [14] states the meaning 'הפקדה' for action 53 as fact. Also missing (would be INCOMPLETE on its own): the direction gate - rows whose Action_Transfer_Direction_69 is not \"1\" or \"2\" go to the unconnected 'אחר' output and are not inserted (Split by trans direction DTSX:69934); [1] lists only the last-row and 'תנועות והחזר דמי ניהול' filters.",
+      "evidence": "0008:57393, 69934, 69975",
+      "wrongUnits": [
+        {
+          "unit": "[14] 'בהפקדה לשנת שכר שוטפת או קודמת'",
+          "problem": "Meaning of Action_Type_56 = 53 ('deposit') not proven by any supplied file; only the output name FtCurrentOrPrevDepositCondition suggests it.",
+          "correct": "כאשר Action_Type_56 = 53 (השערה: הפקדה) וחודש השכר בשנה הנוכחית או הקודמת ...",
+          "evidence": "0008:57393"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\FT|detailed",
+      "hash": "bdd52c1dca90",
+      "verdict": "WRONG",
+      "detail": "Every structural unit re-derived and correct: Trim All Input Columns (47 inputs) before the '@' check; gen_TranstypeId != \"58\" && Transfer_Type_2 == \"2\"; Check if trans exists Full cache (CacheType 0) on Gen_ftCurrentYearBase/Gen_fundmainBase/Product/gen_banks bank 10, gen_transferid not null (tech omits the (DT_WSTR,6)(DT_I4) conversion of the finance id - note only); /100 DT_CY with NULL->0; Format Dates 8/6 chars, <1900 or invalid -> NULL (input lengths 30); ToUniversalTime except CrmMinimumDate; Param numbers 14/23/24/31/32/45/46/49/58/67 and Param_40 = gen_banksid verified against the 80-column INSERT; Get Bank Id NoMatchBehavior 0 + FailComponent; transfer/recived derived columns ('0' string comparison); product lookup -> warning; competitor IgnoreFailure; Append Zeros (12/4/4, dot removal); fund lookup NoMatch unconnected; group-type mapping and provision 1-7 (main.vb:17-47); trans type no-match -> Multicast -> continue + warning; overpayment main.cs:118-130; salary split and NULL rules (enum Employee=2, Gemel=1, EducationFund=4); tax arrays {01,02,04}/{05,06}; FinancialModuleWay; insert RedirectRow; ContactBase update; demislika branch. Wrong units below.",
+      "evidence": "0008:53553-82600 (FT); 57313, 57393, 61683, 61790, 61917, 62760, 62873, 62940, 63118, 63150, 67210, 68823, 68953, 69934, 69975, 70009, 70133, 70255, 70288, 82516, 82519, 82566; Create System Columns main.cs:117-125",
+      "wrongUnits": [
+        {
+          "unit": "[51] and [68] 'האם זו הפקדה (סוג הפעולה Action_Type_56 = 53) ...'",
+          "problem": "The meaning 'deposit' for Action_Type_56 = 53 is not proven by any supplied file; only the output name FtCurrentOrPrevDepositCondition suggests it.",
+          "correct": "האם Action_Type_56 = 53 (השערה: הפקדה) ...",
+          "evidence": "0008:57393, 70009"
+        },
+        {
+          "unit": "[72] 'ModifiedBy = משתמש המערכת' (with [62] 'הבעלים והיוצר הם משתמש המערכת')",
+          "problem": "The same Hebrew term is used for two different variables: owner/creator of the transaction = User::UserId (Create System Columns main.cs:119-124), ModifiedBy of gen_demislikamonthsalary = User::CrmAdminId (Row.AdminId, main.cs:125 -> Param_0). The text implies the same user; nothing in the files shows they are equal.",
+          "correct": "ModifiedBy = User::CrmAdminId (משתנה נפרד מ-UserId שמשמש כבעלים/יוצר התנועה).",
+          "evidence": "0008:57722-57730 (Create System Columns), 82516-82519, variables DTSX:215, 281"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\FT|detail",
+      "hash": "fb1affa14d91",
+      "verdict": "WRONG",
+      "detail": "[1], [2], [4], [5] verified (population incl. direction 1/2; match keys and Full cache; bank '10' FailComponent; dot removal + padding to 12; 80-column INSERT with UserId owner/creator, StateCode 0 / StatusCode 1; ContactBase after successful insert; demislika update with CrmAdminId; meanings labelled; gen_isdailytrans = TRUE). One wrong unit in [3].",
+      "evidence": "0008:15, 69975",
+      "wrongUnits": [
+        {
+          "unit": "[3] 'סינון שורת סיום וסוג רשומה'",
+          "problem": "Calls the Transfer_Type_2 == \"2\" filter a 'record type' filter. The field is Transfer_Type; no supplied file gives it the meaning 'record type'.",
+          "correct": "סינון שורת סיום ו-Transfer_Type_2 = \"2\" (עם Action_Type_56 != 58).",
+          "evidence": "0008:15, 69975"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Create fundmain for transferin|short",
+      "hash": "ec1316cfb34f",
+      "verdict": "INCOMPLETE",
+      "detail": "Stated steps are correct (pairing by request, existing dest fund -> nothing, source fund bank 10 with gen_existinfile = 1 labelled unproven, SDK create with source details, zero balances, temporary address). Missing write-deciding gates that the crm claim of the same component now lists: (a) a bank-10 Product must exist for the target course (get dest fundtype, DTSX:34127; No Match has no path, row dropped); (b) only the first row per new fund number (course-account) is created (remove duplicate, duplicates output unconnected); (c) [2] does not say unpaired rows are dropped (Merge Join JoinType=2 inner on Request_ID_74, DTSX:34586). [1] also omits the concrete filter (Action_Type_56 = \"57\", Transfer_Type_2 = \"1\", Age_Dependent_Model_112 != \"1\", DTSX:34026).",
+      "evidence": "0008:34026, 34127, 34586, 33995, remove duplicate main.cs:32-40; Create fundmain flow paths",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Create fundmain for transferin|detailed",
+      "hash": "3287e5414a26",
+      "verdict": "CONFIRMED",
+      "detail": "Re-derived in path order: source -> Trim (12 cols) -> '@' -> Filter (57, Transfer_Type_2 \"1\", same account, same fund type, Age != \"1\"; default unconnected) -> Split Transfer Direction (\"2\" -> Sort 1 target course; else -> Sort account + source course; EliminateDuplicates false) -> Merge Join inner, 1 key Request_ID_74 -> Append Zeros (dot removal, pad) -> get dest fundtype (bank 10 product, No Match no path) -> get dest fund (Partial cache, No Match continues) -> Derived Column (DT_WSTR,4)(DT_I4)course + \"-\" + (DT_WSTR,12)(DT_I8)account -> remove duplicate -> get source fund (Full cache; bank 10, gen_existinfile = 1, account + productnumber = Source_Fund_Course_17; getutcdate() as gen_fundcreationdate) -> Set Fields (temporary address literals) -> Dates To Local (ToLocalTime unless CrmMinimumDate) -> 5 SDK copies (gen_existinfile true, gen_inputsource 1, 14 Money(0), weighted fee 0.0, gen_modifiedbybank DateTime.Now, batches of 10). Copy 3 Error -> Union All Created -> Row Insert Count (DTSX:37737), others -> ETL warning: correct.",
+      "evidence": "0008:21892-37760; 22694, 32977, 33995, 34026, 34065, 34127, 34190-34284, 34586, 35598, 36273, 36326, 36425, 36458, 23617 (Create gen_fundmain main.cs:40-169), 37737",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Create fundmain for transferin|crm",
+      "hash": "a74b330b5fea",
+      "verdict": "CONFIRMED",
+      "detail": "Entity gen_fundmain, Create, SDK (ExecuteMultipleExtension RequestType.Create). when_he now includes the dest-product gate, no existing dest fund, source fund bank 10 with gen_existinfile = 1 (labelled), once per fund number. Population described by the label 'בקשת העברה בין מסלולים' (detailed gives the exact filter).",
+      "evidence": "0008:34026, 34065, 34127, 34190, 33995, 23617 main.cs:40, 142",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Create transferin Maslulim|title",
+      "hash": "91fa7e919f4d",
+      "verdict": "WRONG",
+      "detail": "Flow units verified (5006->1025, '@', filter incl. Action_Operation_Type_57 != \"04\" and Age != \"1\", Full-cache get tranferin on gen_requestidentifier, Inner Merge Join on 3 keys, > UtcNow-2 months, customer account by account + gen_id, SDK create type 5 / state 1, batches of 10, 5 copies). One unproven meaning.",
+      "evidence": "0008:15, 40871",
+      "wrongUnits": [
+        {
+          "unit": "short_he: '(סוג הפעולה Action_Type_56 = 57, סוג רשומה 2, ...)'",
+          "problem": "The condition is Transfer_Type_2 == \"2\"; the field is Transfer_Type and no supplied file says it is a record type.",
+          "correct": "Transfer_Type_2 = \"2\" (or label the meaning השערה).",
+          "evidence": "0008:15, 40871"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Create transferin Maslulim|detailed",
+      "hash": "5885c050445f",
+      "verdict": "CONFIRMED",
+      "detail": "All units re-derived: Handle Gemel (GEMEL_TO_INVEST_BY_BANK \"5006\" -> GEMEL_TO_INVEST_BY_CRM \"1025\", main.cs:79-80, 120-124) before Trim (12 cols; Action_Operation_Type_57 not trimmed) and the '@' check; Filter (DTSX:40871); get tranferin Full cache, no state filter, Match unconnected; Conditional Split; Sort/Sort 1 EliminateDuplicates=true (50315, 50379) with the listed keys; Merge Join JoinType 2, NumKeyColumns 3, left-side columns kept; Append Zeros on account and gen_id; Format Dates (8 -> yyyy/MM/dd, 6 -> \"20\"+YYMMDD, other/invalid -> null; empty -> str.Trim() on null -> uncaught exception); Dates ToUniveral; Filter Last Two Month (he-IL TryParse && > UtcNow.AddMonths(-2), NULL dropped); Get source customer account (Full cache, No Match unconnected) -> contact, identity number, customer account; transfertype 5 / currentstate 1; Dates To Local; SDK create (gen_transferid = account number, src = dest = customer account, currency, DateTime.Parse of local date). End-state statements about duplicates and cache are exact.",
+      "evidence": "0008:37773-50500; 38575, 39380, 39413, 39491, 40871, 41626, 42407, 42492, 43485, 49608, 50313-50379, 50487; SDK Create gen_TransferIn main.cs:32-92",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Create transferin Maslulim|decisions",
+      "hash": "238f6f500f3e",
+      "verdict": "CONFIRMED",
+      "detail": "All 8 decisions (incl. the added '@' last-row check) match the DTSX expressions, lookup keys, sort/dedupe settings, join type and the date filter; outcomes correct.",
+      "evidence": "0008:39380, 40871, 42407, 42492, 43485, 50313-50379; Handle Gemel main.cs:120-124; Filter Last Two Month main.cs:31-40",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Create Acount Courses and course partition for transferin|detailed",
+      "hash": "e5c54f9fc329",
+      "verdict": "CONFIRMED",
+      "detail": "Path order verified: Trim (9 cols) -> '@' -> Append Zeros (Target_Fund_AccountNumber_47, Target_Fund_course_44, Source_Fund_Course_17; dot removal + pad) -> get tranferin (Partial cache; Gen_transferin join Gen_customeraccount on gen_customeraccountdest; account + request id; no state filter) -> Format Dates (empty -> exception, both directions) -> Dates ToUniveral -> set additional fields (IsFullTransfer / AmountCalculationType expressions exact) -> Split Direction -> source: get source fund (Partial cache, bank 10, productnumber = Source_Fund_Course_17, account = Target_Fund_AccountNumber_47) -> Check for exist account courses (No cache) -> SDK create gen_accountcourses (gen_transactiontype, gen_amauntcalculationtype, gen_name = source gen_fundnumber, gen_financenumber, 4 flags, links, balance = transaction amount = source balance); destination: get dest fund (Full cache, inner joins Contact and Gen_agentcontract) -> Check if exist course partition (Full cache) -> Dates To Local -> SDK create gen_coursepartition (type 2, gen_creationdate = DateTime.Parse(local date), applicant id, fund finance id, contract number, links incl. supervisor). All 10 SDK Error outputs reach the ETL-warning unions. Note: [8] 'סוג ההעברה' (gen_transfertype read from gen_transferin, not written) and [14] 'סוג ההעברה' (IsFullTransfer, written as gen_transactiontype - called 'סוג עסקה' in [25]) use the same term for two different values; the tech makes it unambiguous.",
+      "evidence": "0008:899-21000; 2437, 3282, 3342, 3375, 3480, 4854, 5635, 5782, 5916, 19093, 19849, 19882, 19939, 19996; SDK Create gen_accountcourses (DTSX:6338) main.cs:31-104; SDK Create gen_coursepartition (DTSX:12673) main.cs:31-101",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Create Acount Courses and course partition for transferin|decisions",
+      "hash": "e85cebdb47f5",
+      "verdict": "CONFIRMED",
+      "detail": "All 8 decisions verified, including the added get source fund / get dest fund gates (NoMatchBehavior 1, No Match without path) and the exact SQL/keys of each lookup.",
+      "evidence": "0008:3282, 3342, 3375, 5635, 5782, 5916, 19093, 19849",
+      "wrongUnits": []
+    }
+  ],
+  "missingWrites": []
+}

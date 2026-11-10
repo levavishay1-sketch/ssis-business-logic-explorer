@@ -1,0 +1,246 @@
+{
+  "verifier": "ssis-verifier",
+  "package": "0025_Agents_Agencies",
+  "scope": "logic-claims re-check after fixes",
+  "checkedAt": "2026-11-07T12:07:01.054Z",
+  "checked": 18,
+  "results": [
+    {
+      "id": "L|summary",
+      "hash": "0ddf73bf7ab4",
+      "verdict": "CONFIRMED",
+      "detail": "[1] Balance: union of direct and parent contract (acc.Gen_agentcontractId = ac.gen_agencycontractnumber), written to gen_agentvalue / gen_agencyvalue by direct SQL; commission: gen_commissionpostponed != 1 (NULL excluded) plus missing/expired licence, bookkeeping or tax-deduction date; reason 5 if licence missing/expired else 4; SDK update. [2] [CRM] DTSID {D51CCED1-...} Psql/ALTSHULER_MSCRM design-time, both OLE DB Commands on it, disabled Execute SQL Task Connection={D51CCED1-...} (DTSX:3160), CRM.Proxy ExecuteMultipleExtension RequestType.Update, config file not supplied and may override, source-only analysis. No file source in the package. All verified.",
+      "evidence": "source/DailyProcess/0025_Agents_Agencies.dtsx:1-20, 3156-3160, 5061-5090, 5127-5130, 5171-5174, 6007-6016, 6047-6055, 6317-6372",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Update agents balance|title",
+      "hash": "1e8d349efce1",
+      "verdict": "CONFIRMED",
+      "detail": "title, short_he and flow_he[1-4] match: sum per agent+agency combination from agent contract and parent contract, HAVING ABS(...)>1, split !ISNULL(gen_agentsid) first then !ISNULL(gen_agencieid), Default Output unconnected; the last-processed-combination rule is now correctly conditional on more than one combination. Summary level; the failure branch is covered in the detailed claim verdict.",
+      "evidence": "source/DailyProcess/0025_Agents_Agencies.dtsx:5014-5047, 5061-5090, 5127-5130, 5171-5174, 5217-5219",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Update agents balance|short",
+      "hash": "fbb53e8997bd",
+      "verdict": "INCOMPLETE",
+      "detail": "Units [1]-[9] match the query and split. End unit [10] states the final values unconditionally; the data flow has a failure branch that is not shown. Unit [2] also attributes the stored values to the agent and the agency without the ownership reasoning.",
+      "evidence": "source/DailyProcess/0025_Agents_Agencies.dtsx:5083-5090, 5139, 5183, 7073-7075",
+      "wrongUnits": [
+        {
+          "unit": 10,
+          "problem": "Final state stated unconditionally.",
+          "correct": "Conditional on all UPDATEs succeeding. Update Agents and Update Agencies have errorRowDisposition=FailComponent (DTSX:5139, 5183). A failed UPDATE fails the data flow; rows already updated stay updated (no transaction), later rows are not written, and because 'Update agents balance' -> 'Set Gen_commissionpostponed' (disabled) -> 'update agents commissionpostponed field' are Success constraints (DTSX:7073-7074), the commission-postponed steps for agents and agencies do not run in that run.",
+          "evidence": "source/DailyProcess/0025_Agents_Agencies.dtsx:5139, 5183, 7073-7074"
+        },
+        {
+          "unit": 2,
+          "problem": "Owner of unqualified gen_agentvalue / gen_agencyvalue assumed.",
+          "correct": "gen_agentvalue, gen_agencyvalue, gen_agencieid and gen_agentsid are unqualified in the source query (DTSX:5062-5090). The text treats them as the agent's and agency's stored values/keys (e.g. 'all no-agent rows of an agency group into one row', which needs gen_agentvalue to be NULL when there is no agent, i.e. owned by gen_agents) without stating the ambiguity reasoning (the UPDATEs prove Gen_agentsBase.gen_agentvalue and Gen_agencieBase.gen_agencyvalue/gen_agencieid exist; another joined table with the same column would make the query ambiguous and fail; per the user the package runs in production).",
+          "evidence": "source/DailyProcess/0025_Agents_Agencies.dtsx:5062-5090, 5127-5130, 5171-5174"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Update agents balance|detailed",
+      "hash": "529d638714c1",
+      "verdict": "INCOMPLETE",
+      "detail": "Units [1]-[14] match: union of direct and parent-contract rows, left joins, group by gen_agentsid, gen_agencieid, gen_agentvalue, gen_agencyvalue, sum(isnull(gen_accountbalance,0)), HAVING ABS(sum - isnull(agentvalue,0) + isnull(agencyvalue,0)) > 1, split EvaluationOrder 0/1, Default Output unconnected (paths DTSX:5217-5219), Param_0<-balance, Param_1<-gen_agentsid / gen_agencieid. Missing: the failure branch of both OLE DB Commands and its effect on the rest of the package; end unit [15] is unconditional. Unit [12] (one row per agency for no-agent rows) depends on unqualified column ownership that is not argued in the text.",
+      "evidence": "source/DailyProcess/0025_Agents_Agencies.dtsx:5014-5047, 5061-5090, 5127-5140, 5171-5184, 5217-5219, 7073-7075",
+      "wrongUnits": [
+        {
+          "unit": 15,
+          "problem": "End state unconditional; no failure branch anywhere in the flow.",
+          "correct": "Update Agents and Update Agencies have errorRowDisposition=FailComponent (DTSX:5139, 5183). A failed UPDATE fails the data flow; rows already updated stay updated (no transaction), later rows are not written, and because 'Update agents balance' -> 'Set Gen_commissionpostponed' (disabled) -> 'update agents commissionpostponed field' are Success constraints (DTSX:7073-7074), the commission-postponed steps for agents and agencies do not run in that run.",
+          "evidence": "source/DailyProcess/0025_Agents_Agencies.dtsx:5139, 5183, 7073-7074"
+        },
+        {
+          "unit": 12,
+          "problem": "Grouping conclusion relies on gen_agentvalue being NULL for no-agent rows (owned by gen_agents).",
+          "correct": "gen_agentvalue, gen_agencyvalue, gen_agencieid and gen_agentsid are unqualified in the source query (DTSX:5062-5090). The text treats them as the agent's and agency's stored values/keys (e.g. 'all no-agent rows of an agency group into one row', which needs gen_agentvalue to be NULL when there is no agent, i.e. owned by gen_agents) without stating the ambiguity reasoning (the UPDATEs prove Gen_agentsBase.gen_agentvalue and Gen_agencieBase.gen_agencyvalue/gen_agencieid exist; another joined table with the same column would make the query ambiguous and fail; per the user the package runs in production).",
+          "evidence": "source/DailyProcess/0025_Agents_Agencies.dtsx:5062-5090"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Update agents balance|detail",
+      "hash": "8509ac07ae55",
+      "verdict": "INCOMPLETE",
+      "detail": "Units [1]-[3] verified. Unit [5] business outcome is unconditional although an UPDATE failure fails the data flow. Unit [4] gives Psql/ALTSHULER_MSCRM as the connection without saying it is the design-time value (the package loads the unsupplied C:\\Generix\\SSISConfigFile.dtsConfig, EnableConfig=True; the summary scopeNote says so, this unit does not). Unit [2] names the join columns correctly but the stored-value owners are not argued.",
+      "evidence": "source/DailyProcess/0025_Agents_Agencies.dtsx:4-6, 5061-5090, 5139, 5183, 7073-7074",
+      "wrongUnits": [
+        {
+          "unit": 5,
+          "problem": "Outcome stated unconditionally.",
+          "correct": "Prefix with: if all updates succeed. Update Agents and Update Agencies have errorRowDisposition=FailComponent (DTSX:5139, 5183). A failed UPDATE fails the data flow; rows already updated stay updated (no transaction), later rows are not written, and because 'Update agents balance' -> 'Set Gen_commissionpostponed' (disabled) -> 'update agents commissionpostponed field' are Success constraints (DTSX:7073-7074), the commission-postponed steps for agents and agencies do not run in that run.",
+          "evidence": "source/DailyProcess/0025_Agents_Agencies.dtsx:5139, 5183, 7073-7074"
+        },
+        {
+          "unit": 4,
+          "problem": "Connection target presented without the design-time / config-override caveat.",
+          "correct": "[CRM] is Psql/ALTSHULER_MSCRM at design time; the unsupplied config file may override it at runtime.",
+          "evidence": "source/DailyProcess/0025_Agents_Agencies.dtsx:4-6, 17"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Update agents balance|open",
+      "hash": "6629632ea86d",
+      "verdict": "CONFIRMED",
+      "detail": "[1] Correct and conditional ('when the query runs'): 0004 inserts Gen_AccountBalance into Gen_fundmainbase (0004_LeumiFile-MY.dtsx:61789-61792) and the ambiguity reasoning is stated. Independently, the second union branch joins gen_agentcontract twice (ac, acc), so gen_agentcontract cannot have gen_accountbalance without making the query ambiguous. [2] The intent of the HAVING expression cannot be settled from the files.",
+      "evidence": "source/DailyProcess/0025_Agents_Agencies.dtsx:5068-5081, 5090; source/DailyProcess/0004_LeumiFile-MY.dtsx:61789-61792",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\update agents commissionpostponed field|title",
+      "hash": "b4cf1d8fe927",
+      "verdict": "CONFIRMED",
+      "detail": "title, short_he (flag != 1 and NULL excluded; licence, bookkeeping or tax-deduction date missing or expired; marked with a pause reason) and flow_he[1-3] (reason 5 if licence missing/expired else 4; SDK) match the SQL, derived column and script.",
+      "evidence": "source/DailyProcess/0025_Agents_Agencies.dtsx:6007-6012, 6047-6055, 6317-6372",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\update agents commissionpostponed field|short",
+      "hash": "000a849500e5",
+      "verdict": "INCOMPLETE",
+      "detail": "Units [1]-[7] verified. End unit [8] presents as certain that every selected agent is marked except one whose update returned a CRM error, and that such an error is logged as a warning.",
+      "evidence": "source/DailyProcess/0025_Agents_Agencies.dtsx:6317-6410, 7061-7064, 7075",
+      "wrongUnits": [
+        {
+          "unit": 8,
+          "problem": "Outcome stated as certain.",
+          "correct": "Not proven by the files: (a) whether ExecuteMultipleExtension (external CRM.Proxy) sets ContinueOnError. If it does not, requests after the first faulted one in the same batch are not executed, get no response item, and stay unmarked with no warning, so 'only the agent with a CRM error stays unmarked' is not established (the package's own open question [3] says ContinueOnError is unknown). (b) The exception path: an exception from ExcecuteBulk called at the 1000th row is caught in Input0_ProcessInputRow, the current row goes to the unconnected CastingError output and myEntities is not cleared, so later batches are not sent until EndOfRowset; the final ExcecuteBulk at EndOfRowset is outside try/catch, so an exception there (including the ApplicationException for a missing response) fails the data flow, and the agencies step (Success constraint DTSX:7075) does not run. (c) Whether faults are reported at all depends on the external proxy types (cast of response.Results[1].Value to OrganizationResponseCollection).",
+          "evidence": "source/DailyProcess/0025_Agents_Agencies.dtsx:6358-6369, 6373-6395, 6403-6406, 7075"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\update agents commissionpostponed field|detailed",
+      "hash": "04b819d04dab",
+      "verdict": "INCOMPLETE",
+      "detail": "Units [1]-[12] verified: SQL filter (gen_commissionpostponed != 1, NULL excluded; three dates null or dateadd(HOUR,3,...) < CONVERT(DATE,GETDATE())), derived column replaces gen_pausereason with ISNULL(lic)||DATEDIFF(\"dd\",GETDATE(),lic)<0?5:4 on the already shifted licence date, script sets gen_commissionpostponed=true and gen_pausereason OptionSetValue (only if not null, which the expression never yields), batches of 1000. The error branch [13]-[17] and end [18] cover only per-item faults; the exception branch (row to unconnected CastingError, list not cleared, final send outside try, data-flow failure stopping the agencies step) is not a branch of the flow, and the fault branch's completeness depends on unknown ContinueOnError.",
+      "evidence": "source/DailyProcess/0025_Agents_Agencies.dtsx:6007-6012, 6047-6055, 6317-6410, 7061-7064, 7075",
+      "wrongUnits": [
+        {
+          "unit": 13,
+          "problem": "Only the per-item Fault branch is modelled.",
+          "correct": "Not proven by the files: (a) whether ExecuteMultipleExtension (external CRM.Proxy) sets ContinueOnError. If it does not, requests after the first faulted one in the same batch are not executed, get no response item, and stay unmarked with no warning, so 'only the agent with a CRM error stays unmarked' is not established (the package's own open question [3] says ContinueOnError is unknown). (b) The exception path: an exception from ExcecuteBulk called at the 1000th row is caught in Input0_ProcessInputRow, the current row goes to the unconnected CastingError output and myEntities is not cleared, so later batches are not sent until EndOfRowset; the final ExcecuteBulk at EndOfRowset is outside try/catch, so an exception there (including the ApplicationException for a missing response) fails the data flow, and the agencies step (Success constraint DTSX:7075) does not run. (c) Whether faults are reported at all depends on the external proxy types (cast of response.Results[1].Value to OrganizationResponseCollection).",
+          "evidence": "source/DailyProcess/0025_Agents_Agencies.dtsx:6358-6369, 6373-6395, 6403-6406, 7075"
+        },
+        {
+          "unit": 18,
+          "problem": "End state presented as certain.",
+          "correct": "Make conditional on ContinueOnError (unknown) and on no exception in ExcecuteBulk.",
+          "evidence": "source/DailyProcess/0025_Agents_Agencies.dtsx:6373-6395"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\update agents commissionpostponed field|detail",
+      "hash": "d5c4e2f8a255",
+      "verdict": "INCOMPLETE",
+      "detail": "Units [1]-[4] verified (population incl. NULL exclusion, update by Gen_agentsId, reason expression, SDK ExecuteMultiple batches of 1000, gen_commissionpostponed=true literal, gen_pausereason 4/5). Unit [5] states as certain that only agents whose update returned an error stay unmarked.",
+      "evidence": "source/DailyProcess/0025_Agents_Agencies.dtsx:6007-6012, 6047-6055, 6317-6410",
+      "wrongUnits": [
+        {
+          "unit": 5,
+          "problem": "Outcome stated as certain.",
+          "correct": "Not proven by the files: (a) whether ExecuteMultipleExtension (external CRM.Proxy) sets ContinueOnError. If it does not, requests after the first faulted one in the same batch are not executed, get no response item, and stay unmarked with no warning, so 'only the agent with a CRM error stays unmarked' is not established (the package's own open question [3] says ContinueOnError is unknown). (b) The exception path: an exception from ExcecuteBulk called at the 1000th row is caught in Input0_ProcessInputRow, the current row goes to the unconnected CastingError output and myEntities is not cleared, so later batches are not sent until EndOfRowset; the final ExcecuteBulk at EndOfRowset is outside try/catch, so an exception there (including the ApplicationException for a missing response) fails the data flow, and the agencies step (Success constraint DTSX:7075) does not run. (c) Whether faults are reported at all depends on the external proxy types (cast of response.Results[1].Value to OrganizationResponseCollection).",
+          "evidence": "source/DailyProcess/0025_Agents_Agencies.dtsx:6358-6369, 6373-6395, 6403-6406"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\update agents commissionpostponed field|decisions",
+      "hash": "1a0c2135c118",
+      "verdict": "CONFIRMED",
+      "detail": "Both conditions quoted exactly from the SQL (DTSX:6007-6012) and the derived column (DTSX:6047-6055); meaning_he states the NULL-flag exclusion and 'licence missing or expired'.",
+      "evidence": "source/DailyProcess/0025_Agents_Agencies.dtsx:6007-6012, 6047-6055",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\update agents commissionpostponed field|crm",
+      "hash": "c02e82d551bd",
+      "verdict": "CONFIRMED",
+      "detail": "Entity gen_agents, Update with gen_commissionpostponed = true (literal) and gen_pausereason (OptionSetValue), mechanism SDK (ExecuteMultipleExtension RequestType.Update), attempted for every selected agent; when_he states the population including the NULL exclusion.",
+      "evidence": "source/DailyProcess/0025_Agents_Agencies.dtsx:6007-6012, 6349-6352, 6373-6379",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\update agencies commissionpostponed field|title",
+      "hash": "af8ff692e45d",
+      "verdict": "CONFIRMED",
+      "detail": "Same logic as agents on Gen_agencie (gen_bookkeepingexp / gen_taxdeductionexp), NULL-flag exclusion stated; script identical except Entity(\"gen_agencie\") and Row.GenagencieId (diff of main.cs).",
+      "evidence": "source/DailyProcess/0025_Agents_Agencies.dtsx:3946-3951, 3986-3994, 4200-4331",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\update agencies commissionpostponed field|short",
+      "hash": "ac9c054782ec",
+      "verdict": "INCOMPLETE",
+      "detail": "Units [1]-[7] verified. End unit [8] presents as certain that every selected agency is marked except one whose update returned a CRM error, logged as a warning.",
+      "evidence": "source/DailyProcess/0025_Agents_Agencies.dtsx:4200-4331, 5000-5003, 7076",
+      "wrongUnits": [
+        {
+          "unit": 8,
+          "problem": "Outcome stated as certain.",
+          "correct": "Not proven by the files: (a) whether ExecuteMultipleExtension (external CRM.Proxy) sets ContinueOnError. If it does not, requests after the first faulted one in the same batch are not executed, get no response item, and stay unmarked with no warning, so 'only the agency with a CRM error stays unmarked' is not established (the package's own open question [3] says ContinueOnError is unknown). (b) The exception path: an exception from ExcecuteBulk called at the 1000th row is caught in Input0_ProcessInputRow, the current row goes to the unconnected CastingError output and myEntities is not cleared, so later batches are not sent until EndOfRowset; the final ExcecuteBulk at EndOfRowset is outside try/catch, so an exception there (including the ApplicationException for a missing response) fails the data flow. (c) Whether faults are reported at all depends on the external proxy types (cast of response.Results[1].Value to OrganizationResponseCollection).",
+          "evidence": "source/DailyProcess/0025_Agents_Agencies.dtsx:4279-4290, 4294-4316, 4325-4327"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\update agencies commissionpostponed field|detailed",
+      "hash": "3108b0dacc69",
+      "verdict": "INCOMPLETE",
+      "detail": "Units [1]-[11] verified (Gen_agencie SQL with gen_bookkeepingexp / gen_taxdeductionexp, NULL exclusion, derived column, identical script, batches of 1000). The error branch [12]-[16] and end [17] cover only per-item faults; the exception branch and the ContinueOnError dependency are missing.",
+      "evidence": "source/DailyProcess/0025_Agents_Agencies.dtsx:3946-3951, 3986-3994, 4200-4331, 5000-5003",
+      "wrongUnits": [
+        {
+          "unit": 12,
+          "problem": "Only the per-item Fault branch is modelled.",
+          "correct": "Not proven by the files: (a) whether ExecuteMultipleExtension (external CRM.Proxy) sets ContinueOnError. If it does not, requests after the first faulted one in the same batch are not executed, get no response item, and stay unmarked with no warning, so 'only the agency with a CRM error stays unmarked' is not established (the package's own open question [3] says ContinueOnError is unknown). (b) The exception path: an exception from ExcecuteBulk called at the 1000th row is caught in Input0_ProcessInputRow, the current row goes to the unconnected CastingError output and myEntities is not cleared, so later batches are not sent until EndOfRowset; the final ExcecuteBulk at EndOfRowset is outside try/catch, so an exception there (including the ApplicationException for a missing response) fails the data flow. (c) Whether faults are reported at all depends on the external proxy types (cast of response.Results[1].Value to OrganizationResponseCollection).",
+          "evidence": "source/DailyProcess/0025_Agents_Agencies.dtsx:4279-4290, 4294-4316, 4325-4327"
+        },
+        {
+          "unit": 17,
+          "problem": "End state presented as certain.",
+          "correct": "Make conditional on ContinueOnError (unknown) and on no exception in ExcecuteBulk.",
+          "evidence": "source/DailyProcess/0025_Agents_Agencies.dtsx:4294-4316"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\update agencies commissionpostponed field|detail",
+      "hash": "f1143eca8221",
+      "verdict": "INCOMPLETE",
+      "detail": "Units [1]-[4] verified (NULL-flag exclusion now stated, update by Gen_agencieId, reason expression, SDK Update with gen_commissionpostponed=true and gen_pausereason). Unit [5] states as certain that only agencies whose update returned an error stay unmarked.",
+      "evidence": "source/DailyProcess/0025_Agents_Agencies.dtsx:3946-3951, 3986-3994, 4200-4331",
+      "wrongUnits": [
+        {
+          "unit": 5,
+          "problem": "Outcome stated as certain.",
+          "correct": "Not proven by the files: (a) whether ExecuteMultipleExtension (external CRM.Proxy) sets ContinueOnError. If it does not, requests after the first faulted one in the same batch are not executed, get no response item, and stay unmarked with no warning, so 'only the agency with a CRM error stays unmarked' is not established (the package's own open question [3] says ContinueOnError is unknown). (b) The exception path: an exception from ExcecuteBulk called at the 1000th row is caught in Input0_ProcessInputRow, the current row goes to the unconnected CastingError output and myEntities is not cleared, so later batches are not sent until EndOfRowset; the final ExcecuteBulk at EndOfRowset is outside try/catch, so an exception there (including the ApplicationException for a missing response) fails the data flow. (c) Whether faults are reported at all depends on the external proxy types (cast of response.Results[1].Value to OrganizationResponseCollection).",
+          "evidence": "source/DailyProcess/0025_Agents_Agencies.dtsx:4279-4290, 4294-4316, 4325-4327"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\update agencies commissionpostponed field|decisions",
+      "hash": "cba6427c0909",
+      "verdict": "CONFIRMED",
+      "detail": "Both conditions quoted exactly (DTSX:3946-3951 with gen_bookkeepingexp / gen_taxdeductionexp; derived column DTSX:3986-3994); meaning_he states the NULL-flag exclusion.",
+      "evidence": "source/DailyProcess/0025_Agents_Agencies.dtsx:3946-3951, 3986-3994",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\update agencies commissionpostponed field|crm",
+      "hash": "5d795810c62d",
+      "verdict": "CONFIRMED",
+      "detail": "Entity gen_agencie, Update gen_commissionpostponed = true (literal) and gen_pausereason, SDK ExecuteMultipleExtension RequestType.Update; when_he includes the NULL exclusion.",
+      "evidence": "source/DailyProcess/0025_Agents_Agencies.dtsx:3946-3951, 4270-4276",
+      "wrongUnits": []
+    }
+  ]
+}

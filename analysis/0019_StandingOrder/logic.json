@@ -1,0 +1,294 @@
+{
+  "package": "0019_StandingOrder",
+  "analyst": "ssis-business-logic",
+  "source": {
+    "file": "source/DailyProcess/0019_StandingOrder.dtsx",
+    "sha256": "63C5C7487C33DE7314A248C3495D1F042D67D647DEB54F2A0039846942CEC653",
+    "lines": 5397
+  },
+  "scopeNote_he": "נותח קוד המקור (C#) של רכיבי הסקריפט בלבד; ה-DLL המקומפל לא פוענח. CRM.Proxy הוא אסמבלי חיצוני (external_unknown). מנהל החיבורים [Prod] = Data Source=psql; Initial Catalog=ALTSHULER_MSCRM ומשמש לקריאה בלבד (שאילתת מקור על טבלאות CRM). [SSIS_Logs] (psrs/SSIS_Logs) משמש רק את ספק הרישום של SSIS (מסגרת). אין קובץ, Staging או SQL DML. יש כותב עסקי אחד ל-CRM: רכיב הסקריפט update Standing Order. שאר הכתיבות ל-CRM הן של המסגרת (רשומות תהליך ETL): Create ETL Process record, ETL Warning ו-ETL Record Finish. הכתיבה העסקית היחידה היא עדכון gen_standingorder דרך ה-SDK (IOrganizationService.Update, Supported). משמעויות הקודים: בשאילתה מסומן gen_depositType = 2 בהערה '--One time' ו-gen_depositType <> 2 בהערה '--Not one time' (DTSX:3998, 4005). לסוג תנועה '53' ולקבוצה '02' אין הגדרה בקבצים שסופקו. 100000009 מוגדר בקוד כקבוע FIRST_TRANSACTION_RECEIVED.",
+  "summary_he": "החבילה מסמנת הוראות קבע (gen_standingorder) שנמצאה עבורן תנועה תואמת, בסטטוס 100000009 (שם הקבוע בקוד: FIRST_TRANSACTION_RECEIVED). אין סינון לפי מצב ההוראה (statecode/statuscode); הסינון היחיד על ההוראה הוא gen_isfirsttransactionreceivied = 0 ו-gen_ispastrecord = 0 (הוראה שבה אחד מהשדות האלה NULL אינה נכללת). הוראת קבע מתאימה לסימון כשבאחת מקופות חשבון הלקוח נמצאה תנועה בטבלת Gen_ftCurrentYear (לפי שמה: השנה הנוכחית – השערה) מסוג '53' בקבוצה '02', מאותו בנק, סניף וחשבון בנק כמו בהוראה, בסכום זהה לסכום ההוראה (הסכום החד-פעמי כש-gen_depositType = 2, אחרת סכום החיוב) ובתאריך ביצוע שאינו מוקדם מתאריך החיוב שבהוראה. הוראה שסוג ההפקדה שלה NULL אינה עומדת באף אחד משני התנאים ואינה מסומנת. בכל ריצה מסומנת לכל היותר הוראה אחת לכל צירוף של סכום תנועה ופרטי הבנק של ההוראה (בנק, חשבון, סניף). ההוראה שנבחרה מקבלת statuscode 100000009 (שם הקבוע בקוד: FIRST_TRANSACTION_RECEIVED) והדגל gen_isfirsttransactionreceivied = true. מכיוון שהבחירה מקבצת לפי סכום ופרטי בנק ולא לפי הוראה, הקבצים אינם מוכיחים שזו התנועה הראשונה של ההוראה.",
+  "executionOrder": [
+    {
+      "step": 1,
+      "refId": "Package\\Get Organization Variables",
+      "title_he": "טעינת משתני ארגון (מסגרת)",
+      "trigger": "start (no incoming constraint)"
+    },
+    {
+      "step": 2,
+      "refId": "Package\\Create ETL Process record",
+      "title_he": "רשומת תהליך ETL (מסגרת)",
+      "trigger": "after Get Organization Variables · Success (DTSX:5079)"
+    },
+    {
+      "step": 3,
+      "refId": "Package\\Update Standing Order First Transaction Received",
+      "title_he": "סימון הוראות קבע שנמצאה עבורן תנועה תואמת",
+      "trigger": "after Create ETL Process record · Success (DTSX:5080)"
+    },
+    {
+      "step": 4,
+      "refId": "Package\\End ETL Process record",
+      "title_he": "סיום רשומת תהליך ETL (מסגרת)",
+      "trigger": "after Update Standing Order First Transaction Received · Success (DTSX:5081)"
+    }
+  ],
+  "ignoredAsFramework": [
+    "Package\\Get Organization Variables",
+    "Package\\Create ETL Process record",
+    "Package\\End ETL Process record",
+    "Package\\Update Standing Order First Transaction Received\\Set Warning columns",
+    "Package\\Update Standing Order First Transaction Received\\ETL Warning",
+    "LogProvider: SSIS log provider for SQL Server → [SSIS_Logs] (DTSX:16)"
+  ],
+  "components": [
+    {
+      "refId": "Package\\Update Standing Order First Transaction Received",
+      "title_he": "סימון הוראות קבע שנמצאה עבורן תנועה תואמת",
+      "techName": "Update Standing Order First Transaction Received",
+      "short_he": "הוראות קבע שטרם סומנו (בכל מצב) מותאמות לתנועות מסוג '53' בקבוצה '02' (השערה: הפקדות) מטבלת תנועות השנה הנוכחית (לפי שם הטבלה – השערה) בקופות הלקוח לפי פרטי הבנק, הסכום ותאריך החיוב; הוראה שנמצאה לה תנועה תואמת מסומנת בסטטוס 100000009 (שם הקבוע בקוד: FIRST_TRANSACTION_RECEIVED). לכל צירוף של סכום ופרטי בנק נבחרת רק ההתאמה המוקדמת, ולכן זו אינה בהכרח התנועה הראשונה של ההוראה.",
+      "flow_he": [
+        "איתור הוראות קבע עם gen_isfirsttransactionreceivied = 0 ו-gen_ispastrecord = 0",
+        "התאמה לתנועות '53'/'02' בקופות חשבון הלקוח: בנק, סניף, חשבון בנק, סכום ותאריך חיוב",
+        "לכל צירוף של סכום ופרטי בנק נבחרת רק ההתאמה עם תאריך הביצוע המוקדם ביותר",
+        "עדכון ב-CRM: statuscode = 100000009 (בקוד: FIRST_TRANSACTION_RECEIVED) ו-gen_isfirsttransactionreceivied = true"
+      ],
+      "short": {
+        "nodes": [
+          {
+            "type": "step",
+            "text": "המערכת מאתרת הוראות קבע, בכל מצב, שבהן gen_isfirsttransactionreceivied = 0 ו-gen_ispastrecord = 0."
+          },
+          {
+            "type": "decision",
+            "text": "האם באחת מקופות הלקוח נרשמה תנועה מסוג '53' בקבוצה '02' (בטבלת תנועות השנה הנוכחית, לפי שם הטבלה – השערה) מאותו בנק, סניף וחשבון בנק כמו בהוראה, בסכום ההוראה (הסכום החד-פעמי כשסוג ההפקדה 2, אחרת סכום החיוב) ולא לפני תאריך החיוב המתאים שבהוראה? הוראה שסוג ההפקדה שלה ריק (NULL) אינה מותאמת לעולם.",
+            "branches": [
+              {
+                "label": "כן",
+                "nodes": [
+                  {
+                    "type": "write",
+                    "text": "הוראת הקבע מעודכנת ב-CRM: הסטטוס נקבע ל-100000009 (שם הקבוע בקוד: FIRST_TRANSACTION_RECEIVED), ובאותו עדכון gen_isfirsttransactionreceivied = true, ולכן ההוראה אינה נבחרת שוב בריצות הבאות (הבחירה דורשת gen_isfirsttransactionreceivied = 0)."
+                  }
+                ]
+              },
+              {
+                "label": "לא",
+                "nodes": [
+                  {
+                    "type": "step",
+                    "text": "הוראת הקבע נשארת ללא שינוי ותיבדק שוב בריצה הבאה."
+                  }
+                ]
+              }
+            ],
+            "tech": "ft.Gen_TransTypeID = '53' and ft.Gen_transgrouptypeid = '02' (DTSX:3989-3990); פרטי בנק (DTSX:3992-3994); (so.gen_depositType = 2 and so.gen_amountofonetime = ft.Gen_TransTotalAmount and so.gen_onetimechargeadate <= ft.gen_ActualExecutionDate) or (so.gen_depositType <> 2 and so.Gen_chargeamount = ft.Gen_TransTotalAmount and so.gen_monthlychargedate <= ft.gen_ActualExecutionDate) (DTSX:3996-4009)"
+          },
+          {
+            "type": "step",
+            "text": "כשכמה הוראות קבע חולקות אותם פרטי בנק ואותו סכום, רק אחת מהן מסומנת בכל ריצה."
+          },
+          {
+            "type": "end",
+            "text": "הוראות קבע שנמצאה עבורן תנועה תואמת בקופות הלקוח מסומנות ב-CRM בסטטוס 100000009 (שם הקבוע בקוד: FIRST_TRANSACTION_RECEIVED) וב-gen_isfirsttransactionreceivied = true, ולכן אינן נבחרות שוב. הקבצים אינם מוכיחים שזו התנועה הראשונה של ההוראה, כי הבחירה מקבצת לפי סכום ופרטי בנק ולא לפי הוראה, ולמשמעות קודי התנועה '53'/'02' אין הגדרה בקבצים."
+          }
+        ]
+      },
+      "detailed": {
+        "nodes": [
+          {
+            "type": "step",
+            "text": "האוכלוסייה היא הוראות קבע שבהן gen_isfirsttransactionreceivied = 0 ו-gen_ispastrecord = 0, ללא סינון לפי מצב ההוראה (statecode/statuscode).",
+            "tech": "Get StandingOrders With First transaction · so.gen_isfirsttransactionreceivied = 0 and so.gen_ispastrecord = 0",
+            "evidence": "DTSX:3987-3988"
+          },
+          {
+            "type": "step",
+            "text": "כל הוראה מוצלבת עם התנועות בטבלת Gen_ftCurrentYear (לפי שמה: השנה הנוכחית – השערה) בכל הקופות של חשבון הלקוח שלה, מסוג תנועה '53' וקבוצת תנועה '02'.",
+            "tech": "Gen_ftCurrentYear ft JOIN Gen_fundmain f ON ft.gen_fundnumber = f.Gen_fundmainId JOIN Gen_standingorder so ON so.gen_customeraccount = f.Gen_customeraccountname; ft.Gen_TransTypeID = '53' and ft.Gen_transgrouptypeid = '02'",
+            "evidence": "DTSX:3980-3990"
+          },
+          {
+            "type": "decision",
+            "text": "האם פרטי הבנק בתנועה זהים לפרטי הבנק בהוראת הקבע (מספר חשבון, סניף ומספר בנק)?",
+            "tech": "right('0000000000000' + so.Gen_bankaccountnumber, 12) = right('0000000000000' + ft.Gen_CurrentAccountNumber, 12) and so.Gen_branch = ft.Gen_CurrentAccountBranch and bank.Gen_BankNumber = ft.Gen_CurrentAccountBank (gen_banks לפי so.gen_bankname)",
+            "evidence": "DTSX:3985, DTSX:3992-3994",
+            "branches": [
+              {
+                "label": "לא",
+                "nodes": [
+                  {
+                    "type": "step",
+                    "text": "התנועה אינה מותאמת להוראה זו."
+                  }
+                ]
+              },
+              {
+                "label": "כן",
+                "nodes": [
+                  {
+                    "type": "decision",
+                    "text": "מהו סוג ההפקדה בהוראה? (בשאילתה, הערך 2 מסומן בהערה 'One time')",
+                    "tech": "so.gen_depositType = 2 (הערת SQL: --One time) / so.gen_depositType <> 2 (הערת SQL: --Not one time); אין ענף לערך NULL",
+                    "evidence": "DTSX:3999",
+                    "branches": [
+                      {
+                        "label": "2 (חד-פעמית לפי הערת השאילתה)",
+                        "nodes": [
+                          {
+                            "type": "step",
+                            "text": "התנועה תואמת אם סכומה שווה לסכום החד-פעמי שבהוראה ותאריך הביצוע שלה אינו מוקדם מתאריך החיוב החד-פעמי.",
+                            "tech": "so.gen_amountofonetime = ft.Gen_TransTotalAmount and so.gen_onetimechargeadate <= ft.gen_ActualExecutionDate",
+                            "evidence": "DTSX:4000-4001"
+                          }
+                        ]
+                      },
+                      {
+                        "label": "ערך אחר שאינו 2 (בהערה: Not one time)",
+                        "nodes": [
+                          {
+                            "type": "step",
+                            "text": "התנועה תואמת אם סכומה שווה לסכום החיוב שבהוראה ותאריך הביצוע שלה אינו מוקדם מתאריך החיוב החודשי.",
+                            "tech": "so.gen_depositType <> 2 and so.Gen_chargeamount = ft.Gen_TransTotalAmount and so.gen_monthlychargedate <= ft.gen_ActualExecutionDate",
+                            "evidence": "DTSX:4006-4008"
+                          }
+                        ]
+                      },
+                      {
+                        "label": "ריק (NULL)",
+                        "nodes": [
+                          {
+                            "type": "step",
+                            "text": "ההוראה אינה עומדת באף אחד משני התנאים, ולכן אינה מותאמת לתנועה ואינה מסומנת.",
+                            "tech": "NULL = 2 ו-NULL <> 2 אינם מתקיימים ב-SQL (DTSX:3999, 4006)"
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "type": "step",
+            "text": "ההתאמות מקובצות לפי סכום התנועה ופרטי הבנק של ההוראה (בנק, חשבון, סניף), ובכל קבוצה נשמרת רק ההתאמה עם תאריך הביצוע המוקדם ביותר. מזהה ההוראה אינו חלק מהקיבוץ, ולכן אם כמה הוראות חולקות אותם פרטי בנק וסכום, רק אחת מהן נבחרת בריצה.",
+            "tech": "ROW_NUMBER() over(partition by ft.gen_transtotalamount, so.gen_bankname, so.gen_bankaccountnumber, so.gen_branch order by ft.gen_ActualExecutionDate asc) ... where RowNum = 1",
+            "evidence": "DTSX:3978, DTSX:4012"
+          },
+          {
+            "type": "write",
+            "text": "הוראת הקבע מתעדכנת ל-statuscode 100000009 (שם הקבוע בקוד: FIRST_TRANSACTION_RECEIVED), והדגל gen_isfirsttransactionreceivied מקבל true.",
+            "tech": "gen_standingorder · Update · SDK (service.Update, שורה-שורה): statuscode = OptionSetValue(100000009) [const FIRST_TRANSACTION_RECEIVED]; gen_isfirsttransactionreceivied = true",
+            "evidence": "update Standing Order main.cs:84, 125-129"
+          },
+          {
+            "type": "step",
+            "text": "עדכון שנכשל נרשם כאזהרת ETL עם מזהה ההוראה (מסגרת), והעיבוד ממשיך להוראה הבאה.",
+            "tech": "catch → ErrorBuffer.Description = e.Message; ErrorBuffer.standingorderid (main.cs:131-136) → Set Warning columns → ETL Warning"
+          },
+          {
+            "type": "end",
+            "text": "הוראות קבע שנמצאה עבורן תנועה תואמת בקופות הלקוח מסומנות ב-CRM, ואם העדכון הצליח הן אינן נבחרות שוב בריצות הבאות. התנועה שנבחרה היא המוקדמת בקבוצה של סכום ופרטי בנק, ולא בהכרח החיוב הראשון של ההוראה עצמה; לקודי התנועה '53'/'02' אין הגדרה בקבצים."
+          }
+        ]
+      },
+      "detail_he": [
+        {
+          "h": "מקור ואוכלוסייה",
+          "t": "שאילתה על טבלאות CRM (חיבור [Prod], ALTSHULER_MSCRM): Gen_standingorder עם gen_isfirsttransactionreceivied = 0 ו-gen_ispastrecord = 0, מוצלבות לתנועות Gen_ftCurrentYear בקופות Gen_fundmain של חשבון הלקוח, Gen_TransTypeID = '53' ו-Gen_transgrouptypeid = '02' (DTSX:3975-3990)."
+        },
+        {
+          "h": "התאמה לרשומות קיימות",
+          "t": "ההתאמה בין הוראה לתנועה: חשבון לקוח (so.gen_customeraccount = f.Gen_customeraccountname); מספר חשבון בנק: לשני הצדדים מוסיפים 13 אפסים בתחילת הערך ומשווים את 12 התווים האחרונים, כך שערך קצר מרופד באפסים וערך ארוך מ-12 תווים נחתך ל-12 התווים האחרונים (שני מספרים שונים עם אותם 12 תווים אחרונים נחשבים זהים); מספר חשבון ריק (NULL) אינו מותאם (בהגדרת ברירת המחדל CONCAT_NULL_YIELDS_NULL); סניף; מספר בנק דרך gen_banks; וסכום ותאריך לפי סוג ההוראה (DTSX:3992-4008). העדכון לפי Gen_standingorderId שנשלף מ-CRM (main.cs:128)."
+        },
+        {
+          "h": "החלטות",
+          "t": "סוג הפקדה 2 (בהערת השאילתה: One time): gen_amountofonetime = סכום התנועה ו-gen_onetimechargeadate <= תאריך הביצוע. סוג הפקדה שאינו 2 (בהערה: Not one time): Gen_chargeamount = סכום התנועה ו-gen_monthlychargedate <= תאריך הביצוע. הוראה שסוג ההפקדה שלה NULL אינה עומדת באף אחד משני התנאים ואינה מותאמת. לכל צירוף (סכום, בנק, חשבון, סניף) נבחרת רק השורה עם תאריך הביצוע המוקדם ביותר (RowNum = 1)."
+        },
+        {
+          "h": "כתיבה ל-CRM",
+          "t": "Update ל-gen_standingorder דרך ה-SDK (service.Update): statuscode = 100000009 (ערך קבוע מוכח, const FIRST_TRANSACTION_RECEIVED, main.cs:84,126), gen_isfirsttransactionreceivied = true (main.cs:127). הקוד אינו קובע statecode. אין יצירה או מחיקה."
+        },
+        {
+          "h": "תוצאה עסקית",
+          "t": "הוראות קבע שנמצאה עבורן בקופות חשבון הלקוח, בטבלה Gen_ftCurrentYear, תנועה תואמת (Gen_TransTypeID = '53' ו-Gen_transgrouptypeid = '02' – לקודים אין הגדרה בקבצים שסופקו; אותם פרטי בנק, סכום זהה ותאריך ביצוע שאינו מוקדם מתאריך החיוב שבהוראה) מסומנות ב-statuscode 100000009 (שם הקבוע בקוד: FIRST_TRANSACTION_RECEIVED) וב-gen_isfirsttransactionreceivied = true, ולכן, אם העדכון הצליח, אינן נבחרות שוב בריצות הבאות. 'ראשונה' אינו נקבע לכל הוראה: הבחירה (RowNum = 1) מקבצת לפי סכום התנועה ופרטי הבנק של ההוראה (בנק, חשבון, סניף) ולא לפי ההוראה, ונקראת רק Gen_ftCurrentYear. לכן התנועה המוקדמת בכל קבוצה משויכת להוראה אחת, והיא אינה בהכרח החיוב הראשון של אותה הוראה."
+        }
+      ],
+      "decisions": [
+        {
+          "where": "Get StandingOrders With First transaction (SQL)",
+          "condition": "so.gen_isfirsttransactionreceivied = 0 and so.gen_ispastrecord = 0 and ft.Gen_TransTypeID = '53' and ft.Gen_transgrouptypeid = '02'",
+          "meaning_he": "הוראה שטרם סומנה ואינה רשומת עבר, מול תנועה מסוג '53' בקבוצה '02'",
+          "outcome_he": "מועמדת להתאמה"
+        },
+        {
+          "where": "Get StandingOrders With First transaction (SQL)",
+          "condition": "right('0000000000000' + so.Gen_bankaccountnumber, 12) = right('0000000000000' + ft.Gen_CurrentAccountNumber, 12) and so.Gen_branch = ft.Gen_CurrentAccountBranch and bank.Gen_BankNumber = ft.Gen_CurrentAccountBank",
+          "meaning_he": "פרטי הבנק בתנועה זהים לאלה שבהוראה",
+          "outcome_he": "נדרש להתאמה"
+        },
+        {
+          "where": "Get StandingOrders With First transaction (SQL)",
+          "condition": "(so.gen_depositType = 2 and so.gen_amountofonetime = ft.Gen_TransTotalAmount and so.gen_onetimechargeadate <= ft.gen_ActualExecutionDate) or (so.gen_depositType <> 2 and so.Gen_chargeamount = ft.Gen_TransTotalAmount and so.gen_monthlychargedate <= ft.gen_ActualExecutionDate)",
+          "meaning_he": "הסכום זהה לסכום ההוראה (הסכום החד-פעמי כשסוג ההפקדה 2, אחרת סכום החיוב) והתנועה בוצעה לא לפני תאריך החיוב. הוראה עם gen_depositType NULL אינה עומדת באף צד.",
+          "outcome_he": "נדרש להתאמה"
+        },
+        {
+          "where": "Get StandingOrders With First transaction (SQL)",
+          "condition": "ROW_NUMBER() over(partition by ft.gen_transtotalamount, so.gen_bankname, so.gen_bankaccountnumber, so.gen_branch order by ft.gen_ActualExecutionDate asc) ... where RowNum = 1",
+          "meaning_he": "לכל צירוף סכום+פרטי בנק נבחרת ההתאמה המוקדמת ביותר",
+          "outcome_he": "רק ההוראה בשורה הראשונה מעודכנת"
+        }
+      ],
+      "crmEffects": [
+        {
+          "entity": "gen_standingorder",
+          "verb": "Update",
+          "mechanism": "SDK",
+          "when_he": "לכל הוראה שנבחרה (RowNum = 1): statuscode = 100000009, gen_isfirsttransactionreceivied = true"
+        }
+      ],
+      "evidence": [
+        "Package\\Update Standing Order First Transaction Received\\Get StandingOrders With First transaction · DTSX:3970, SqlCommand DTSX:3975-4016",
+        "Package\\Update Standing Order First Transaction Received\\update Standing Order · DTSX:4090, main.cs (code DTSX:4092, sha 0d253194f663) lines 84, 120-137",
+        "paths DTSX:5070-5072",
+        "precedence DTSX:5080, DTSX:5081"
+      ],
+      "openQuestions_he": [
+        "משמעות סוג תנועה '53' וקבוצת תנועה '02' – לא מוגדרת בחבילה (השערה: הפקדה מהוראת קבע).",
+        "משמעות gen_depositType = 2 ('One time' לפי הערת SQL) ושאר הערכים – לא מוגדרת בחבילה מעבר להערה.",
+        "האם statuscode 100000009 תקף עבור ה-statecode הנוכחי של ההוראה – לא ידוע; ה-statecode אינו נקבע בקוד.",
+        "הוראות שהשדות gen_isfirsttransactionreceivied או gen_ispastrecord שלהן NULL אינן נכללות (התנאי '= 0'); האם קיימות כאלה – לא ידוע."
+      ]
+    }
+  ],
+  "findings_he": [
+    {
+      "severity": "medium",
+      "text": "הקיבוץ ב-ROW_NUMBER הוא לפי סכום התנועה ופרטי הבנק של ההוראה בלבד, בלי מזהה ההוראה. כשכמה הוראות קבע (למשל בחשבונות לקוח שונים) חולקות אותו חשבון בנק ואותו סכום, רק אחת מהן מסומנת בכל ריצה, והשאר מתעכבות לריצות הבאות (אחת בכל ריצה). כשתאריכי הביצוע זהים, הבחירה אינה דטרמיניסטית.",
+      "evidence": "DTSX:3978, DTSX:4012"
+    },
+    {
+      "severity": "low",
+      "text": "ההתאמה דורשת שוויון מדויק בין סכום התנועה לסכום ההוראה. אם הסכום בהוראה שונה מהחיוב בפועל (למשל אחרי עדכון סכום), ההוראה לעולם לא תסומן.",
+      "evidence": "DTSX:4000, DTSX:4007"
+    },
+    {
+      "severity": "low",
+      "text": "התנועה נבדקת בכל קופה של חשבון הלקוח ולא בקופה מסוימת של ההוראה. בנוסף, נבדקות רק תנועות מהטבלה Gen_ftCurrentYear. שהיא מכילה רק את השנה הנוכחית נגזר משם הטבלה בלבד (השערה); אין בחבילה סינון תאריכים שמוכיח זאת.",
+      "evidence": "DTSX:3980-3985"
+    },
+    {
+      "severity": "low",
+      "text": "התנאי so.gen_depositType <> 2 אינו מתקיים כשסוג ההפקדה ריק (NULL), ולכן הוראה ללא סוג הפקדה לא תסומן לעולם.",
+      "evidence": "DTSX:4006"
+    },
+    {
+      "severity": "info",
+      "text": "רק statuscode מתעדכן (100000009) ולא statecode. העדכון נעשה שורה-שורה (service.Update) ולא ב-ExecuteMultiple.",
+      "evidence": "main.cs:125-129"
+    }
+  ]
+}

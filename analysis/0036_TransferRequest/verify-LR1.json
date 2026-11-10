@@ -1,0 +1,48 @@
+{
+ "verifier": "ssis-verifier",
+ "package": "0036_TransferRequest",
+ "scope": "logic-claims re-check after fixes",
+ "checkedAt": "2026-11-07T16:44:30.263Z",
+ "checked": 4,
+ "results": [
+  {
+   "id": "L|exec",
+   "hash": "c0a83dc53296",
+   "verdict": "CONFIRMED",
+   "detail": "All 6 steps and triggers match: 5 PrecedenceConstraints with no DTS:Value (= Success), LogicalAnd, linear chain Get Variables -> Create ETL -> Get NonWorkingDays -> Update LastThreeWorkingDays -> Update SuspicionAsEmitted -> End ETL. No disabled executables, no configurations, no event handlers. Step 5 label (status 7 -> 11, three working days after send-to-bank) matches the SQL and the derived constant.",
+   "evidence": "DTSX:4549-4553; DTSX:3584-3587; DTSX:3616",
+   "wrongUnits": []
+  },
+  {
+   "id": "L|Package\\Update SuspicionAsEmitted Transfer Request|title",
+   "hash": "78aad68c1797",
+   "verdict": "CONFIRMED",
+   "detail": "Re-derived: OLE DB source on [Psql] selects gen_transferrequestId where gen_tanferinstatus = 7 and gen_SendToBankDate is not null and datediff(day, ?, gen_SendToBankDate) <= 0, ? = User::LastThreeWorkingDays (ParameterMapping {BCF4D8B7}); Derived Column gen_suspicionAsEmitted = 11; script sets entity[\"gen_tanferinstatus\"] = new OptionSetValue(11) and calls CrmProxy.GetCrmService().Update. Threshold traced in ScriptMain: counter starts at 2 from yesterday, so result = 3rd working day before today. \"Sent on or before threshold\" = \"3 working days or more ago\" is correct. No unproven meaning of status 7/11 asserted.",
+   "evidence": "DTSX:3584-3587, 3589 (ParameterMapping), 3616, main.cs DTSX:3881-3901; ScriptMain DTSX:3285-3311",
+   "wrongUnits": []
+  },
+  {
+   "id": "L|Package\\Update SuspicionAsEmitted Transfer Request|short",
+   "hash": "d7162e8fc81b",
+   "verdict": "WRONG",
+   "detail": "Units [1] and [2] are correct (status 7, sent to bank on/before the threshold; SDK Update to 11; on exception the row goes to the unconnected Error output, so the record is not updated). Unit [3] restates the condition incorrectly.",
+   "evidence": "DTSX:3584-3587; main.cs DTSX:3881-3901; Error output DTSX:4531, paths DTSX:4541-4542",
+   "wrongUnits": [
+    {
+     "unit": 3,
+     "problem": "\"בקשות העברה שנשארו בסטטוס 7 עד יום הסף\" (\"requests that remained in status 7 until the threshold day\") moves the threshold onto how long the status lasted and drops the send-to-bank condition. The code checks only the status at run time (= 7) and that gen_SendToBankDate falls on or before the threshold day; nothing checks status history up to the threshold day.",
+     "correct": "בקשות העברה שנמצאות בזמן הריצה בסטטוס 7 ושתאריך השליחה לבנק שלהן (gen_SendToBankDate) הוא ביום הסף או לפניו מסומנות בסטטוס 11. לפי שם הרכיב זה סימון SuspicionAsEmitted (המשמעות העסקית לא מוכחת).",
+     "evidence": "DTSX:3586-3587 (where gen_tanferinstatus = 7 and gen_SendToBankDate is not null and datediff(day, ?, gen_SendToBankDate) <= 0)"
+    }
+   ]
+  },
+  {
+   "id": "L|Package\\Update SuspicionAsEmitted Transfer Request|detail",
+   "hash": "abebceb81e5b",
+   "verdict": "CONFIRMED",
+   "detail": "All 5 units match: population SQL verbatim; update keyed directly by entity.Id = gen_transferrequestId; no split/decision besides the SQL; SDK Update gen_tanferinstatus = OptionSetValue(11); the outcome is stated as the technical condition (on or before the threshold = 3rd working day before today), and the meaning of statuses 7 and 11 is marked as not proven.",
+   "evidence": "DTSX:3584-3587, 3616; main.cs DTSX:3884-3889",
+   "wrongUnits": []
+  }
+ ]
+}

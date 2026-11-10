@@ -1,0 +1,154 @@
+{
+  "verifier": "ssis-verifier",
+  "package": "0017_CloseWithdrawalForecast",
+  "scope": "mapping-A.json",
+  "source": {
+    "file": "source/DailyProcess/0017_CloseWithdrawalForecast.dtsx",
+    "sha256": "91af73f3fbbf9a812ba9770e90c09e85d8c99c52324c6c26e2b75e0f9903dd5e"
+  },
+  "checked": 21,
+  "results": [
+    {
+      "id": "close withdrawal|gen_withdrawal|UPDATE|gen_currentstate [Close automaty sended withdrawals]",
+      "verdict": "CONFIRMED",
+      "detail": "Re-derived: default 14; minStatus==maxStatus&&minStatus==4 -> 3; C# precedence (A&&B)||(C&&D) partial-withdrawal test, then Truncate(Abs(gentranstotalamount)) != Truncate(Abs(Genwithdrawalvalue)) -> 15 overriding both. Values 3/14/15, no single literal. SQL aggregates (min/max feedbackstatus over flp rows NOT IN(5,6); min(x+0); sum(ISNULL); ISNULL(Gen_withdrawalvalue,0)) and population (state 8, actionid 54, transgrouptype 5, ft.gen_valuedate >= gen_datesenttothebank, inner join flpart) match. Input columns bound by lineageId to the source outputs. Key = entity[\"gen_withdrawalid\"] (attribute, not entity.Id). Precedence Constraint 1 has no DTS:Value -> Success. Note: minStatus/maxStatus read without IsNull check, but NULL statuses are already excluded by NOT IN.",
+      "evidence": "DTSX:151-166 (main.cs:30-45), SQL DTSX:1094-1141, path DTSX:1193, precedence DTSX:5313"
+    },
+    {
+      "id": "close withdrawal|gen_withdrawal|UPDATE|gen_dateofactualwithdrawal [Close automaty sended withdrawals]",
+      "verdict": "CONFIRMED",
+      "detail": "Row.genvaluedate.ToLocalTime() when !genvaluedate_IsNull; gen_valuedate = min(ft.gen_valuedate) of qualifying transactions. Practically never NULL (filter ft.gen_valuedate >= gen_datesenttothebank removes NULLs).",
+      "evidence": "DTSX:168-170 (main.cs:47-49), SQL DTSX:1109 (min), filter DTSX:1117-1120"
+    },
+    {
+      "id": "close withdrawal|gen_withdrawal|UPDATE|gen_withdrawalfinishdate [Close automaty sended withdrawals]",
+      "verdict": "CONFIRMED",
+      "detail": "Same expression and condition as gen_dateofactualwithdrawal.",
+      "evidence": "DTSX:171 (main.cs:50)"
+    },
+    {
+      "id": "close withdrawal|gen_withdrawal|UPDATE|gen_actualwithdrawalamount [Close automaty sended withdrawals]",
+      "verdict": "CONFIRMED",
+      "detail": "new Money(Row.gentranstotalamount), sign kept; Abs/Truncate only in the state comparison. The IsNull guard is moot: sum(ISNULL(..,0)) over >=1 row is never NULL.",
+      "evidence": "DTSX:173-176 (main.cs:52-55), SQL DTSX:1107"
+    },
+    {
+      "id": "close withdrawal|gen_withdrawal|UPDATE|gen_nettransferamount [Close automaty sended withdrawals]",
+      "verdict": "CONFIRMED",
+      "detail": "new Money(Row.gennetoamountofaction) unchanged; sum(ISNULL(gen_netoamountofaction,0)), never NULL in practice.",
+      "evidence": "DTSX:177-180 (main.cs:56-59), SQL DTSX:1108"
+    },
+    {
+      "id": "close withdrawal|gen_withdrawal|UPDATE|gen_currentstate [Close manualy sended withdrawals]",
+      "verdict": "CONFIRMED",
+      "detail": "Default 3, partial-withdrawal + truncated-abs mismatch -> 15; no 14, minStatus/maxStatus not selected. Population state 10, gen_valuedate >= w.CreatedOn (unqualified), flp.gen_feedbackstatus ! =5 quoted literally. Precedence Constraint 3 (no DTS:Value -> Success). Whether the '! =5' SQL parses is not provable from the DTSX (see LOGIC findings_he[4]); the claim describes the code exactly.",
+      "evidence": "DTSX:1447-1459 (main.cs:34-46), SQL DTSX:2176-2215, precedence DTSX:5314"
+    },
+    {
+      "id": "close withdrawal|gen_withdrawal|UPDATE|gen_dateofactualwithdrawal [Close manualy sended withdrawals]",
+      "verdict": "CONFIRMED",
+      "detail": "Row.genvaluedate.ToLocalTime() when not NULL; min(ft.gen_valuedate) with gen_valuedate >= w.CreatedOn.",
+      "evidence": "DTSX:1461-1463, SQL DTSX:2189, 2200"
+    },
+    {
+      "id": "close withdrawal|gen_withdrawal|UPDATE|gen_withdrawalfinishdate [Close manualy sended withdrawals]",
+      "verdict": "CONFIRMED",
+      "detail": "Same value/condition as gen_dateofactualwithdrawal.",
+      "evidence": "DTSX:1464 (main.cs:51)"
+    },
+    {
+      "id": "close withdrawal|gen_withdrawal|UPDATE|gen_actualwithdrawalamount [Close manualy sended withdrawals]",
+      "verdict": "CONFIRMED",
+      "detail": "new Money(Row.gentranstotalamount) unchanged; sum(ISNULL(gen_transtotalamount,0)).",
+      "evidence": "DTSX:1466-1469, SQL DTSX:2187"
+    },
+    {
+      "id": "close withdrawal|gen_withdrawal|UPDATE|gen_nettransferamount [Close manualy sended withdrawals]",
+      "verdict": "CONFIRMED",
+      "detail": "new Money(Row.gennetoamountofaction) unchanged; sum(ISNULL(gen_netoamountofaction,0)).",
+      "evidence": "DTSX:1470-1473, SQL DTSX:2188"
+    },
+    {
+      "id": "LOGIC scopeNote_he",
+      "verdict": "CONFIRMED",
+      "detail": "Re-check: text now states [CRM] Psql/ALTSHULER_MSCRM is the design-time string only, EnableConfig=True (DTSX:1) and external config C:\\Generix\\SSISConfigFile.dtsConfig (DTSX:11) may override it -> blocked_external_dependency. Matches the DTSX.",
+      "evidence": "DTSX:1, 4-7, 11",
+      "previousVerdict": "INCOMPLETE",
+      "previousDetail": "States as fact that [CRM] = Psql/ALTSHULER_MSCRM. That is only the design-time connection string; the package has EnableConfig=True and an XML configuration C:\\Generix\\SSISConfigFile.dtsConfig (not supplied) that can override it at runtime -> runtime target is external_unknown (CLAUDE.md rules 4, 9). Read-only use of [CRM], no file/staging/DML: confirmed.",
+      "recheckedOn": "2026-11-06"
+    },
+    {
+      "id": "LOGIC summary_he",
+      "verdict": "CONFIRMED",
+      "detail": "Consistent with both flows; 'automatic/manual' attributed to component names.",
+      "evidence": "DTSX:76, 1198"
+    },
+    {
+      "id": "LOGIC executionOrder",
+      "verdict": "CONFIRMED",
+      "detail": "Get Variables -> Create ETL -> Close automaty -> Close manualy -> End ETL; all constraints have no DTS:Value/EvalOp (default Success, constraint-only), LogicalAnd=True. No disabled executables.",
+      "evidence": "DTSX:5312-5315"
+    },
+    {
+      "id": "LOGIC components[0]",
+      "verdict": "CONFIRMED",
+      "detail": "Re-check: short_he/short.nodes[0]/[1] now state the partition-not-in-5/6 requirement and label status 4 = successful as השערה; detailed.nodes[3] adds NULL-status exclusion (correct: NOT IN excludes NULL); gen_ftcurrentyear 'current year' labelled השערה. All match DTSX.",
+      "evidence": "SQL DTSX:1126-1141; main.cs:30-33 (DTSX:151-154)",
+      "previousVerdict": "INCOMPLETE",
+      "previousDetail": "Decisions, SQL, code lines and writes re-derived and correct. But short.nodes[1] states as fact 'קיבלו היזון חוזר מוצלח (סטטוס 4)' - the meaning 'successful' of feedback status 4 is not defined in the package (the component's own openQuestions_he[1] says so); and 'כל פיצולי שכבות הנזילות' omits that partitions in status 5/6 (and NULL status) are excluded before min/max. 'תנועות מהשנה הנוכחית' (detailed.nodes[1]) is inferred from the table name gen_ftcurrentyear only - should be marked השערה.",
+      "recheckedOn": "2026-11-06"
+    },
+    {
+      "id": "LOGIC components[1]",
+      "verdict": "CONFIRMED",
+      "detail": "State 10 population, ! =5 filter, default 3/15 logic, no Fault branch in ExcecuteBulk (only valid-response branch, empty) re-derived. Executability depends on the '! =5' parse question (findings_he[4]).",
+      "evidence": "DTSX:1447-1500, SQL DTSX:2176-2215"
+    },
+    {
+      "id": "LOGIC findings_he[0]",
+      "verdict": "CONFIRMED",
+      "detail": "Transactions are joined via Gen_customeraccount -> Gen_fundmain -> gen_ftcurrentyear, with no link to the specific withdrawal; several open withdrawals on one account each sum all qualifying transactions.",
+      "evidence": "DTSX:1105-1120, 2186-2200"
+    },
+    {
+      "id": "LOGIC findings_he[1]",
+      "verdict": "CONFIRMED",
+      "detail": "Auto: ErrorBuffer.AddRow on Fault (main.cs:85-90) but the data flow has a single path (source -> script), Error output unconnected. Manual: no Fault branch. Re-selection next run is an inference that holds while the query criteria still match.",
+      "evidence": "DTSX:188-210, path DTSX:1193 only; DTSX:1483-1500"
+    },
+    {
+      "id": "LOGIC findings_he[2]",
+      "verdict": "CONFIRMED",
+      "detail": "Re-check: now describes per-value Truncate(Abs(x)) comparison with correct examples (100.99 vs 101.00 -> 15; 100.10 vs 100.90 -> equal), opposite-sign equality, and sign kept in gen_actualwithdrawalamount. Matches code.",
+      "evidence": "DTSX:158, 175 (auto); DTSX:1451, 1468 (manual)",
+      "previousVerdict": "WRONG",
+      "previousDetail": "'פער של אגורות אינו מזוהה כפער' is an over-generalisation. The code truncates each absolute value separately, not the difference: a sub-shekel gap that crosses a whole-shekel boundary IS flagged (e.g. 100.99 vs 101.00 -> 100 != 101 -> state 15), while gaps up to 0.99 inside the same whole shekel are not. Also Abs makes opposite-sign equal amounts compare equal. Correct: comparison of Truncate(Abs(x)) per value; written amount keeps original sign.",
+      "recheckedOn": "2026-11-06"
+    },
+    {
+      "id": "LOGIC findings_he[3]",
+      "verdict": "CONFIRMED",
+      "detail": "Re-check: now states selection requires a qualifying transaction AND at least one partition with feedbackstatus not in (5,6) via INNER JOIN; withdrawals without such a partition (all 5/6, NULL, none) stay open; selected ones always get >= 14. Matches DTSX.",
+      "evidence": "SQL DTSX:1126-1141; DTSX:151-154",
+      "previousVerdict": "WRONG",
+      "previousDetail": "'אין מצב שבו הבקשה נשארת פתוחה למרות שנמצאה תנועה' is false. The source query INNER JOINs trans with flpart, which requires at least one gen_fluiditylayerspartition row with gen_feedbackstatus NOT IN (5,6) (NULL status also excluded). A state-8 withdrawal with a qualifying transaction but no such partition row (all 5/6, NULL status, or no partitions) is not selected and stays open. The rest (state >= 14 even with no status-4 partition) is correct.",
+      "recheckedOn": "2026-11-06"
+    },
+    {
+      "id": "LOGIC findings_he[4]",
+      "verdict": "UNVERIFIABLE",
+      "detail": "Re-check: text now explicitly says UNVERIFIABLE, separates unproven general T-SQL knowledge (whitespace allowed inside compound comparison operators -> '<> 5', status 6 included, NULL excluded) from circumstantial DTSX evidence (externalMetadataColumns isUsed=True, 7 columns, DTSX:2236-2244), and states the consequence if it does not parse (no DelayValidation -> package validation fails, neither close flow runs). Accurate; the parse question itself remains unsettled from the DTSX alone - legitimately UNVERIFIABLE.",
+      "evidence": "SQL DTSX:2213; DTSX:2236-2244; DTSX:1198",
+      "previousVerdict": "UNVERIFIABLE",
+      "previousDetail": "Cannot be settled by execution from the DTSX alone. (1) T-SQL knowledge (not proven here): SQL Server's parser accepts whitespace between the characters of compound comparison operators ('! =', '< >', '> ='), so '! =5' would parse as '<> 5'. (2) Circumstantial DTSX evidence: the OLE DB Source carries externalMetadataColumns isUsed=True with exactly the 7 columns of this select list, i.e. the designer described this command successfully at some point. (3) Consequence if it did NOT parse: no DelayValidation is set and ValidateExternalMetadata defaults to True, so package validation would fail before any task runs - the automatic flow would not run either, not only the manual one; if it failed later at PreExecute, 'Close manualy sended withdrawals' fails, End ETL (Success constraint DTSX:5315) is skipped and the OnError handler marks gen_etlprocess failed. If it parses, semantics = feedbackstatus <> 5 (status 6 included, NULL excluded) vs NOT IN (5,6) in the auto flow. Production execution logs are needed to close this.",
+      "recheckedOn": "2026-11-06"
+    },
+    {
+      "id": "LOGIC findings_he[5]",
+      "verdict": "CONFIRMED",
+      "detail": "ToLocalTime on Unspecified Kind treats the value as UTC; correctness depends on DB storage (unproven).",
+      "evidence": "DTSX:170-171, 1463-1464"
+    }
+  ],
+  "missingWrites": []
+}

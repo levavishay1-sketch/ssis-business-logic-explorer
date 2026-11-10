@@ -1,0 +1,40 @@
+{
+  "verifier": "ssis-verifier",
+  "package": "0032_POAOperator",
+  "scope": "logic-claims re-check after fixes",
+  "checkedAt": "2026-11-07T00:00:00Z",
+  "checked": 3,
+  "results": [
+    {
+      "id": "L|finding#3",
+      "hash": "8f096cf5fd1f",
+      "verdict": "CONFIRMED",
+      "detail": "Re-derived. Account flow: the exists Lookup is on gen_customeraccount, with ParameterMap gen_customeraccountid (DTSX:543-553). Pension flow: the Lookup is on gen_policy, with ParameterMap gen_policiesid (DTSX:3631-3641). Both use [psql]=ALTSHULER_MSCRM with CacheType=1 (partial), NoMatchCachePercentage=0 and NoMatchBehavior=1. Only the No Match output is connected. Neither lookup query has an operator or status filter. The source SQL joins account/policy -> Account -> gen_poaoperator (status 2) on gen_employername (DTSX:3081-3110, 6125-6153), so two valid operators of one employer produce two rows for the same account or policy. The Create script calls service.Create per row (pension main.cs:212; account main.cs:212). The duplicate outcome is correctly stated as conditional on coverage and on lookup timing. 'Later runs will not link a further operator' is correct: the lookup matches any existing link of any status.",
+      "evidence": "DTSX:543-553, 3631-3641 (lookups); DTSX:3081-3110, 6125-6153 (sources); data-flow paths (only Lookup No Match Output connected); pension Create main.cs:124-221",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Update POA Account Operator Out Of Date|detailed",
+      "hash": "f3a31e677b0d",
+      "verdict": "CONFIRMED",
+      "detail": "[1]-[2] match the SQL: where dateadd(HH,3, gen_enddate) < GETDATE() and gen_poastatus = 2 -- valid (DTSX:10053-10055). A NULL end date is not selected, which the 'no' branch covers. [7] Expired Status: expiredStatus = 4 (DTSX:9973). The 'expired' label comes from the comment at DTSX:15807, in a later flow. [8] main.cs:122-130 and 139-142: entity gen_poaaccountoperator, gen_poastatus = OptionSetValue(4), ExecuteMultipleExtension Update, batch of 500. [9] Checked line by line. Fault items in the response are ignored, because the ErrorBuffer lines are commented out (main.cs:155-160). ExecuteBulk at count == 500 runs inside the try (128-131). On an exception, the catch writes Message = ex.Message + ', Record Guid:' + the triggering row's id into ErrorBuffer.Message, which is wstr(100). A longer text throws inside the catch, so the component fails. entitiesList.Clear() runs only after a successful bulk (163), so the count never equals 500 again and every later row waits for the final flush. That flush, together with the retained first 500, runs in Input0_ProcessInput (176-179) outside any try. Error output -> Failed To Update Poa account operator -> ETL Warning 1 1. The constraints carry no Value, so they are Success (DTSX:18795-18802). Unit 9 is accurate. 'The list is not emptied' implies the first 500 are re-sent in the final batch.",
+      "evidence": "DTSX:10053-10055; 9973; 10084 main.cs:118-180; Error output Message wstr(100); DTSX:18795-18802",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Create POA Account Operator - Pension|open",
+      "hash": "e78d6897b1b5",
+      "verdict": "WRONG",
+      "detail": "Unit 2 (the corrected unit) is now correct. The Lookup is select gen_policy from gen_poaaccountoperator ... where gen_policy = ?, with ParameterMap gen_policiesid (DTSX:3631-3641). Unit 1 overgeneralises. The source keeps policies with CreatedOn > DATEADD(dd,-2,GETDATE()) whose employer has a gen_poaoperator with gen_poastatus = 2 at run time (DTSX:6150-6153). Nothing compares the policy's creation time with the POA's creation time. A policy created shortly before the operator POA is still linked if a run within 2 days of the policy's creation sees the POA as valid. So 'policies that existed before the POA was created are not linked' is not proven as stated. The same wording appears in L|Package\\Create POA Account Operator|open [1] and in finding#2, which are outside this re-check.",
+      "evidence": "Get Policies DTSX:6125-6153; Check If POA Account Operator Exist DTSX:3631-3641; grep: gen_poaaccountoperator appears only in 0032",
+      "wrongUnits": [
+        {
+          "unit": 1,
+          "problem": "States that every policy created before the operator POA is not linked. The filter is a 48-hour window on the policy's CreatedOn, relative to run time, together with the POA's current status. It is not 'policy created before the POA'.",
+          "correct": "The package considers only policies created in the 2 days before the run (CreatedOn > DATEADD(dd,-2,GETDATE())). A policy is linked only if a run inside that window finds a valid (status 2) operator POA for its employer, and the coverage conditions hold. Policies whose window passed before the POA became valid, or before the package ran, are never linked by this package. No other supplied package creates gen_poaaccountoperator. Who links them is unknown.",
+          "evidence": "DTSX:6150-6153"
+        }
+      ]
+    }
+  ]
+}

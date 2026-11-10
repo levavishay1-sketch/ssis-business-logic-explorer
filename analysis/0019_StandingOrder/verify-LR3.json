@@ -1,0 +1,64 @@
+{
+  "verifier": "ssis-verifier",
+  "package": "0019_StandingOrder",
+  "scope": "logic-claims re-check round 3",
+  "checkedAt": "2026-11-07",
+  "checked": 6,
+  "results": [
+    {
+      "id": "L|summary",
+      "hash": "fdb20caeee29",
+      "verdict": "CONFIRMED",
+      "detail": "I re-derived this from SqlCommand DTSX:3975-4012 and update Standing Order main.cs (main.cs line 1 = DTSX:4215). It checks out on: the joins Gen_ftCurrentYear-Gen_fundmain (ft.gen_fundnumber = f.Gen_fundmainId), Gen_standingorder (so.gen_customeraccount = f.Gen_customeraccountname) and gen_banks; the filters = 0 on gen_isfirsttransactionreceivied/gen_ispastrecord (NULL excluded); '53'/'02'; account right(13 zeros + x, 12), branch and bank number; the amount and date per depositType = 2 / <> 2 (NULL matches neither); and ROW_NUMBER partition by ft.gen_transtotalamount, so.gen_bankname, so.gen_bankaccountnumber, so.gen_branch with RowNum = 1. Each order falls in exactly one partition, because its amount is fixed by its depositType, so at most one order is marked per combination. The write is statuscode = OptionSetValue(FIRST_TRANSACTION_RECEIVED = 100000009) and gen_isfirsttransactionreceivied = true (main.cs:84,126-127). In the scope note: there is no package configuration (no DTS:Configuration / dtsConfig in the file). [Prod] is used only by readers: the End ETL Lookup (DTSX:2247), the Get Organization Variables source (DTSX:2314) and the business source (DTSX:4020). [SSIS_Logs] is used only by the log provider (DTSX:16). The SDK writers are Create ETL Process record (DTSX:277, crmServiceProxy.Create), ETL Record Finish (DTSX:818, Update), ETL Warning (DTSX:3310, Create) and update Standing Order (DTSX:4343, service.Update). The SQL comments '--One time' / '--Not one time' are at DTSX:3998 and 4005. The type of Gen_CurrentAccountNumber is wstr(12) in the supplied 0008 insert into ftCurrentYearBase (0008:63163), so the string padding semantics hold. 'The only filter on the order' is read as the filter on the order's own flags; the matching conditions are listed right after it.",
+      "evidence": "0019_StandingOrder.dtsx:3975-4012, 4020, 2247, 2314, 16, 277, 818, 3310, 4298, 4340-4343; 0008_LeumiFile-PY.dtsx:63163",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|exec",
+      "hash": "a581d82b639b",
+      "verdict": "CONFIRMED",
+      "detail": "There are 4 executables. Get Organization Variables has no incoming constraint. Constraint (DTSX:5079) runs from Get Organization Variables to Create ETL Process record, Constraint 1 (DTSX:5080) to Update Standing Order First Transaction Received, and Constraint 5 (DTSX:5081) to End ETL Process record. None has DTS:Value or an expression, so all are Success. No executable is disabled.",
+      "evidence": "0019_StandingOrder.dtsx:91, 550, 2293, 3108, 5079-5081",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Update Standing Order First Transaction Received|title",
+      "hash": "12c094530ccd",
+      "verdict": "CONFIRMED",
+      "detail": "short_he: 'all states' is correct, because there is no statecode/statuscode filter. '53'/'02' is labelled השערה, and the meaning of the table name is labelled השערה. The matching is by bank details, amount and charge date, and only the earliest match per amount and bank combination is kept (ROW_NUMBER … order by gen_ActualExecutionDate asc, RowNum = 1). 'Not necessarily the first transaction' is correctly hedged. flow_he[1]-[4] match DTSX:3986-4012 and main.cs:126-127.",
+      "evidence": "0019_StandingOrder.dtsx:3975-4012; main.cs:126-127 (DTSX:4340-4341)",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Update Standing Order First Transaction Received|short",
+      "hash": "efcd3bdd5d32",
+      "verdict": "INCOMPLETE",
+      "detail": "The decision in unit [2] asks only whether the customer's funds have a transaction from the same bank account, for the order amount and not before the charge date, and branch 'כן' leads to the write. It leaves out a row-selection condition: only transactions with Gen_TransTypeID = '53' and Gen_transgrouptypeid = '02' count (DTSX:3989-3990). Unit [8] mentions the codes only in a note on their meaning, not as a condition. The decision also does not say that an order with gen_depositType NULL never matches (DTSX:3999, 4006), even though such an order can meet the stated test. As written, an order with a matching transaction of another type, or with depositType NULL, would answer 'כן', but it is not marked. The other units are correct: [1] the flags = 0 with no state filter; [6] a not-updated order keeps flag 0 and is read again; [7] one order per amount and bank combination.",
+      "evidence": "0019_StandingOrder.dtsx:3986-4012",
+      "wrongUnits": [
+        {
+          "unit": "[2] decision",
+          "problem": "The condition Gen_TransTypeID = '53' AND Gen_transgrouptypeid = '02' is missing, and so is the depositType NULL exclusion.",
+          "correct": "האם באחת מקופות הלקוח נרשמה תנועה מסוג '53' בקבוצה '02' מאותו בנק, סניף וחשבון, בסכום ההוראה לפי סוג ההפקדה (2 או שאינו 2; NULL אינו מותאם) ולא לפני תאריך החיוב?",
+          "evidence": "DTSX:3989-3990, 3999, 4006"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Update Standing Order First Transaction Received|detailed",
+      "hash": "e48fc9866de3",
+      "verdict": "CONFIRMED",
+      "detail": "Every unit matches the SQL. [1] filters, DTSX:3987-3988. [2] joins and '53'/'02', DTSX:3980-3990. [3] account/branch/bank, DTSX:3992-3994. [7]-[13] depositType 2 / <> 2 with the SQL comments, and NULL matches neither, DTSX:3998-4008. [14] the ROW_NUMBER partition and RowNum = 1, DTSX:3978, 4012. [15] matches main.cs:126-129 (row-by-row service.Update). [16] on failure handling is correct: the catch at main.cs:131-136 adds an ErrorBuffer row with Description = e.Message and standingorderid, then the next row is processed. The Error path (DTSX:5071) goes to Set Warning columns (RecordKey = standingorderid, WarningDescription = \"Error: \" + Description) and then to ETL Warning, which creates gen_etlprocesswarning (DTSX:3297-3310). [17] is correct: after a successful update the flag is true, so it no longer satisfies = 0.",
+      "evidence": "0019_StandingOrder.dtsx:3975-4012, 4041-4089, 5070-5072, 3297-3310; main.cs:126-136 (DTSX:4340-4350)",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Update Standing Order First Transaction Received|detail",
+      "hash": "9502b935e00a",
+      "verdict": "CONFIRMED",
+      "detail": "[1] The source, the [Prod] design-time connection (there is no package configuration, so no override note is needed), the filters and the literals are right (DTSX:6, 3975-3990). [2] The account comparison right('0000000000000' + x, 12) on both sides is right: padding, truncation to the last 12 characters, and NULL does not match under the default CONCAT_NULL_YIELDS_NULL (stated conditionally). Branch, bank number through gen_banks, and Id = GenstandingorderId (main.cs:128) are also right. [3] The depositType branches, the operators, NULL matching neither, and RowNum = 1 per (amount, bank, account, branch) are right. [4] statuscode = 100000009 (const, main.cs:84,126) and gen_isfirsttransactionreceivied = true (main.cs:127) are right; there is no statecode, no create and no delete. [5] The business outcome is correctly hedged ('אם העדכון הצליח', 'לא בהכרח החיוב הראשון'), and the codes are stated as undefined.",
+      "evidence": "0019_StandingOrder.dtsx:6, 3975-4012; main.cs:84,126-128 (DTSX:4298, 4340-4342)",
+      "wrongUnits": []
+    }
+  ]
+}

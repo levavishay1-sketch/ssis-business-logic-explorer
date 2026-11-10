@@ -1,0 +1,569 @@
+{
+  "verifier": "ssis-verifier",
+  "package": "0004_LeumiFile-MY",
+  "scope": "logic-claims part 1/2",
+  "checkedAt": "2026-11-07T11:45:20.920Z",
+  "checked": 57,
+  "results": [
+    {
+      "id": "L|summary",
+      "hash": "5ef993ee017a",
+      "verdict": "INCOMPLETE",
+      "detail": "Overall chain, staging, bank 10, SDK vs direct SQL are correct. Missing: (a) not all SDK writes are ExecuteMultiple - gen_kibutz is created by a single IOrganizationService.Create per row (Create Kibutz main.cs:74, x5 components); (b) Minhali daily also performs further CRM writes not mentioned: UPDATE ContactBase SET gen_loaneligibilitycalculationrequired=1 after every fund create/update, and UPDATE Gen_fundmain SET gen_agentappointmentdate for the other funds of the same customer account.",
+      "evidence": "source/DailyProcess/0004_LeumiFile-MY.dtsx:48718,49697,50699,51678,52657 (service.Create(kibutz)); :93448, :93486 (Update Loaneligibilitycalculationrequired In Contact To Yes / Yes 1); :92815-92818 (Update 'gen_agentappointmentdate' for the same account, WHERE gen_customeraccountname = ? and Gen_fundmainid <> ?)",
+      "wrongUnits": [
+        {
+          "unit": 0,
+          "problem": "SDK mechanism over-generalised and two Minhali-daily CRM writes omitted",
+          "correct": "SDK writes = ExecuteMultiple (account/contact/gen_employers) + single Create (gen_kibutz). Add: ContactBase.gen_loaneligibilitycalculationrequired=1 (direct SQL, Unsupported) after Create/Update gen_fundmain; gen_agentappointmentdate propagated to other gen_fundmain rows of the same gen_customeraccountname (direct SQL, Unsupported).",
+          "evidence": "source/DailyProcess/0004_LeumiFile-MY.dtsx:48718; :93448; :93486; :92815"
+        }
+      ]
+    },
+    {
+      "id": "L|exec",
+      "hash": "16142eed7892",
+      "verdict": "CONFIRMED",
+      "detail": "Re-derived all 21 PrecedenceConstraints: none carries DTS:Value (all Success), LogicalAnd=True; Constraint 4 Set Files->Foreach Loop is EvalOp=3 (ExpressionAndConstraint) with @[User::isFileExist]. Loop internal chain Truncate->Write->Create ETL->Account For Employers->Step1->Create Employers->Step2->Contacts->Step3->Accounts Minhali->Step4->Kibutz->Truncate AggregateFunds->Aggregate->Minhali daily->Step5->End ETL matches. Foreach Loop Container 1 and Move file To Archive are DTS:Disabled=\"True\".",
+      "evidence": "source/DailyProcess/0004_LeumiFile-MY.dtsx:98831-98846, 101965-101969, 99361, 99370",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|ignored",
+      "hash": "2d125d994900",
+      "verdict": "WRONG",
+      "detail": "All data-flow items (row counters, ETL Warning, Set Error/CastingError/Warning columns, Union Alls feeding counters, Created/Updated/no need to update, Derived Column/Derived Column 1/UpdatedColumns -> Count Update Rows) and the gen_etlprocess* tasks, OnError annotation, disabled archive and log provider were checked: they write only gen_etlprocess/gen_etlprocesscounter/gen_etlprocesswarning/annotation or nothing. Exception: unit [2] Get Sytem User Id is not pure plumbing - it produces values that are written into CRM records.",
+      "evidence": "source/DailyProcess/0004_LeumiFile-MY.dtsx:100252 (Get Sytem User Id, ReadWriteVariables SystemUserId/UserId/BusinessUnitId/OwnerIdType/TransactionCurrencyId); Minhali daily\\Add System Columns main.cs:117-125 (DTSX:59813); Create gen_FundMain DTSX:61785 (CreatedBy, ModifiedBy, OwnerId, OwnerIdType, OwningBusinessUnit, TransactionCurrencyId); Contacts Derived Column DTSX:26997-27034; Accounts Add Additional Fields DTSX:14968; Kibutz DTSX:48408",
+      "wrongUnits": [
+        {
+          "unit": 2,
+          "problem": "Get Sytem User Id is listed as ignored plumbing, but its variables reach CRM",
+          "correct": "Get Sytem User Id resolves SystemUserId/UserId, BusinessUnitId, OwnerIdType and TransactionCurrencyId; these are written as CreatedBy/ModifiedBy/OwnerId/OwnerIdType/OwningBusinessUnit/TransactionCurrencyId of every new gen_fundmain (Gen_fundmainbase INSERT), as ModifiedBy of the direct-SQL updates of ContactBase/AccountBase/Account, and as CreatedBy/ModifiedBy/OwnerId/OwningBusinessUnit of gen_contactlogs. It should be documented as record-owner/audit metadata source, not ignored.",
+          "evidence": "source/DailyProcess/0004_LeumiFile-MY.dtsx:59813 (Add System Columns main.cs:117-125); :61785; :26997-27034"
+        }
+      ]
+    },
+    {
+      "id": "L|finding#1",
+      "hash": "88c0034b84e5",
+      "verdict": "CONFIRMED",
+      "detail": "All 13 OLEDBCommand components that write CRM tables use Package.ConnectionManagers[CRM] = Data Source=psql;Initial Catalog=ALTSHULER_MSCRM; no package configurations override it. Tables match: AccountBase+CustomerAddressBase (Accounts Minhali), ContactBase+CustomerAddressBase and gen_contactlogsbase INSERT (Contacts), Account x5 (Kibutz), Gen_fundmainbase INSERT, Gen_fundmain UPDATE x2, ContactBase gen_loaneligibilitycalculationrequired x2. No script runs direct SQL (no SqlConnection/ExecuteNonQuery).",
+      "evidence": "source/DailyProcess/0004_LeumiFile-MY.dtsx:4-8 (CRM connection), 22692, 26692, 34275, 56520, 56572, 56624, 56676, 56728, 61785, 92815, 92870, 93448, 93486",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|finding#2",
+      "hash": "f08179c7fae9",
+      "verdict": "CONFIRMED",
+      "detail": "UPDATE Gen_fundmain column list has no Gen_AccountBalance, portion totals, Mony/Year transfer & deposit fields, FundCurrentYearTotal/totalDepositCurrentYear/totalTransCurentYear, Gen_revaluationdate, gen_kibutzname/number, gen_customercategory - all present only in the Gen_fundmainbase INSERT. Whether they are refreshed elsewhere is correctly left unknown (only gen_fundmain Creates with balance 0 were found in other supplied packages).",
+      "evidence": "source/DailyProcess/0004_LeumiFile-MY.dtsx:92873 vs :61788",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|finding#3",
+      "hash": "b8ea7d6d9aa2",
+      "verdict": "CONFIRMED",
+      "detail": "UPDATE Gen_fundmain writes every ? directly. The 8 Minhali-daily lookups with NoMatchBehavior=0 and Lookup Match Output errorRowDisposition=IgnoreFailure are exactly: Get active agent contract guid, Get bank branch Id, Get fund estate code, Get corporate number 1, get Employer, Get Aggregate Fund Balance, Get fund MF template data, Get Product. gen_brokernumber comes straight from the agent-contract lookup (Param_28). Overwrite-with-NULL is data-dependent and correctly worded conditionally.",
+      "evidence": "source/DailyProcess/0004_LeumiFile-MY.dtsx:69913, 69995, 70060, 70123, 70208, 70276, 70358, 70578; :92873",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|finding#4",
+      "hash": "bee878753d26",
+      "verdict": "CONFIRMED",
+      "detail": "set bank id value: gen_address1_line1 = ISNULL(Address_Street_98) && Address_Street_98 != \"\" ? Street + \" \" + Neighborhood : Neighborhood. Street present -> FALSE -> neighborhood only; street NULL -> TRUE && NULL = NULL -> result NULL. Trim String Fields already turns \"\" into NULL. Create Employer writes gen_address1_line1 when not NULL (main.cs:156-157).",
+      "evidence": "source/DailyProcess/0004_LeumiFile-MY.dtsx:42592-42596; Create Employer main.cs:156-157 @DTSX:37310",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|finding#5",
+      "hash": "c782a318af5f",
+      "verdict": "CONFIRMED",
+      "detail": "Derived Column: recordsource = gendercodeDB; UPDATE CustomerAddressBase name = case when ? = 1 then ? else name end with Param_41=recordsource, Param_42=address1_name. Bug wording is labelled השערה.",
+      "evidence": "source/DailyProcess/0004_LeumiFile-MY.dtsx:27007-27010; :34352-34360 (input mapping recordsource->Param_41, address1_name->Param_42)",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|finding#6",
+      "hash": "bf836dbffe82",
+      "verdict": "CONFIRMED",
+      "detail": "Update fields by mobilephone and email main.cs:125-129 sets Row.isUpdateCustomerPreference before the preference comparison; main.cs:148-151 only resets the local variable and returns, so the row keeps true, Conditional Split routes it to Create ContactLog with gen_customerpreference(DB) unchanged.",
+      "evidence": "Update fields by mobilephone and email main.cs:125-152 @DTSX:34790; Conditional Split DTSX:24067; Create ContactLog DTSX:26692",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|finding#7",
+      "hash": "d5f204874d86",
+      "verdict": "CONFIRMED",
+      "detail": "Fields From File Or DB: whole body in try { } catch (Exception e) { } (main.cs:31,193-195); line 62 reads Row.genexcludedupdatedepositmfpercentage without _IsNull; subsequent rules = disconnecting date/reason (79-89), CheckLastRow/gen_mycreateddate (93-100), deposit/accrual indicators and BENEFITMAIL (103-187). Consequence correctly labelled השערה.",
+      "evidence": "Fields From File Or DB main.cs:29-196 @DTSX:64909",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|finding#8",
+      "hash": "8a2dd5d1c021",
+      "verdict": "CONFIRMED",
+      "detail": "Handale financial track: investmentPeriodMap = {6:1,12:2,24:3}; investmentPeriodMap[result] (main.cs:35,40) throws for any other non-zero integer; int.Parse at main.cs:97; no try/catch. Failure impact correctly labelled השערה.",
+      "evidence": "Handale financial track main.cs:11-16, 33-41, 97 @DTSX:70602",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|finding#9",
+      "hash": "87e1ba6e7354",
+      "verdict": "CONFIRMED",
+      "detail": "Create Employer: gen_corporatename set under if (!Row.genactivecustomernumber_IsNull) (main.cs:181-182); gen_estatecodetype set from Row.Genemployernumberestate (main.cs:190-191); input gen_estatetypename (Get fund estate code) is never used in code. Update Employer has gen_inputsourcedb as input but never writes gen_inputsource.",
+      "evidence": "Create Employer main.cs:178-191 @DTSX:37310; Set inputsource for update employers DTSX:42804; Update Employer @DTSX:45273",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|finding#10",
+      "hash": "c25710e09f61",
+      "verdict": "CONFIRMED",
+      "detail": "Create Kibutz (x5) catch block adds a row to the async Error output (main.cs:79-83) and never calls DirectRowToSuccess; none of the 5 Error outputs has a path. Row is lost silently, Update Account not executed.",
+      "evidence": "Create Kibutz main.cs:64-85 @DTSX:48522; Create Kibutz data-flow paths (only Outputs[Success] connected)",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|finding#11",
+      "hash": "30b8f39c052a",
+      "verdict": "CONFIRMED",
+      "detail": "SqlCommand: where gen_maxamount = (select ISNULL(min(gen_maxamount),(select max(gen_maxamount) from gen_fundmftemplates)) ... ) - fallback max is over all gen_fundmftemplates with no template/bank/statecode filter. On no match (NoMatchBehavior=0, IgnoreFailure) Set MF leaves gen_managementfeepercentage unset (main.cs:144-155). Labelled השערה correctly.",
+      "evidence": "source/DailyProcess/0004_LeumiFile-MY.dtsx:70300-70312; Set MF main.cs:144-155",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|finding#12",
+      "hash": "3668b7479741",
+      "verdict": "CONFIRMED",
+      "detail": "Set Deposit Mf Percentage: FundType branch (main.cs:64-70) replaces only minDepositMfPercentage; start/end dates keep the values of the last winning level (or null). Output at main.cs:73-78.",
+      "evidence": "Set Deposit Mf Percentage main.cs:63-78 @DTSX:77381",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|finding#13",
+      "hash": "af09bd5e3bdb",
+      "verdict": "CONFIRMED",
+      "detail": "Set Files: comment \"sort files desc ... to get the latest one\" but Array.Sort ascending by LastWriteTime; every matching file is added to FilesArray and the ADO enumerator (EnumerateRowsInFirstTable) iterates all. Archive container/task are disabled.",
+      "evidence": "Set Files ScriptMain.cs @source/DailyProcess/0004_LeumiFile-MY.dtsx:101439 (CheckFile); source/DailyProcess/0004_LeumiFile-MY.dtsx:527-532; :99361, :99370",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|finding#14",
+      "hash": "752a9df645c4",
+      "verdict": "CONFIRMED",
+      "detail": "Contacts: Remove Duplicate (HashSet on gen_identitynumber) precedes Check if customer id number/Set unknwon customer data (gen_identitynumber=\"000000000\"); Accounts Minhali: Add 0 -> remove duplicates account -> Set columns -> Check if customer id number -> accountnumber=\"000000000\". Several distinct 0/1/18 ids therefore collapse to one key after dedup.",
+      "evidence": "Create Contacts paths (Remove Duplicate -> Check if customer id number); Create Accounts For Minhali paths; DTSX:24034, 15211, 21005, 31319",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|finding#15",
+      "hash": "5c7494d8dc71",
+      "verdict": "CONFIRMED",
+      "detail": "Accounts (both flows) name = \"לקוח לא ידוע\"; contact lastname \"לקוח\" / firstname \"לא ידוע\"; Minhali daily Last_Name_9 = \"לא ידוע\", First_Name_10 = \"לקוח\" and gen_customername = Last + \" \" + First. Account For Employers Set unknwon customer data changes only name.",
+      "evidence": "source/DailyProcess/0004_LeumiFile-MY.dtsx:9507-9511, 21005-21015, 31319-31341, 81054-81076",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|finding#16",
+      "hash": "40adc0e7490d",
+      "verdict": "WRONG",
+      "detail": "\"estate type 210\" and \"Other Customer(s)\" outputs are indeed unconnected in Contacts, Accounts Minhali and Minhali daily. But the Minhali-daily part is wrong for rows without a product: rows whose fund type number is NULL or \"0000\" hit output \"No product\" of \"Check for last row and product exist\", which is unconnected - they are dropped silently, with no ETL warning. Only rows whose product number is not found in CRM (Get fund type name(product) No Match) get Set Warning columns 1 -> ETL Warning 1.",
+      "evidence": "source/DailyProcess/0004_LeumiFile-MY.dtsx:59959-59990 (Check for last row and product exist, No product unconnected); Minhali daily paths: Get fund type name(product).Outputs[Lookup No Match Output] => Set Warning columns 1; Check if contact exists No Match => Set Warning columns 1 1; Check if account exists No Match => Set Warning columns 1 2",
+      "wrongUnits": [
+        {
+          "unit": 1,
+          "problem": "States that rows without product produce an ETL warning",
+          "correct": "Rows with no product number (ISNULL or \"0000\") are silently discarded (No product output unconnected); only a product number that is not found in CRM (bank 10) produces an ETL warning. Missing contact / missing account produce ETL warnings as stated.",
+          "evidence": "source/DailyProcess/0004_LeumiFile-MY.dtsx:59959-59990; Minhali daily path list"
+        }
+      ]
+    },
+    {
+      "id": "L|finding#17",
+      "hash": "3ea21e5baf8c",
+      "verdict": "WRONG",
+      "detail": "Accounts Minhali Check if account exists indeed has no statecode filter and always updates. But \"the other flows look up active accounts only\" is false: Create Kibutz\\Is Account Exists also selects from account without any statecode filter.",
+      "evidence": "source/DailyProcess/0004_LeumiFile-MY.dtsx:15077 (no statecode); :53490 (Create Kibutz Is Account Exists: select Right('000000000'+accountnumber,9) ... from account with (nolock) where accountnumber is not null); :4164, :37035, :60003, :70084 (statecode = 0)",
+      "wrongUnits": [
+        {
+          "unit": 1,
+          "problem": "Claims all other flows search active accounts only",
+          "correct": "Account For Employers, Create Employers, Minhali daily (Check if account exists, Get corporate number 1) filter statecode = 0; Create Kibutz (Is Account Exists) does not filter statecode either, so Kibutz also links gen_kibutz to inactive accounts.",
+          "evidence": "source/DailyProcess/0004_LeumiFile-MY.dtsx:53490"
+        }
+      ]
+    },
+    {
+      "id": "L|finding#18",
+      "hash": "21954671fabe",
+      "verdict": "WRONG",
+      "detail": "The 14 IgnoreFailure lookups are correct, but the stated extractor gap does not exist: evidence/0004_LeumiFile-MY.json stores errorRowDisposition on every output (tools/dtsx-extract.mjs:249) and contains exactly these 14 Lookup Match Outputs with errorRowDisposition=\"IgnoreFailure\".",
+      "evidence": "evidence/0004_LeumiFile-MY.json dataFlows[].components[].outputs[].errorRowDisposition (14 x IgnoreFailure at lines 7417, 7484, 7555, 40613, 40678, 40745, 69913, 69995, 70060, 70123, 70208, 70276, 70358, 70578); tools/dtsx-extract.mjs:249",
+      "wrongUnits": [
+        {
+          "unit": 1,
+          "problem": "Says evidence JSON does not keep output-level errorRowDisposition",
+          "correct": "Evidence JSON already keeps output-level errorRowDisposition; the 14 IgnoreFailure lookups are present there. No extractor extension needed for this.",
+          "evidence": "evidence/0004_LeumiFile-MY.json; tools/dtsx-extract.mjs:249"
+        }
+      ]
+    },
+    {
+      "id": "L|finding#19",
+      "hash": "872e2e32b10a",
+      "verdict": "CONFIRMED",
+      "detail": "Fields From File Or DB: dt filled from User::NonWorkingDays (result set of the CalendarRule query on Friday/Saturday/Holiday); CheckIsWorkingDaysBetweenDatesGreaterThen7 uses dt.Select(\"starttime = '\" + dateTo.ToString() + \"'\") (main.cs:219, 228). Effect correctly labelled השערה.",
+      "evidence": "Fields From File Or DB main.cs:16-22, 216-231 @DTSX:64909; source/DailyProcess/0004_LeumiFile-MY.dtsx:99383-99389",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|finding#20",
+      "hash": "cd2f7734e544",
+      "verdict": "CONFIRMED",
+      "detail": "get Employer: input gen_employername is readWrite with CopyFromReferenceColumn=gen_corporatename (joined on Employer_Agreement_Number_35 + Main_Fund_Number, active gen_employers of bank 10); it follows Get corporate number 1 (account by Employer_Number_38 -> gen_employername) on the \"Employee\" branch and \"מעמד במיגזר תואם\" output. Written to Create gen_FundMain Param_39 and Update gen_fundmain Param_30.",
+      "evidence": "source/DailyProcess/0004_LeumiFile-MY.dtsx:70145-70208, 70082-70123, 59925 (Check employer number 1), 62561 (Employee or indipendent); Create gen_FundMain input gen_employername->Param_39; Update gen_fundmain gen_employername->Param_30",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|finding#21",
+      "hash": "501ccb5e097c",
+      "verdict": "CONFIRMED",
+      "detail": "Update Employer main.cs:200-203: Helpers bool compare treats \"1\"/\"true\" as true; on difference Convert.ToBoolean(Row.genisactiveemplyer) on a wstr(1) value (\"0\"/\"1\") throws FormatException -> catch (Exception) -> DirectRowToCastingError, entity never added. Create path converts via Convert.ToInt32 first (main.cs:166-171). Impact labelled השערה.",
+      "evidence": "Update Employer main.cs:200-203, 229-237 @DTSX:45273; Helpers.cs bool case; Create Employer main.cs:166-171 @DTSX:37310; source/DailyProcess/0004_LeumiFile-MY.dtsx:41012 (wstr length 1)",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|finding#22",
+      "hash": "38d4d1b18a57",
+      "verdict": "CONFIRMED",
+      "detail": "Create Kibutz Add 0: FormatField makes null/\"\" -> \"\" -> PadLeft(size,'0'); Set AccountName And AccountNumber checks only !_IsNull && !IsNullOrWhiteSpace (main.cs:122, 134) which a zero string passes; Is Account Exists / If Kibutz Exsits compare Right('000000000'+number,9). Reflection-exception alternative labelled השערה.",
+      "evidence": "Create Kibutz\\Add 0 to short id num main.cs:46-68 @DTSX:47595; Set AccountName And AccountNumber main.cs:115-144 @DTSX:53629; DTSX:53440, 53490",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|finding#23",
+      "hash": "c18733b3281a",
+      "verdict": "WRONG",
+      "detail": "Correct for AccountBase/CustomerAddressBase (Accounts Minhali) and ContactBase/CustomerAddressBase (Contacts), including the email/mobile CASE guards. Wrong for Gen_fundmain: not \"all columns in the update\" are overwritten by an empty file value. Fields From File Or DB (on the update path before Update gen_fundmain) restores DB values: gen_disconnectingconnectiondate = DB value when the file value is NULL (main.cs:79-80); gen_disconnectingconnectionreason = DB value when the file value is 0 (main.cs:83-89); gen_depositmfindicator / gen_accrualmfindicator start from the DB values (main.cs:37-38); gen_managementfeepercentage = DB when gen_mfratedtotal (main.cs:45-48); gen_mycreateddate (CheckLastRow) = DB date when DB >= file date (main.cs:97-100). Deposit-MF exclusion exception is correct (Set gen_depositmfpercentage).",
+      "evidence": "Fields From File Or DB main.cs:37-100 @DTSX:64909; Minhali daily path Multicast 5 -> Fields From File Or DB -> Multicast 2 -> Set gen_depositmfpercentage -> Update gen_fundmain; DTSX:78684 ; DTSX:92873",
+      "wrongUnits": [
+        {
+          "unit": 1,
+          "problem": "States Gen_fundmain update overwrites every column with an empty file value; lists only email/mobile and deposit MF as exceptions",
+          "correct": "For Gen_fundmain several columns are protected by Fields From File Or DB: gen_disconnectingconnectiondate (file NULL -> DB value), gen_disconnectingconnectionreason (file 0 -> DB value or NULL), deposit/accrual MF indicators (default DB), gen_managementfeepercentage (DB when gen_mfratedtotal), gen_mycreateddate (DB when later). Note this script runs inside an empty try/catch (see finding#7).",
+          "evidence": "Fields From File Or DB main.cs:37-100 @DTSX:64909"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Foreach Loop Container\\Create Contacts For Minhali|title",
+      "hash": "b67a61b91a1f",
+      "verdict": "WRONG",
+      "detail": "flow_he[1]-[8] verified (Trim, last row, Check customer type default + Row_Level_147==\"1\", Add 0 commented out, dedupe, unknown 0/1/18, Custom Fields, mobile detection, Lookup statecode=0, Create batches of 10). Units [2] and [11] misstate the contact-log trigger, and [2] also states an unproven meaning and over-restricts mobile/email.",
+      "evidence": "Create Contact main.cs:55-85 @DTSX:25111; Update fields by mobilephone and email main.cs:125-152 @DTSX:34790; Update Correct Value DTSX:34651; Conditional Split DTSX:24067",
+      "wrongUnits": [
+        {
+          "unit": 2,
+          "problem": "\"נכתבים רק כשהמקור בבעלות הקובץ והשדה ריק ב-CRM\" and \"שינוי בהעדפת ערוץ הדיוור נרשם ביומן\"",
+          "correct": "The meaning of gen_recordsorce = 1 (\"source owned by the file\") is not proven by the package (the open question itself says unknown); state the condition literally (gen_recordsorce = 1). The restriction applies only to updates - Create Contact writes mobilephone/emailaddress1 whenever present. The gen_contactlogs row is written when isUpdateCustomerPreference is true (source 1 and mobile/email differ from CRM after Update Correct Value), even if the computed preference equals the CRM value (finding#6).",
+          "evidence": "Create Contact main.cs:55-85; Update fields by mobilephone and email main.cs:125-152"
+        },
+        {
+          "unit": 11,
+          "problem": "\"ואם השתנתה העדפה → INSERT ל-gen_contactlogsbase\"",
+          "correct": "INSERT happens when isUpdateCustomerPreference is true (set at main.cs:129 before the preference comparison), i.e. when mobile/email were filled from the file for a gen_recordsorce = 1 contact; it also happens when the preference did not change.",
+          "evidence": "Update fields by mobilephone and email main.cs:125-152; Conditional Split DTSX:24067"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Foreach Loop Container\\Create Contacts For Minhali|short",
+      "hash": "057d044d2605",
+      "verdict": "CONFIRMED",
+      "detail": "Population (default \"פרטי\" output + Is Contact label \"IsContact\"), unknown customer, mobile detection, invalid e-mail -> NULL, active-contact lookup, create vs always-update, mobile/e-mail only when gen_recordsorce=1 and CRM empty, preference + log on change all match. Note [8]: the log is also written when the computed preference equals CRM (see finding#6), which this unit does not exclude.",
+      "evidence": "DTSX:23592-23661, 28690, 24034, 31319, 29829, 23676, 34651, 34790, 24067, 26692, 34275",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Foreach Loop Container\\Create Contacts For Minhali|detailed",
+      "hash": "f31b67a161b0",
+      "verdict": "CONFIRMED",
+      "detail": "Every step re-derived: Trim (\"\"->NULL), last row \"@\", Check customer type order 0..2 + default, Is Contact Row_Level_147==\"1\", Add 0 body commented out, Remove Duplicate HashSet, unknown (DT_I8) 0/1/18 -> \"לקוח\"/\"לא ידוע\"/\"000000000\"/NULL DOB, Format date (yyyyMMdd/yyyyMM, <1900 -> NULL), Custom Fields (LEFT(...,10), gendercode 1/2, ראשי, TRUE flags), mobile/e-mail regex, Lookup statecode=0, Create (batches of 10, gen_inputsource=1, sourcelastupdate=3), Update Correct Value, preference 1/2/3 and status 2/1 (labels proven by Create ContactLog SQL text), UPDATE ContactBase/CustomerAddressBase (ObjectTypeCode=2, name param = gendercodeDB), INSERT gen_contactlogsbase gen_processname=4. Note [35]: the transmission-status test uses the CRM value Gen_bankcustomeridnumberDB, while [38] uses the file gen_bankcustomeridnumber.",
+      "evidence": "DTSX:23592-34772 (components listed); Create Contact main.cs:34-137; Update fields by mobilephone and email main.cs:80-198; UPDate contact SQL DTSX:34278; Create ContactLog SQL DTSX:26695",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Foreach Loop Container\\Create Contacts For Minhali|detail",
+      "hash": "10ad7f34fdf9",
+      "verdict": "CONFIRMED",
+      "detail": "Population, lookup (statecode=0, no gen_leumi filter), update without change check, CASE guards, preference values/labels, Create and Update column lists, CustomerAddressBase name condition and gen_processname=4 all match the DTSX.",
+      "evidence": "DTSX:23592-23628, 23676-23786, 25111, 34275-34360, 26692-26695, 34790",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Foreach Loop Container\\Create Contacts For Minhali|decisions",
+      "hash": "e606e3e9cdc9",
+      "verdict": "CONFIRMED",
+      "detail": "All 15 conditions match the DTSX expressions/code (evaluation orders 0,1,2; NoMatchBehavior=1; regex; Update Correct Value expressions; isUpdateCustomerPreference incl. finding; recordsource=gendercodeDB with Param_41/Param_42).",
+      "evidence": "DTSX:23592-23628, 23643, 28690, 24034, 28923, 29829, 23676, 34651, 34790, 24067, 26957-27031, 34278",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Foreach Loop Container\\Create Contacts For Minhali|crm",
+      "hash": "1efc30d8a4cd",
+      "verdict": "CONFIRMED",
+      "detail": "Create contact via ExecuteMultiple (RequestType.Create); UPDATE ContactBase and CustomerAddressBase (AddressNumber=1, ObjectTypeCode=2) in one OLEDBCommand on CRM connection for every lookup match; INSERT gen_contactlogsbase when isUpdateCustomerPreference.",
+      "evidence": "source/DailyProcess/0004_LeumiFile-MY.dtsx:25375, 34275, 26692, 24067",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Foreach Loop Container\\Create Contacts For Minhali|open",
+      "hash": "0e299a0325e4",
+      "verdict": "CONFIRMED",
+      "detail": "Row_Level_147 and gen_recordsorce meanings are not defined anywhere in the supplied packages (only the output label \"IsContact\"); the gendercodeDB question is labelled השערה.",
+      "evidence": "grep of source/DailyProcess/*.dtsx for gen_recordsorce / Row_Level (no labels/comments)",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Foreach Loop Container\\Create Account For Employers|title",
+      "hash": "8a15a5405ef3",
+      "verdict": "WRONG",
+      "detail": "flow_he[1]-[10] verified. short_he qualifies the funds as \"פעילות\" (active), which is not the condition.",
+      "evidence": "source/DailyProcess/0004_LeumiFile-MY.dtsx:4164-4186 (left join gen_fundmain where gen_existinfile = 1 and gen_accountname is not null - no statecode filter); :7856",
+      "wrongUnits": [
+        {
+          "unit": 2,
+          "problem": "\"חשבון שכבר יש לו קופות פעילות בקובץ לא מתעדכן\"",
+          "correct": "An account is skipped when at least one gen_fundmain (any statecode) has gen_existinfile = 1 and gen_accountname = the account, as stored in CRM when this step runs (before Minhali daily of the current file). Activity/statecode of the fund is not checked.",
+          "evidence": "source/DailyProcess/0004_LeumiFile-MY.dtsx:4164-4186"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Foreach Loop Container\\Create Account For Employers|short",
+      "hash": "fce8dbf612eb",
+      "verdict": "CONFIRMED",
+      "detail": "Population, account number fallback, unknown name, active-account lookup, create, has-funds skip, changed-fields update (name, city/building/line1/postal code, returned mail, DOB) all match. Note [8] \"אין לו קופות\" means: no gen_fundmain with gen_existinfile = 1 (other funds may exist).",
+      "evidence": "DTSX:4093, 7582-7608, 4326, 9507, 4162-4218, 7856, Update Account main.cs:124-235",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Foreach Loop Container\\Create Account For Employers|detailed",
+      "hash": "053fb6da02eb",
+      "verdict": "WRONG",
+      "detail": "Steps [1]-[32] and [34]-[36] verified (incl. lookups IgnoreFailure and unused outputs, padding incl. NULL -> zeros, Check for employer funds, truncation FailComponent, merge, unknown, dedupe with unconnected Duplicate, Format Dates, lookup with accountsWithFunds, CheckIfToUpdate 12h rule, batches of 1000/100). Unit [33] claims an empty file value clears the CRM value - the code does not do that except for gen_customerdateofbirth. Not mentioned (minor): Set null to empty String fileds turns CRM \"\" into NULL before the comparison, and the DB postal code is compared as isnull(Address1_PostalCode,'0000000').",
+      "evidence": "Update Account main.cs:135-207 @DTSX:12239 (BufferWrapper getters use Buffer.GetString/GetInt32); Extensions.cs:55-67; Set null to empty String fileds DTSX:8808; DTSX:4164 isnull(Address1_PostalCode,'0000000')",
+      "wrongUnits": [
+        {
+          "unit": 33,
+          "problem": "\"ערך ריק בקובץ מוחק את הערך הקיים\"",
+          "correct": "Only gen_customerdateofbirth is explicitly cleared (else account[\"gen_customerdateofbirth\"] = null, main.cs:201-204). For name, gen_address1_city, gen_address1_buildingid, address1_line1, address1_postalcode and gen_returnedmailcount the code assigns Row.<col> without an _IsNull check after CheckIfToUpdate detects NULL-vs-value; reading a NULL column through the generated typed getter (Buffer.GetString / Buffer.GetInt32) cannot yield null for the int field and per the SSIS PipelineBuffer API throws ColumnIsNullException, which the catch turns into CastingError (ETL warning) with no update for that account at all. So clearing by an empty file value is not shown by the code; at minimum it must not be stated as fact.",
+          "evidence": "Update Account main.cs:135-176, 199-207, 229-233 @DTSX:12239"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Foreach Loop Container\\Create Account For Employers|detail",
+      "hash": "e0bce65f5735",
+      "verdict": "CONFIRMED",
+      "detail": "Source/filter expression, lookup with accountsWithFunds subquery, decision tree, commented-out fax/telephone/accountnumber updates, Create field list with constants and batch 1000, Update batch 100 + gen_modifiedbybank all match.",
+      "evidence": "DTSX:7701, 4093-4114, 4162-4218, 7856, Create Account main.cs:125-221 @DTSX:4434, Update Account main.cs:124-277 @DTSX:12239",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Foreach Loop Container\\Create Account For Employers|decisions",
+      "hash": "04cdb22fe698",
+      "verdict": "CONFIRMED",
+      "detail": "All 8 conditions match (Last row unconnected, employer-funds split with default \"פרטי\" unconnected, merge expressions, (DT_I8) 0/1/18, HashSet dedupe main.cs:113, lookup NoMatchBehavior=1 statecode=0, accountsWithFunds == 1, Extensions IsEqual rules).",
+      "evidence": "DTSX:4129-4147, 4093-4114, 7582-7608, 4326-4344, 7889, 4162-4218, 7856-7874, Extensions.cs:10-67",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Foreach Loop Container\\Create Account For Employers|crm",
+      "hash": "aac5bbc7f50a",
+      "verdict": "WRONG",
+      "detail": "Create via ExecuteMultiple Create and Update via ExecuteMultiple Update are correct. The update condition qualifies the funds as active.",
+      "evidence": "source/DailyProcess/0004_LeumiFile-MY.dtsx:4752, 12601, 4164-4186",
+      "wrongUnits": [
+        {
+          "unit": 2,
+          "problem": "\"נמצא, ללא קופות פעילות בקובץ\"",
+          "correct": "Found (active account) AND no gen_fundmain of any statecode with gen_existinfile = 1 pointing to it (accountsWithFunds = 0) AND at least one compared field differs.",
+          "evidence": "source/DailyProcess/0004_LeumiFile-MY.dtsx:4164-4186; :7856"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Foreach Loop Container\\Create Account For Employers|open",
+      "hash": "cd01cb89b58c",
+      "verdict": "CONFIRMED",
+      "detail": "Both items are correctly labelled: the reason for skipping accounts with funds is a השערה; Sector_Code_17/Employer_Type_41 code meanings are not defined in the supplied files (only the combined output label and a numeric Select Case mapping 0210->4 in Minhali daily).",
+      "evidence": "source/DailyProcess/0004_LeumiFile-MY.dtsx:4093-4114; :61040-61046",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Foreach Loop Container\\Create Accounts For Minhali|title",
+      "hash": "4e621495a42e",
+      "verdict": "CONFIRMED",
+      "detail": "Population (order-1 condition && Row_Level_147==\"3\"), padding + VB dedupe, Set columns, unknown -> \"000000000\"/\"לקוח לא ידוע\", lookup without statecode, Create via SDK, UPDATE AccountBase + CustomerAddressBase for every match all match.",
+      "evidence": "DTSX:14990-15027, 15042, 14180, 19386, 20274, 15211, 21005, 15075-15113, 16121, 22692-22712",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Foreach Loop Container\\Create Accounts For Minhali|short",
+      "hash": "a00c8655c6d7",
+      "verdict": "WRONG",
+      "detail": "Units [1]-[7] verified. The end state [8] overstates: the lookup also matches inactive accounts and the UPDATE does not change statecode - it only sets gen_isoperate = 1.",
+      "evidence": "source/DailyProcess/0004_LeumiFile-MY.dtsx:15077-15090 (no statecode filter); :22695-22705 (UPDATE AccountBase sets gen_inputsource=1, gen_isoperate=1, no statecode)",
+      "wrongUnits": [
+        {
+          "unit": 8,
+          "problem": "\"כל לקוח תאגידי בקובץ קיים ב-CRM כחשבון פעיל\"",
+          "correct": "Each such customer exists in CRM as an account with gen_isoperate = 1; if the matched account was inactive (statecode <> 0) it stays inactive, because the update does not touch statecode.",
+          "evidence": "source/DailyProcess/0004_LeumiFile-MY.dtsx:15077; :22695"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Foreach Loop Container\\Create Accounts For Minhali|detailed",
+      "hash": "af1675000477",
+      "verdict": "WRONG",
+      "detail": "Functionally all steps match (order, conditions, Set columns, unknown, Format Dates 1 + Convert To Date, lookup without statecode, Create batch 1000 gen_postalcode=Mailbox_78, UPDATE AccountBase/CustomerAddressBase ObjectTypeCode=1). One technical annotation is wrong.",
+      "evidence": "remove duplicates account main.vb:16-25 @DTSX:19386",
+      "wrongUnits": [
+        {
+          "unit": 14,
+          "problem": "tech annotation \"(VB HashSet)\"",
+          "correct": "remove duplicates account is VB code using an ArrayList (Dim accountnumbers As New ArrayList; accountnumbers.Contains / Add), not a HashSet. Behaviour (first occurrence kept, duplicates to unconnected output \"deuplicate\") is the same.",
+          "evidence": "main.vb:16-25 @DTSX:19386"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Foreach Loop Container\\Create Accounts For Minhali|detail",
+      "hash": "e7b6a0da2b2c",
+      "verdict": "CONFIRMED",
+      "detail": "Population, lookup without statecode, always-update, Create field list incl. gen_modifiedbybank=Now and batch 1000, UPDATE AccountBase column list and CustomerAddressBase (AddressNumber=1, ObjectTypeCode=1) match.",
+      "evidence": "DTSX:14990-15027, 15075-15113, Create Account main.cs:123-205 @DTSX:16121, 22695-22704",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Foreach Loop Container\\Create Accounts For Minhali|decisions",
+      "hash": "c8b139292b10",
+      "verdict": "CONFIRMED",
+      "detail": "All 7 conditions match (order 2 tests only \"1\" and \"5\", unlike Contacts; main.vb ArrayList Contains; (DT_I8) 0/1/18 -> \"000000000\"/\"לקוח לא ידוע\"; lookup without statecode).",
+      "evidence": "DTSX:15042, 14990-15027, 19386, 15211, 21005, 15075",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Foreach Loop Container\\Create Accounts For Minhali|crm",
+      "hash": "06f2c15b3b80",
+      "verdict": "CONFIRMED",
+      "detail": "Create account via ExecuteMultiple Create; UPDATE AccountBase and CustomerAddressBase (AddressNumber=1, ObjectTypeCode=1) via OLEDBCommand on CRM connection for every match, including inactive accounts.",
+      "evidence": "source/DailyProcess/0004_LeumiFile-MY.dtsx:16453, 22692-22712",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Foreach Loop Container\\Create Accounts For Minhali|open",
+      "hash": "303d1538536b",
+      "verdict": "CONFIRMED",
+      "detail": "Row_Level_147=\"3\", id type \"7\" and sector codes 0210/0775 have no definition in the supplied files beyond the combined output label.",
+      "evidence": "DTSX:14990-15027; grep of supplied DTSX",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Foreach Loop Container\\Aggregate Account Balance|title",
+      "hash": "89b08020913e",
+      "verdict": "CONFIRMED",
+      "detail": "Format money fields (TryParse, x!=0 -> x/100 else 0), (DT_CY) casts, gen_accountbalance sum, Last row/No product unconnected, product lookup bank 10 NoMatchBehavior=1 unconnected, Aggregate GroupBy x3 + Sum, INSERT into AggregateFunds on SQL.GENERIX_STAGING (psql/generix_staging), used by Minhali daily Get Aggregate Fund Balance -> Get fund MF template data.",
+      "evidence": "source/DailyProcess/0004_LeumiFile-MY.dtsx:536-664, 716 (Format money fields main.cs:48-58), 2015, 2499, 604, 2059-2083, 541-561 (AggregationType 0,0,4,0), 661-664, 69950-69962, 70328",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Foreach Loop Container\\Aggregate Account Balance|short",
+      "hash": "736ecf865171",
+      "verdict": "CONFIRMED",
+      "detail": "Matches: per-row balance = employee + employer + compensation portion totals; summed per bank / bank account / product type; stored in staging work table used for MF tier; no CRM write.",
+      "evidence": "DTSX:2499-2513, 541-561, 661-664, 69950, 70328",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Foreach Loop Container\\Aggregate Account Balance|detailed",
+      "hash": "a9c1406f9bc8",
+      "verdict": "CONFIRMED",
+      "detail": "All steps match. ÷100 as conversion to shekels is supported by the CRM currency literal \"שקל חדש\" used for the transaction currency. Truncate AggregateFunds runs on the same SQL.GENERIX_STAGING connection.",
+      "evidence": "Format money fields main.cs:48-58 @DTSX:716; DTSX:604-631, 2059-2134, 541-561, 661-664, 93619",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Foreach Loop Container\\Aggregate Account Balance|detail",
+      "hash": "265c5f28b0eb",
+      "verdict": "INCOMPLETE",
+      "detail": "Write target and business result are correct, but the population omits one filter.",
+      "evidence": "source/DailyProcess/0004_LeumiFile-MY.dtsx:2059-2083 (Get fund type name(product): NoMatchBehavior=1; Lookup No Match Output unconnected)",
+      "wrongUnits": [
+        {
+          "unit": 0,
+          "problem": "Population lists only last row and \"No product\" as exclusions",
+          "correct": "Rows whose Course_Number_22 has no product of bank 10 in CRM (Get fund type name(product) No Match, unconnected) are also excluded from the aggregate.",
+          "evidence": "source/DailyProcess/0004_LeumiFile-MY.dtsx:2059-2083"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Foreach Loop Container\\Aggregate Account Balance|decisions",
+      "hash": "624ad5add404",
+      "verdict": "CONFIRMED",
+      "detail": "Conditions and outcomes match; the agorot->shekel meaning is supported by the ÷100 scaling into CRM money fields whose transaction currency literal is \"שקל חדש\".",
+      "evidence": "DTSX:604-631, 2059-2134, Format money fields main.cs:48-58, DTSX:541-561",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Foreach Loop Container\\Aggregate Account Balance|open",
+      "hash": "bf03848be1be",
+      "verdict": "CONFIRMED",
+      "detail": "Verified: Aggregate reads gen_bankaccountnumber raw from staging (no Trim/padding), whereas Minhali daily trims (Trim String Fields) and pads with Set String Fields (PadLeft to field size) before Get Aggregate Fund Balance joins on gen_bankaccountnumber. Whether the file field is already zero-filled to 12 cannot be settled from the package - correctly labelled השערה.",
+      "evidence": "Aggregate Read MY Data From Staging DTSX:2167 (Bank_Account_Number_27 -> gen_bankaccountnumber); Minhali daily Set String Fields main.cs:47-53 @DTSX:79571; Get Aggregate Fund Balance DTSX:69950-69962",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Foreach Loop Container\\Write MY File To Staging|title",
+      "hash": "11e0ef01fcff",
+      "verdict": "CONFIRMED",
+      "detail": "Flat file connection Minhali Daily Source: RaggedRight, CodePage 1255, LocaleID 1037, 303 FlatFileColumns, no header settings, ConnectionString expression @[User::FullFileName]; destination OpenRowset [dbo].[MY_FileData] fast load (TABLOCK, CHECK_CONSTRAINTS) on PSRS_GENERIX_STAGING. (Filler87 is not mapped - see detailed.)",
+      "evidence": "source/DailyProcess/0004_LeumiFile-MY.dtsx:9-320, 96032-96045",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Foreach Loop Container\\Write MY File To Staging|short",
+      "hash": "a800d99bad73",
+      "verdict": "CONFIRMED",
+      "detail": "Read of the whole file, all rows saved to staging, no CRM change - correct.",
+      "evidence": "source/DailyProcess/0004_LeumiFile-MY.dtsx:96032-98830",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Foreach Loop Container\\Write MY File To Staging|detailed",
+      "hash": "e1b9b0b1bda7",
+      "verdict": "WRONG",
+      "detail": "Truncate on the same PSRS_GENERIX_STAGING connection, ragged-right cp1255 without header, no transformations, trailer row filtered with \"@\" check in all six later data flows, staging target - all correct. The column count is wrong.",
+      "evidence": "source/DailyProcess/0004_LeumiFile-MY.dtsx:305 (FlatFileColumn Filler87), :98499 (output column Filler87); Insert To MY_FileData has 302 input columns",
+      "wrongUnits": [
+        {
+          "unit": 3,
+          "problem": "\"כל 303 השדות נטענים\"",
+          "correct": "The Flat File Source outputs 303 columns but Insert To MY_FileData maps 302; column Filler87 (width 87) is not loaded into MY_FileData.",
+          "evidence": "source/DailyProcess/0004_LeumiFile-MY.dtsx:305, 98499; Write MY File To Staging input column count = 302"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Foreach Loop Container\\Write MY File To Staging|detail",
+      "hash": "2541fcc18b15",
+      "verdict": "CONFIRMED",
+      "detail": "All rows including the \"@\" trailer are loaded; no CRM write in this step.",
+      "evidence": "source/DailyProcess/0004_LeumiFile-MY.dtsx:96032-98830; Check for last row components at 618, 4142, 15055, 23656, 37013, 48443, 59973",
+      "wrongUnits": []
+    }
+  ]
+}

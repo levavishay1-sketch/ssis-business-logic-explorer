@@ -1,0 +1,66 @@
+{
+  "verifier": "ssis-verifier",
+  "package": "0036_TransferRequest",
+  "scope": "mapping-A.json",
+  "checked": 9,
+  "results": [
+    {
+      "id": "Update Transfer Requests|gen_transferrequest|UPDATE|gen_tanferinstatus",
+      "verdict": "CONFIRMED",
+      "detail": "main.cs:118-122: LogicalName \"gen_transferrequest\", Id = Row.gentransferrequestId, entity[\"gen_tanferinstatus\"] = new OptionSetValue(Row.gensuspicionAsEmitted); Derived Column Expression literal 11. Source SQL on [Psql]: where gen_tanferinstatus = 7 and gen_SendToBankDate is not null and datediff(day, ? , gen_SendToBankDate) <= 0; ParameterMapping Parameter0 -> {BCF4D8B7-...} = User::LastThreeWorkingDays (DTSX:20). Precedence Get NonWorkingDays -> Update LastThreeWorkingDays Variable -> Update SuspicionAsEmitted Transfer Request (Constraints 2/3, Success). Error output has no path (2 paths only). Re-check: the mapping-A note now correctly says that the package defines no package configurations and that only a job-level override (/SET) outside the DTSX could change User::LastThreeWorkingDays. Grep for DTS:Configuration in the 0036 DTSX finds nothing.",
+      "evidence": "0036_TransferRequest.dtsx:3584-3592, 3627, 3645 main.cs:114-135, 4530-4546 (paths), 4551-4552, 20-21",
+      "previousVerdict": "CONFIRMED",
+      "previousDetail": "main.cs:118-122: LogicalName \"gen_transferrequest\", Id = Row.gentransferrequestId, entity[\"gen_tanferinstatus\"] = new OptionSetValue(Row.gensuspicionAsEmitted); Derived Column Expression literal 11. Source SQL on [Psql]: where gen_tanferinstatus = 7 and gen_SendToBankDate is not null and datediff(day, ? , gen_SendToBankDate) <= 0; ParameterMapping Parameter0 -> {BCF4D8B7-...} = User::LastThreeWorkingDays (DTSX:20). Precedence Get NonWorkingDays -> Update LastThreeWorkingDays Variable -> Update SuspicionAsEmitted Transfer Request (Constraints 2/3, Success). Error output has no path (2 paths only). Minor inaccuracy in mapping-A notes only: 'unless overridden by configuration - not supplied' - this package has no DTS:Configurations at all (only an external dtexec /SET could change the variable).",
+      "recheckedOn": "2026-11-06"
+    },
+    {
+      "id": "LOGIC scopeNote / summary",
+      "verdict": "CONFIRMED",
+      "detail": "No DTS:Configurations (does not load SSISConfigFile), no LogProviders, no EventHandlers (only a commented AssemblyResolve line matches 'EventHandler'); [Psql] = Psql/ALTSHULER_MSCRM read-only.",
+      "evidence": "DTSX:4-8, 212"
+    },
+    {
+      "id": "LOGIC executionOrder",
+      "verdict": "CONFIRMED",
+      "detail": "Constraint GetVars->Create; 1 Create->Get NonWorkingDays; 2 ->LastThree; 3 ->Suspicion; 4 ->End. All Success.",
+      "evidence": "DTSX:4549-4553"
+    },
+    {
+      "id": "LOGIC Package\\Update LastThreeWorkingDays Variable",
+      "verdict": "CONFIRMED",
+      "detail": "Script differs from 0027 only in the counter: 0036 starts at 2, decrements, breaks at 0 (ScriptMain.cs:111, 125-128); 0027 starts at 1, increments, breaks at 3. Both perform exactly two counts before breaking on the next working day, so both return the 3rd working day counting yesterday as the 1st (D-3 with no non-working days) - same date for the same NonWorkingDays input and run time. Get NonWorkingDays SQL is identical to 0027 apart from whitespace; connection {B1F06256} = [Psql]. Failure overwritten by Success at line 104 verified; design-time value 10/3/2017 1:52:22 PM (no configuration in this package, so the caveat-free wording is acceptable).",
+      "evidence": "ScriptMain.cs:92-135 (DTSX:3180); 0027 ScriptMain.cs:107-134 (DTSX:5131); DTSX:2257-2261, 20-21"
+    },
+    {
+      "id": "LOGIC Package\\Update SuspicionAsEmitted Transfer Request",
+      "verdict": "CONFIRMED",
+      "detail": "SQL, parameter, literal 11, attribute spelling gen_tanferinstatus, unconnected Error output verified.",
+      "evidence": "DTSX:3579-3645, 4530-4546"
+    },
+    {
+      "id": "LOGIC finding#1 (update failures swallowed)",
+      "verdict": "CONFIRMED",
+      "detail": "catch -> DirectRowToError; Error output has no path.",
+      "evidence": "main.cs:124-133; DTSX:4530-4546"
+    },
+    {
+      "id": "LOGIC finding#2 (hidden failure in LastThreeWorkingDays)",
+      "verdict": "CONFIRMED",
+      "detail": "Line 100 Failure, line 104 Success unconditionally; variable keeps 10/3/2017 1:52:22 PM.",
+      "evidence": "ScriptMain.cs:94-104; DTSX:20-21"
+    },
+    {
+      "id": "LOGIC finding#3 (same date as 0027 despite different code)",
+      "verdict": "CONFIRMED",
+      "detail": "Re-traced both loops (see Update LastThreeWorkingDays Variable item); diff of the two ScriptMain.cs bodies shows only the counter init/condition/step changes.",
+      "evidence": "0036 ScriptMain.cs:111-129; 0027 ScriptMain.cs:111-130"
+    },
+    {
+      "id": "LOGIC ignoredAsFramework",
+      "verdict": "CONFIRMED",
+      "detail": "Create ETL Process record (gen_etlprocess create, DTSX:237-242), ETL Record Finish (gen_etlprocess update, DTSX:774-782), Get Variables From Etl Variables (variables only). No other CRM calls.",
+      "evidence": "DTSX:237-242, 774-782, 3886-3889"
+    }
+  ],
+  "missingWrites": []
+}

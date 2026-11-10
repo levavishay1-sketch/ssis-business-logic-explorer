@@ -1,0 +1,108 @@
+{
+ "verifier": "ssis-verifier",
+ "package": "0023_Employers",
+ "scope": "mapping-A.json",
+ "note": "Independent re-derivation against raw source/DailyProcess/0023_Employers.dtsx (sha D80294BF...), component.mjs output and lineage IDs read directly from the DTSX (inputColumn lineageId / externalMetadataColumnId / InputColumnID / OutputColumnLineageID). Every claim printed by `node tools/claims.mjs 0023_Employers mapping-A.json` and every --fields entry checked; recordKeyColumns, declaredRowFilters, declaredSources and readWriteModifications spot-checked; all code files scanned for CRM writes.",
+ "checked": 16,
+ "counts": { "CONFIRMED": 16, "WRONG": 0, "INCOMPLETE": 0, "UNVERIFIABLE": 0 },
+ "results": [
+  {
+   "id": "Create|gen_employers|UPDATE|gen_mfaccumulation",
+   "verdict": "CONFIRMED",
+   "detail": "Writer 'Create' (ManagedComponentHost, DTSX 3885) builds Entity LogicalName gen_employers, Entity.Id = Row.Genemployersid, sends ExecuteMultipleExtension(..., RequestType.Update, ...) in batches of 1000 -> UPDATE despite the name. main.cs:127-128 sets gen_mfaccumulation only when not NULL. Input gen_mfaccumulation <= Union All 1 <= Union All, whose Input 1 = Set Study Fund Columns.gen_mfaccumulation (= study_fund, DTSX 5994) and Input 2 = Set Pension Fund Columns.gen_mfaccumulation (= provident_fund, DTSX 5936) (lineage verified DTSX 7360-7460). study_fund/provident_fund <= Merge Join left (InputColumnID, DTSX 5811-5820) <= Sort <= convert: ISNULL(x)||x==\"\" ? NULL(DT_R8) : (DT_R8)x (DTSX 3858/3864, FailComponent) on study_fund_Source/provident_fund_Source, trimmed in place by TRIM (readWrite, main.cs:33-58), from MF Source File external columns 'השתלמות'/'גמל' (DTSX 5871-5877, 5901-5902). Branch decided by Check Fund type on CRM ProductTypeCode (200001||1 pension, 200000||2 study, DE Output unconnected; DTSX 3715/3723). VALUE fields complete, nothing invented; 'ח פ' correctly only INFLUENCE (declared key).",
+   "evidence": "main.cs:121-147; DTSX 3702-3742, 3855-3866, 5732-5834, 5917-6030, 7360-7560"
+  },
+  {
+   "id": "Create|gen_employers|UPDATE|gen_mfaccumulationenddate",
+   "verdict": "CONFIRMED",
+   "detail": "main.cs:129-130 (when not NULL). Both Set Pension/Study Fund Columns map gen_mfaccumulationenddate = EndDate (DTSX 5948/6006) <= Merge Join EndDate <= convert EndDate = ISNULL||\"\" ? NULL(DT_DBTIMESTAMP) : (DT_DBTIMESTAMP)EndDate_Source (DTSX 3846, errorRowDisposition FailComponent) <= TRIM <= file 'ת סיום' (DTSX 5865, 5900). Also a condition input of 'Check If Date Valid' (auto row filter in fieldmap). 'ח פ' influence (record key) correct.",
+   "evidence": "main.cs:129-130; DTSX 3843-3848, 5948, 6006, 3766-3767"
+  },
+  {
+   "id": "Create|gen_employers|UPDATE|gen_mfaccumulationstartdate",
+   "verdict": "CONFIRMED",
+   "detail": "main.cs:131-132. = StartDate (DTSX 5942/6000) <= convert (DT_DBTIMESTAMP) with ''/NULL -> NULL (DTSX 3840) <= TRIM <= file 'ת התחלה' (DTSX 5859, 5899). Manipulations complete.",
+   "evidence": "main.cs:131-132; DTSX 3837-3842, 5942, 6000"
+  },
+  {
+   "id": "Create|gen_employers|UPDATE|gen_mfdeposit",
+   "verdict": "CONFIRMED",
+   "detail": "main.cs:133-134. = Dposit (DTSX 5954/6012) <= convert (DT_R8), ''/NULL -> NULL (DTSX 3870) <= TRIM <= file 'הפקדה' (DTSX 5889, 5904; last column, CRLF-delimited).",
+   "evidence": "main.cs:133-134; DTSX 3867-3872, 5954, 6012"
+  },
+  {
+   "id": "Create|gen_employers|UPDATE|gen_mfdepositstartdate",
+   "verdict": "CONFIRMED",
+   "detail": "main.cs:135-136. = Deposit_Start_Date (DTSX 5960/6018) <= convert (DT_DBTIMESTAMP), ''/NULL -> NULL (DTSX 3852) <= TRIM <= file 'תאריך התחלת הסכם מהפקדה' (DTSX 5883, 5903). Same column drives 'Deposit Date Valid' (DTSX 3759).",
+   "evidence": "main.cs:135-136; DTSX 3849-3854, 5960, 6018"
+  },
+  {
+   "id": "Update Account|account|UPDATE|gen_employeesfundsvalue",
+   "verdict": "CONFIRMED",
+   "detail": "OLE DB Command 'Update Account' on Package.ConnectionManagers[CRM] (Psql / ALTSHULER_MSCRM): UPDATE dbo.AccountBase SET Gen_EmployeesFundsValue = ?, Gen_employeesweightedmanagementfee = ? where accountid = ? -> 1st '?' = Param_0; input Gen_EmployeesFundsValue bound to ExternalColumns[Param_0] (DTSX 8004). Value <= Union All (4 identical-lineage inputs) <= 'get employers' SUM(ISNULL(gen_fundmain.gen_accountbalance,0)) (DTSX 7796-7808, CRM connection). No file field; direct SQL on CRM base table = Unsupported.",
+   "evidence": "DTSX 7991-7994, 8003-8023, 7796-7808; Check if to update DTSX 7744-7781"
+  },
+  {
+   "id": "Update Account|account|UPDATE|gen_employeesweightedmanagementfee",
+   "verdict": "CONFIRMED",
+   "detail": "2nd '?' = Param_1; input Gen_employeesweightedmanagementfee bound to ExternalColumns[Param_1] (DTSX 8005). Value = CASE WHEN SUM(ISNULL(balance,0)) = 0 THEN 0 ELSE SUM(ISNULL(balance,0) * Gen_managementFeePercentage) / SUM(ISNULL(balance,0)) END (DTSX 7797-7801). Write condition (4 OR'ed outputs, Default unconnected) verified. No file field.",
+   "evidence": "DTSX 7991-7994, 8005, 7797-7801, 7744-7781"
+  },
+  {
+   "id": "FIELD ח פ #1",
+   "verdict": "CONFIRMED",
+   "detail": "crm_influence_only is right: gen_corporatenumber (ext 'ח פ', DTSX 5847) is only trimmed, used as the Sort / Merge Join key (cachedSortKeyPosition=1, DTSX 5740/5756) and in the ETL warning text (Set Warning columns 1 1, plumbing). It is carried by Union All but not by Union All 1 / Create inputs, so it is never written as a value.",
+   "evidence": "DTSX 5740, 5756, 6093-6099, 7461-7550; Create inputs (6 columns)"
+  },
+  {
+   "id": "FIELD שם מעסיק #2",
+   "verdict": "CONFIRMED",
+   "detail": "logic_only_no_crm is right: gen_employername (ext 'שם מעסיק', DTSX 5853) passes TRIM, Sort and the Merge Join output (DTSX 5806) but no downstream component consumes it (not an input of Set Pension/Study Fund Columns, Union All, Check splits, Create, or the warning columns).",
+   "evidence": "DTSX 5747, 5806-5810, 5917-6030, 7360-7460"
+  },
+  {
+   "id": "SPOT recordKey Create (recordKeyColumns [])",
+   "verdict": "CONFIRMED",
+   "detail": "Entity.Id = Row.Genemployersid (main.cs:126). Gen_employersid <= Merge Join (Right input, InputColumnID DTSX 5768) <= Sort 1 <= OLE DB Source 'Get Employer Nunmer' on CRM: select gen_corporatenumber, Gen_employersid, product.ProductTypeCode from Gen_employers join product on productid = gen_fundtypename (DTSX 5689-5695). LEFT join (JoinType=1), 1 key, TreatNullsAsEqual=true. Leaving recordKeyColumns empty and declaring 'ח פ' as key per attribute is accurate.",
+   "evidence": "main.cs:126; DTSX 5684-5729, 5730-5834"
+  },
+  {
+   "id": "SPOT recordKey Update Account (recordKeyColumns [])",
+   "verdict": "CONFIRMED",
+   "detail": "where accountid = ? -> 3rd '?' = Param_2 <= accountid from 'get employers' (FROM account ...). CRM-only, no file lineage.",
+   "evidence": "DTSX 7994, 8003"
+  },
+  {
+   "id": "SPOT declaredRowFilter Create | Merge Join -> Check if employer exist | ח פ",
+   "verdict": "CONFIRMED",
+   "detail": "LEFT Merge Join of trimmed file corporate number with CRM employers; 'Employer not exist' = ISNULL(Gen_employersid) (DTSX 3800) -> Set Warning columns 1 1 -> Union All 2 -> ETL Warning 1 (no write). Sort/Sort 1 EliminateDuplicates=false (DTSX 6176, 6317), so a corporate number matching several gen_employers rows yields one update per record, as stated.",
+   "evidence": "DTSX 3797-3810, 5732-5734, 6176, 6317"
+  },
+  {
+   "id": "SPOT declaredSources 'ח פ' (role key) on the 5 gen_employers attributes",
+   "verdict": "CONFIRMED",
+   "detail": "Correct use of declaredSources: the key's effect (record identity via Gen_employersid, and via the matched record's ProductTypeCode the choice of 'גמל' vs 'השתלמות') cannot be expressed through the writer's input columns, which come from a CRM projection.",
+   "evidence": "main.cs:126; DTSX 3715, 3723, 5689, 5732-5734"
+  },
+  {
+   "id": "SPOT readWriteModifications TRIM (*)",
+   "verdict": "CONFIRMED",
+   "detail": "TRIM has all 8 source columns as readWrite inputs (DTSX 6368); code trims non-empty strings only (\"\" stays \"\"); 'convert' then maps \"\"/NULL to NULL. Flat file RetainNulls=false (DTSX 5838).",
+   "evidence": "TRIM main.cs:33-58; DTSX 5838, 6368"
+  },
+  {
+   "id": "SPOT routing Check If Date Valid / Check Fund type",
+   "verdict": "CONFIRMED",
+   "detail": "Check If Date Valid: 'Deposit Date Valid' (EvaluationOrder 0) !ISNULL(gen_mfdepositstartdate) && < GETDATE(); 'MF Accumulation Date Valid' (1) accumulation/start/end not NULL && start < GETDATE() && end > GETDATE(); Default -> Set Warning columns 1 -> ETL warning. Both valid outputs -> Union All 1 -> Create. Check Fund type DE Output has no path (dropped). Analyst note that a row passing either check sends all 5 non-NULL values is correct.",
+   "evidence": "DTSX 3756-3777, 3712-3733; paths (component.mjs --list)"
+  },
+  {
+   "id": "SPOT precedence (write conditions)",
+   "verdict": "CONFIRMED",
+   "detail": "Constraint 4 EvalOp=3 @[User::isFileExist] -> Set MF on employers (DTSX 8057). Constraints 5 (!@[User::isFileExist]) and 6 (after Move FileTo Archive) into Update employer amount omit DTS:LogicalAnd while 0-3 carry LogicalAnd=\"True\"; the analyst keeps the OR reading as unresolved, which is the correct treatment.",
+   "evidence": "DTSX 8053-8059"
+  }
+ ],
+ "missingWrites": [],
+ "missingWritesNote": "All code files and SQL scanned. Other CRM writes are ETL plumbing only: Create ETL Process record (gen_etlprocess Create), End ETL Process record\\ETL Record Finish (gen_etlprocess Update), Set MF on employers\\ETL Warning 1 (gen_etlprocesswarning Create), OnError\\Error ETL Process record (gen_etlprocess Update + annotation Create). No other OLE DB Command / destination. No disabled executables."
+}

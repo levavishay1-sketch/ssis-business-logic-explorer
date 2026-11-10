@@ -1,0 +1,441 @@
+{
+ "verifier": "ssis-verifier",
+ "package": "0031_PoaAccountUpdateDaily",
+ "scope": "mapping-A.json",
+ "checked": 61,
+ "results": [
+  {
+   "id": "Update gen_powerofattorney ACTIVE|gen_powerofattorney|UPDATE|gen_currentstate",
+   "verdict": "CONFIRMED",
+   "detail": "Value (literal 1), key (Gen_powerofattorneyId) and in-script condition are correct. One statement is not guaranteed: \"every source row reaches this writer once\". If Is Renewal (agentcyIdNumberPa == agentcyIdNumber) or AppendixType (gen_appendixtype != 2 && ...) evaluates to NULL, that output has errorRowDisposition=FailComponent. Under documented SSIS Conditional Split behaviour, a NULL condition result is a row error, so the data flow fails. agentcyIdNumber = isnull(Contact.Gen_Identitynumber, Account.AccountNumber) is NULL when the POA has neither. Sort By PoaId is blocking (async), so in that case NO waiting POA is activated in that run, while NeedToSendMailBit updates already executed for earlier rows stay committed. Rows on Union input 2 (Update Json path) carry non-NULL JSON and are dropped by \"Is emailDetailsJson Contains Data 1\". That part is CONFIRMED.",
+   "evidence": "source/DailyProcess/0031_PoaAccountUpdateDaily.dtsx:30214 main.cs:32-42; Is Renewal source/DailyProcess/0031_PoaAccountUpdateDaily.dtsx:27056 (FailComponent); AppendixType source/DailyProcess/0031_PoaAccountUpdateDaily.dtsx:22859 (FailComponent); Sort By PoaId source/DailyProcess/0031_PoaAccountUpdateDaily.dtsx:28819-28821 (EliminateDuplicates=false); source SQL source/DailyProcess/0031_PoaAccountUpdateDaily.dtsx:27226-27265",
+   "previousVerdict": "FIXED",
+   "recheck": "Re-checked 2026-11-06. The mapping-A condition now says activation is not guaranteed. It records FailComponent on Is Renewal/AppendixType, labels the NULL-error behaviour a hypothesis, and covers the blocking Sort (no activations in the run while NeedToSendMailBit updates stay committed). fieldmap influence now lists agentcyIdNumber, agentcyIdNumberPa and gen_appendixtype. Residual nit, not blocking: logic.json:2015 says \"if the evaluation error is configured FailComponent\" although it IS configured (DTSX:27056, 22859). It also says only the activations \"after it\" are lost, but because Sort By PoaId is blocking, none of the run's activations happen.",
+   "verdictHistory": [
+    "INCOMPLETE",
+    "FIXED"
+   ],
+   "recheck2": "Re-checked 2026-11-06 (2nd): the fix is still present in the current files; FIXED becomes CONFIRMED (allowed verdict set). The residual logic.json:2015 nit is resolved: it now cites FailComponent DTSX:27056/22859 and states that no activation of the run happens (blocking Sort, DTSX:28819)."
+  },
+  {
+   "id": "Update NeedToSendMailBit|gen_powerofattorney|UPDATE|gen_receivingdateofcancelpoa",
+   "verdict": "CONFIRMED",
+   "detail": "CONFIRMED: Param_0 is the 1st '?' (line 31305) and binds Gen_receivingdatePoa = dateadd(HH,3,poa.gen_receivingdate) of the waiting POA. Param_1 is the 2nd '?' (line 31307) and binds PowerOfAttorneyIdPa = the active POA from the full-cache Lookup (CacheType=0; first match wins). CASE has no ELSE, so NULL is written when the target row's own Gen_appendixtype is not 2, 3 or 5. The write goes directly to Gen_powerofattorneyBase on [CRM] (Unsupported). MISSING: (1) the write depends on Is Renewal [Not Renewal] (agentcyIdNumber from the source vs agentcyIdNumberPa from the Lookup). These two columns are condition sources but appear in neither 'from' nor fieldmap rowFilters (empty). (2) A NULL on either side fails the component (FailComponent), see the ACTIVE claim. (3) Several waiting POAs on the same account/program hit the same active POA. It is updated once per waiting POA, and the last row wins (order not determined).",
+   "evidence": "source/DailyProcess/0031_PoaAccountUpdateDaily.dtsx:31302-31307 SqlCommand; source/DailyProcess/0031_PoaAccountUpdateDaily.dtsx:31317-31318 Param_0/Param_1 binding; Lookup source/DailyProcess/0031_PoaAccountUpdateDaily.dtsx:27079-27105 (CacheType 0, NoMatchBehavior 1); Is Renewal source/DailyProcess/0031_PoaAccountUpdateDaily.dtsx:27045/27056",
+   "previousVerdict": "INCOMPLETE",
+   "recheck": "Re-checked 2026-11-06. FIXED in substance: claims DB sources now include INFL agentcyIdNumber and agentcyIdNumberPa; fieldmap rowFilters include Is Renewal and the Lookup Match; the condition records the NULL failure (as hypothesis) and last-wins. One residual citation error remains: the mapping-A writer condition says \"Is Renewal output disposition is FailComponent (DTSX:22859)\". DTSX:22859 is the AppendixType output; the Is Renewal output disposition is at DTSX:27056 (component DTSX:27045).",
+   "verdictHistory": [
+    "INCOMPLETE"
+   ],
+   "recheck2": "Re-checked 2026-11-06 (2nd). The citation is now \"Is Renewal output disposition is FailComponent (DTSX:27056)\". This matches the raw DTSX: line 27056 is the Is Renewal output with errorRowDisposition=FailComponent; the component is at 27045. Condition sources (agentcyIdNumber, agentcyIdNumberPa) are in the claims DB sources. Is Renewal rowFilter has leads=false, which is correct because the writer is on Not Renewal. Value and params unchanged and correct."
+  },
+  {
+   "id": "Update gen_powerofattorney CANCELED And Status Transfer To Bank|gen_powerofattorney|UPDATE|gen_currentstate",
+   "verdict": "CONFIRMED",
+   "detail": "Literal CANCELED=2 (main.cs:27, 74). Key = Gen_powerofattorneyId (main.cs:73). Condition: gencurrentstate NULL or != 2 (main.cs:69). Source WHERE Gen_enddate <= GETDATE() and Gen_currentstate = 1. Every source row reaches the writer through the NoMail branch (Union input 3) or the Set Data Output 0 branch (input 2). Input-1 rows carry JSON and are dropped by Contains Data 1.",
+   "evidence": "source/DailyProcess/0031_PoaAccountUpdateDaily.dtsx:21671 main.cs:65-91; source source/DailyProcess/0031_PoaAccountUpdateDaily.dtsx:18171-18214; Union All Data input mapping (input 1 = CustomOutput GenpowerofattorneyId/emailDetailsJson/genstatustransfertobank)"
+  },
+  {
+   "id": "Update gen_powerofattorney CANCELED And Status Transfer To Bank|gen_powerofattorney|UPDATE|gen_statustransfertobank",
+   "verdict": "CONFIRMED",
+   "detail": "Literal WAITING_SENDING_TO_BANK=2 (main.cs:28, 77). It is set only inside the gen_currentstate != 2 block and only when the input status is NULL or != 2 (main.cs:75). The roles (condition on gen_statustransfertobank and gen_currentstate) are correct.",
+   "evidence": "source/DailyProcess/0031_PoaAccountUpdateDaily.dtsx:21671 main.cs:69-78"
+  },
+  {
+   "id": "Update sentToPrintOn|gen_powerofattorney|UPDATE|gen_senttoprinton",
+   "verdict": "CONFIRMED",
+   "detail": "SET gen_SentToPrintOn = GETUTCDATE(). This is not a fixed value. The single '?' binds Param_0 = PowerOfAttorneyId (Union All output), whose origin is the staging column PowerOfAttorneySendEmails.PowerOfAttorneyId. Lookup filters are correct as listed: Get Agent or else Get Agencie; Get Power Of Attorney; Get Contact; Pension or else Provident Fund. All of these redirect No Match to an unconnected output. Get Reciving Date uses IgnoreFailure, so it does not filter. Both 'Check If Exists Agent_cy Email Address' branches are unioned. Caveats: (a) 'view' for Gen_powerofattorney is the CRM naming convention, not proven by the DTSX (DB objects not supplied). (b) The Conditional Split StatusAfterUpdate == 2 has FailComponent, so a NULL StatusAfterUpdate would fail the flow.",
+   "evidence": "source/DailyProcess/0031_PoaAccountUpdateDaily.dtsx:36595-36597, 36606 (Param_0 lineage Union All.PowerOfAttorneyId); source source/DailyProcess/0031_PoaAccountUpdateDaily.dtsx:31813-31820; lookups source/DailyProcess/0031_PoaAccountUpdateDaily.dtsx:31557/31636/31715/31861/31964 (IgnoreFailure 32013)/32089/33900; Conditional Split source/DailyProcess/0031_PoaAccountUpdateDaily.dtsx:31460"
+  },
+  {
+   "id": "Update Current State Poa Main|gen_powerofattorneymain|UPDATE|gen_currentstate",
+   "verdict": "CONFIRMED",
+   "detail": "Value = Row.gencurrentstaterelated (main.cs:73). Union input 3 = Lookup value 4 unchanged (Is Wrong True). Input 4 = in-place 'gen_currentstate_related + 1' (usageType readWrite) on child state 2, giving 3. Input 2 = Derived Column constant 3 after If Exists Active No Match. The update is skipped when the main already has that value or when the related value is NULL (main.cs:66-68). The source is POA Mains with a child modified in the last 36h.",
+   "evidence": "source/DailyProcess/0031_PoaAccountUpdateDaily.dtsx:40252 main.cs:64-91; source/DailyProcess/0031_PoaAccountUpdateDaily.dtsx:38954, 39106-39124, 39147-39157, 39232-39242, 39334 (=3), 39361 (+1); Union All input mapping"
+  },
+  {
+   "id": "Move Annotation To Customer Account|annotation|UPDATE|objectid",
+   "verdict": "CONFIRMED",
+   "detail": "Value and key are CONFIRMED: EntityReference('gen_customeraccount', gencustomeraccountid), id = AnnotationId, and the update is skipped if either is NULL (main.cs:126-134). The update runs before Remove Duplicates and before the Create, so the note is moved even if the Create then fails. MISSING: the Annotation LEFT JOIN is inside the ROW_NUMBER() OVER (PARTITION BY gen_customeraccountid ORDER BY Gen_signaturedate DESC) subquery, and the query keeps only rowNumber = 1. So each customer-account row carries ONE annotation only. If the POA Main has several annotations, only one (an arbitrary tie on the same signature date) moves per account, and the rest stay on the POA Main. The 'ends on the LAST processed account' note holds only when several account rows carry the same AnnotationId. Source has no ORDER BY, so which row is last is not determined.",
+   "evidence": "source/DailyProcess/0031_PoaAccountUpdateDaily.dtsx:3295-3336 (left join Annotation 3323, rowNumber=1 3336); main.cs:122-143 @source/DailyProcess/0031_PoaAccountUpdateDaily.dtsx:3431; path Lookup No Match -> Move Annotation -> Remove Duplicates",
+   "previousVerdict": "FIXED",
+   "recheck": "Re-checked 2026-11-06. The mapping-A condition and note 8 now state that the ROW_NUMBER/rowNumber = 1 join gives one annotation per row, so other annotations never move. They also state that last-wins applies only when the same AnnotationId recurs, in an undetermined order. Evidence DTSX:3323/3336 is correct.",
+   "verdictHistory": [
+    "INCOMPLETE",
+    "FIXED"
+   ],
+   "recheck2": "Re-checked 2026-11-06 (2nd): the fix is still present in the current files; FIXED becomes CONFIRMED (allowed verdict set)."
+  },
+  {
+   "id": "Move Annotation To Policies|annotation|UPDATE|objectid",
+   "verdict": "CONFIRMED",
+   "detail": "Value and key are CONFIRMED: EntityReference('gen_policies', Genprogrammainid), id = AnnotationId (main.cs:127-135). MISSING: (1) the same ROW_NUMBER issue. The Annotation join is inside the PARTITION BY Gen_programmainid with rowNumber = 1, so there is one annotation per program row, and other annotations of the POA Main are not moved. (2) The move runs before Remove Duplicates, which keys only on Gen_powerofattorneymainId. The note can therefore be moved to a program whose POA create is removed as a duplicate in this run. (3) The 'gen_policies' logical-name mismatch is a fact in the DTSX, but the runtime outcome cannot be verified (CRM metadata not supplied).",
+   "evidence": "source/DailyProcess/0031_PoaAccountUpdateDaily.dtsx:7589-7630 (left join Annotation 7618, rowNumber 7630); source/DailyProcess/0031_PoaAccountUpdateDaily.dtsx:7979; Remove Duplicates source/DailyProcess/0031_PoaAccountUpdateDaily.dtsx:9066-9068",
+   "previousVerdict": "FIXED",
+   "recheck": "Re-checked 2026-11-06. The condition now covers the one-annotation-per-row effect (DTSX:7618/7630) and the move before Remove Duplicates (keyed on Gen_powerofattorneymainId only). The gen_policies runtime outcome stays in unresolved, which is correct.",
+   "verdictHistory": [
+    "INCOMPLETE",
+    "FIXED"
+   ],
+   "recheck2": "Re-checked 2026-11-06 (2nd): the fix is still present in the current files; FIXED becomes CONFIRMED (allowed verdict set)."
+  },
+  {
+   "id": "Create POA Account - Agent|gen_powerofattorney|CREATE|gen_appendixtype [Create Power Of Attorney]",
+   "verdict": "CONFIRMED",
+   "detail": "OptionSetValue(Genappendixtype), set only if not NULL and in ValidOptionsetsValues['gen_appendixtype'] (StringMap of Gen_powerofattorney, DTSX:13693). Source WHERE forces POA Main Gen_appendixtype = 2, and correctly no fixedValue is recorded (row value). Source column comes from Get Customer Accounts (one row per customer account, rowNumber = 1). Rows pass Lookup No Match and Remove Duplicates.",
+   "evidence": "source/DailyProcess/0031_PoaAccountUpdateDaily.dtsx:1781 main.cs:138-139 (DTSX line = 1786 + main.cs line); source source/DailyProcess/0031_PoaAccountUpdateDaily.dtsx:3295-3336"
+  },
+  {
+   "id": "Create POA Account - Agent|gen_powerofattorney|CREATE|gen_powerofattorneysource [Create Power Of Attorney]",
+   "verdict": "CONFIRMED",
+   "detail": "OptionSetValue(genpowerofattorneysource), set only if not NULL and the value is valid. Source column comes from Get Customer Accounts (one row per customer account, rowNumber = 1). Rows pass Lookup No Match and Remove Duplicates.",
+   "evidence": "source/DailyProcess/0031_PoaAccountUpdateDaily.dtsx:1781 main.cs:142-143 (DTSX line = 1786 + main.cs line); source source/DailyProcess/0031_PoaAccountUpdateDaily.dtsx:3295-3336"
+  },
+  {
+   "id": "Create POA Account - Agent|gen_powerofattorney|CREATE|gen_appendixd [Create Power Of Attorney]",
+   "verdict": "CONFIRMED",
+   "detail": "The appendix TYPE value is written into gen_appendixd, set only if it is valid for gen_appendixd. Source column comes from Get Customer Accounts (one row per customer account, rowNumber = 1). Rows pass Lookup No Match and Remove Duplicates.",
+   "evidence": "source/DailyProcess/0031_PoaAccountUpdateDaily.dtsx:1781 main.cs:146-147 (DTSX line = 1786 + main.cs line); source source/DailyProcess/0031_PoaAccountUpdateDaily.dtsx:3295-3336"
+  },
+  {
+   "id": "Create POA Account - Agent|gen_powerofattorney|CREATE|gen_currentstate [Create Power Of Attorney]",
+   "verdict": "CONFIRMED",
+   "detail": "Literal 1, unconditional. Source column comes from Get Customer Accounts (one row per customer account, rowNumber = 1). Rows pass Lookup No Match and Remove Duplicates.",
+   "evidence": "source/DailyProcess/0031_PoaAccountUpdateDaily.dtsx:1781 main.cs:150 (DTSX line = 1786 + main.cs line); source source/DailyProcess/0031_PoaAccountUpdateDaily.dtsx:3295-3336"
+  },
+  {
+   "id": "Create POA Account - Agent|gen_powerofattorney|CREATE|gen_statustransfertobank [Create Power Of Attorney]",
+   "verdict": "CONFIRMED",
+   "detail": "Enum WaitingTransferToBank = 2 (the enum also has duplicate value 3 for NoShippingRequired and SendToBank). Set only if the POA Main value is not NULL and is valid. The role is condition only. Source column comes from Get Customer Accounts (one row per customer account, rowNumber = 1). Rows pass Lookup No Match and Remove Duplicates.",
+   "evidence": "source/DailyProcess/0031_PoaAccountUpdateDaily.dtsx:1781 main.cs:93-98, 153-154 (DTSX line = 1786 + main.cs line); source source/DailyProcess/0031_PoaAccountUpdateDaily.dtsx:3295-3336"
+  },
+  {
+   "id": "Create POA Account - Agent|gen_powerofattorney|CREATE|gen_contactname [Create Power Of Attorney]",
+   "verdict": "CONFIRMED",
+   "detail": "EntityReference('contact', POA Main Gen_contactname), set only if not NULL and not Guid.Empty. Source column comes from Get Customer Accounts (one row per customer account, rowNumber = 1). Rows pass Lookup No Match and Remove Duplicates.",
+   "evidence": "source/DailyProcess/0031_PoaAccountUpdateDaily.dtsx:1781 main.cs:157-158 (DTSX line = 1786 + main.cs line); source source/DailyProcess/0031_PoaAccountUpdateDaily.dtsx:3295-3336"
+  },
+  {
+   "id": "Create POA Account - Agent|gen_powerofattorney|CREATE|gen_powerofattorneymain [Create Power Of Attorney]",
+   "verdict": "CONFIRMED",
+   "detail": "EntityReference('gen_powerofattorneymain', POA Main id). Source column comes from Get Customer Accounts (one row per customer account, rowNumber = 1). Rows pass Lookup No Match and Remove Duplicates.",
+   "evidence": "source/DailyProcess/0031_PoaAccountUpdateDaily.dtsx:1781 main.cs:161-162 (DTSX line = 1786 + main.cs line); source source/DailyProcess/0031_PoaAccountUpdateDaily.dtsx:3295-3336"
+  },
+  {
+   "id": "Create POA Account - Agent|gen_powerofattorney|CREATE|gen_customeraccount",
+   "verdict": "CONFIRMED",
+   "detail": "EntityReference('gen_customeraccount', gen_customeraccountid). Source column comes from Get Customer Accounts (one row per customer account, rowNumber = 1). Rows pass Lookup No Match and Remove Duplicates.",
+   "evidence": "source/DailyProcess/0031_PoaAccountUpdateDaily.dtsx:1781 main.cs:165-166 (DTSX line = 1786 + main.cs line); source source/DailyProcess/0031_PoaAccountUpdateDaily.dtsx:3295-3336",
+   "legacyId": "Create POA Account - Agent|gen_powerofattorney|CREATE|gen_customeraccount [Create Power Of Attorney]"
+  },
+  {
+   "id": "Create POA Account - Agent|gen_powerofattorney|CREATE|gen_agentname [Create Power Of Attorney]",
+   "verdict": "CONFIRMED",
+   "detail": "EntityReference('gen_agents', POA Main Gen_agentname). The DTSX facts behind the analyst's conflict note are verified: Get Agent joins contact on gen_agentname = contactid, and Gen_agents on Gen_agents.gen_contactname = gen_agentname. The source SQL joins Contact.ContactId = poa.Gen_agentname. 0029 (Create POA Main For Automated Joining) writes gen_powerofattorneymain.gen_agentname as 'contact'. The runtime outcome cannot be verified, as the note states. Source column comes from Get Customer Accounts (one row per customer account, rowNumber = 1). Rows pass Lookup No Match and Remove Duplicates.",
+   "evidence": "source/DailyProcess/0031_PoaAccountUpdateDaily.dtsx:1781 main.cs:169-170 (DTSX line = 1786 + main.cs line); source source/DailyProcess/0031_PoaAccountUpdateDaily.dtsx:3295-3336"
+  },
+  {
+   "id": "Create POA Account - Agent|gen_powerofattorney|CREATE|gen_agencyname [Create Power Of Attorney]",
+   "verdict": "CONFIRMED",
+   "detail": "EntityReference('gen_agencie', POA Main Gen_agencyname). The conflicting joins (account on gen_agencyname = accountid; Gen_agencie.gen_agencyname = gen_agencyname) are verified. The runtime outcome cannot be verified. Source column comes from Get Customer Accounts (one row per customer account, rowNumber = 1). Rows pass Lookup No Match and Remove Duplicates.",
+   "evidence": "source/DailyProcess/0031_PoaAccountUpdateDaily.dtsx:1781 main.cs:173-174 (DTSX line = 1786 + main.cs line); source source/DailyProcess/0031_PoaAccountUpdateDaily.dtsx:3295-3336"
+  },
+  {
+   "id": "Create POA Account - Agent|gen_powerofattorney|CREATE|gen_identitynumber [Create Power Of Attorney]",
+   "verdict": "CONFIRMED",
+   "detail": "Row.Genidentitynumber.Trim(), skipped if NULL or ''. Minor detail: a whitespace-only value passes the check and is written as '' after Trim. Source column comes from Get Customer Accounts (one row per customer account, rowNumber = 1). Rows pass Lookup No Match and Remove Duplicates.",
+   "evidence": "source/DailyProcess/0031_PoaAccountUpdateDaily.dtsx:1781 main.cs:177-178 (DTSX line = 1786 + main.cs line); source source/DailyProcess/0031_PoaAccountUpdateDaily.dtsx:3295-3336"
+  },
+  {
+   "id": "Create POA Account - Agent|gen_powerofattorney|CREATE|gen_signaturedate [Create Power Of Attorney]",
+   "verdict": "CONFIRMED",
+   "detail": "AddHours(3) when not NULL. Source column comes from Get Customer Accounts (one row per customer account, rowNumber = 1). Rows pass Lookup No Match and Remove Duplicates.",
+   "evidence": "source/DailyProcess/0031_PoaAccountUpdateDaily.dtsx:1781 main.cs:181-182 (DTSX line = 1786 + main.cs line); source source/DailyProcess/0031_PoaAccountUpdateDaily.dtsx:3295-3336"
+  },
+  {
+   "id": "Create POA Account - Agent|gen_powerofattorney|CREATE|gen_receivingdate [Create Power Of Attorney]",
+   "verdict": "CONFIRMED",
+   "detail": "AddHours(3) when not NULL. Source column comes from Get Customer Accounts (one row per customer account, rowNumber = 1). Rows pass Lookup No Match and Remove Duplicates.",
+   "evidence": "source/DailyProcess/0031_PoaAccountUpdateDaily.dtsx:1781 main.cs:184-185 (DTSX line = 1786 + main.cs line); source source/DailyProcess/0031_PoaAccountUpdateDaily.dtsx:3295-3336"
+  },
+  {
+   "id": "Create POA Account - Agent|gen_powerofattorney|CREATE|gen_enddate [Create Power Of Attorney]",
+   "verdict": "CONFIRMED",
+   "detail": "gen_enddate+3h, otherwise gen_receivingdate+3h+10 years. Not set if both are NULL. Source column comes from Get Customer Accounts (one row per customer account, rowNumber = 1). Rows pass Lookup No Match and Remove Duplicates.",
+   "evidence": "source/DailyProcess/0031_PoaAccountUpdateDaily.dtsx:1781 main.cs:188-192 (DTSX line = 1786 + main.cs line); source source/DailyProcess/0031_PoaAccountUpdateDaily.dtsx:3295-3336"
+  },
+  {
+   "id": "Create POA Account - Agent|gen_powerofattorney|CREATE|gen_startdate [Create Power Of Attorney]",
+   "verdict": "CONFIRMED",
+   "detail": "DateTime.Now. This is not a fixed value. Source column comes from Get Customer Accounts (one row per customer account, rowNumber = 1). Rows pass Lookup No Match and Remove Duplicates.",
+   "evidence": "source/DailyProcess/0031_PoaAccountUpdateDaily.dtsx:1781 main.cs:195 (DTSX line = 1786 + main.cs line); source source/DailyProcess/0031_PoaAccountUpdateDaily.dtsx:3295-3336"
+  },
+  {
+   "id": "Create POA Account - Agent|gen_powerofattorney|CREATE|gen_agentcontract [Create Power Of Attorney]",
+   "verdict": "CONFIRMED",
+   "detail": "EntityReference('gen_agentcontract', gen_advisornumber), inside if (genproductsubcustomeraccount != 2). No _IsNull check is needed because the source WHERE forces productsub in (1,2,4,5). Source column comes from Get Customer Accounts (one row per customer account, rowNumber = 1). Rows pass Lookup No Match and Remove Duplicates.",
+   "evidence": "source/DailyProcess/0031_PoaAccountUpdateDaily.dtsx:1781 main.cs:197-200 (DTSX line = 1786 + main.cs line); source source/DailyProcess/0031_PoaAccountUpdateDaily.dtsx:3295-3336"
+  },
+  {
+   "id": "Create POA Account - Agent|gen_powerofattorney|CREATE|gen_consultname [Create Power Of Attorney]",
+   "verdict": "CONFIRMED",
+   "detail": "EntityReference('account', gen_consultname), only when productsub != 2. Source column comes from Get Customer Accounts (one row per customer account, rowNumber = 1). Rows pass Lookup No Match and Remove Duplicates.",
+   "evidence": "source/DailyProcess/0031_PoaAccountUpdateDaily.dtsx:1781 main.cs:197, 202-203 (DTSX line = 1786 + main.cs line); source source/DailyProcess/0031_PoaAccountUpdateDaily.dtsx:3295-3336"
+  },
+  {
+   "id": "Create POA Account - Agent|gen_powerofattorney|CREATE|gen_startdateconsultation [Create Power Of Attorney]",
+   "verdict": "CONFIRMED",
+   "detail": "gen_counselingstartdate+3h, only when productsub != 2. Source column comes from Get Customer Accounts (one row per customer account, rowNumber = 1). Rows pass Lookup No Match and Remove Duplicates.",
+   "evidence": "source/DailyProcess/0031_PoaAccountUpdateDaily.dtsx:1781 main.cs:197, 205-206 (DTSX line = 1786 + main.cs line); source source/DailyProcess/0031_PoaAccountUpdateDaily.dtsx:3295-3336"
+  },
+  {
+   "id": "Create POA Account - Agent|gen_powerofattorney|CREATE|gen_advisorname [Create Power Of Attorney]",
+   "verdict": "CONFIRMED",
+   "detail": "EntityReference('gen_bankadvisor', ...), only when productsub != 2. Source column comes from Get Customer Accounts (one row per customer account, rowNumber = 1). Rows pass Lookup No Match and Remove Duplicates.",
+   "evidence": "source/DailyProcess/0031_PoaAccountUpdateDaily.dtsx:1781 main.cs:197, 208-209 (DTSX line = 1786 + main.cs line); source source/DailyProcess/0031_PoaAccountUpdateDaily.dtsx:3295-3336"
+  },
+  {
+   "id": "Create POA Account - Agent|gen_powerofattorney|CREATE|gen_branchbankadvisor [Create Power Of Attorney]",
+   "verdict": "CONFIRMED",
+   "detail": "EntityReference('gen_bankbranch', ...), only when productsub != 2. Source column comes from Get Customer Accounts (one row per customer account, rowNumber = 1). Rows pass Lookup No Match and Remove Duplicates.",
+   "evidence": "source/DailyProcess/0031_PoaAccountUpdateDaily.dtsx:1781 main.cs:197, 211-212 (DTSX line = 1786 + main.cs line); source source/DailyProcess/0031_PoaAccountUpdateDaily.dtsx:3295-3336"
+  },
+  {
+   "id": "Create POA Account - Agent|gen_powerofattorney|CREATE|gen_enddateconsultation [Create Power Of Attorney]",
+   "verdict": "CONFIRMED",
+   "detail": "gen_counselingenddate+3h, only when productsub != 2. Source column comes from Get Customer Accounts (one row per customer account, rowNumber = 1). Rows pass Lookup No Match and Remove Duplicates.",
+   "evidence": "source/DailyProcess/0031_PoaAccountUpdateDaily.dtsx:1781 main.cs:197, 214-215 (DTSX line = 1786 + main.cs line); source source/DailyProcess/0031_PoaAccountUpdateDaily.dtsx:3295-3336"
+  },
+  {
+   "id": "Create POA Account - Agent|gen_powerofattorney|CREATE|gen_appointmentofagent [Create Power Of Attorney]",
+   "verdict": "CONFIRMED",
+   "detail": "bool gen_agentappointment, only when productsub != 2. Source column comes from Get Customer Accounts (one row per customer account, rowNumber = 1). Rows pass Lookup No Match and Remove Duplicates.",
+   "evidence": "source/DailyProcess/0031_PoaAccountUpdateDaily.dtsx:1781 main.cs:197, 217-218 (DTSX line = 1786 + main.cs line); source source/DailyProcess/0031_PoaAccountUpdateDaily.dtsx:3295-3336"
+  },
+  {
+   "id": "Create POA Account - Agent|gen_powerofattorney|CREATE|gen_appendixtype [Create Power Of Attorney - Pension]",
+   "verdict": "CONFIRMED",
+   "detail": "OptionSetValue(Genappendixtype), set only if not NULL and in ValidOptionsetsValues['gen_appendixtype'] (StringMap of Gen_powerofattorney, DTSX:13693). Source WHERE forces POA Main Gen_appendixtype = 2, and correctly no fixedValue is recorded (row value). Source is Get Policies (one row per program, rowNumber = 1). Remove Duplicates keys on Gen_powerofattorneymainId only.",
+   "evidence": "source/DailyProcess/0031_PoaAccountUpdateDaily.dtsx:6102 main.cs:138-139 (DTSX line = 6226 + main.cs line); source source/DailyProcess/0031_PoaAccountUpdateDaily.dtsx:7589-7630; Remove Duplicates source/DailyProcess/0031_PoaAccountUpdateDaily.dtsx:9066-9068"
+  },
+  {
+   "id": "Create POA Account - Agent|gen_powerofattorney|CREATE|gen_powerofattorneysource [Create Power Of Attorney - Pension]",
+   "verdict": "CONFIRMED",
+   "detail": "OptionSetValue(genpowerofattorneysource), set only if not NULL and the value is valid. Source is Get Policies (one row per program, rowNumber = 1). Remove Duplicates keys on Gen_powerofattorneymainId only.",
+   "evidence": "source/DailyProcess/0031_PoaAccountUpdateDaily.dtsx:6102 main.cs:142-143 (DTSX line = 6226 + main.cs line); source source/DailyProcess/0031_PoaAccountUpdateDaily.dtsx:7589-7630; Remove Duplicates source/DailyProcess/0031_PoaAccountUpdateDaily.dtsx:9066-9068"
+  },
+  {
+   "id": "Create POA Account - Agent|gen_powerofattorney|CREATE|gen_appendixd [Create Power Of Attorney - Pension]",
+   "verdict": "CONFIRMED",
+   "detail": "The appendix TYPE value is written into gen_appendixd, set only if it is valid for gen_appendixd. Source is Get Policies (one row per program, rowNumber = 1). Remove Duplicates keys on Gen_powerofattorneymainId only.",
+   "evidence": "source/DailyProcess/0031_PoaAccountUpdateDaily.dtsx:6102 main.cs:146-147 (DTSX line = 6226 + main.cs line); source source/DailyProcess/0031_PoaAccountUpdateDaily.dtsx:7589-7630; Remove Duplicates source/DailyProcess/0031_PoaAccountUpdateDaily.dtsx:9066-9068"
+  },
+  {
+   "id": "Create POA Account - Agent|gen_powerofattorney|CREATE|gen_currentstate [Create Power Of Attorney - Pension]",
+   "verdict": "CONFIRMED",
+   "detail": "Literal 1, unconditional. Source is Get Policies (one row per program, rowNumber = 1). Remove Duplicates keys on Gen_powerofattorneymainId only.",
+   "evidence": "source/DailyProcess/0031_PoaAccountUpdateDaily.dtsx:6102 main.cs:150 (DTSX line = 6226 + main.cs line); source source/DailyProcess/0031_PoaAccountUpdateDaily.dtsx:7589-7630; Remove Duplicates source/DailyProcess/0031_PoaAccountUpdateDaily.dtsx:9066-9068"
+  },
+  {
+   "id": "Create POA Account - Agent|gen_powerofattorney|CREATE|gen_statustransfertobank [Create Power Of Attorney - Pension]",
+   "verdict": "CONFIRMED",
+   "detail": "Enum WaitingTransferToBank = 2. Set only if the POA Main value is valid. Source is Get Policies (one row per program, rowNumber = 1). Remove Duplicates keys on Gen_powerofattorneymainId only.",
+   "evidence": "source/DailyProcess/0031_PoaAccountUpdateDaily.dtsx:6102 main.cs:87-92, 153-154 (DTSX line = 6226 + main.cs line); source source/DailyProcess/0031_PoaAccountUpdateDaily.dtsx:7589-7630; Remove Duplicates source/DailyProcess/0031_PoaAccountUpdateDaily.dtsx:9066-9068"
+  },
+  {
+   "id": "Create POA Account - Agent|gen_powerofattorney|CREATE|gen_contactname [Create Power Of Attorney - Pension]",
+   "verdict": "CONFIRMED",
+   "detail": "EntityReference('contact', POA Main Gen_contactname), set only if not NULL and not Guid.Empty. Source is Get Policies (one row per program, rowNumber = 1). Remove Duplicates keys on Gen_powerofattorneymainId only.",
+   "evidence": "source/DailyProcess/0031_PoaAccountUpdateDaily.dtsx:6102 main.cs:157-158 (DTSX line = 6226 + main.cs line); source source/DailyProcess/0031_PoaAccountUpdateDaily.dtsx:7589-7630; Remove Duplicates source/DailyProcess/0031_PoaAccountUpdateDaily.dtsx:9066-9068"
+  },
+  {
+   "id": "Create POA Account - Agent|gen_powerofattorney|CREATE|gen_powerofattorneymain [Create Power Of Attorney - Pension]",
+   "verdict": "CONFIRMED",
+   "detail": "EntityReference('gen_powerofattorneymain', POA Main id). Source is Get Policies (one row per program, rowNumber = 1). Remove Duplicates keys on Gen_powerofattorneymainId only.",
+   "evidence": "source/DailyProcess/0031_PoaAccountUpdateDaily.dtsx:6102 main.cs:161-162 (DTSX line = 6226 + main.cs line); source source/DailyProcess/0031_PoaAccountUpdateDaily.dtsx:7589-7630; Remove Duplicates source/DailyProcess/0031_PoaAccountUpdateDaily.dtsx:9066-9068"
+  },
+  {
+   "id": "Create POA Account - Agent|gen_powerofattorney|CREATE|gen_customerprogram",
+   "verdict": "CONFIRMED",
+   "detail": "EntityReference('gen_policies', Gen_programmainid). The package joins gen_powerofattorney.gen_customerprogram to Gen_programmain.Gen_programmainId (verified at DTSX:18206 and 27261), and 'gen_policies' appears only at DTSX:6392 and 7979. The runtime outcome cannot be verified. Source is Get Policies (one row per program, rowNumber = 1). Remove Duplicates keys on Gen_powerofattorneymainId only.",
+   "evidence": "source/DailyProcess/0031_PoaAccountUpdateDaily.dtsx:6102 main.cs:165-166 (DTSX line = 6226 + main.cs line); source source/DailyProcess/0031_PoaAccountUpdateDaily.dtsx:7589-7630; Remove Duplicates source/DailyProcess/0031_PoaAccountUpdateDaily.dtsx:9066-9068",
+   "legacyId": "Create POA Account - Agent|gen_powerofattorney|CREATE|gen_customerprogram [Create Power Of Attorney - Pension]"
+  },
+  {
+   "id": "Create POA Account - Agent|gen_powerofattorney|CREATE|gen_agentname [Create Power Of Attorney - Pension]",
+   "verdict": "CONFIRMED",
+   "detail": "EntityReference('gen_agents', POA Main Gen_agentname). The DTSX facts behind the analyst's conflict note are verified: Get Agent joins contact on gen_agentname = contactid, and Gen_agents on Gen_agents.gen_contactname = gen_agentname. The source SQL joins Contact.ContactId = poa.Gen_agentname. 0029 (Create POA Main For Automated Joining) writes gen_powerofattorneymain.gen_agentname as 'contact'. The runtime outcome cannot be verified, as the note states. Source is Get Policies (one row per program, rowNumber = 1). Remove Duplicates keys on Gen_powerofattorneymainId only.",
+   "evidence": "source/DailyProcess/0031_PoaAccountUpdateDaily.dtsx:6102 main.cs:169-170 (DTSX line = 6226 + main.cs line); source source/DailyProcess/0031_PoaAccountUpdateDaily.dtsx:7589-7630; Remove Duplicates source/DailyProcess/0031_PoaAccountUpdateDaily.dtsx:9066-9068"
+  },
+  {
+   "id": "Create POA Account - Agent|gen_powerofattorney|CREATE|gen_agencyname [Create Power Of Attorney - Pension]",
+   "verdict": "CONFIRMED",
+   "detail": "EntityReference('gen_agencie', POA Main Gen_agencyname). The conflicting joins (account on gen_agencyname = accountid; Gen_agencie.gen_agencyname = gen_agencyname) are verified. The runtime outcome cannot be verified. Source is Get Policies (one row per program, rowNumber = 1). Remove Duplicates keys on Gen_powerofattorneymainId only.",
+   "evidence": "source/DailyProcess/0031_PoaAccountUpdateDaily.dtsx:6102 main.cs:173-174 (DTSX line = 6226 + main.cs line); source source/DailyProcess/0031_PoaAccountUpdateDaily.dtsx:7589-7630; Remove Duplicates source/DailyProcess/0031_PoaAccountUpdateDaily.dtsx:9066-9068"
+  },
+  {
+   "id": "Create POA Account - Agent|gen_powerofattorney|CREATE|gen_identitynumber [Create Power Of Attorney - Pension]",
+   "verdict": "CONFIRMED",
+   "detail": "Row.Genidentitynumber.Trim(), skipped if NULL or ''. Minor detail: a whitespace-only value passes the check and is written as '' after Trim. Uses POA Main Gen_identitynumber; programmainIdentityNumber is not used (verified). Source is Get Policies (one row per program, rowNumber = 1). Remove Duplicates keys on Gen_powerofattorneymainId only.",
+   "evidence": "source/DailyProcess/0031_PoaAccountUpdateDaily.dtsx:6102 main.cs:177-178 (DTSX line = 6226 + main.cs line); source source/DailyProcess/0031_PoaAccountUpdateDaily.dtsx:7589-7630; Remove Duplicates source/DailyProcess/0031_PoaAccountUpdateDaily.dtsx:9066-9068"
+  },
+  {
+   "id": "Create POA Account - Agent|gen_powerofattorney|CREATE|gen_signaturedate [Create Power Of Attorney - Pension]",
+   "verdict": "CONFIRMED",
+   "detail": "AddHours(3) when not NULL. Source is Get Policies (one row per program, rowNumber = 1). Remove Duplicates keys on Gen_powerofattorneymainId only.",
+   "evidence": "source/DailyProcess/0031_PoaAccountUpdateDaily.dtsx:6102 main.cs:181-182 (DTSX line = 6226 + main.cs line); source source/DailyProcess/0031_PoaAccountUpdateDaily.dtsx:7589-7630; Remove Duplicates source/DailyProcess/0031_PoaAccountUpdateDaily.dtsx:9066-9068"
+  },
+  {
+   "id": "Create POA Account - Agent|gen_powerofattorney|CREATE|gen_receivingdate [Create Power Of Attorney - Pension]",
+   "verdict": "CONFIRMED",
+   "detail": "AddHours(3) when not NULL. Source is Get Policies (one row per program, rowNumber = 1). Remove Duplicates keys on Gen_powerofattorneymainId only.",
+   "evidence": "source/DailyProcess/0031_PoaAccountUpdateDaily.dtsx:6102 main.cs:184-185 (DTSX line = 6226 + main.cs line); source source/DailyProcess/0031_PoaAccountUpdateDaily.dtsx:7589-7630; Remove Duplicates source/DailyProcess/0031_PoaAccountUpdateDaily.dtsx:9066-9068"
+  },
+  {
+   "id": "Create POA Account - Agent|gen_powerofattorney|CREATE|gen_enddate [Create Power Of Attorney - Pension]",
+   "verdict": "CONFIRMED",
+   "detail": "gen_enddate+3h, otherwise gen_receivingdate+3h+10 years. Not set if both are NULL. Source is Get Policies (one row per program, rowNumber = 1). Remove Duplicates keys on Gen_powerofattorneymainId only.",
+   "evidence": "source/DailyProcess/0031_PoaAccountUpdateDaily.dtsx:6102 main.cs:188-192 (DTSX line = 6226 + main.cs line); source source/DailyProcess/0031_PoaAccountUpdateDaily.dtsx:7589-7630; Remove Duplicates source/DailyProcess/0031_PoaAccountUpdateDaily.dtsx:9066-9068"
+  },
+  {
+   "id": "Create POA Account - Agent|gen_powerofattorney|CREATE|gen_startdate [Create Power Of Attorney - Pension]",
+   "verdict": "CONFIRMED",
+   "detail": "DateTime.Now. This is not a fixed value. Source is Get Policies (one row per program, rowNumber = 1). Remove Duplicates keys on Gen_powerofattorneymainId only.",
+   "evidence": "source/DailyProcess/0031_PoaAccountUpdateDaily.dtsx:6102 main.cs:195 (DTSX line = 6226 + main.cs line); source source/DailyProcess/0031_PoaAccountUpdateDaily.dtsx:7589-7630; Remove Duplicates source/DailyProcess/0031_PoaAccountUpdateDaily.dtsx:9066-9068"
+  },
+  {
+   "id": "Create POA Account - Agent|gen_powerofattorney|CREATE|gen_agentcontract [Create Power Of Attorney - Pension]",
+   "verdict": "CONFIRMED",
+   "detail": "No product-sub condition in the pension variant. Source is Get Policies (one row per program, rowNumber = 1). Remove Duplicates keys on Gen_powerofattorneymainId only.",
+   "evidence": "source/DailyProcess/0031_PoaAccountUpdateDaily.dtsx:6102 main.cs:198-199 (DTSX line = 6226 + main.cs line); source source/DailyProcess/0031_PoaAccountUpdateDaily.dtsx:7589-7630; Remove Duplicates source/DailyProcess/0031_PoaAccountUpdateDaily.dtsx:9066-9068"
+  },
+  {
+   "id": "Create POA Account - Agent|gen_powerofattorney|CREATE|gen_consultname [Create Power Of Attorney - Pension]",
+   "verdict": "CONFIRMED",
+   "detail": "EntityReference('account', ...). Source is Get Policies (one row per program, rowNumber = 1). Remove Duplicates keys on Gen_powerofattorneymainId only.",
+   "evidence": "source/DailyProcess/0031_PoaAccountUpdateDaily.dtsx:6102 main.cs:201-202 (DTSX line = 6226 + main.cs line); source source/DailyProcess/0031_PoaAccountUpdateDaily.dtsx:7589-7630; Remove Duplicates source/DailyProcess/0031_PoaAccountUpdateDaily.dtsx:9066-9068"
+  },
+  {
+   "id": "Create POA Account - Agent|gen_powerofattorney|CREATE|gen_startdateconsultation [Create Power Of Attorney - Pension]",
+   "verdict": "CONFIRMED",
+   "detail": "+3h. Source is Get Policies (one row per program, rowNumber = 1). Remove Duplicates keys on Gen_powerofattorneymainId only.",
+   "evidence": "source/DailyProcess/0031_PoaAccountUpdateDaily.dtsx:6102 main.cs:204-205 (DTSX line = 6226 + main.cs line); source source/DailyProcess/0031_PoaAccountUpdateDaily.dtsx:7589-7630; Remove Duplicates source/DailyProcess/0031_PoaAccountUpdateDaily.dtsx:9066-9068"
+  },
+  {
+   "id": "Create POA Account - Agent|gen_powerofattorney|CREATE|gen_advisorname [Create Power Of Attorney - Pension]",
+   "verdict": "CONFIRMED",
+   "detail": "EntityReference('gen_bankadvisor', ...). Source is Get Policies (one row per program, rowNumber = 1). Remove Duplicates keys on Gen_powerofattorneymainId only.",
+   "evidence": "source/DailyProcess/0031_PoaAccountUpdateDaily.dtsx:6102 main.cs:207-208 (DTSX line = 6226 + main.cs line); source source/DailyProcess/0031_PoaAccountUpdateDaily.dtsx:7589-7630; Remove Duplicates source/DailyProcess/0031_PoaAccountUpdateDaily.dtsx:9066-9068"
+  },
+  {
+   "id": "Create POA Account - Agent|gen_powerofattorney|CREATE|gen_branchbankadvisor [Create Power Of Attorney - Pension]",
+   "verdict": "CONFIRMED",
+   "detail": "EntityReference('gen_bankbranch', ...). Source is Get Policies (one row per program, rowNumber = 1). Remove Duplicates keys on Gen_powerofattorneymainId only.",
+   "evidence": "source/DailyProcess/0031_PoaAccountUpdateDaily.dtsx:6102 main.cs:210-211 (DTSX line = 6226 + main.cs line); source source/DailyProcess/0031_PoaAccountUpdateDaily.dtsx:7589-7630; Remove Duplicates source/DailyProcess/0031_PoaAccountUpdateDaily.dtsx:9066-9068"
+  },
+  {
+   "id": "Create POA Account - Agent|gen_powerofattorney|CREATE|gen_enddateconsultation [Create Power Of Attorney - Pension]",
+   "verdict": "CONFIRMED",
+   "detail": "+3h. Source is Get Policies (one row per program, rowNumber = 1). Remove Duplicates keys on Gen_powerofattorneymainId only.",
+   "evidence": "source/DailyProcess/0031_PoaAccountUpdateDaily.dtsx:6102 main.cs:213-214 (DTSX line = 6226 + main.cs line); source source/DailyProcess/0031_PoaAccountUpdateDaily.dtsx:7589-7630; Remove Duplicates source/DailyProcess/0031_PoaAccountUpdateDaily.dtsx:9066-9068"
+  },
+  {
+   "id": "Create POA Account - Agent|gen_powerofattorney|CREATE|gen_appointmentofagent [Create Power Of Attorney - Pension]",
+   "verdict": "CONFIRMED",
+   "detail": "bool. Source is Get Policies (one row per program, rowNumber = 1). Remove Duplicates keys on Gen_powerofattorneymainId only.",
+   "evidence": "source/DailyProcess/0031_PoaAccountUpdateDaily.dtsx:6102 main.cs:216-217 (DTSX line = 6226 + main.cs line); source source/DailyProcess/0031_PoaAccountUpdateDaily.dtsx:7589-7630; Remove Duplicates source/DailyProcess/0031_PoaAccountUpdateDaily.dtsx:9066-9068"
+  },
+  {
+   "id": "FINDING: 4 agent e-mail scripts fully commented out",
+   "verdict": "CONFIRMED",
+   "detail": "In Email - Start Date Poa, ...With Commission Appointment, Email - Cancel Poa To Perform Actions and ...With Commission Appointment, both Input0_ProcessInput and Input0_ProcessInputRow contain only commented code inside '#region In Comment due to 13366'. PreExecute only creates CrmProxy/GetCrmService, and PostExecute is empty. CreateEmail and SendEmail are unreachable. Output 0 is synchronous, so rows still pass through to the status writers.",
+   "evidence": "source/DailyProcess/0031_PoaAccountUpdateDaily.dtsx:22960, 24536, 13817, 15478 (outputs sync: 24525, 26065, 15467, 17107)"
+  },
+  {
+   "id": "FINDING: NeedToSendMailBit CASE without ELSE writes NULL",
+   "verdict": "CONFIRMED",
+   "detail": "The CASE WHEN (Gen_appendixtype in 2/3/5 of the TARGET row) THEN ? END has no ELSE, so it yields NULL and overwrites gen_receivingdateofcancelpoa on the old active POA.",
+   "evidence": "source/DailyProcess/0031_PoaAccountUpdateDaily.dtsx:31302-31307"
+  },
+  {
+   "id": "FINDING: Set Data For Cancel Poa Emails CustomOutput.genstatustransfertobank never assigned",
+   "verdict": "CONFIRMED",
+   "detail": "Only CustomOutputBuffer.GenpowerofattorneyId (main.cs:59) and emailDetailsJson (main.cs:64) are set. POADetails.gen_statustransfertobank (main.cs:125) is never copied to the buffer. It is mapped into Union All Data input 1 (gen_statustransfertobank), but those rows carry non-NULL JSON and never reach the CANCELED writer, so CRM is not affected.",
+   "evidence": "source/DailyProcess/0031_PoaAccountUpdateDaily.dtsx:18330 main.cs:54-66, 118-126"
+  },
+  {
+   "id": "FINDING: EntityReference names gen_agents / gen_agencie / gen_policies vs package joins",
+   "verdict": "CONFIRMED",
+   "detail": "All cited DTSX facts are verified: DTSX:1956/1960/6392/6396/6400/7979; Get Agencie 31565-31566; Get Agent 31644-31645; source joins 27256-27257; gen_customerprogram join 18206/27261. In 0029_POA.dtsx: 10987-10988 and 13906-13907 (both in disabled flows) and 22758/22820/22823 (Entity gen_powerofattorneymain, flow Create POA Main For Automated Joining). Whether creates fail at runtime cannot be verified (CRM metadata not supplied). It is correctly labelled a hypothesis.",
+   "evidence": "source/DailyProcess/0031_PoaAccountUpdateDaily.dtsx lines as listed; source/DailyProcess/0029_POA.dtsx:22758-22823"
+  },
+  {
+   "id": "FINDING: annotation ends on the last processed account (mapping-A note)",
+   "verdict": "CONFIRMED",
+   "detail": "Last-write-wins per row is correct. But because of ROW_NUMBER over the Annotation join with rowNumber = 1, each account/program row carries only one annotation. Other annotations of the same POA Main are never moved, and different accounts can receive different annotations. \"Last\" applies only to rows carrying the same AnnotationId, in an undetermined order.",
+   "evidence": "source/DailyProcess/0031_PoaAccountUpdateDaily.dtsx:3296-3336, 7590-7630",
+   "previousVerdict": "FIXED",
+   "recheck": "Re-checked 2026-11-06. mapping-A note 8 now limits \"last processed row\" to rows carrying the same AnnotationId and adds the ROW_NUMBER limitation.",
+   "verdictHistory": [
+    "INCOMPLETE",
+    "FIXED"
+   ],
+   "recheck2": "Re-checked 2026-11-06 (2nd): the fix is still present in the current files; FIXED becomes CONFIRMED (allowed verdict set)."
+  },
+  {
+   "id": "logic.json risk: annotation moved to the FIRST created account/program; other accounts do not get it",
+   "verdict": "CONFIRMED",
+   "detail": "This contradicts mapping-A and the code. The update runs once per row (main.cs:122-135, no 'already moved' guard), so a repeated AnnotationId ends on the LAST processed row, and the order is undetermined (no ORDER BY). 'First created' is not proven. The statement also omits the ROW_NUMBER single-annotation-per-row effect. logic.json should say 'last processed row (order undetermined)' and add the ROW_NUMBER limitation.",
+   "evidence": "analysis/0031_PoaAccountUpdateDaily/logic.json:2010; source/DailyProcess/0031_PoaAccountUpdateDaily.dtsx:3431 main.cs:122-135; source/DailyProcess/0031_PoaAccountUpdateDaily.dtsx:3336",
+   "previousVerdict": "FIXED",
+   "recheck": "Re-checked 2026-11-06. logic.json:2010 now says: moved per row with no \"already moved\" check, ends at the last processed row in an undetermined order (no ORDER BY), and only one annotation per account/program because of ROW_NUMBER. This matches the code and mapping-A. Evidence lines 3323/3336/7618/7630 are correct.",
+   "verdictHistory": [
+    "WRONG",
+    "FIXED"
+   ],
+   "recheck2": "Re-checked 2026-11-06 (2nd): the fix is still present in the current files; FIXED becomes CONFIRMED (allowed verdict set)."
+  },
+  {
+   "id": "mapping-A scriptOutputs emailDetailsJson (both Set Data scripts) ProductType mapping",
+   "verdict": "CONFIRMED",
+   "detail": "This only affects staging; there is no CRM impact. POADetails.ProductType maps '4' and '3' to a Hebrew label and empty to ''. Any other non-empty value leaves productType unset (null). The expression omits that case.",
+   "evidence": "Set Data For Start Date Poa Emails POADetails.cs:26-44 @source/DailyProcess/0031_PoaAccountUpdateDaily.dtsx:27372",
+   "previousVerdict": "FIXED",
+   "recheck": "Re-checked 2026-11-06. Both emailDetailsJson expressions now say \"any other value -> null (the setter assigns nothing, POADetails.cs:31-42)\".",
+   "verdictHistory": [
+    "INCOMPLETE",
+    "FIXED"
+   ],
+   "recheck2": "Re-checked 2026-11-06 (2nd): the fix is still present in the current files; FIXED becomes CONFIRMED (allowed verdict set)."
+  },
+  {
+   "id": "fieldmap.json rowFilters (all 52 targets)",
+   "verdict": "CONFIRMED",
+   "detail": "rowFilters is [] for every target. tools/compose.mjs:83 keeps only lineage row filters that have fileFields, which never happens in a DB-sourced package. The lineage itself has the filters: Is Renewal and Lookup Match for NeedToSendMailBit; Check If POA Account Agent (Exist) and Remove Duplicates for the creates and moves; the four lookups and two splits for Update Current State Poa Main; Get Agent/Agencie/Contact/POA/Provident lookups for sentToPrintOn. They survive only as free text in writeCondition. Also: the lineage labels the ACTIVE/CANCELED filter '[Contains Data]' and NeedToSendMailBit '[Renewal]', but the writers sit on the 'No Data' and 'Not Renewal' outputs. And claims.mjs gives identical ids to the two 'Create POA Account - Agent' writers (account vs pension); this file disambiguates them with a [data flow] suffix.",
+   "evidence": "tools/compose.mjs:83; lineage/0031_PoaAccountUpdateDaily.lineage.json writeComponents[].rowFilters",
+   "previousVerdict": "INCOMPLETE",
+   "recheck": "Re-checked 2026-11-06. MAIN ISSUE FIXED: all 52 targets now have rowFilters (0 empty), including Is Renewal and Lookup Match (NeedToSendMailBit), Check If POA Account Agent (Exist) (creates and moves), and the POA Main lookups and splits. Two residual tool issues remain. (1) rowFilters still show output \"Renewal\" for NeedToSendMailBit and \"Contains Data\" for ACTIVE/CANCELED, but the writers are on \"Not Renewal\" and \"No Data\", so the label is the opposite branch. (2) claims.mjs still emits identical ids for the account and pension \"Create POA Account - Agent\" writers: 21 duplicate ### CLAIM ids out of 52.",
+   "verdictHistory": [
+    "INCOMPLETE"
+   ],
+   "recheck2": "Re-checked 2026-11-06 (2nd). FIXED: the branch labels now carry a leads flag. Is Renewal[Renewal] has leads=false (writer on Not Renewal, correct). \"Is emailDetailsJson Contains Data 1\"[Contains Data] has leads=false (writers on No Data, correct). \"Is emailDetailsJson Contains Data\"[Contains Data] has leads=true: topologically correct, because Contains Data -> Update Json -> Union input 2 -> Sort does reach the writer chain. But every row on that branch has non-NULL JSON and is dropped at Contains Data 1, so in practice it feeds no writer rows (informational). Cosmetic: Is Renewal is listed twice for NeedToSendMailBit. STILL OPEN: `node tools/claims.mjs 0031_PoaAccountUpdateDaily mapping-A.json` still emits 21 duplicate \"### CLAIM\" ids out of 52. The account and pension \"Create POA Account - Agent\" writers share ids such as \"Create POA Account - Agent|gen_powerofattorney|CREATE|gen_appendixtype\", so claim-level verdicts cannot be keyed unambiguously. This file disambiguates them with a [data flow] suffix.",
+   "recheck3": "Re-checked 2026-11-06 (3rd). claims.mjs now prints 52 claim ids, all unique (0 duplicates). The account and pension writers carry \" [Create Power Of Attorney]\" / \" [Create Power Of Attorney - Pension]\" per tools/claimid.mjs, and ids unique to one writer (gen_customeraccount, gen_customerprogram) keep the short form. Every one of the 52 attribute-claim ids in this file now equals a claims.mjs id verbatim; the 2 short-form ids were renamed, with the old form kept in legacyId. NeedToSendMailBit rowFilters now list Is Renewal[Renewal] once (leads=false; correct, the writer is on Not Renewal) plus the Lookup Match routing. All 52 targets keep non-empty rowFilters."
+  },
+  {
+   "id": "logic.json risk: mixed statuses without active POA cancel the POA Main",
+   "verdict": "CONFIRMED",
+   "detail": "The mechanics are verified: the main is set to 3 (DTSX:39334). But calling value 3 'canceled' for gen_powerofattorneymain rests only on the component name 'Set Related Current State To Canceled'. The option meanings are not in the DTSX (StringMap not supplied), as mapping-A itself notes.",
+   "evidence": "analysis/0031_PoaAccountUpdateDaily/logic.json:2005; source/DailyProcess/0031_PoaAccountUpdateDaily.dtsx:39334",
+   "previousVerdict": "FIXED",
+   "recheck": "Re-checked 2026-11-06. logic.json:2005 and the POA Main section (lines 1064, 1097, 1106, 1124, 1184, 1224, 1291) now mark 3 = \"canceled\" and 4 = \"wrong\" as hypotheses based on component names. Minor residual: the open question at logic.json:1342 still says mixed statuses \"will cancel\" the POA Main without the hypothesis qualifier.",
+   "verdictHistory": [
+    "UNVERIFIABLE",
+    "FIXED"
+   ],
+   "recheck2": "Re-checked 2026-11-06 (2nd): the fix is still present in the current files; FIXED becomes CONFIRMED (allowed verdict set). The residual logic.json:1342 is resolved: it now marks 3 = \"canceled\" and \"undesired\" as hypotheses."
+  }
+ ],
+ "missingWrites": [],
+ "notesOnScope": "No business CRM write is missing. All 30 SDK/SQL write calls in the DTSX were enumerated (grep .Create/.Update/.Execute). gen_etlprocess, gen_etlprocesswarning and gen_etlprocesscounter (6 Script Tasks) are plumbing. The 4 commented-out agent e-mail scripts are dead code. Send Poa Emails/Send Email (email Create + SendEmail, out of scope per assignment) remains. The 3 staging OLE DB Commands (Update Json x2, Update IsProcessed True) target SQL.GENERIX_STAGING. No disabled executables, no event handlers, and no property expressions on CRM writers.",
+ "recheckedOn": "2026-11-06 (3rd)"
+}

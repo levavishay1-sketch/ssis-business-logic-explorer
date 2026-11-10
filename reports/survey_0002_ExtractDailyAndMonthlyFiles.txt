@@ -1,0 +1,56 @@
+# 0002_ExtractDailyAndMonthlyFiles.dtsx · 46E408848FD8B88FD19DB63F6A9DFE38D7996629FC8F72DCBDA921670BD3CAE9
+
+## Connection managers
+- [psql] OLEDB Data Source=psql;Initial Catalog=ALTSHULER_MSCRM;Integrated Security=SSPI;  
+- [qsrs.SSIS_Logs] OLEDB Data Source=psrs;Initial Catalog=SSIS_Logs;Integrated Security=SSPI;  
+
+## Executables (disabled marked !)
+-   Create ETL Process record | Microsoft.ScriptTask  
+-   End ETL Process record | Microsoft.Pipeline  
+-   Extract GZ  Fiels | Microsoft.Pipeline  
+-   Get Organization Variables | Microsoft.Pipeline  
+-   Package.EventHandlers[OnError] | EventHandler  
+-   Package.EventHandlers[OnError]\Error ETL Process record | Microsoft.ScriptTask  
+
+## Precedence
+- Get Organization Variables -> Create ETL Process record | Success Constraint   
+- Create ETL Process record -> Extract GZ  Fiels | Success Constraint   
+- Extract GZ  Fiels -> End ETL Process record | Success Constraint   
+
+## DataFlow End ETL Process record
+  - ETL Record Finish | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 2 out 0
+  - Get gen_etlprocessid | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 0 out 1
+  - Lookup | Lookup  | conn [psql]  | in 1 out 1
+     path Lookup.Outputs[Lookup Match Output] => ETL Record Finish.Inputs[Input 0]
+     path Get gen_etlprocessid.Outputs[Output 0] => Lookup.Inputs[Lookup Input]
+
+## DataFlow Extract GZ  Fiels
+  - ETL_Warning | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 5 out 0
+  - Extract GZ Fiels | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 0 out 1
+  - Set Warning columns | DerivedColumn  | conn   | in 1 out 4
+     path Set Warning columns.Outputs[Derived Column Output] => ETL_Warning.Inputs[Input 0]
+     path Extract GZ Fiels.Outputs[Error] => Set Warning columns.Inputs[Derived Column Input]
+
+## DataFlow Get Organization Variables
+  - Get Etl Variables | OLEDBSource  | conn [psql]  | in 0 out 2
+  - Set Variables | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 2 out 0
+     path Get Etl Variables.Outputs[OLE DB Source Output] => Set Variables.Inputs[Input 0]
+
+## SQL statements
+- End ETL Process record\Lookup | Microsoft.Lookup.SqlCommand | [psql] 
+    select p.gen_etlprocessid , case when pw.gen_etlprocessid is null then 0 else 1 end as isWarningExist from gen_etlprocess p left join (select distinct gen_etlprocessId from gen_etlprocesswarning ) as pw on p.gen_etlprocessId = pw.gen_etlprocessId
+- End ETL Process record\Lookup | Microsoft.Lookup.SqlCommandParam | [psql] 
+    select * from (select p.gen_etlprocessid , case when pw.gen_etlprocessid is null then 0 else 1 end as isWarningExist from gen_etlprocess p left join (select distinct gen_etlprocessId from gen_etlprocesswarning ) as pw on p.gen_etlprocessId = pw.gen_etlprocessId) [refTable] where [refTable].[gen_etlprocessid] = ?
+- Get Organization Variables\Get Etl Variables | Microsoft.OLEDBSource.SqlCommand | [psql] 
+    select gen_key, gen_value from gen_etlvariable where (gen_scope = 'global' OR gen_scope = 'LeumiFile-IC')
+
+## Code write candidates (per owner)
+- Create ETL Process record {"variables-write":2,"sql-command":1,"crm-entity":1,"crm-sdk-create":1}
+- End ETL Process record\ETL Record Finish {"sql-command":2,"crm-entity":3,"output-buffer":1,"crm-sdk-update":1}
+- End ETL Process record\Get gen_etlprocessid {"sql-command":2,"output-buffer":2}
+- Extract GZ  Fiels\ETL_Warning {"crm-entity":3,"crm-sdk-create":1}
+- Extract GZ  Fiels\Extract GZ Fiels {"sql-command":2,"output-buffer":1,"file-io":7,"crm-sdk-create":1,"crm-sdk-delete":1}
+- Get Organization Variables\Set Variables {"sql-command":2}
+- Package.EventHandlers[OnError]\Error ETL Process record {"crm-entity":4,"crm-sdk-update":1,"crm-sdk-create":1}
+
+## External refs (non-framework) CRM2015.Proxy

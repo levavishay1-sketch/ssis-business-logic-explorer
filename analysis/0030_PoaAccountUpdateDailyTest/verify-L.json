@@ -1,0 +1,186 @@
+{
+  "verifier": "ssis-verifier",
+  "package": "0030_PoaAccountUpdateDailyTest",
+  "scope": "logic-claims all",
+  "checkedAt": "2026-11-07T00:00:00Z",
+  "checked": 23,
+  "results": [
+    {
+      "id": "L|summary",
+      "hash": "e49c06285abe",
+      "verdict": "CONFIRMED",
+      "detail": "Verified items: Wait flow (state 3, start date passed) -> lookup of active (state 1) POA by isnull(account, program) -> not-renewal -> UPDATE Gen_powerofattorneyBase.gen_iscancellationemailrequired via [CRM] psql/ALTSHULER_MSCRM -> staging letter rows. Cancel flow (state 1, end date passed) -> staging letter rows in [SQL.GENERIX_STAGING].dbo.PowerOfAttorneySendEmails. SDK writes are only gen_etlprocess (create/update) and gen_etlprocesscounter (create). Configurations list is empty and there are no EventHandlers. LogProvider is SRS.SSIS_Logs (psrs/SSIS_Logs). No component writes gen_currentstate.",
+      "evidence": "DTSX:4-21, 123; DTSX:5378-5419, 5541-5567, 6658-6677, 6701-6709, 4187-4235, 5219-5227; Create ETL ScriptMain.cs:98-104; Write To ETLProcessCounter End ScriptMain.cs:52-64"
+    },
+    {
+      "id": "L|exec",
+      "hash": "3deed23fd3b3",
+      "verdict": "CONFIRMED",
+      "detail": "Linear Success chain, all constraints LogicalAnd=True: 8218, 8219, 8221, 8222, 8223, 8224, 8220. Order matches steps 1-8.",
+      "evidence": "DTSX:8218-8224"
+    },
+    {
+      "id": "L|ignored",
+      "hash": "297be53d28dc",
+      "verdict": "CONFIRMED",
+      "detail": "Get Organization Variables reads gen_etlvariable. Get Valid Optionsets Values reads StringMap into User::ValidOptionsetsValues, which has no consumer. Set Queue Id Variable runs 'select QueueId from Queue' into User::AgentDescQueueId, which has no consumer. The counter/ETL tasks write only gen_etlprocess/gen_etlprocesscounter. The log provider is SQL Server logging. None of them writes business data or feeds the Handle flows.",
+      "evidence": "Build Valid Values Dictionary main.cs:103; Set Queue Variable main.cs:101; grep ValidOptionsetsValues/AgentDescQueueId (DTSX:28, 70, 3410-3545, 3978, 7061, 7178-7186, 7595)"
+    },
+    {
+      "id": "L|finding#1",
+      "hash": "d131efa98ff9",
+      "verdict": "CONFIRMED",
+      "detail": "OLE DB Command 'Update NeedToSendMailBit' on [CRM] (Data Source=psql; Initial Catalog=ALTSHULER_MSCRM): update Gen_powerofattorneyBase set gen_iscancellationemailrequired = CASE ... where Gen_powerofattorneyId = ? (Param_0 <- PowerOfAttorneyIdPa). Direct SQL on the CRM base table bypasses the SDK pipeline (Unsupported).",
+      "evidence": "DTSX:6658-6677; DTSX:4"
+    },
+    {
+      "id": "L|finding#2",
+      "hash": "9aed791da4a8",
+      "verdict": "CONFIRMED",
+      "detail": "Neither Handle flow contains a script component or CRM destination (the only ManagedComponentHosts are in the ETL, Get Organization Variables, Optionsets and Queue flows), and no SQL sets gen_currentstate. The re-selection consequence is labelled a hypothesis and is conditional on no external actor.",
+      "evidence": "componentClassID census of 0030; DTSX:5378-5419, 4192-4235"
+    },
+    {
+      "id": "L|finding#3",
+      "hash": "049fd12aaab2",
+      "verdict": "WRONG",
+      "detail": "The FailComponent settings are verified (Is Renewal.Renewal DTSX:5518, AppendixType.AppendixTypeNeedToSendMail DTSX:5317), as are the update-before-AppendixType order and the Success constraint 8223. The failure conditions are overstated as unconditional.",
+      "evidence": "Handle Wait paths; DTSX:5518, 5317, 8223",
+      "wrongUnits": [
+        {
+          "unit": 1,
+          "problem": "Says any active POA without an agent/agency ID, or any waiting POA without an appendix type, fails the data flow.",
+          "correct": "Is Renewal only sees rows that the lookup matched, so a NULL agentcyIdNumberPa fails the flow only when that active POA shares account/program with a due waiting POA. AppendixType only sees Not-Renewal rows (after Update NeedToSendMailBit), so a waiting POA with NULL gen_appendixtype fails the flow only when it matched an active POA of a different agent. A waiting POA with NULL appendix type and no active match goes to Union All -> No Email without error.",
+          "evidence": "paths: Lookup No Match -> Union All; Lookup Match -> Is Renewal; Not Renewal -> Update NeedToSendMailBit -> AppendixType"
+        }
+      ]
+    },
+    {
+      "id": "L|finding#4",
+      "hash": "a8bf4274be6a",
+      "verdict": "CONFIRMED",
+      "detail": "Both source queries filter the outer query with agentcyIdNumber NOT IN (6 literals). For NULL agentcyIdNumber (isnull(Contact.Gen_Identitynumber, Account.AccountNumber) both NULL) the predicate is UNKNOWN, so the row is excluded.",
+      "evidence": "Get Waiting Poa DTSX:5378-5419; Get Active Poa DTSX:4192-4235"
+    },
+    {
+      "id": "L|finding#5",
+      "hash": "22deab4c2552",
+      "verdict": "CONFIRMED",
+      "detail": "(1) 0030 has 8 executables and 0031 has 19. The 6 listed tasks exist only in 0031; the other differences are counter tasks and renamed Handle tasks. (2) 0031 'Update gen_powerofattorney ACTIVE' / '...CANCELED And Status Transfer To Bank' are script components calling proxy.Update with gen_currentstate; 0030 Handle flows have no script component. (3) 0031 sets gen_receivingdateofcancelpoa = CASE ... THEN ? END with no ELSE; 0030 sets gen_iscancellationemailrequired with ELSE 0. (4) gen_iscancellationemailrequired has 0 occurrences in 0031.",
+      "evidence": "0031 DTSX:31302-31307, 21671, 30214; 0031 main.cs ACTIVE:36-42, CANCELED:71-82; 0030 DTSX:6661-6668"
+    },
+    {
+      "id": "L|finding#6",
+      "hash": "d77627141bfe",
+      "verdict": "CONFIRMED",
+      "detail": "All 12 DTSX lines mentioning the two variables are definitions, the setter in the script, generated wrappers, or ReadWriteVariables lists. There is no expression, query parameter or other reader.",
+      "evidence": "DTSX:28, 70, 3410, 3537-3545, 3978, 7061, 7178-7186, 7595"
+    },
+    {
+      "id": "L|finding#7",
+      "hash": "0e46908bff4d",
+      "verdict": "CONFIRMED",
+      "detail": "Gen_startdate and Gen_enddate (written to StartDate/EndDate) are dateadd(HH,3,...) in both source queries, a fixed offset. The selection filters use the unshifted values.",
+      "evidence": "DTSX:5378-5419, 4192-4235; destination mapping Gen_startdate->StartDate, Gen_enddate->EndDate"
+    },
+    {
+      "id": "L|Package\\Handle Wait Status - For Active|title",
+      "hash": "c6e49871aada",
+      "verdict": "CONFIRMED",
+      "detail": "The title, short_he and flow_he[1-5] match the data flow paths and SQL. 'Company agencies' is backed by the SQL comment '--Check agency =! altshuler'.",
+      "evidence": "Handle Wait paths; DTSX:5378-5419, 6658-6677"
+    },
+    {
+      "id": "L|Package\\Handle Wait Status - For Active|short",
+      "hash": "15a0a5736b77",
+      "verdict": "CONFIRMED",
+      "detail": "The branches match: No Match and Renewal go to No Email. Not Renewal goes to the SQL update, then the new POA's AppendixType 2/3/5 leads to a new-POA letter (with or without commission), otherwise No Email. All rows go to staging, and no status write occurs.",
+      "evidence": "Handle Wait paths; DTSX:5317-5340, 5620-5722"
+    },
+    {
+      "id": "L|Package\\Handle Wait Status - For Active|detailed",
+      "hash": "f3b249d86f92",
+      "verdict": "CONFIRMED",
+      "detail": "Every unit was re-derived: SQL filters and the 6 excluded IDs, dateadd +3h, lookup (Full cache, NoMatchBehavior=1, key CustomerAccountProgram->CustomerAccountProgramPa), Is Renewal expression and FailComponent, UPDATE CASE 2/3/5->1 else 0 on the old POA (Param_0=PowerOfAttorneyIdPa), AppendixType expression and FailComponent, appointment split, derived values (NewStatus/EmailFormat/IsProcessed/LetterVersion 1/2), the 14-column staging mapping. The NULL-condition failure is labelled as general SSIS behaviour.",
+      "evidence": "DTSX:5378-5419, 5541-5567, 5507-5518, 6658-6677, 5307-5317, 5340-5353, 5620-5722, 6701-6709"
+    },
+    {
+      "id": "L|Package\\Handle Wait Status - For Active|detail",
+      "hash": "62008918f678",
+      "verdict": "CONFIRMED",
+      "detail": "Population, matching keys, decisions with FailComponent, the only CRM write (direct SQL on gen_iscancellationemailrequired) and the staging StatusAfterUpdate=1 are all verified.",
+      "evidence": "DTSX:5378-5419, 5541-5567, 5518, 5317, 6658-6668, 5632, 5683, 5734 (NewStatus=1)"
+    },
+    {
+      "id": "L|Package\\Handle Wait Status - For Active|decisions",
+      "hash": "bcccdfc3965d",
+      "verdict": "CONFIRMED",
+      "detail": "All 6 conditions match the SQL/expressions exactly, including that the UPDATE's CASE reads Gen_appendixtype of the row being updated (the old active POA).",
+      "evidence": "DTSX:5378-5419, 5551, 5521, 6661-6668, 5320, 5353"
+    },
+    {
+      "id": "L|Package\\Handle Wait Status - For Active|crm",
+      "hash": "b3030388b576",
+      "verdict": "CONFIRMED",
+      "detail": "gen_powerofattorney (Gen_powerofattorneyBase): gen_iscancellationemailrequired is set to 1 for appendix 2/3/5 and 0 otherwise, by SQL on [CRM], Unsupported. The trigger condition is correct.",
+      "evidence": "DTSX:6658-6677; DTSX:4"
+    },
+    {
+      "id": "L|Package\\Handle Wait Status - For Active|open",
+      "hash": "a25db6c80469",
+      "verdict": "WRONG",
+      "detail": "Units [1] and [3] are genuine open points. Unit [2] can largely be answered from the supplied files.",
+      "evidence": "0030 DTSX:4222, 4338, 4350, 5406; 0031 Update gen_powerofattorney ACTIVE main.cs:16; 0031 ... CANCELED main.cs:27",
+      "wrongUnits": [
+        {
+          "unit": 2,
+          "problem": "Says the business meaning of gen_currentstate 1 and 3 is not proven by the files.",
+          "correct": "gen_currentstate 3 = waiting is labelled by the SQL comment 'Gen_currentstate = 3 --waiting' (DTSX:4338, 4350) and the alias WaitingPoas (DTSX:5406). gen_currentstate 1 = active is labelled by the alias ActivePoas (DTSX:4222) and the task/source names 'Get Active Poa' / 'Handle Active Status'. The supplied sibling 0031 declares const int ACTIVE = 1 and CANCELED = 2 for gen_currentstate. Only the meanings of appendix types 2, 3 and 5 remain unproven.",
+          "evidence": "0030 DTSX:4222, 4338, 4350, 5406; 0031 main.cs ACTIVE:16, CANCELED:27"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Handle Active Status - For Cancel|title",
+      "hash": "b34a835a68ce",
+      "verdict": "CONFIRMED",
+      "detail": "Title, short_he and flow_he[1-4] match. The flow contains no CRM write: the destination is GENERIX_STAGING and the reads are an OLE DB Source and a Lookup.",
+      "evidence": "Handle Active paths; DTSX:4187-4235, 4326-4360, 5219-5227"
+    },
+    {
+      "id": "L|Package\\Handle Active Status - For Cancel|short",
+      "hash": "ce164fa32e9f",
+      "verdict": "CONFIRMED",
+      "detail": "Is Need To Send split, then appointment split, then Get Agency match/no-match, giving letter 3 or 8. NoMail goes to No Email. All rows have NewStatus=2 in staging, and there is no CRM status change.",
+      "evidence": "DTSX:4408-4421, 4154-4168, 4326-4360, 4052-4088, 4103-4139, 4441-4471"
+    },
+    {
+      "id": "L|Package\\Handle Active Status - For Cancel|detailed",
+      "hash": "1532dedabe90",
+      "verdict": "CONFIRMED",
+      "detail": "All units re-derived. Get Active Poa filter (end date passed, state 1, 6 IDs excluded). Is Need To Send expression (!ISNULL && == TRUE). No Email (2, ' ללא אימייל', TRUE). With-appointment path via Union All 1 to version 3. Get Agency (state 3 '--waiting', ContractType 1 '--bank', keys account/program/appendixtype, Full cache, NoMatchBehavior=1). Match gives version 3, no match gives version 8. Staging mapping verified.",
+      "evidence": "DTSX:4187-4235, 4408-4421, 4441-4471, 4154-4168, 4326-4360, 4052-4139, 5219-5227"
+    },
+    {
+      "id": "L|Package\\Handle Active Status - For Cancel|detail",
+      "hash": "1f507f85f466",
+      "verdict": "CONFIRMED",
+      "detail": "Population, matching, decisions, no CRM write and StatusAfterUpdate=2 are verified. 'bank' is supported by the SQL comment.",
+      "evidence": "DTSX:4187-4235, 4326-4360, 4052-4139"
+    },
+    {
+      "id": "L|Package\\Handle Active Status - For Cancel|decisions",
+      "hash": "b5767d9a08db",
+      "verdict": "CONFIRMED",
+      "detail": "The 4 conditions match the DTSX exactly. The appointment split and the Get Agency outcomes are routed as stated.",
+      "evidence": "DTSX:4192-4235, 4421, 4167, 4328-4360; Handle Active paths"
+    },
+    {
+      "id": "L|Package\\Handle Active Status - For Cancel|open",
+      "hash": "a6ba7f5b4a34",
+      "verdict": "CONFIRMED",
+      "detail": "[1] NULL-key matching in a Full-cache lookup (CacheType=0) is SSIS runtime behaviour that is not determinable from the files, and the data are unknown. [2] No component in 0030 sets the cancelled state. Who acts on the staging rows is outside the supplied scope (0031 cancels independently via its own SDK component, not via this staging table).",
+      "evidence": "DTSX:4354; Handle Active component census"
+    }
+  ]
+}

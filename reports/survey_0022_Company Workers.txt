@@ -1,0 +1,180 @@
+# 0022_Company Workers.dtsx · F838665D8308355A5FDEB4383396D4D72B33064003318F08932428D4F2EE8D76
+
+## Connection managers
+- [CRM] OLEDB Data Source=Psql;Initial Catalog=ALTSHULER_MSCRM;Integrated Security=SSPI;  
+- [SRS.SSIS_Logs] OLEDB  EXPR ConnectionString=@[User::ConnStringSrsSsis_Logs] 
+
+## Executables (disabled marked !)
+-   Create ETL Process record | Microsoft.ScriptTask  
+-   End ETL Process record | Microsoft.Pipeline  
+-   Get Variables From SystemConfigurarion | Microsoft.Pipeline  
+-   Update CW FTRequests | Microsoft.Pipeline  
+-   Update CW Funds | Microsoft.Pipeline  
+-   Update MF Archive | Microsoft.Pipeline  
+-   Update MF Current Year | Microsoft.Pipeline  
+-   Update MF Previous Year | Microsoft.Pipeline  
+-   Update Regular FTRequest | Microsoft.Pipeline  
+-   Update Regular Funds | Microsoft.Pipeline  
+-   Update Trans | Microsoft.Pipeline  
+-   Package.EventHandlers[OnError] | EventHandler  
+-   Package.EventHandlers[OnError]\Error ETL Process record | Microsoft.ScriptTask  
+
+## Precedence
+- Get Variables From SystemConfigurarion -> Create ETL Process record | Success Constraint   
+- Create ETL Process record -> Update CW Funds | Success Constraint   
+- Update CW Funds -> Update Regular Funds | Success Constraint   
+- Update Regular Funds -> Update Trans | Success Constraint   
+- Update Trans -> Update MF Current Year | Success Constraint   
+- Update MF Current Year -> Update MF Previous Year | Success Constraint   
+- Update MF Previous Year -> Update MF Archive | Success Constraint   
+- Update MF Archive -> Update CW FTRequests | Success Constraint   
+- Update CW FTRequests -> Update Regular FTRequest | Success Constraint   
+- Update Regular FTRequest -> End ETL Process record | Success Constraint   
+
+## DataFlow End ETL Process record
+  - ETL Record Finish | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 2 out 0
+  - Get gen_etlprocessid | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 0 out 1
+  - Lookup | Lookup  | conn [CRM]  | in 1 out 1
+     path Lookup.Outputs[Lookup Match Output] => ETL Record Finish.Inputs[Input 0]
+     path Get gen_etlprocessid.Outputs[Output 0] => Lookup.Inputs[Lookup Input]
+
+## DataFlow Get Variables From SystemConfigurarion
+  - Get SystemConfigurations | OLEDBSource  | conn [CRM]  | in 0 out 2
+  - Set Variables | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 2 out 0
+     path Get SystemConfigurations.Outputs[OLE DB Source Output] => Set Variables.Inputs[Input 0]
+
+## DataFlow Update CW FTRequests
+  - Get CW ftrequests | OLEDBSource  | conn [CRM]  | in 0 out 1
+  - get user | Lookup  | conn [CRM]  | in 1 out 2
+  - Set Columns | DerivedColumn  | conn   | in 0 out 2
+  - Sort | Sort  | conn   | in 5 out 5
+  - Update owner on ftrequest | OLEDBCommand  | conn [CRM]  | in 4 out 0
+     path Set Columns.Outputs[Derived Column Output] => get user.Inputs[Lookup Input]
+     path get user.Outputs[Lookup Match Output] => Sort.Inputs[Sort Input]
+     path Get CW ftrequests.Outputs[OLE DB Source Output] => Set Columns.Inputs[Derived Column Input]
+     path Sort.Outputs[Sort Output] => Update owner on ftrequest.Inputs[OLE DB Command Input]
+
+## DataFlow Update CW Funds
+  - Get CW funds | OLEDBSource  | conn [CRM]  | in 0 out 1
+  - get user | Lookup  | conn [CRM]  | in 1 out 2
+  - Set Columns | DerivedColumn  | conn   | in 0 out 2
+  - Sort | Sort  | conn   | in 5 out 5
+  - Update owner on fund | OLEDBCommand  | conn [CRM]  | in 4 out 0
+     path Set Columns.Outputs[Derived Column Output] => get user.Inputs[Lookup Input]
+     path get user.Outputs[Lookup Match Output] => Sort.Inputs[Sort Input]
+     path Get CW funds.Outputs[OLE DB Source Output] => Set Columns.Inputs[Derived Column Input]
+     path Sort.Outputs[Sort Output] => Update owner on fund.Inputs[OLE DB Command Input]
+
+## DataFlow Update MF Archive
+  - Get MF | OLEDBSource  | conn [CRM]  | in 0 out 4
+  - Sort | Sort  | conn   | in 4 out 4
+  - Update owner on MF | OLEDBCommand  | conn [CRM]  | in 4 out 0
+     path Get MF.Outputs[OLE DB Source Output] => Sort.Inputs[Sort Input]
+     path Sort.Outputs[Sort Output] => Update owner on MF.Inputs[OLE DB Command Input]
+
+## DataFlow Update MF Current Year
+  - Get MF | OLEDBSource  | conn [CRM]  | in 0 out 4
+  - Sort | Sort  | conn   | in 4 out 4
+  - Update owner on MF | OLEDBCommand  | conn [CRM]  | in 4 out 0
+     path Get MF.Outputs[OLE DB Source Output] => Sort.Inputs[Sort Input]
+     path Sort.Outputs[Sort Output] => Update owner on MF.Inputs[OLE DB Command Input]
+
+## DataFlow Update MF Previous Year
+  - Get MF | OLEDBSource  | conn [CRM]  | in 0 out 4
+  - Sort | Sort  | conn   | in 4 out 4
+  - Update owner on MF | OLEDBCommand  | conn [CRM]  | in 4 out 0
+     path Get MF.Outputs[OLE DB Source Output] => Sort.Inputs[Sort Input]
+     path Sort.Outputs[Sort Output] => Update owner on MF.Inputs[OLE DB Command Input]
+
+## DataFlow Update Regular FTRequest
+  - Get regular  ftrequest | OLEDBSource  | conn [CRM]  | in 0 out 1
+  - Get User | Lookup  | conn [CRM]  | in 1 out 2
+  - Set Columns | DerivedColumn  | conn   | in 0 out 2
+  - Sort | Sort  | conn   | in 5 out 5
+  - Update owner on ftrequest | OLEDBCommand  | conn [CRM]  | in 4 out 0
+     path Set Columns.Outputs[Derived Column Output] => Get User.Inputs[Lookup Input]
+     path Get User.Outputs[Lookup Match Output] => Sort.Inputs[Sort Input]
+     path Get regular  ftrequest.Outputs[OLE DB Source Output] => Set Columns.Inputs[Derived Column Input]
+     path Sort.Outputs[Sort Output] => Update owner on ftrequest.Inputs[OLE DB Command Input]
+
+## DataFlow Update Regular Funds
+  - Get regular  funds | OLEDBSource  | conn [CRM]  | in 0 out 1
+  - Get User | Lookup  | conn [CRM]  | in 1 out 2
+  - Set Columns | DerivedColumn  | conn   | in 0 out 2
+  - Sort | Sort  | conn   | in 5 out 5
+  - Update owner on fund | OLEDBCommand  | conn [CRM]  | in 4 out 0
+     path Set Columns.Outputs[Derived Column Output] => Get User.Inputs[Lookup Input]
+     path Get User.Outputs[Lookup Match Output] => Sort.Inputs[Sort Input]
+     path Get regular  funds.Outputs[OLE DB Source Output] => Set Columns.Inputs[Derived Column Input]
+     path Sort.Outputs[Sort Output] => Update owner on fund.Inputs[OLE DB Command Input]
+
+## DataFlow Update Trans
+  - Get ft | OLEDBSource  | conn [CRM]  | in 0 out 4
+  - Sort | Sort  | conn   | in 4 out 4
+  - Update owner on FT | OLEDBCommand  | conn [CRM]  | in 4 out 0
+     path Get ft.Outputs[OLE DB Source Output] => Sort.Inputs[Sort Input]
+     path Sort.Outputs[Sort Output] => Update owner on FT.Inputs[OLE DB Command Input]
+
+## SQL statements
+- End ETL Process record\Lookup | Microsoft.Lookup.SqlCommand | [CRM] 
+    select p.gen_etlprocessid , case when pw.gen_etlprocessid is null then 0 else 1 end as isWarningExist from gen_etlprocess p left join (select distinct gen_etlprocessId from gen_etlprocesswarning ) as pw on p.gen_etlprocessId = pw.gen_etlprocessId
+- End ETL Process record\Lookup | Microsoft.Lookup.SqlCommandParam | [CRM] 
+    select * from (select p.gen_etlprocessid , case when pw.gen_etlprocessid is null then 0 else 1 end as isWarningExist from gen_etlprocess p left join (select distinct gen_etlprocessId from gen_etlprocesswarning ) as pw on p.gen_etlprocessId = pw.gen_etlprocessId) [refTable] where [refTable].[gen_etlprocessid] = ?
+- Get Variables From SystemConfigurarion\Get SystemConfigurations | Microsoft.OLEDBSource.SqlCommand | [CRM] 
+    SELECT gen_key ,gen_Value FROM gen_etlvariable where gen_scope ='global' or gen_scope = ?
+- Update CW FTRequests\Get CW ftrequests | Microsoft.OLEDBSource.SqlCommand | [CRM] 
+    select gen_ftrequestid from gen_ftrequest ft join SystemUser on systemuserid = OwnerId where SystemUser.DomainName != ? and exists (select cw.Gen_identitynumber from Gen_companyworker cw where cw.gen_identitynumber = ft.Gen_identitynumber)
+- Update CW FTRequests\get user | Microsoft.Lookup.SqlCommand | [CRM] 
+    select systemuserid as OwnerId, BusinessUnitId as OwningBusinessUnit, domainname from SystemUser
+- Update CW FTRequests\get user | Microsoft.Lookup.SqlCommandParam | [CRM] 
+    select * from (select systemuserid as OwnerId, BusinessUnitId as OwningBusinessUnit, domainname from SystemUser) [refTable] where [refTable].[domainname] = ?
+- Update CW FTRequests\Update owner on ftrequest | Microsoft.OLEDBCommand.SqlCommand | [CRM] 
+    update [Gen_ftrequestBase] set [OwnerId]=? , [OwningBusinessUnit]=?, [OwnerIdType]=? where [Gen_ftrequestId] = ?
+- Update CW Funds\Get CW funds | Microsoft.OLEDBSource.SqlCommand | [CRM] 
+    select gen_fundmainid from gen_fundmain join SystemUser on systemuserid = OwnerId where SystemUser.DomainName != ? and exists (select Gen_companyworker.Gen_identitynumber from Gen_companyworker where gen_customeridnumber = Gen_identitynumber)
+- Update CW Funds\get user | Microsoft.Lookup.SqlCommand | [CRM] 
+    select systemuserid as OwnerId, BusinessUnitId as OwningBusinessUnit, domainname from SystemUser
+- Update CW Funds\get user | Microsoft.Lookup.SqlCommandParam | [CRM] 
+    select * from (select systemuserid as OwnerId, BusinessUnitId as OwningBusinessUnit, domainname from SystemUser) [refTable] where [refTable].[domainname] = ?
+- Update CW Funds\Update owner on fund | Microsoft.OLEDBCommand.SqlCommand | [CRM] 
+    update [Gen_fundmainBase] set [OwnerId]=? , [OwningBusinessUnit]=?, [OwnerIdType]=? where [Gen_fundmainId] = ?
+- Update MF Archive\Get MF | Microsoft.OLEDBSource.SqlCommand | [CRM] 
+    select mf.Gen_mfArchiveId, f.OwnerId, f.OwningBusinessUnit, f.OwnerIdType from Gen_mfArchive mf join gen_fundmain f on gen_fundmainid = mf.gen_fundnumber where f.OwnerId != mf.OwnerId
+- Update MF Archive\Update owner on MF | Microsoft.OLEDBCommand.SqlCommand | [CRM] 
+    update [Gen_mfArchiveBase] set [OwnerId]=?, [OwningBusinessUnit]=?, [OwnerIdType]=? where [Gen_mfArchiveId] = ?
+- Update MF Current Year\Get MF | Microsoft.OLEDBSource.SqlCommand | [CRM] 
+    select mf.Gen_mfCurrentYearId, f.OwnerId, f.OwningBusinessUnit, f.OwnerIdType from Gen_mfCurrentYear mf join gen_fundmain f on gen_fundmainid = mf.gen_fundnumber where f.OwnerId != mf.OwnerId
+- Update MF Current Year\Update owner on MF | Microsoft.OLEDBCommand.SqlCommand | [CRM] 
+    update [Gen_mfcurrentyearBase] set [OwnerId]=?, [OwningBusinessUnit]=?, [OwnerIdType]=? where [Gen_mfcurrentyearId] = ?
+- Update MF Previous Year\Get MF | Microsoft.OLEDBSource.SqlCommand | [CRM] 
+    select mf.Gen_mfPreviousYearId, f.OwnerId, f.OwningBusinessUnit, f.OwnerIdType from Gen_mfPreviousYear mf join gen_fundmain f on gen_fundmainid = mf.gen_fundnumber where f.OwnerId != mf.OwnerId
+- Update MF Previous Year\Update owner on MF | Microsoft.OLEDBCommand.SqlCommand | [CRM] 
+    update [Gen_mfPreviousYearBase] set [OwnerId]=?, [OwningBusinessUnit]=?, [OwnerIdType]=? where [Gen_mfPreviousYearId] = ?
+- Update Regular FTRequest\Get regular  ftrequest | Microsoft.OLEDBSource.SqlCommand | [CRM] 
+    select gen_ftrequestid from gen_ftrequest ft join SystemUser on systemuserid = OwnerId where SystemUser.DomainName != ? and not exists (select cw.Gen_identitynumber from Gen_companyworker cw where cw.gen_identitynumber = ft.Gen_identitynumber)
+- Update Regular FTRequest\Get User | Microsoft.Lookup.SqlCommand | [CRM] 
+    select systemuserid as OwnerId, BusinessUnitId as OwningBusinessUnit, domainname from SystemUser
+- Update Regular FTRequest\Get User | Microsoft.Lookup.SqlCommandParam | [CRM] 
+    select * from (select systemuserid as OwnerId, BusinessUnitId as OwningBusinessUnit, domainname from SystemUser) [refTable] where [refTable].[domainname] = ?
+- Update Regular FTRequest\Update owner on ftrequest | Microsoft.OLEDBCommand.SqlCommand | [CRM] 
+    update [gen_ftrequestBase] set [OwnerId]=? , [OwningBusinessUnit]=?, [OwnerIdType]=? where [gen_ftrequestId] = ?
+- Update Regular Funds\Get regular  funds | Microsoft.OLEDBSource.SqlCommand | [CRM] 
+    select gen_fundmainid from gen_fundmain join SystemUser on systemuserid = OwnerId where SystemUser.DomainName != ? and not exists (select Gen_companyworker.Gen_identitynumber from Gen_companyworker where gen_customeridnumber = Gen_identitynumber)
+- Update Regular Funds\Get User | Microsoft.Lookup.SqlCommand | [CRM] 
+    select systemuserid as OwnerId, BusinessUnitId as OwningBusinessUnit, domainname from SystemUser
+- Update Regular Funds\Get User | Microsoft.Lookup.SqlCommandParam | [CRM] 
+    select * from (select systemuserid as OwnerId, BusinessUnitId as OwningBusinessUnit, domainname from SystemUser) [refTable] where [refTable].[domainname] = ?
+- Update Regular Funds\Update owner on fund | Microsoft.OLEDBCommand.SqlCommand | [CRM] 
+    update [Gen_fundmainBase] set [OwnerId]=? , [OwningBusinessUnit]=?, [OwnerIdType]=? where [Gen_fundmainId] = ?
+- Update Trans\Get ft | Microsoft.OLEDBSource.SqlCommand | [CRM] 
+    select ft.Gen_ftCurrentYearId, f.OwnerId, f.OwningBusinessUnit, f.OwnerIdType from Gen_ftCurrentYear ft join gen_fundmain f on gen_fundmainid = ft.gen_fundnumber where f.OwnerId != ft.OwnerId
+- Update Trans\Update owner on FT | Microsoft.OLEDBCommand.SqlCommand | [CRM] 
+    update [Gen_ftcurrentyearBase] set [OwnerId]=?, [OwningBusinessUnit]=?, [OwnerIdType]=? where [Gen_ftcurrentyearId] = ?
+
+## Code write candidates (per owner)
+- Create ETL Process record {"crm-entity":1,"crm-sdk-create":1,"variables-write":1}
+- End ETL Process record\ETL Record Finish {"sql-command":2,"crm-entity":3,"output-buffer":1,"crm-sdk-update":1}
+- End ETL Process record\Get gen_etlprocessid {"sql-command":2,"output-buffer":2}
+- Package.EventHandlers[OnError]\Error ETL Process record {"crm-entity":4,"crm-sdk-update":1,"crm-sdk-create":1}
+
+## External refs (non-framework) CRM2015.Proxy

@@ -1,0 +1,225 @@
+{
+  "package": "0038_EmployerEnrolment",
+  "dataFlows": [
+    "Package\\Send Email"
+  ],
+  "analyst": "ssis-field-lineage",
+  "source": {
+    "file": "source/DailyProcess/0038_EmployerEnrolment.dtsx",
+    "sha256": "EE81202D1055BC8499F5E40CDA63F17C6D610F25057154E97841E2C0C9C981D3"
+  },
+  "scriptOutputs": [],
+  "crmWrites": [
+    {
+      "component": "Package\\Send Email\\Send Email To Maasikim",
+      "identicalCopies": [],
+      "entity": "email",
+      "verb": "CREATE",
+      "mechanism": "SDK (CrmProxy.Create email, followed by service.Execute OrganizationRequest 'SendEmail' {EmailId, TrackingToken=\"\", IssueSend=true})",
+      "status": "Supported",
+      "recordKey": "New record (service.Create returns emailid); no lookup of existing e-mails - one e-mail per input row, no deduplication.",
+      "recordKeyColumns": [],
+      "declaredRowFilters": [
+        {
+          "file": "PSQL",
+          "field": "Get Data From Employer Enrolment & Fundmain: gen_currentstate",
+          "via": "Package\\Send Email\\Get Data From Employer Enrolment & Fundmain",
+          "why": "Source SQL (CRM DB, filtered views): Gen_employerenrolment ee JOIN Gen_fundmain fm ON customer id numbers equal after stripping leading zeros/spaces (SUBSTRING(x, PATINDEX('%[^0 ]%', x + ' '), LEN(x)) on both sides) JOIN product p ON p.ProductId = fm.gen_fundtypename JOIN Account a ON ee.gen_employersnumber = a.AccountId LEFT JOIN Gen_employers e ON e.Gen_employersId = fm.gen_employernumber AND a.AccountNumber = e.Gen_CorporateNumber WHERE gen_currentstate = 1 AND gen_employerdepositdate <= fm.Gen_FundCreationDate AND ee.CreatedOn >= GETDATE()-7 AND ((p.gen_subproduct = 1 AND ee.gen_producttype = 1) OR (p.gen_subproduct = 4 AND ee.gen_producttype = 2) OR (p.gen_subproduct = 2 AND ee.gen_producttype = 3)) AND fm.Gen_existinfile = 1. One row per (enrolment, matching fund): an enrolment matching several funds yields several e-mails.",
+          "evidence": "SqlCommand DTSX:6076-6112"
+        },
+        {
+          "file": "PSQL",
+          "field": "Get Data From Employer Enrolment & Fundmain: gen_producttype",
+          "via": "Package\\Send Email\\Get Data From Employer Enrolment & Fundmain",
+          "why": "Source SQL WHERE product-type / sub-product pairing (see first filter of this writer).",
+          "evidence": "SqlCommand DTSX:6109-6111"
+        },
+        {
+          "file": "PSQL",
+          "field": "Get Data From Employer Enrolment & Fundmain: gen_subproduct",
+          "via": "Package\\Send Email\\Get Data From Employer Enrolment & Fundmain",
+          "why": "Source SQL WHERE product-type / sub-product pairing (see first filter of this writer).",
+          "evidence": "SqlCommand DTSX:6109-6111"
+        },
+        {
+          "file": "PSQL",
+          "field": "Get Data From Employer Enrolment & Fundmain: gen_employerdepositdate",
+          "via": "Package\\Send Email\\Get Data From Employer Enrolment & Fundmain",
+          "why": "Source SQL WHERE gen_employerdepositdate <= fm.Gen_FundCreationDate.",
+          "evidence": "SqlCommand DTSX:6107"
+        },
+        {
+          "file": "PSQL",
+          "field": "Get Data From Employer Enrolment & Fundmain: gen_fundcreationdate",
+          "via": "Package\\Send Email\\Get Data From Employer Enrolment & Fundmain",
+          "why": "Source SQL WHERE gen_employerdepositdate <= fm.Gen_FundCreationDate.",
+          "evidence": "SqlCommand DTSX:6107"
+        },
+        {
+          "file": "PSQL",
+          "field": "Get Data From Employer Enrolment & Fundmain: gen_fundestateid",
+          "via": "Package\\Send Email\\Check If To Send Mail",
+          "why": "Script routing (DirectRowToOutput0 only): row continues to the writer only if !gen_producttype_IsNull && !gen_fundestateid_IsNull AND either (gen_selfemployed == false && gen_fundestateid == 1 && eemployersId and fmemployernumber both non-NULL && eemployersId == fmemployernumber && !gen_incorrectamount_IsNull) or (gen_selfemployed == true && gen_fundestateid == 2 && !gen_incorrectamount_IsNull). Other non-NULL combinations of selfemployed/fundestateid go to 'Errors' (ETL warning); everything else is silently dropped (no DirectRowTo call). eemployersId is the LEFT JOIN Gen_employers match, so for a salaried enrolment the fund's employer must be the Gen_employers record whose Gen_CorporateNumber equals the enrolment employer's AccountNumber.",
+          "evidence": "Check If To Send Mail main.cs:115-144 (DTSX:3656-3685)"
+        },
+        {
+          "file": "PSQL",
+          "field": "Get Data From Employer Enrolment & Fundmain: gen_selfemployed",
+          "via": "Package\\Send Email\\Check If To Send Mail",
+          "why": "Same script routing: gen_selfemployed == false requires fundestateid 1 and employer match; == true requires fundestateid 2.",
+          "evidence": "Check If To Send Mail main.cs:119, 132 (DTSX:3660, 3673)"
+        },
+        {
+          "file": "PSQL",
+          "field": "Get Data From Employer Enrolment & Fundmain: eemployersId",
+          "via": "Package\\Send Email\\Check If To Send Mail",
+          "why": "Same script routing: for non-self-employed rows eemployersId (e.Gen_employersId from LEFT JOIN) must be non-NULL and equal fmemployernumber.",
+          "evidence": "Check If To Send Mail main.cs:121-123 (DTSX:3662-3664)"
+        },
+        {
+          "file": "PSQL",
+          "field": "Get Data From Employer Enrolment & Fundmain: fmemployernumber",
+          "via": "Package\\Send Email\\Check If To Send Mail",
+          "why": "Same script routing: fmemployernumber (fm.gen_employernumber) must be non-NULL and equal eemployersId for non-self-employed rows.",
+          "evidence": "Check If To Send Mail main.cs:121-123 (DTSX:3662-3664)"
+        },
+        {
+          "file": "PSQL",
+          "field": "Get Data From Employer Enrolment & Fundmain: gen_incorrectamount",
+          "via": "Package\\Send Email\\Check If To Send Mail",
+          "why": "Same script routing: rows with NULL gen_incorrectamount are dropped in both branches.",
+          "evidence": "Check If To Send Mail main.cs:125, 134 (DTSX:3666, 3675)"
+        }
+      ],
+      "condition": "Row reaches the writer via 'Check If To Send Mail' Output 0 (see declaredRowFilters), then inside Input0_ProcessInputRow the e-mail is created only when Row.gendeposittype == 1 (to = Gvia queue) or == 2 (to = Maasikim queue); any other value: nothing is created (main.cs:86-95). After Create, SendEmail is executed immediately (main.cs:154-156, 161-171). NULL handling (DTSX fact + general SSIS/.NET knowledge, not verified at runtime): the BufferWrapper getters read the columns with Buffer.GetString / GetGuid / GetInt32 and no NULL check (DTSX:6819-6823 employerenrolment_customeridnumber, 6849-6853 gen_fundnumber, 6879-6883 Gen_customername, 6894-6898 Gen_employerenrolmentId, 6909-6913 gen_deposittype, 6924-6928 EmployerNumber). main.cs:78-83 (DTSX:6409-6414) reads all of them unconditionally before the deposit-type test, and per documented SSIS behaviour reading a NULL column value throws ColumnIsNullException. The catch(Exception ex) then evaluates ex.InnerException.Message (main.cs:112, DTSX:6443); with no InnerException this throws NullReferenceException inside the catch, so the component - and the 'Send Email' data flow - fails. The same applies to a NULL gen_deposittype (main.cs:86/91) and to an invalid/empty queue id in User::MaasikimQueueId / User::GviaQueueId (new Guid(...) throws FormatException, main.cs:75-76). A NULL in any of these columns therefore never yields an e-mail with empty text; it aborts processing.",
+      "attributes": [
+        {
+          "attribute": "regardingobjectid",
+          "from": [
+            {
+              "column": "Gen_employerenrolmentId",
+              "role": "value"
+            },
+            {
+              "column": "gen_deposittype",
+              "role": "condition"
+            }
+          ],
+          "expression": "email[\"regardingobjectid\"] = new EntityReference(toEntityName1, employerEnrolment.EmployerEnrolmentGuid) with toEntityName1 = \"gen_employerenrolment\" and EmployerEnrolmentGuid = Row.GenemployerenrolmentId (ee.Gen_employerenrolmentId). Unchanged GUID. A NULL gen_deposittype does not skip the row silently: it throws and fails the component (see NULL handling in this writer's condition; general SSIS/.NET semantics).",
+          "fixedValue": null,
+          "condition": "gendeposittype == 1 or 2",
+          "evidence": "Send Email To Maasikim main.cs:33, 83, 131 (DTSX:6364, 6414, 6462)"
+        },
+        {
+          "attribute": "subject",
+          "from": [
+            {
+              "column": "gen_fundnumber",
+              "role": "value"
+            },
+            {
+              "column": "Gen_customername",
+              "role": "value"
+            },
+            {
+              "column": "employerenrolment_customeridnumber",
+              "role": "value"
+            },
+            {
+              "column": "gen_deposittype",
+              "role": "condition"
+            }
+          ],
+          "expression": "SetMailSubject(EmployerEnrolmentId, EmployerEnrolmentName, EmployerEnrolmentFundNumber) => FundNumber + \",\" + CustomerName + \",\" + CustomerId + \"-התראה בגין מסך שגויים \" where FundNumber = Row.genfundnumber (fm.gen_fundnumber), CustomerName = Row.Gencustomername (ee.Gen_customername), CustomerId = Row.employerenrolmentcustomeridnumber (ee.gen_customeridnumber, not zero-stripped). The three columns are never NULL in a created e-mail: a NULL in any of them throws while reading the row (see the NULL handling note in this writer's condition) and fails the component (general SSIS/.NET semantics, hypothesis at runtime).",
+          "fixedValue": null,
+          "condition": "gendeposittype == 1 or 2",
+          "evidence": "Send Email To Maasikim main.cs:78, 80, 82, 133, 176-181 (DTSX:6409, 6411, 6413, 6464, 6507-6512); BufferWrapper getters DTSX:6819-6823, 6849-6853, 6879-6883; catch main.cs:110-121 (DTSX:6441-6452)"
+        },
+        {
+          "attribute": "description",
+          "from": [
+            {
+              "column": "employerenrolment_customeridnumber",
+              "role": "value"
+            },
+            {
+              "column": "Gen_customername",
+              "role": "value"
+            },
+            {
+              "column": "EmployerNumber",
+              "role": "value"
+            },
+            {
+              "column": "gen_fundnumber",
+              "role": "value"
+            },
+            {
+              "column": "gen_incorrectamount",
+              "role": "value"
+            },
+            {
+              "column": "gen_deposittype",
+              "role": "condition"
+            }
+          ],
+          "expression": "SetMailBody(...) builds HTML: \"<html dir=\\\"rtl\\\">\" + \"תז-\" + EmployerEnrolmentId (Row.employerenrolmentcustomeridnumber) + \"<br />\" + \"שם מלא לקוח - \" + EmployerEnrolmentName (Row.Gencustomername) + \"<br />\" + \"ח.פ מעסיק -\" + EmployerEnrolmentEmployerId (Row.EmployerNumber = a.AccountNumber of the enrolment's employer account) + \"<br />\" + \"  מספר קופה שנפתחה -\" + EmployerEnrolmentFundNumber (Row.genfundnumber) + \"<br />\" + \"סכום הפקדה שגוי - \" + EmployerEnrolmentIncorrectDepositAmount + \"<br />\" + \"<b>בברכה, מחלקת מעסיקים</b>\" + \"</html>\". EmployerEnrolmentIncorrectDepositAmount = !Row.genincorrectamount_IsNull ? Row.genincorrectamount.ToString() : null (decimal/currency ToString with the host's current culture; never NULL here because Check If To Send Mail drops NULL amounts). NULL handling: employerenrolment_customeridnumber, Gen_customername, EmployerNumber and gen_fundnumber are read via Buffer.GetString without a NULL check (only gen_incorrectamount is guarded by _IsNull); a NULL in any of them throws ColumnIsNullException while building EmployerEnrolment (main.cs:78-82) and, through the catch's ex.InnerException.Message, fails the component - it is never rendered as empty text (DTSX fact for the code; exception behaviour = general SSIS/.NET knowledge, not verified at runtime).",
+          "fixedValue": null,
+          "condition": "gendeposittype == 1 or 2",
+          "evidence": "Send Email To Maasikim main.cs:78-82, 134, 183-195 (DTSX:6409-6413, 6465, 6514-6526); BufferWrapper getters DTSX:6819-6823, 6849-6853, 6879-6883, 6924-6928; catch main.cs:110-121 (DTSX:6441-6452)"
+        },
+        {
+          "attribute": "directioncode",
+          "from": [
+            {
+              "column": "gen_deposittype",
+              "role": "condition"
+            }
+          ],
+          "expression": "email[\"directioncode\"] = true (Outgoing).",
+          "fixedValue": true,
+          "condition": "gendeposittype == 1 or 2",
+          "evidence": "Send Email To Maasikim main.cs:135 (DTSX:6466)"
+        },
+        {
+          "attribute": "from",
+          "from": [
+            {
+              "column": "gen_deposittype",
+              "role": "condition"
+            }
+          ],
+          "expression": "email[\"from\"] = EntityCollection{EntityName = \"queue\", Entities = [activityparty{partyid = new EntityReference(\"queue\", from)}]}. Both calls pass from = Maasikim = new Guid(Variables.MaasikimQueueId) (package variable set by 'Get Variables From Etl Varibles' from gen_etlvariable, key 'MaasikimQueueId'). Not a literal; no input column carries the value. A NULL gen_deposittype or an invalid queue GUID variable does not skip the row silently: it throws and fails the component (see NULL handling in this writer's condition; general SSIS/.NET semantics).",
+          "fixedValue": null,
+          "condition": "gendeposittype == 1 or 2 (same sender queue in both cases)",
+          "evidence": "Send Email To Maasikim main.cs:35-36, 75, 89, 94, 137-148 (DTSX:6366-6367, 6406, 6420, 6425, 6468-6479); variable setter Get Variables From Etl Varibles\\Script Component main.cs:100-104, 122 (ReadWriteVariables DTSX:3283)"
+        },
+        {
+          "attribute": "to",
+          "from": [
+            {
+              "column": "gen_deposittype",
+              "role": "condition"
+            }
+          ],
+          "expression": "email[\"to\"] = EntityCollection{EntityName = \"queue\", Entities = [activityparty{partyid = new EntityReference(\"queue\", to)}]} where to = new Guid(Variables.GviaQueueId) when Row.gendeposittype == 1, and to = new Guid(Variables.MaasikimQueueId) when Row.gendeposittype == 2. Values are package variables from gen_etlvariable (keys 'GviaQueueId' / 'MaasikimQueueId'); gen_deposittype only selects which one. A NULL gen_deposittype or an invalid queue GUID variable does not skip the row silently: it throws and fails the component (see NULL handling in this writer's condition; general SSIS/.NET semantics).",
+          "fixedValue": null,
+          "condition": "gendeposittype == 1 -> Gvia queue; == 2 -> Maasikim queue",
+          "evidence": "Send Email To Maasikim main.cs:34, 75-76, 86-95, 141-153 (DTSX:6365, 6406-6407, 6417-6426, 6472-6484)"
+        }
+      ],
+      "evidence": "Send Email To Maasikim main.cs:71-174 (DTSX:6402-6505), ScriptComponent DTSX:6207; input columns DTSX:7420-7427"
+    }
+  ],
+  "readWriteModifications": [],
+  "lookupBridges": [],
+  "unresolved": [],
+  "notes": [
+    "Writers in lineage: 4 script writers. Mapped: 1 (Send Email\\Send Email To Maasikim: email CREATE + SendEmail request, 6 attributes). Excluded as ETL plumbing: Send Email\\ETL Warning 1 2 1 and its byte-identical copy ETL Warning 1 2 1 1 (gen_etlprocesswarning creates, dupes.json), End ETL Process record\\ETL Record Finish (gen_etlprocess update); also the Script Task 'Create ETL Process record' and the variable-loading flow 'Get Variables From Etl Varibles'.",
+    "Besides creating the e-mail, the script immediately executes the CRM message SendEmail (IssueSend=true, TrackingToken=\"\") on the new e-mail - this changes the e-mail state to sent/pending send in CRM; it is a CRM action, not an attribute assignment (main.cs:156, 161-171 / DTSX:6487, 6492-6502).",
+    "Input column gen_employernumber (fm.gen_employernumber) is passed to the writer but never referenced in its code (only Row.EmployerNumber = a.AccountNumber is used for the 'ח.פ מעסיק' line).",
+    "Duplicates: the SQL joins enrolment to fund on the zero-stripped customer id number; an enrolment with several matching funds (passing the filters) produces several e-mails per run, and because the window is ee.CreatedOn >= GETDATE()-7, the same enrolment is re-mailed on every daily run for 7 days (no 'already sent' flag is read or written in this package). Fact = SQL text; operational impact = hypothesis (depends on schedule).",
+    "Error handling (code = DTSX fact; runtime behaviour = general SSIS/.NET knowledge, not verified): any exception in Input0_ProcessInputRow - including ColumnIsNullException from reading a NULL employerenrolment_customeridnumber / gen_fundnumber / Gen_customername / EmployerNumber / gen_deposittype (GetString/GetInt32 without NULL check, DTSX:6819-6928) and FormatException from an invalid queue GUID variable - reaches catch(Exception ex), which reads ex.InnerException.Message; with no InnerException this throws NullReferenceException inside the catch and fails the component and the data flow (remaining rows get no e-mail; e-mails already created/sent stay). Only exceptions with an InnerException not containing 'token' are routed to the Error output (ETL warning). SoapException branch sets Row.ErrorMessage but does NOT call DirectRowToError. Retry counter is never reset. If Create succeeds and SendEmail fails, the e-mail remains in CRM unsent.",
+    "Check If To Send Mail reads Row.genselfemployed without an _IsNull check; per SSIS buffer semantics a NULL here raises an exception (hypothesis, not verified at runtime)."
+  ]
+}

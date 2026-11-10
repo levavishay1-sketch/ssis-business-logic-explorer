@@ -1,0 +1,34 @@
+{
+  "verifier": "ssis-verifier",
+  "package": "0025_Agents_Agencies",
+  "scope": "logic-claims re-check",
+  "checkedAt": "2026-11-10",
+  "checked": 3,
+  "results": [
+    {
+      "id": "L|summary",
+      "hash": "5cdacdcb6e3b",
+      "verdict": "CONFIRMED",
+      "detail": "Part (1): Get agent Data (DTSX:5056-5094) sums isnull(gen_accountbalance,0) over a UNION ALL of the fund's own contract (ac via f.gen_brokernumber) and the contract it references (acc via ac.gen_agencycontractnumber), grouped by gen_agentsid/gen_agencieid (left joins), HAVING ABS(sum - isnull(gen_agentvalue,0) + isnull(gen_agencyvalue,0)) > 1 (plus sign stated). Agent Or Agency: !ISNULL(gen_agentsid) EvaluationOrder 0 -> Update Agents (UPDATE Gen_agentsBase SET gen_agentvalue = ? WHERE gen_agentsid = ?); !ISNULL(gen_agencieid) order 1 -> Update Agencies (Gen_agencieBase.gen_agencyvalue); Default Output has no path. Both OLE DB Commands on [CRM] = Unsupported. Part (2): both sources filter gen_commissionpostponed != 1 (NULL excluded) AND (licence / bookkeeping / tax-deduction expiry IS NULL OR dateadd(HOUR,3,x) < CONVERT(DATE,GETDATE())); 'set pausereason field' replaces gen_pausereason in place: ISNULL(gen_licenseexpdate) || DATEDIFF(\"dd\",GETDATE(),gen_licenseexpdate) < 0 ? 5 : 4 (licence date already +3h from the SQL); scripts set gen_commissionpostponed = true and gen_pausereason via ExecuteMultipleExtension RequestType.Update (agents main.cs:71-80, agencies analogous). scopeNote_he: [CRM] DTSX:4-6 and DTSID, all sources/commands on [CRM], disabled Execute SQL Task Connection={D51CCED1-...} (DTSX:3156-3160), HintPath D:\\CRM2015.Proxy.dll at DTSX:4336 and 6553 (both), EnableConfig=True + unsupplied C:\\Generix\\SSISConfigFile.dtsConfig (DTSX:1, 17), source-only analysis - correct; CRM2015.Proxy is the only non-system reference, so CRM.Proxy comes from it. Notes: the quoted Hebrew labels 'שווי סוכן' / 'שווי סוכנות' / 'עמלה מושהית' appear in no supplied file (only the ETL warning text 'שגיאה בעדכון סטטוס מושהה עמלה בסוכן'); they are used as renderings next to the attribute names, not as business claims.",
+      "evidence": "0025_Agents_Agencies.dtsx:4-6, 17, 3156-3160, 3941-3950, 3986, 4336, 5014-5047, 5056-5094, 5127-5224, 6002-6016, 6047, 6553, main.cs (DTSX:6277ff) lines 71-80, 95-129",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|finding#4",
+      "hash": "1a503946e906",
+      "verdict": "CONFIRMED",
+      "detail": "Expression verified (DTSX:5090): gen_agencyvalue is added. Ownership assumption explicitly labelled השערה. (א) with no agent the term is ABS(sum + stored agency value); conditional on the stored value being the previous write and unchanged balances it is ABS(2*sum) > 1, i.e. |sum| > 0.5, rewritten with the same value; otherwise ABS(new + previous) > 1 decides - correct (one no-agent group per agency, since NULL agent ids group together). (ב) correctly conditional: when sum = gen_agentvalue the term reduces to ABS(gen_agencyvalue) > 1. Opposite-sign skip correctly hedged. Not framed as a bug.",
+      "evidence": "0025_Agents_Agencies.dtsx:5062-5090, 5014-5047, 5127-5224",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\update agents commissionpostponed field|open",
+      "hash": "b74354352fee",
+      "verdict": "CONFIRMED",
+      "detail": "[1] no labels for pause reasons 4/5 anywhere in the package (derived column literal only). [2] no comment explains the +3 hours (SQL has no comments; hypothesis labelled). [3] ExecuteMultipleExtension behaviour unknown - CRM2015.Proxy is external.",
+      "evidence": "0025_Agents_Agencies.dtsx:6007, 6047-6055, main.cs (DTSX:6277ff) 95-118",
+      "wrongUnits": []
+    }
+  ],
+  "missingWrites": []
+}

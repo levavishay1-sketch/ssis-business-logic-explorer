@@ -1,0 +1,756 @@
+{
+  "verifier": "ssis-verifier",
+  "package": "0009_LeumiFile-BY",
+  "scope": "mapping-A.json",
+  "checked": 102,
+  "round": 2,
+  "summary": {
+    "claims": {
+      "CONFIRMED": 51,
+      "FIXED": 21,
+      "WRONG": 0,
+      "INCOMPLETE": 0,
+      "UNVERIFIABLE": 0
+    },
+    "fields": {
+      "CONFIRMED": 10,
+      "FIXED": 6
+    },
+    "spotChecks": {
+      "CONFIRMED": 14,
+      "WRONG": 0,
+      "INCOMPLETE": 0
+    }
+  },
+  "notes": [
+    "ROUND 2 (re-verification after tool fix + mapping-A update): all 21 non-CONFIRMED claims and all 6 non-CONFIRMED field items re-checked against the current `node tools/claims.mjs 0009_LeumiFile-BY mapping-A.json` (+ --fields) output and the code -> all FIXED. 14 new spot-checks (SC-*) on declaredRowFilters / recordKeyColumns / declaredSources and on the tool-computed per-writer rowFilters: 11 CONFIRMED, 1 WRONG (false-positive row filters), 2 INCOMPLETE (row-filter polarity/attribution; Maslulim Merge Join/Sort filters not structured). The round-1 notes below describe the state before the fix.",
+    "ROOT CAUSE of most WRONG verdicts (tool, not analyst JSON): tools/lineage.mjs:148-149 stores scriptOutputs.from[].role on script-code nodes, but lineage.mjs:250 builds node.origin = s.from.map(...) without the role, and compose.mjs:50 / lineage.mjs:268 follow n.origin with the PARENT role. Every input that the analyst declared role 'condition' on a resolved script output (Convert Data Types, Convert gen_isActive, Compare Fields Before Update) is therefore printed as VALUE in the claims. mapping-A.json itself has the correct roles. Fixing the tool (propagate 'influence' for condition/key roles) would turn the 17 WRONG claims into correct ones; the attribute-level facts below must still be re-checked after the fix.",
+    "Copies verified: SDK Create (outside) 1-5 main.cs sha 018b435872df and identical input lists; Create Annotation 1-5 sha c872f18903c1; Maslulim SDK Create 1-5 sha f575e09a3041; Update TransferIn 2/3/4/5 sha 824c90373700, Update TransferIn 1 sha 7bf44029d7f8 (whitespace only at main.cs 128/153/170); Update 1 and 2 have the extra unused input ProcessNumber. Functional behaviour of all Update versions is identical, so Update 1/2/3 get identical verdicts.",
+    "Chain-order cosmetic issue (not a verdict driver): Maslulim chains print 'Trim All Input Columns' before 'Childe Saving handel', but the real order is Read BY Data From Staging -> Childe Saving handel -> Set Task Name Variable -> Multicast -> Trim All Input Columns (paths in the Maslulim data flow). The RWM text itself correctly says 'runs before Trim'.",
+    "Runtime-semantics consistency: the analyst applies PipelineBuffer ColumnIsNullException semantics to Update TransferIn (FINDING 2) but scriptOutputs for 'Convert gen_isActive from char to int' says NULL Is_Active_92 -> gen_IsActive NULL. By the same semantics string.IsNullOrEmpty(Row.IsActive92) (main.cs:121, DTSX 87394) throws on a NULL column with no try/catch (data-flow failure). Practically only '' reaches it (Trim keeps ''), so it does not change a mapping, but the statement should be aligned.",
+    "No missing CRM writes found: the only CRM writers in the two data flows are SDK Create gen_TransferIn 1-5 (outside source), Update TransferIn 1-5, Create Annotation 1-5 and Maslulim SDK Create gen_TransferIn 1-5; all attributes they set (26 / 10 / 4 / 12) are covered and none is invented."
+  ],
+  "results": [
+    {
+      "id": "SDK Create gen_TransferIn 1|gen_transferin|CREATE|gen_clientstatus",
+      "dataFlow": "Create transferin from outside source",
+      "verdict": "FIXED",
+      "detail": "ROUND 2: claim now shows VALUE Is_Active_92, INFLUENCE Transfer_Status_Reason_89, Transfer_Approval_Index_122 — matches the code. ROUND 1: VALUE lists Is_Active_92, Transfer_Status_Reason_89, Transfer_Approval_Index_122. Only Is_Active_92 is a value (Trim -> int.Parse; 0 -> 2, else as is; writer skips NULL/0). Transfer_Status_Reason_89 and Transfer_Approval_Index_122 only decide whether the row leaves 'Convert gen_isActive' via Output 0 (each NULL or int-parsable) -> they are INFLUENCE (condition). mapping-A scriptOutputs already has role=condition; the claim shows VALUE because of the compose/lineage role bug (see notes). Rest of the claim (entity, attribute, condition !IsNull && != 0, manipulation) is correct.",
+      "evidence": "Convert gen_isActive main.cs:121-131 value, 135-168 routing (DTSX 87394-87441); SDK Create main.cs:78-79 (DTSX 97156-97157)"
+    },
+    {
+      "id": "SDK Create gen_TransferIn 1|gen_transferin|CREATE|gen_statusleumi",
+      "dataFlow": "Create transferin from outside source",
+      "verdict": "FIXED",
+      "detail": "ROUND 2: claim now shows VALUE Request_Status_58, INFLUENCE Transfer_Approval_Index_122, Transfer_Status_Reason_89 — correct. ROUND 1: VALUE should be Request_Status_58 only (Trim -> Int32.TryParse -> MapLeumiStatus, unmapped -> 0 written). Transfer_Approval_Index_122 and Transfer_Status_Reason_89 only feed isValidRecord in 'Convert Data Types' (row goes to Output 0 if any of the three parses) -> INFLUENCE (condition), not VALUE. Mapping table 18 values + default 0 verified exactly.",
+      "evidence": "Convert Data Types main.cs:120-138 (DTSX 85503-85521); SDK Create main.cs:84-85, 193-216 (DTSX 97162-97163, 97271-97294)"
+    },
+    {
+      "id": "SDK Create gen_TransferIn 1|gen_transferin|CREATE|gen_fundfinanceid",
+      "dataFlow": "Create transferin from outside source",
+      "verdict": "FIXED",
+      "detail": "ROUND 2: claim now shows VALUE Source_Curator_Course_Id_18 (analyst declaredSources: lookup returns the same reference column it joins on, full cache exact match, every row reaching the writer has a match) plus INFLUENCE Source_Curator_Course_Id_18 (lookup key) — correct; declaredSources evidence re-checked (DTSX 94467-94469, 106315-106333, 97206-97207). ROUND 1: Claim: VALUE none, INFLUENCE Source_Curator_Course_Id_18. The written value gen_sourcefundfinanceid is the lookup return RIGHT('000000'+Competitor.Gen_FundFinanceID,6) of the SAME reference column used as join key (JoinToReferenceColumn=gen_fundfinanceid, full cache = exact match), so on every row that reaches the writer (CompetitorId not NULL) the value written is byte-identical to the trimmed Source_Curator_Course_Id_18 (file pos 77-82). The claim should state that the CRM value equals Source_Curator_Course_Id_18 (trimmed) by lookup-key equality, i.e. effectively a VALUE mapping of that field.",
+      "evidence": "Get source competitor ignore failue SqlCommand DTSX 94467-94469, input Source_Curator_Course_Id_18 JoinToReferenceColumn=gen_fundfinanceid, output gen_sourcefundfinanceid <- ref.gen_fundfinanceid; SDK Create main.cs:128-129 (DTSX 97206-97207)"
+    },
+    {
+      "id": "SDK Create gen_TransferIn 1|gen_transferin|CREATE|gen_transfertype",
+      "dataFlow": "Create transferin from outside source",
+      "verdict": "CONFIRMED",
+      "detail": "Literal 1 from Derived Column 'set additional fields'; writer OptionSetValue(gen_transfertype).",
+      "evidence": "set additional fields DTSX 104324 (gen_transfertype = 1); main.cs:72-73 (DTSX 97150-97151)"
+    },
+    {
+      "id": "SDK Create gen_TransferIn 1|gen_transferin|CREATE|gen_currentstate",
+      "dataFlow": "Create transferin from outside source",
+      "verdict": "CONFIRMED",
+      "detail": "Literal 1 from 'set additional fields'.",
+      "evidence": "DTSX 104324; main.cs:75-76 (DTSX 97153-97154)"
+    },
+    {
+      "id": "SDK Create gen_TransferIn 1|gen_transferin|CREATE|gen_transferrequestsource",
+      "dataFlow": "Create transferin from outside source",
+      "verdict": "CONFIRMED",
+      "detail": "ISNULL(Gen_Reportbasedonstatisticalinfostampreceived) ? 2 : (==1 ? 2 : 1); value from CRM Gen_agentcontract via Get ExtraData from FundMain keyed by Dest_Gen_customeraccountid <- Get dest customer account (Dest_Account_Number_47 zero-padded 12, ProductTypeId = Dest_Fund_Type_43 with 5006->1025). INFLUENCE fields correct.",
+      "evidence": "set additional fields DTSX 104324; lookups DTSX 94250, 94315; main.cs:81-82 (DTSX 97159-97160)"
+    },
+    {
+      "id": "SDK Create gen_TransferIn 1|gen_transferin|CREATE|gen_transferincreationsource",
+      "dataFlow": "Create transferin from outside source",
+      "verdict": "CONFIRMED",
+      "detail": "const TRANSFERIN_CREATION_SOURCE_LEUMI_BY = 1, unconditional.",
+      "evidence": "main.cs:32, 87 (DTSX 97110, 97165)"
+    },
+    {
+      "id": "SDK Create gen_TransferIn 1|gen_transferin|CREATE|gen_appendixdreceived",
+      "dataFlow": "Create transferin from outside source",
+      "verdict": "CONFIRMED",
+      "detail": "Appendix_D_Received_154: Trim -> Convert Dates (len 8 yyyyMMdd -> yyyy/MM/dd, len 6 -> 20yy/MM/dd, else/unparsable NULL; column length 10 so fieldSize<10 rule not triggered) -> DateTime.Parse(...).ToLocalTime().",
+      "evidence": "Convert Dates main.cs:38-77 (input lengths 10, DTSX 87165-87170); main.cs:98-99 (DTSX 97176-97177)"
+    },
+    {
+      "id": "SDK Create gen_TransferIn 1|gen_transferin|CREATE|gen_appendixdsent",
+      "dataFlow": "Create transferin from outside source",
+      "verdict": "CONFIRMED",
+      "detail": "Appendix_D_Sended_153 is NOT an input of Trim (verified) -> Convert Dates -> DateTime.Parse(...).ToLocalTime().",
+      "evidence": "Trim input list DTSX 106152ff; main.cs:100-101 (DTSX 97178-97179)"
+    },
+    {
+      "id": "SDK Create gen_TransferIn 1|gen_transferin|CREATE|gen_requestcancellationdate",
+      "dataFlow": "Create transferin from outside source",
+      "verdict": "CONFIRMED",
+      "detail": "Trim -> Convert Dates -> DateTime.Parse(...).ToLocalTime().",
+      "evidence": "main.cs:102-103 (DTSX 97180-97181)"
+    },
+    {
+      "id": "SDK Create gen_TransferIn 1|gen_transferin|CREATE|gen_bankingreceiveddate",
+      "dataFlow": "Create transferin from outside source",
+      "verdict": "CONFIRMED",
+      "detail": "Appendix_D_Sended_153 (no Trim) -> Convert Dates -> DateTime.Parse without ToLocalTime.",
+      "evidence": "main.cs:104-107 (DTSX 97182-97185)"
+    },
+    {
+      "id": "SDK Create gen_TransferIn 1|gen_transferin|CREATE|gen_requestidentifier",
+      "dataFlow": "Create transferin from outside source",
+      "verdict": "CONFIRMED",
+      "detail": "Request_Id_73 trimmed, as is.",
+      "evidence": "main.cs:113-114 (DTSX 97191-97192)"
+    },
+    {
+      "id": "SDK Create gen_TransferIn 1|gen_transferin|CREATE|gen_identitynumber",
+      "dataFlow": "Create transferin from outside source",
+      "verdict": "CONFIRMED",
+      "detail": "contact.Gen_Identitynumber via Get ExtraData from FundMain (Gen_fundmain.gen_contactname -> Contact), keyed by Dest_Gen_customeraccountid; file fields only INFLUENCE.",
+      "evidence": "DTSX 94317-94336; main.cs:116-117 (DTSX 97194-97195)"
+    },
+    {
+      "id": "SDK Create gen_TransferIn 1|gen_transferin|CREATE|gen_transferid",
+      "dataFlow": "Create transferin from outside source",
+      "verdict": "CONFIRMED",
+      "detail": "Source_Account_Number_20: Trim -> Append Zeros (create path only; Replace('.','') and left-pad '0' to column length 12; NULL/'' -> '000000000000').",
+      "evidence": "Append Zeros main.cs:38-66, input length 12; main.cs:119-120 (DTSX 97197-97198)"
+    },
+    {
+      "id": "SDK Create gen_TransferIn 1|gen_transferin|CREATE|gen_accountnumbersrctext",
+      "dataFlow": "Create transferin from outside source",
+      "verdict": "CONFIRMED",
+      "detail": "Same value as gen_transferid.",
+      "evidence": "main.cs:122-123 (DTSX 97200-97201)"
+    },
+    {
+      "id": "SDK Create gen_TransferIn 1|gen_transferin|CREATE|gen_sourcefundnumber",
+      "dataFlow": "Create transferin from outside source",
+      "verdict": "CONFIRMED",
+      "detail": "Same value as gen_transferid.",
+      "evidence": "main.cs:125-126 (DTSX 97203-97204)"
+    },
+    {
+      "id": "SDK Create gen_TransferIn 1|gen_transferin|CREATE|gen_mislakanumber",
+      "dataFlow": "Create transferin from outside source",
+      "verdict": "CONFIRMED",
+      "detail": "Mislaka_Number_152 trimmed, assigned without IsNull check inside try (NULL -> CastingError).",
+      "evidence": "main.cs:131 (DTSX 97209)"
+    },
+    {
+      "id": "SDK Create gen_TransferIn 1|gen_transferin|CREATE|gen_currentdeposits",
+      "dataFlow": "Create transferin from outside source",
+      "verdict": "CONFIRMED",
+      "detail": "(DT_BOOL)(ISNULL(Action_Type_57) ? 1 : ((DT_I4)Action_Type_57 == 2 ? 1 : 0)); cast error -> FailComponent; gen_currentDeposits variant commented out.",
+      "evidence": "set additional fields DTSX 104324, errorRowDisposition FailComponent DTSX 104349; main.cs:137-141 (DTSX 97215-97219)"
+    },
+    {
+      "id": "SDK Create gen_TransferIn 1|gen_transferin|CREATE|gen_actualtransferamount",
+      "dataFlow": "Create transferin from outside source",
+      "verdict": "CONFIRMED",
+      "detail": "Literal 0.0 (Double).",
+      "evidence": "main.cs:147 (DTSX 97225)"
+    },
+    {
+      "id": "SDK Create gen_TransferIn 1|gen_transferin|CREATE|gen_expectedtransferamount",
+      "dataFlow": "Create transferin from outside source",
+      "verdict": "CONFIRMED",
+      "detail": "Literal 0.0 (Double).",
+      "evidence": "main.cs:148 (DTSX 97226)"
+    },
+    {
+      "id": "SDK Create gen_TransferIn 1|gen_transferin|CREATE|gen_operationpersonname",
+      "dataFlow": "Create transferin from outside source",
+      "verdict": "CONFIRMED",
+      "detail": "ISNULL(Gen_agents.Gen_operationpersonname, Gen_agencie.Gen_operationpersonname) via Get ExtraData from FundMain; INFLUENCE Dest_Account_Number_47, Dest_Fund_Type_43.",
+      "evidence": "DTSX 94317-94336; main.cs:154-155 (DTSX 97232-97233)"
+    },
+    {
+      "id": "SDK Create gen_TransferIn 1|gen_transferin|CREATE|gen_customeraccountdest",
+      "dataFlow": "Create transferin from outside source",
+      "verdict": "CONFIRMED",
+      "detail": "Gen_customeraccountid from Get dest customer account (Gen_bankaccountnumber = padded Dest_Account_Number_47 AND gen_id = ProductTypeId).",
+      "evidence": "DTSX 94250-94266; main.cs:157-158 (DTSX 97235-97236)"
+    },
+    {
+      "id": "SDK Create gen_TransferIn 1|gen_transferin|CREATE|gen_sourcefundtype",
+      "dataFlow": "Create transferin from outside source",
+      "verdict": "CONFIRMED",
+      "detail": "CompetitorId from Get source competitor (key Source_Curator_Course_Id_18 trimmed).",
+      "evidence": "DTSX 94465-94469; main.cs:160-161 (DTSX 97238-97239)"
+    },
+    {
+      "id": "SDK Create gen_TransferIn 1|gen_transferin|CREATE|gen_investhousename",
+      "dataFlow": "Create transferin from outside source",
+      "verdict": "CONFIRMED",
+      "detail": "Competitor.gen_investhousename from the same lookup.",
+      "evidence": "main.cs:163-164 (DTSX 97241-97242)"
+    },
+    {
+      "id": "SDK Create gen_TransferIn 1|gen_transferin|CREATE|gen_contactname",
+      "dataFlow": "Create transferin from outside source",
+      "verdict": "CONFIRMED",
+      "detail": "Gen_fundmain.gen_contactname via Get ExtraData from FundMain.",
+      "evidence": "main.cs:166-167 (DTSX 97244-97245)"
+    },
+    {
+      "id": "SDK Create gen_TransferIn 1|gen_transferin|CREATE|transactioncurrencyid",
+      "dataFlow": "Create transferin from outside source",
+      "verdict": "CONFIRMED",
+      "detail": "Variable User::TransactionCurrencyId, written only when Guid.TryParse succeeds; no file field.",
+      "evidence": "main.cs:169-173 (DTSX 97247-97251)"
+    },
+    {
+      "id": "Update TransferIn 3|gen_transferin|UPDATE|gen_actionstatus",
+      "dataFlow": "Create transferin from outside source",
+      "verdict": "FIXED",
+      "detail": "ROUND 2: claim now shows VALUE none, INFLUENCE Request_Id_73, Transfer_Status_Reason_89, Request_Status_58, Transfer_Approval_Index_122 — correct (value is a literal 11/3/12 chosen by rules). ROUND 1: VALUE lists Transfer_Approval_Index_122, Transfer_Status_Reason_89, Request_Status_58, but the written value is one of the literals 11 / 3 / 12 chosen by rules in Compare Fields (Approval, Reject, Deposit; later wins), assigned only if different from gen_actionstatusDB. No file value reaches the attribute: VALUE must be empty; Transfer_Approval_Index_122 (==1 / ==0), Request_Status_58 (==195), Transfer_Status_Reason_89 (7876/7877/7878) are INFLUENCE (conditions), plus Request_Id_73 (record key / DB values, already listed). mapping-A scriptOutputs has the correct roles; claim wrong because of the role-propagation bug.",
+      "evidence": "Compare Fields main.cs:133-188, 238-313 (DTSX 82885-82940, 82990-83065); Update TransferIn 3 main.cs:128-129 (DTSX 117593-117594)"
+    },
+    {
+      "id": "Update TransferIn 3|gen_transferin|UPDATE|gen_rejecttype",
+      "dataFlow": "Create transferin from outside source",
+      "verdict": "FIXED",
+      "detail": "ROUND 2: claim now shows fixedValue=4 with expression 'always OptionSetValue(4)', VALUE none, INFLUENCE Request_Id_73 + the three reject-rule fields — correct (Compare Fields main.cs:30, 155 = DTSX 82907). ROUND 1: The only non-NULL value Compare Fields can produce is the literal REJECT_TYPE_CHILD_SAVINGS = 4 (when IsNationalInsuranceReject and gen_rejecttypeDB NULL or != 4). The three file fields listed as VALUE are only conditions -> INFLUENCE; VALUE must be empty and fixedValue should be 4 (conditional literal), currently null.",
+      "evidence": "Compare Fields main.cs:30, 147-157 (DTSX 82899-82909); Update main.cs:131-132 (DTSX 117596-117597)"
+    },
+    {
+      "id": "Update TransferIn 3|gen_transferin|UPDATE|gen_requestrejectreason",
+      "dataFlow": "Create transferin from outside source",
+      "verdict": "FIXED",
+      "detail": "ROUND 2: claim now shows VALUE none, INFLUENCE Request_Id_73 + three condition fields, expression 'The only value that can reach CRM is null ... 45/46/47 NEVER written' — correct per Update main.cs:134-139 and Compare main.cs:158-168. ROUND 1: Claim lists Transfer_Status_Reason_89, Transfer_Approval_Index_122, Request_Status_58 as VALUE, yet (as the writer expression itself states) 45/46/47 are never written: the attribute is set only to null (when Compare Fields output == -1, i.e. CRM reason already equals the mapped reason) or from the NULL column (Row.genrequestrejectreason read when _IsNull). No file-derived value reaches CRM -> VALUE must be empty; all three fields are INFLUENCE (reject-rule conditions; Transfer_Status_Reason_89 also decides -1 vs no-assign through GetRequestRejectReason). Expression/notes otherwise accurate.",
+      "evidence": "Compare Fields main.cs:158-168, 332-355 (DTSX 82910-82920, 83084-83107); Update main.cs:134-139 (DTSX 117599-117604)"
+    },
+    {
+      "id": "Update TransferIn 3|gen_transferin|UPDATE|gen_fixtransferdate",
+      "dataFlow": "Create transferin from outside source",
+      "verdict": "FIXED",
+      "detail": "ROUND 2: claim now shows VALUE none, INFLUENCE Request_Id_73 (TN -> Gen_transferinId -> Get Transactions key, declaredSources) + Transfer_Status_Reason_89, Request_Status_58, Transfer_Approval_Index_122 — correct. ROUND 1: Written value = gen_valuedateDB from CRM ('Get Transactions' lookup on Gen_transferinId; first gen_valuedate of transtype 53) -> no file VALUE. Transfer_Approval_Index_122 is a condition of DepositRecivingCondition; Transfer_Status_Reason_89 and Request_Status_58 only reach it through Convert Data Types routing. All three belong in INFLUENCE (with Request_Id_73), not VALUE.",
+      "evidence": "Compare Fields main.cs:171-181, 238-256 (DTSX 82923-82933, 82990-83008); Get Transactions DTSX 94713-94789; Update main.cs:141-142 (DTSX 117606-117607)"
+    },
+    {
+      "id": "Update TransferIn 3|gen_transferin|UPDATE|gen_statusleumi",
+      "dataFlow": "Create transferin from outside source",
+      "verdict": "FIXED",
+      "detail": "ROUND 2: claim now shows VALUE Request_Status_58, INFLUENCE Request_Id_73, Transfer_Approval_Index_122, Transfer_Status_Reason_89 — correct. ROUND 1: VALUE should be Request_Status_58 only (TryParse -> MapLeumiStatus, written only if > 0 and != gen_statusleumiDB, writer also skips 0). Transfer_Approval_Index_122 and Transfer_Status_Reason_89 only affect Convert Data Types routing -> INFLUENCE.",
+      "evidence": "Compare Fields main.cs:226-234 (DTSX 82978-82986); Update main.cs:161-164 (DTSX 117626-117629)"
+    },
+    {
+      "id": "Update TransferIn 3|gen_transferin|UPDATE|gen_bankingreceiveddate",
+      "dataFlow": "Create transferin from outside source",
+      "verdict": "FIXED",
+      "detail": "ROUND 2: claim now shows INFLUENCE Request_Id_73 with chain ending 'identifies the updated record (record key Gen_transferinId in Update TransferIn 3)' via recordKeyColumns — correct (main.cs:172, DTSX 117637). ROUND 1: VALUE Appendix_D_Sended_153 (Convert Dates, no Trim, DateTime.Parse without ToLocalTime) is correct, but INFLUENCE is empty: the record updated is transferIn.Id = Gen_transferinId returned by 'get tranferin from TN ignore failue' WHERE gen_requestidentifier = Request_Id_73, so Request_Id_73 is the record key and must be listed as INFLUENCE (as it is for the other 9 Update attributes). Also only rows with needToUpdate == TRUE reach this write (stated in write condition).",
+      "evidence": "Update main.cs:165-168, 172 (DTSX 117630-117633, 117637); TN lookup DTSX 94543-94592"
+    },
+    {
+      "id": "Update TransferIn 3|gen_transferin|UPDATE|gen_appendixdreceived",
+      "dataFlow": "Create transferin from outside source",
+      "verdict": "CONFIRMED",
+      "detail": "Trim -> Convert Dates -> Compare Fields (differs from DB.ToString(\"yyyy/MM/dd\"), TryParse -> ToLocalTime) -> writer if >= 1900-01-01; INFLUENCE Request_Id_73.",
+      "evidence": "Compare main.cs:192-200 (DTSX 82944-82952); Update main.cs:144-147 (DTSX 117609-117612)"
+    },
+    {
+      "id": "Update TransferIn 3|gen_transferin|UPDATE|gen_appendixdsent",
+      "dataFlow": "Create transferin from outside source",
+      "verdict": "CONFIRMED",
+      "detail": "No Trim; Convert Dates -> Compare (ToLocalTime) -> writer >= 1900.",
+      "evidence": "Compare main.cs:201-209 (DTSX 82953-82961); Update main.cs:148-151 (DTSX 117613-117616)"
+    },
+    {
+      "id": "Update TransferIn 3|gen_transferin|UPDATE|gen_requestcancellationdate",
+      "dataFlow": "Create transferin from outside source",
+      "verdict": "CONFIRMED",
+      "detail": "Trim -> Convert Dates -> Compare (ToLocalTime) -> writer >= 1900.",
+      "evidence": "Compare main.cs:211-219 (DTSX 82963-82971); Update main.cs:153-156 (DTSX 117618-117621)"
+    },
+    {
+      "id": "Update TransferIn 3|gen_transferin|UPDATE|gen_mislakanumber",
+      "dataFlow": "Create transferin from outside source",
+      "verdict": "CONFIRMED",
+      "detail": "Mislaka_Number_152 trimmed, assigned when non-empty and != DB; writer reads without IsNull check (flagged as unresolved runtime behaviour).",
+      "evidence": "Compare main.cs:220-224 (DTSX 82972-82976); Update main.cs:157-160 (DTSX 117622-117625)"
+    },
+    {
+      "id": "Update TransferIn 1|gen_transferin|UPDATE|gen_actionstatus",
+      "dataFlow": "Create transferin from outside source",
+      "verdict": "FIXED",
+      "detail": "ROUND 2: now VALUE none, INFLUENCE Request_Id_73 + 3 condition fields — correct. ROUND 1:Same as Update TransferIn 3: value is literal 11/3/12 chosen by rules; the three file fields are INFLUENCE (conditions), not VALUE.",
+      "evidence": "Update TransferIn 1 main.cs:128-129 (DTSX 114892-114893); Compare main.cs:133-188"
+    },
+    {
+      "id": "Update TransferIn 1|gen_transferin|UPDATE|gen_rejecttype",
+      "dataFlow": "Create transferin from outside source",
+      "verdict": "FIXED",
+      "detail": "ROUND 2: now fixedValue=4, VALUE none, INFLUENCE Request_Id_73 + 3 condition fields — correct. ROUND 1:Same as Update TransferIn 3: only literal 4 can be written; file fields are conditions; fixedValue should be 4.",
+      "evidence": "DTSX 114895-114896; Compare main.cs:147-157"
+    },
+    {
+      "id": "Update TransferIn 1|gen_transferin|UPDATE|gen_requestrejectreason",
+      "dataFlow": "Create transferin from outside source",
+      "verdict": "FIXED",
+      "detail": "ROUND 2: now VALUE none (only null can reach CRM), INFLUENCE Request_Id_73 + 3 condition fields — correct. ROUND 1:Same as Update TransferIn 3: no file value is ever written (only null / NULL-column read); all three fields are INFLUENCE.",
+      "evidence": "DTSX 114898-114903; Compare main.cs:158-168"
+    },
+    {
+      "id": "Update TransferIn 1|gen_transferin|UPDATE|gen_fixtransferdate",
+      "dataFlow": "Create transferin from outside source",
+      "verdict": "FIXED",
+      "detail": "ROUND 2: now VALUE none, INFLUENCE Request_Id_73 + 3 condition fields — correct. ROUND 1:Same as Update TransferIn 3: value = CRM gen_valuedateDB; file fields are conditions only.",
+      "evidence": "DTSX 114905-114906; Compare main.cs:171-181"
+    },
+    {
+      "id": "Update TransferIn 1|gen_transferin|UPDATE|gen_statusleumi",
+      "dataFlow": "Create transferin from outside source",
+      "verdict": "FIXED",
+      "detail": "ROUND 2: now VALUE Request_Status_58, INFLUENCE Request_Id_73, Transfer_Approval_Index_122, Transfer_Status_Reason_89 — correct. ROUND 1:Same as Update TransferIn 3: VALUE only Request_Status_58; Transfer_Approval_Index_122 / Transfer_Status_Reason_89 are routing conditions.",
+      "evidence": "DTSX 114925-114928; Compare main.cs:226-234"
+    },
+    {
+      "id": "Update TransferIn 1|gen_transferin|UPDATE|gen_bankingreceiveddate",
+      "dataFlow": "Create transferin from outside source",
+      "verdict": "FIXED",
+      "detail": "ROUND 2: now INFLUENCE Request_Id_73 via record key Gen_transferinId (DTSX 114936) — correct. ROUND 1:Same as Update TransferIn 3: record key Request_Id_73 (via Gen_transferinId) missing from INFLUENCE.",
+      "evidence": "DTSX 114929-114932, transferIn.Id DTSX 114936"
+    },
+    {
+      "id": "Update TransferIn 1|gen_transferin|UPDATE|gen_appendixdreceived",
+      "dataFlow": "Create transferin from outside source",
+      "verdict": "CONFIRMED",
+      "detail": "Same as Update TransferIn 3.",
+      "evidence": "DTSX 114908-114911"
+    },
+    {
+      "id": "Update TransferIn 1|gen_transferin|UPDATE|gen_appendixdsent",
+      "dataFlow": "Create transferin from outside source",
+      "verdict": "CONFIRMED",
+      "detail": "Same as Update TransferIn 3.",
+      "evidence": "DTSX 114912-114915"
+    },
+    {
+      "id": "Update TransferIn 1|gen_transferin|UPDATE|gen_requestcancellationdate",
+      "dataFlow": "Create transferin from outside source",
+      "verdict": "CONFIRMED",
+      "detail": "Same as Update TransferIn 3 (whitespace-only code difference on this line).",
+      "evidence": "DTSX 114917-114920"
+    },
+    {
+      "id": "Update TransferIn 1|gen_transferin|UPDATE|gen_mislakanumber",
+      "dataFlow": "Create transferin from outside source",
+      "verdict": "CONFIRMED",
+      "detail": "Same as Update TransferIn 3.",
+      "evidence": "DTSX 114921-114924"
+    },
+    {
+      "id": "Update TransferIn 2|gen_transferin|UPDATE|gen_actionstatus",
+      "dataFlow": "Create transferin from outside source",
+      "verdict": "FIXED",
+      "detail": "ROUND 2: now VALUE none, INFLUENCE Request_Id_73 + 3 condition fields — correct. ROUND 1:Same as Update TransferIn 3 (Update 2 has the same main.cs sha 824c90373700 as 3; differs only by unused input ProcessNumber).",
+      "evidence": "DTSX 116247-116248"
+    },
+    {
+      "id": "Update TransferIn 2|gen_transferin|UPDATE|gen_rejecttype",
+      "dataFlow": "Create transferin from outside source",
+      "verdict": "FIXED",
+      "detail": "ROUND 2: now fixedValue=4, VALUE none, INFLUENCE Request_Id_73 + 3 condition fields — correct. ROUND 1:Same as Update TransferIn 3.",
+      "evidence": "DTSX 116250-116251"
+    },
+    {
+      "id": "Update TransferIn 2|gen_transferin|UPDATE|gen_requestrejectreason",
+      "dataFlow": "Create transferin from outside source",
+      "verdict": "FIXED",
+      "detail": "ROUND 2: now VALUE none (only null can reach CRM), INFLUENCE Request_Id_73 + 3 condition fields — correct. ROUND 1:Same as Update TransferIn 3.",
+      "evidence": "DTSX 116253-116258"
+    },
+    {
+      "id": "Update TransferIn 2|gen_transferin|UPDATE|gen_fixtransferdate",
+      "dataFlow": "Create transferin from outside source",
+      "verdict": "FIXED",
+      "detail": "ROUND 2: now VALUE none, INFLUENCE Request_Id_73 + 3 condition fields — correct. ROUND 1:Same as Update TransferIn 3.",
+      "evidence": "DTSX 116260-116261"
+    },
+    {
+      "id": "Update TransferIn 2|gen_transferin|UPDATE|gen_statusleumi",
+      "dataFlow": "Create transferin from outside source",
+      "verdict": "FIXED",
+      "detail": "ROUND 2: now VALUE Request_Status_58, INFLUENCE Request_Id_73, Transfer_Approval_Index_122, Transfer_Status_Reason_89 — correct. ROUND 1:Same as Update TransferIn 3.",
+      "evidence": "DTSX 116280-116283"
+    },
+    {
+      "id": "Update TransferIn 2|gen_transferin|UPDATE|gen_bankingreceiveddate",
+      "dataFlow": "Create transferin from outside source",
+      "verdict": "FIXED",
+      "detail": "ROUND 2: now INFLUENCE Request_Id_73 via record key Gen_transferinId (DTSX 116291) — correct. ROUND 1:Same as Update TransferIn 3: Request_Id_73 record key missing from INFLUENCE.",
+      "evidence": "DTSX 116284-116287, transferIn.Id DTSX 116291"
+    },
+    {
+      "id": "Update TransferIn 2|gen_transferin|UPDATE|gen_appendixdreceived",
+      "dataFlow": "Create transferin from outside source",
+      "verdict": "CONFIRMED",
+      "detail": "Same as Update TransferIn 3.",
+      "evidence": "DTSX 116263-116266"
+    },
+    {
+      "id": "Update TransferIn 2|gen_transferin|UPDATE|gen_appendixdsent",
+      "dataFlow": "Create transferin from outside source",
+      "verdict": "CONFIRMED",
+      "detail": "Same as Update TransferIn 3.",
+      "evidence": "DTSX 116267-116270"
+    },
+    {
+      "id": "Update TransferIn 2|gen_transferin|UPDATE|gen_requestcancellationdate",
+      "dataFlow": "Create transferin from outside source",
+      "verdict": "CONFIRMED",
+      "detail": "Same as Update TransferIn 3.",
+      "evidence": "DTSX 116272-116275"
+    },
+    {
+      "id": "Update TransferIn 2|gen_transferin|UPDATE|gen_mislakanumber",
+      "dataFlow": "Create transferin from outside source",
+      "verdict": "CONFIRMED",
+      "detail": "Same as Update TransferIn 3.",
+      "evidence": "DTSX 116276-116279"
+    },
+    {
+      "id": "Create Annotation|annotation|CREATE|subject",
+      "dataFlow": "Create transferin from outside source",
+      "verdict": "CONFIRMED",
+      "detail": "GetSubjectByCode(DocN_Code) mapping verified literally (12 codes, default ''); DocN_Code trimmed. Slot created only if DocN_Mislaka_Name and DocN_Code not NULL and file found (write condition). FINDING 1 (no annotations for rows created in the same run; Union All Input 3 maps only ProcessNumber and TransferinID) verified.",
+      "evidence": "main.cs:66-89, 103-104, 125-145 (DTSX 88271ff); Union All Input 3 has 2 columns"
+    },
+    {
+      "id": "Create Annotation|annotation|CREATE|filename",
+      "dataFlow": "Create transferin from outside source",
+      "verdict": "CONFIRMED",
+      "detail": "subject + Path.GetExtension(DocN_Mislaka_Name).",
+      "evidence": "main.cs:105 (DTSX 88500)"
+    },
+    {
+      "id": "Create Annotation|annotation|CREATE|documentbody",
+      "dataFlow": "Create transferin from outside source",
+      "verdict": "CONFIRMED",
+      "detail": "Base64 of file found by Directory.GetFiles(AnnotationFilesPath, DocN_Mislaka_Name, AllDirectories); name only selects -> INFLUENCE; file moved to archive after Create.",
+      "evidence": "main.cs:93-117 (DTSX 88488-88512)"
+    },
+    {
+      "id": "Create Annotation|annotation|CREATE|objectid",
+      "dataFlow": "Create transferin from outside source",
+      "verdict": "CONFIRMED",
+      "detail": "EntityReference(gen_transferin, TransferinID); for rows that can carry documents TransferinID = Gen_transferinId from TN lookup keyed by Request_Id_73.",
+      "evidence": "main.cs:107 (DTSX 88502); Union All Input 1/2 Gen_transferinId -> TransferinID"
+    },
+    {
+      "id": "SDK Create gen_TransferIn 1|gen_transferin|CREATE|gen_transfertype",
+      "dataFlow": "Create transferin Maslulim",
+      "verdict": "CONFIRMED",
+      "detail": "Literal 5 from 'Set Additional fields'.",
+      "evidence": "DTSX 133126; main.cs:78-79 (DTSX 126960-126961)"
+    },
+    {
+      "id": "SDK Create gen_TransferIn 1|gen_transferin|CREATE|gen_currentstate",
+      "dataFlow": "Create transferin Maslulim",
+      "verdict": "CONFIRMED",
+      "detail": "Literal 1 from 'Set Additional fields'.",
+      "evidence": "DTSX 133126; main.cs:81-82"
+    },
+    {
+      "id": "SDK Create gen_TransferIn 1|gen_transferin|CREATE|gen_transferincreationsource",
+      "dataFlow": "Create transferin Maslulim",
+      "verdict": "CONFIRMED",
+      "detail": "const 1.",
+      "evidence": "main.cs:34, 84 (DTSX 126916, 126966)"
+    },
+    {
+      "id": "SDK Create gen_TransferIn 1|gen_transferin|CREATE|gen_deliverydate",
+      "dataFlow": "Create transferin Maslulim",
+      "verdict": "CONFIRMED",
+      "detail": "Staging column Execution_Date_54 renamed gen_deliverydate (external column mapping verified) -> Trim -> Sort (key) -> Merge Join left -> Convert Dates (NRE on NULL/'') -> DateTime.Parse, no ToLocalTime; also Filter Last Two Month condition.",
+      "evidence": "Read BY Data DTSX 126691 (ext Execution_Date_54 -> gen_deliverydate); Convert Dates main.cs:53-72; main.cs:90-93 (DTSX 126972-126975)"
+    },
+    {
+      "id": "SDK Create gen_TransferIn 1|gen_transferin|CREATE|gen_bankingreceiveddate",
+      "dataFlow": "Create transferin Maslulim",
+      "verdict": "CONFIRMED",
+      "detail": "Appendix_D_Sended_153: Childe Saving (no-op) -> Trim -> Sort passthrough (non-key; EliminateDuplicates keeps one arbitrary value per key) -> Merge Join left -> Convert Dates -> DateTime.Parse, no ToLocalTime.",
+      "evidence": "Sort DTSX 133879/133881; main.cs:94-97 (DTSX 126976-126979)"
+    },
+    {
+      "id": "SDK Create gen_TransferIn 1|gen_transferin|CREATE|gen_requestidentifier",
+      "dataFlow": "Create transferin Maslulim",
+      "verdict": "CONFIRMED",
+      "detail": "Request_Id_73 (renamed gen_requestidentifier) trimmed, left leg of Merge Join.",
+      "evidence": "DTSX 126695; Merge Join DTSX 126537ff; main.cs:103-104"
+    },
+    {
+      "id": "SDK Create gen_TransferIn 1|gen_transferin|CREATE|gen_identitynumber",
+      "dataFlow": "Create transferin Maslulim",
+      "verdict": "CONFIRMED",
+      "detail": "gen_customeraccount.Gen_customeridnumber via Get source customer account (gen_id = padded-4 Source_Fund_Type_16 after 5006->1025; gen_bankaccountnumber = padded-12 Source_Account_Number_20). Chain shows Trim before Childe Saving; real order is Childe Saving then Trim (cosmetic).",
+      "evidence": "DTSX 126402-126428; main.cs:106-107"
+    },
+    {
+      "id": "SDK Create gen_TransferIn 1|gen_transferin|CREATE|gen_transferid",
+      "dataFlow": "Create transferin Maslulim",
+      "verdict": "CONFIRMED",
+      "detail": "gen_bankaccountnumber = Merge Join output from LEFT Source_Account_Number_20 (verified InputColumnID) -> Append Zeros pad 12. Staging gen_transferid (Transaction_Id_91) never reaches the writer.",
+      "evidence": "Merge Join output mapping DTSX 126567-126591; main.cs:109-110 (DTSX 126991-126992)"
+    },
+    {
+      "id": "SDK Create gen_TransferIn 1|gen_transferin|CREATE|gen_accountnumbersrc",
+      "dataFlow": "Create transferin Maslulim",
+      "verdict": "CONFIRMED",
+      "detail": "EntityReference(gen_customeraccount, lookup gen_customeraccountid).",
+      "evidence": "main.cs:120-121"
+    },
+    {
+      "id": "SDK Create gen_TransferIn 1|gen_transferin|CREATE|gen_customeraccountdest",
+      "dataFlow": "Create transferin Maslulim",
+      "verdict": "CONFIRMED",
+      "detail": "Same gen_customeraccountid as gen_accountnumbersrc.",
+      "evidence": "main.cs:123-124"
+    },
+    {
+      "id": "SDK Create gen_TransferIn 1|gen_transferin|CREATE|gen_contactname",
+      "dataFlow": "Create transferin Maslulim",
+      "verdict": "CONFIRMED",
+      "detail": "gen_customeraccount.Gen_contactname from the same lookup.",
+      "evidence": "main.cs:126-127"
+    },
+    {
+      "id": "SDK Create gen_TransferIn 1|gen_transferin|CREATE|transactioncurrencyid",
+      "dataFlow": "Create transferin Maslulim",
+      "verdict": "CONFIRMED",
+      "detail": "Variable, Guid.TryParse.",
+      "evidence": "main.cs:129-133"
+    },
+    {
+      "id": "FIELD Transaction_Type_2",
+      "dataFlow": "Create transferin from outside source",
+      "verdict": "FIXED",
+      "detail": "ROUND 2: disposition now crm_row_filter with rowFilterOf = 'Filter for transferin from outsource' output 'transfer in' (passing branch) for the Create, Update 1-5 and Annotation writers — correct. ROUND 1:Shown writer_input_unmapped (no CRM). In this flow it is a row condition of EVERY gen_transferin create/update and annotation: 'Filter for transferin from outsource' Transaction_Type_2 == \"1\". Should be recorded as CRM influence (condition).",
+      "evidence": "DTSX 94058"
+    },
+    {
+      "id": "FIELD Transaction_Direction_68",
+      "dataFlow": "both",
+      "verdict": "FIXED",
+      "detail": "ROUND 2: disposition now crm_row_filter, linked to 'Filter for transferin from outsource' (outside source) and to Maslulim 'Conditional Split' (Transaction_Direction_68 == \"2\") — correct. ROUND 1:Shown writer_input_unmapped. Condition of all outside-source writes (== \"2\") and of Maslulim creates (Conditional Split: != \"2\" rows form the written left leg; INNER Merge Join requires a matching == \"2\" row).",
+      "evidence": "DTSX 94058; Maslulim Conditional Split DTSX 123924, Merge Join JoinType=2"
+    },
+    {
+      "id": "FIELD Changes_By_Age_112",
+      "dataFlow": "both",
+      "verdict": "FIXED",
+      "detail": "ROUND 2: disposition now crm_row_filter (both flows' filter splits) — correct. ROUND 1:Shown writer_input_unmapped. Condition (!= \"1\") of all writes in both flows.",
+      "evidence": "DTSX 94058; DTSX 125648"
+    },
+    {
+      "id": "FIELD Creation_Date_70",
+      "dataFlow": "Create transferin from outside source",
+      "verdict": "FIXED",
+      "detail": "ROUND 2: disposition now crm_row_filter (Check CreationDate, Filter rows where create date ...) — disposition correct. Caveat (see SC-ROWFILTER-POLARITY): the expressions attached are the DROPPING branches ('Old records' <= 0, 'Null creation date' ISNULL) without polarity, and the passing ±DaysCount window is attributed to Request_Id_73/Source_Curator_Course_Id_18 but not to Creation_Date_70. ROUND 1:Shown writer_input_unmapped. Condition of all outside-source writes: Check CreationDate (after 22/02/2020) and, for non-child-saving accounts, the +-DaysCount window around User::LastWorkingDay (NULL -> dropped).",
+      "evidence": "DTSX 82520, 94094"
+    },
+    {
+      "id": "FIELD TransferBetweenCoursesType_210 (#190)",
+      "dataFlow": "Create transferin Maslulim",
+      "verdict": "FIXED",
+      "detail": "ROUND 2: disposition now crm_row_filter via 'Filter Financial Course' (staging column TransferBetweenCoursesType_208, file-qualified 'BY source' #190) for Maslulim and outside-source writers — correct (outside-source branch can never match since Subject_56 == \"56\" there, but listing it is harmless). ROUND 1:Shown logic_only_no_crm. Staged as BY_FileData_1.TransferBetweenCoursesType_208 and used by Maslulim 'Filter Financial Course': rows with Subject_56 == \"57\" && value == \"8776\" are NOT created -> condition of Maslulim gen_transferin creates (no effect in outside-source flow because Subject_56 == \"56\" there).",
+      "evidence": "staging insert DTSX 189636 (ext TransferBetweenCoursesType_208 <- TransferBetweenCoursesType_210); DTSX 125614"
+    },
+    {
+      "id": "FIELD Source_Curator_Course_Id_18",
+      "dataFlow": "Create transferin from outside source",
+      "verdict": "FIXED",
+      "detail": "ROUND 2: disposition now crm_value (value: gen_transferin.gen_fundfinanceid; influence: gen_fundfinanceid, gen_sourcefundtype, gen_investhousename) — correct. ROUND 1:Shown crm_influence_only; its trimmed value is written byte-identical to gen_transferin.gen_fundfinanceid through lookup-key equality (see gen_fundfinanceid claim).",
+      "evidence": "DTSX 94465-94469"
+    },
+    {
+      "id": "FIELD Transaction_Id_91",
+      "dataFlow": "Create transferin Maslulim",
+      "verdict": "CONFIRMED",
+      "detail": "Read as gen_transferid and trimmed, but not an input of Sort/Merge Join -> never reaches CRM in these flows.",
+      "evidence": "DTSX 126698; Sort/Merge Join input lists"
+    },
+    {
+      "id": "FIELD Id_Number_4",
+      "dataFlow": "Create transferin from outside source",
+      "verdict": "CONFIRMED",
+      "detail": "Only trimmed in this flow; no writer input here.",
+      "evidence": "Trim input [37]"
+    },
+    {
+      "id": "FIELD Source_Service_Branch_15",
+      "dataFlow": "Create transferin from outside source",
+      "verdict": "CONFIRMED",
+      "detail": "Trim + Compare Fields input never referenced in code; no CRM effect in these flows.",
+      "evidence": "Compare Fields main.cs:127-235"
+    },
+    {
+      "id": "FIELD Source_Employer_Identification_Type_21",
+      "dataFlow": "Create transferin from outside source",
+      "verdict": "CONFIRMED",
+      "detail": "As Source_Service_Branch_15.",
+      "evidence": "Compare Fields main.cs:127-235"
+    },
+    {
+      "id": "FIELD Dest_Bank_32",
+      "dataFlow": "Create transferin from outside source",
+      "verdict": "CONFIRMED",
+      "detail": "As Source_Service_Branch_15.",
+      "evidence": "Compare Fields main.cs:127-235"
+    },
+    {
+      "id": "FIELD Creator_User_Name_53",
+      "dataFlow": "Create transferin from outside source",
+      "verdict": "CONFIRMED",
+      "detail": "As Source_Service_Branch_15.",
+      "evidence": "Compare Fields main.cs:127-235"
+    },
+    {
+      "id": "FIELD Last_Modified_User_65",
+      "dataFlow": "Create transferin from outside source",
+      "verdict": "CONFIRMED",
+      "detail": "As Source_Service_Branch_15.",
+      "evidence": "Compare Fields main.cs:127-235"
+    },
+    {
+      "id": "FIELD Operation_Simbol_69",
+      "dataFlow": "Create transferin from outside source",
+      "verdict": "CONFIRMED",
+      "detail": "As Source_Service_Branch_15.",
+      "evidence": "Compare Fields main.cs:127-235"
+    },
+    {
+      "id": "FIELD Finance_Reference_Employer_130",
+      "dataFlow": "Create transferin from outside source",
+      "verdict": "CONFIRMED",
+      "detail": "Compare Fields input, unused.",
+      "evidence": "Compare Fields main.cs:127-235"
+    },
+    {
+      "id": "FIELD Exempt_Pension_131",
+      "dataFlow": "Create transferin from outside source",
+      "verdict": "CONFIRMED",
+      "detail": "Compare Fields input, unused.",
+      "evidence": "Compare Fields main.cs:127-235"
+    },
+    {
+      "id": "SC-01 declaredRowFilters Convert Data Types (Transfer_Approval_Index_122 / Transfer_Status_Reason_89 / Request_Status_58) on SDK Create, Update 1/2/3, Create Annotation",
+      "dataFlow": "Create transferin from outside source",
+      "verdict": "CONFIRMED",
+      "detail": "isValidRecord true if any of the three is non-NULL and Int32.TryParse succeeds; else DirectRowToError -> 'Derived Column' whose output has no path. Convert Data Types is upstream of all three writer families. Evidence lines match (main.cs:135 = DTSX 85518, DirectRowToOutput0 DTSX 85519).",
+      "evidence": "Convert Data Types main.cs:115-138 (DTSX 85498-85521); path Convert Data Types.Outputs[Error] => Derived Column, no path from Derived Column"
+    },
+    {
+      "id": "SC-02 declaredRowFilter Split By occurance number 1 (Request_Id_73) on SDK Create",
+      "dataFlow": "Create transferin from outside source",
+      "verdict": "CONFIRMED",
+      "detail": "First occurrence -> First (exclusionGroup 1, only output with a path -> set additional fields); 2nd -> Seconed, 3rd+ -> Third (no paths); NULL -> no DirectRowTo call -> dropped. 'Output 0' (exclusionGroup 0) has no path.",
+      "evidence": "DTSX 105395-105417; outputs DTSX 105880/105883; path DTSX 121401"
+    },
+    {
+      "id": "SC-03 declaredRowFilter remove duplications (Dest_Account_Number_47) on SDK Create",
+      "dataFlow": "Create transferin from outside source",
+      "verdict": "CONFIRMED",
+      "detail": "First row per DestAccountNumber47 -> Output 0, later -> Duplicate (no path); input is after Trim and Append Zeros (pad 12).",
+      "evidence": "remove duplications main.cs:119-133 (DTSX 96444-96458)"
+    },
+    {
+      "id": "SC-04 declaredRowFilters Convert gen_isActive (Transfer_Status_Reason_89, Transfer_Approval_Index_122) on SDK Create",
+      "dataFlow": "Create transferin from outside source",
+      "verdict": "CONFIRMED",
+      "detail": "Non-NULL and not int-parsable -> isValidRecord=false -> Error output (no path). Create path only (after Remove 0's), so correctly not declared on Update/Annotation.",
+      "evidence": "main.cs:135-168 (DTSX 87408-87441)"
+    },
+    {
+      "id": "SC-05 declaredRowFilter Filter Last Two Month (Execution_Date_54) on Maslulim SDK Create",
+      "dataFlow": "Create transferin Maslulim",
+      "verdict": "CONFIRMED",
+      "detail": "Only output LastTwoMonth (exclusionGroup=1) -> rows not directed are dropped; condition !IsNull && TryParse(he-IL) && date > UtcNow.AddMonths(-2). gen_deliverydate = staging Execution_Date_54 (external-column mapping DTSX 126691; the cited DTSX 126656 is the SqlCommand, acceptable).",
+      "evidence": "DTSX 125854-125857; output DTSX 126397; path DTSX 135820"
+    },
+    {
+      "id": "SC-06 recordKeyColumns [Gen_transferinId] on Update TransferIn 1/2/3",
+      "dataFlow": "Create transferin from outside source",
+      "verdict": "CONFIRMED",
+      "detail": "transferIn.Id = Row.GentransferinId before service.Update; Gen_transferinId comes from 'get tranferin from TN ignore failue' keyed by Request_Id_73. Composed chains now end with the record-key step.",
+      "evidence": "DTSX 114936 / 116291 / 117637; TN lookup DTSX 94543-94592"
+    },
+    {
+      "id": "SC-07 declaredSources gen_fundfinanceid (Source_Curator_Course_Id_18, value)",
+      "dataFlow": "Create transferin from outside source",
+      "verdict": "CONFIRMED",
+      "detail": "Lookup joins on and returns the same reference column RIGHT('000000'+Gen_FundFinanceID,6); CompetitorId non-NULL guaranteed by 'Check if SourceCompetitor exists'; Trim evidence DTSX 106315-106333 matches Trim main.cs:30-48.",
+      "evidence": "DTSX 94467-94469, 106315-106333, 97206-97207"
+    },
+    {
+      "id": "SC-08 declaredSources Update gen_fixtransferdate (Request_Id_73, key)",
+      "dataFlow": "Create transferin from outside source",
+      "verdict": "CONFIRMED",
+      "detail": "Get Transactions ParameterMap = Union All 2.Gen_transferinId (from TN lookup keyed by Request_Id_73); value gen_valuedateDB.",
+      "evidence": "Get Transactions DTSX 94713-94789"
+    },
+    {
+      "id": "SC-09 declaredSources Update gen_requestrejectreason (Transfer_Status_Reason_89, condition)",
+      "dataFlow": "Create transferin from outside source",
+      "verdict": "CONFIRMED",
+      "detail": "Correct: only -1 (-> null) or NULL can reach the writer; Transfer_Status_Reason_89 decides r (45/46/47) and therefore whether -1 is set. Composed claim also lists Transfer_Approval_Index_122 / Request_Status_58 (reject-rule conditions) — consistent with code.",
+      "evidence": "Compare main.cs:158-168, 332-355; Update main.cs:134-139"
+    },
+    {
+      "id": "SC-10 declaredSources Create Annotation objectid (Request_Id_73, key)",
+      "dataFlow": "Create transferin from outside source",
+      "verdict": "CONFIRMED",
+      "detail": "TransferinID for document-bearing rows = Gen_transferinId from TN lookup (Union All Inputs 1/2 map Gen_transferinId -> TransferinID).",
+      "evidence": "Create Annotation main.cs:107 (DTSX 88502); Union All DTSX 108245"
+    },
+    {
+      "id": "SC-11 declaredSources Maslulim gen_identitynumber / gen_accountnumbersrc / gen_customeraccountdest / gen_contactname (Source_Fund_Type_16, Source_Account_Number_20 keys)",
+      "dataFlow": "Create transferin Maslulim",
+      "verdict": "CONFIRMED",
+      "detail": "Keys of 'Get source customer account' are Merge Join gen_id (= LEFT Source_Fund_Type_16) and gen_bankaccountnumber (= LEFT Source_Account_Number_20) after Append Zeros; declared order 'Childe Saving handel 5006->1025, Trim' matches the real path order.",
+      "evidence": "Merge Join output mapping DTSX 126567-126591; lookup DTSX 126402-126428"
+    },
+    {
+      "id": "SC-ROWFILTER-POLARITY (tool-computed per-writer rowFilters, lineage.mjs:277-290)",
+      "dataFlow": "both",
+      "verdict": "CONFIRMED",
+      "detail": "Resolved. rowFilters() now dedupes on lineageId|component|output, so the passing output 'creation date equal to previous working date' (leads=true) lists Creation_Date_70 together with Request_Id_73 and Source_Curator_Course_Id_18, and 'Null creation date' (leads=false) keeps Creation_Date_70. Verified on SDK Create gen_TransferIn 1, Update TransferIn 1/2/3 and Create Annotation [Create transferin from outside source]. Polarity (leads) was already fixed.",
+      "evidence": "tools/lineage.mjs:321; analysis/0009_LeumiFile-BY/fieldmap.json rowFilters of the writers above",
+      "previousVerdict": "INCOMPLETE",
+      "recheckedOn": "2026-11-06 (round 2)"
+    },
+    {
+      "id": "SC-ROWFILTER-FALSE-POSITIVES (tool-computed rowFilters)",
+      "dataFlow": "Create transferin from outside source",
+      "verdict": "CONFIRMED",
+      "detail": "Resolved. (1) Get Transactions and (2) Conditional Split needToUpdate were already gone. (3) Create Annotation now has Get ExtraData from FundMain, Get dest customer account and Check if SourceCompetitor exists in rowFiltersSuppressed. Proof re-checked: created rows reach Create Annotation only through Union All Input 3, which carries only ProcessNumber and TransferinID (component Union All DTSX 108245); Union All Inputs 1/2 (update path) carry the Doc* columns; Create Annotation calls CreateAnnotation/service.Create only when Doc<n>MislakaName and Doc<n>Code are both non-NULL (main.cs:68-88). No remaining false positive on this writer.",
+      "evidence": "fieldmap.json targets[...\\Create Annotation].rowFiltersSuppressed; DTSX 108245 (Union All), 121427 (Multicast 7 Output 3 -> Union All Input 3); Create Annotation main.cs:68-88",
+      "previousVerdict": "WRONG",
+      "recheckedOn": "2026-11-06 (round 2)"
+    },
+    {
+      "id": "SC-MASLULIM-JOIN-FILTERS (rowFilters / declaredRowFilters)",
+      "dataFlow": "Create transferin Maslulim",
+      "verdict": "CONFIRMED",
+      "detail": "Re-check 2026-11-06: resolved. SDK Create gen_TransferIn 1 [Create transferin Maslulim] now lists inner-join Merge Join (3 keys: gen_requestidentifier=gen_requestidentifier, Source_Account_Number_20=Dest_Account_Number_47, Source_Fund_Type_16=Dest_Fund_Type_43; matches raw sortKeyPositions) and sort-dedup entries for Sort (gen_requestidentifier, Source_Account_Number_20, Source_Fund_Type_16, gen_deliverydate) and Sort 1 (gen_requestidentifier, Dest_Account_Number_47, Dest_Fund_Type_43). Note (tracked in verify-RF.json): Transaction_Direction_68, which decides which join input a row enters, is still absent from every row filter of this writer.",
+      "evidence": "Merge Join DTSX 126537-126541 (JoinType 2, NumKeyColumns 3, TreatNullsAsEqual true), input cols 126547-126559 cachedSortKeyPosition; Sort EliminateDuplicates 133881, keys 133929-133944; Sort 1 EliminateDuplicates 133956, keys 133998-134008",
+      "previousVerdict": "INCOMPLETE",
+      "recheckedOn": "2026-11-06"
+    }
+  ],
+  "missingWrites": []
+}

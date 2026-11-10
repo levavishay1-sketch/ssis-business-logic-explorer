@@ -1,0 +1,40 @@
+{
+  "changes": [
+    {
+      "claimId": "L|summary",
+      "field": "summary_he",
+      "before": "החבילה משלימה את 'תאריך מינוי הסוכן' (gen_agentappointmentdate) בקופות (Gen_fundmain) שהשדה ריק אצלן: לכל קופה כזו נלקח התאריך המאוחר ביותר מבין הקופות האחרות של אותו חשבון לקוח (Gen_customeraccountname) שיש להן תאריך. הכתיבה היא UPDATE ישיר ב-SQL לטבלה Gen_fundmainBase במסד CRM, ולכן היא Unsupported. Gen_customeraccountname הוא שדה Lookup מסוג guid לחשבון הלקוח, כלומר ההתאמה היא לפי מזהה החשבון ולא לפי שם (ראיה מחבילות אחרות: 0005_Customer Account.dtsx:2644, 0015_TransferIn.dtsx:75552). המשמעות 'תאריך מינוי סוכן' נגזרת משם השדה בלבד (השערה).",
+      "after": "החבילה משלימה את 'תאריך מינוי הסוכן' (gen_agentappointmentdate) בקופות (Gen_fundmain) שהשדה ריק אצלן: לכל קופה כזו נלקח התאריך המאוחר ביותר מבין הקופות האחרות של אותו חשבון לקוח (Gen_customeraccountname) שיש להן תאריך. הכתיבה היא UPDATE ישיר ב-SQL לטבלה Gen_fundmainBase במסד CRM, ולכן היא Unsupported. Gen_customeraccountname הוא שדה Lookup מסוג guid לחשבון הלקוח, כלומר ההתאמה היא לפי מזהה החשבון ולא לפי שם (ראיה מחבילות אחרות: 0005_Customer Account.dtsx:2644, 0015_TransferIn.dtsx:75552). מה השדה מכיל, לפי חבילה 0004_LeumiFile-MY: ברכיב Minhali daily\\Set Date Fields הוא מקבל את הזמן הנוכחי (DateTime.Now) כשמספר הסוכן בקופה השתנה וגם שם הסוכן או הסוכנות השתנה. אז הרכיב Update 'gen_agentappointmentdate' for the same account כותב את אותו ערך לשאר הקופות של אותו חשבון (0004_LeumiFile-MY.dtsx:75547-75577, 92815-92825). כלומר זה המועד שבו 0004 זיהתה החלפת סוכן או סוכנות בקופה.",
+      "why": "Verifier accepted: the meaning is set by code in 0004 (active flow Foreach Loop Container\\Minhali daily), not only by the field name. Checked: Set Date Fields input column gen_agentappointmentdate is readWrite and flows to Update gen_fundmain (Param_50, [CRM]) and to the same-account update (Param_0), which is reached through Case 1 ChangeOthrFundsSameAccount == TRUE. Only 'Foreach Loop Container 1' is disabled in 0004. Wording kept to what the code does (time of detection), not 'appointment date' as a business fact.",
+      "evidence": "0004_LeumiFile-MY.dtsx:75238 (Set Date Fields), 75547-75577, 77355 (usageType=readWrite), 92815-92825 (UPDATE Gen_fundmain SET gen_agentappointmentdate = ? WHERE gen_customeraccountname = ? and Gen_fundmainid <> ?), 92926/93011 (Update gen_fundmain Param_50), path from 'check if broker number has been change'.Outputs[Case 1] (ChangeOthrFundsSameAccount == TRUE); disabled executable only at 0004:99361",
+      "verifierAccepted": true
+    },
+    {
+      "claimId": "L|ignored",
+      "field": "ignoredAsFramework",
+      "before": "Package\\Get All Funds\\Create System Variables (ModifiedBy = User::CrmAdminId, ModifiedOn = DateTime.UtcNow; main.cs:127-128, DTSX:2372)",
+      "after": "(removed)",
+      "why": "Verifier accepted: Create System Variables outputs ModifiedBy (new Guid(User::CrmAdminId)) and ModifiedOn (DateTime.UtcNow), which are written by the business UPDATE to Gen_fundmainBase as Param_1/Param_2; its exception on an invalid CrmAdminId stops all updates. Its role is already described in the Get All Funds detailed nodes (step 3 and the write node); a tech pointer was added to the write node.",
+      "evidence": "Create System Variables main.cs:127-128 (DTSX:2372); Update agent appointment date DTSX:3294; input lineage ModifiedBy/ModifiedOn ← Create System Variables.Outputs[Output 0] → Param_1/Param_2 (DTSX:3300-3330)",
+      "verifierAccepted": true
+    },
+    {
+      "claimId": "L|Package\\Get All Funds|detailed",
+      "field": "tech @ Package\\Get All Funds",
+      "before": "gen_fundmain · update Gen_fundmainBase set gen_agentappointmentdate=?(AgentAppointmentDateToInsert),ModifiedBy=?(ModifiedBy),ModifiedOn=?(ModifiedOn) where Gen_fundmainId=?(Gen_fundmainId) · SQL (Unsupported), שורה אחר שורה (OLE DB Command)",
+      "after": "gen_fundmain · update Gen_fundmainBase set gen_agentappointmentdate=?(AgentAppointmentDateToInsert),ModifiedBy=?(ModifiedBy),ModifiedOn=?(ModifiedOn) where Gen_fundmainId=?(Gen_fundmainId) · SQL (Unsupported), שורה אחר שורה (OLE DB Command). ModifiedBy / ModifiedOn מגיעים מרכיב Create System Variables (main.cs:127-128: DateTime.UtcNow; new Guid(User::CrmAdminId))",
+      "why": "Rule 5: Create System Variables moved out of ignoredAsFramework; its business role is pointed to in the write node it serves.",
+      "evidence": "main.cs:127-128 (DTSX:2372); DTSX:3300-3330 lineage",
+      "verifierAccepted": true
+    },
+    {
+      "claimId": "L|Package\\Get All Funds|detail",
+      "field": "t @ Package\\Get All Funds",
+      "before": "השלמת תאריך מינוי הסוכן לכל קופות חשבון הלקוח לפי התאריך האחרון הידוע. משמעות 'תאריך מינוי סוכן' נגזרת משם העמודה בלבד (השערה). הקשר לחשבון הלקוח מוכח מחבילות אחרות (0005:2644, 0015:75552).",
+      "after": "השלמת תאריך מינוי הסוכן לכל קופות חשבון הלקוח לפי התאריך האחרון הידוע. מה השדה מכיל: בחבילה 0004_LeumiFile-MY הוא מקבל את הזמן הנוכחי כשמספר הסוכן בקופה השתנה וגם שם הסוכן או הסוכנות השתנה, והערך מועתק לשאר הקופות של אותו חשבון (0004_LeumiFile-MY.dtsx:75547-75577, 92815-92825). כלומר זה המועד שבו 0004 זיהתה החלפת סוכן או סוכנות בקופה. הקשר לחשבון הלקוח מוכח מחבילות אחרות (0005:2644, 0015:75552).",
+      "why": "Verifier accepted (unit 5): same fact as in summary_he; the supplied files define the field by code in 0004.",
+      "evidence": "0004_LeumiFile-MY.dtsx:75547-75577, 77355, 92815-92825, 93011",
+      "verifierAccepted": true
+    }
+  ]
+}

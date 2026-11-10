@@ -1,0 +1,873 @@
+{
+ "package": "0013_Heir_Daily",
+ "analyst": "ssis-business-logic",
+ "source": {
+  "file": "source/DailyProcess/0013_Heir_Daily.dtsx",
+  "sha256": "BBC3E43C9A1185EE4069107E633CE816C1FE022883B67F8C2EBBCBC6CABF30E4",
+  "lines": 15847
+ },
+ "scopeNote_he": "ניתוח קוד המקור (C#) של רכיבי הסקריפט בלבד; ה-DLL המקומפל לא פוענח. CRM.Proxy / ExecuteMultipleExtension הם אסמבלי חיצוני (external_unknown). פריסת ה-zip נעשית ב-Shell32 (COM). קובץ התצורה C:\\Generix\\SSISConfigFile.dtsConfig (DTSX:138) לא סופק (blocked_external_dependency) וייתכן שהוא דורס משתנים או חיבורים. מנהל החיבורים [CRM] = Psql / ALTSHULER_MSCRM משמש לקריאה בלבד (Lookups); כל הכתיבה ל-CRM היא דרך SDK (Supported).",
+ "summary_he": "החבילה קולטת קבצי רשם יומיים (תיקיות Rasham, השערה: רשם לענייני ירושה), שמגיעים כ-zip או כתיקיות. כל קובץ מפוצל לרשומות לקוח ולרשומות יורש, וכל יורש מוצמד ללקוח של אותה בקשה לפי מחוז, מספר תיק ומספר בקשה. הלקוח מאותר ב-CRM לפי תעודת הזהות; יורש חדש נוצר כ-gen_heir המקושר ללקוח, ויורש קיים מתעדכן בשדות שהשתנו. הכתיבה היא דרך SDK ExecuteMultiple, ובסוף הקליטה התיקייה מועברת לארכיון לפי תאריך. שורות שנדחו אינן מתועדות.",
+ "executionOrder": [
+  {
+   "step": 1,
+   "refId": "Package\\Get Variables From SystemConfigurarion",
+   "title_he": "טעינת משתני ETL (מסגרת)",
+   "trigger": "start (no incoming constraint)"
+  },
+  {
+   "step": 2,
+   "refId": "Package\\Create ETL Process record",
+   "title_he": "רשומת תהליך ETL (מסגרת)",
+   "trigger": "after Get Variables From SystemConfigurarion · Success (DTSX:14519)"
+  },
+  {
+   "step": 3,
+   "refId": "Package\\Convert Zips Files To Folders",
+   "title_he": "פריסת קבצי zip לתיקיות",
+   "trigger": "after Create ETL Process record · Success (DTSX:14520)"
+  },
+  {
+   "step": 4,
+   "refId": "Package\\Get Heirs Folders",
+   "title_he": "איתור תיקיות Rasham",
+   "trigger": "after Convert Zips Files To Folders · Success (DTSX:14523)"
+  },
+  {
+   "step": 5,
+   "refId": "Package\\Foreach Loop Container",
+   "title_he": "לולאה על תיקיות הרשם",
+   "trigger": "after Get Heirs Folders · Success AND @[User::isFileExist] (ExpressionAndConstraint, DTSX:14524)"
+  },
+  {
+   "step": 6,
+   "refId": "Package\\Foreach Loop Container\\Get File From Folder",
+   "title_he": "בחירת קובץ Rasham*.txt בתיקייה",
+   "trigger": "first in loop (no incoming constraint)"
+  },
+  {
+   "step": 7,
+   "refId": "Package\\Foreach Loop Container\\Split File",
+   "title_he": "פיצול לרשומות לקוח ויורש",
+   "trigger": "after Get File From Folder · Expression only @[User::SelectedFilePath] != \"\" (EvalOp=1, DTSX:13082)"
+  },
+  {
+   "step": 8,
+   "refId": "Package\\Foreach Loop Container\\Create And Update Heir",
+   "title_he": "יצירה/עדכון יורשים",
+   "trigger": "after Split File · Success (DTSX:13081)"
+  },
+  {
+   "step": 9,
+   "refId": "Package\\Foreach Loop Container\\Move Folder To Archive",
+   "title_he": "העברת התיקייה לארכיון (מסגרת)",
+   "trigger": "after Create And Update Heir · Success (DTSX:13083)"
+  },
+  {
+   "step": 10,
+   "refId": "Package\\End ETL Process record",
+   "title_he": "סגירת תהליך ETL (מסגרת)",
+   "trigger": "after Foreach Loop Container · Success (DTSX:14521) OR after Get Heirs Folders · Success AND !@[User::isFileExist] (DTSX:14522) — DTS:LogicalAnd חסר בשניהם → OR"
+  }
+ ],
+ "ignoredAsFramework": [
+  "Package\\Get Variables From SystemConfigurarion",
+  "Package\\Create ETL Process record",
+  "Package\\End ETL Process record",
+  "Package\\Foreach Loop Container\\Move Folder To Archive",
+  "Package\\Foreach Loop Container\\Create And Update Heir\\Derived Column",
+  "Package\\Foreach Loop Container\\Create And Update Heir\\Derived Column 1",
+  "Package\\Foreach Loop Container\\Create And Update Heir\\Derived Column 2",
+  "Package\\Foreach Loop Container\\Create And Update Heir\\casting error",
+  "Package\\Foreach Loop Container\\Create And Update Heir\\error",
+  "Package\\Foreach Loop Container\\Create And Update Heir\\no need to",
+  "Package\\Foreach Loop Container\\Create And Update Heir\\updated"
+ ],
+ "components": [
+  {
+   "refId": "Package (control flow)",
+   "title_he": "זרימת בקרה: פריסת zip, איתור תיקיות Rasham ולולאה על התיקיות",
+   "techName": "Convert Zips Files To Folders / Get Heirs Folders / Foreach Loop Container (Get File From Folder, Move Folder To Archive)",
+   "short_he": "קבצי zip בתיקיית המקור נפרסים לתיקיות. כל תיקייה ששמה מתחיל ב-Rasham מעובדת בנפרד: נבחר ממנה קובץ Rasham אחד, נקלטים ממנו היורשים ל-CRM, ואחרי הצלחה התיקייה מועברת לארכיון לפי תאריך.",
+   "flow_he": [
+    "טעינת הגדרות מ-gen_etlvariable ופתיחת רשומת תהליך (מסגרת).",
+    "Convert Zips Files To Folders: כל *.zip נפרס לתיקייה בשם הקובץ, וה-zip מועבר לתוכה.",
+    "Get Heirs Folders: איסוף תיקיות Rasham* ממוינות; isFileExist=true אם נמצאו.",
+    "לולאה על התיקיות: Get File From Folder (הקובץ הראשון Rasham*.txt) → Split File → Create And Update Heir → Move Folder To Archive.",
+    "סגירת תהליך ETL (מסגרת)."
+   ],
+   "short": {
+    "nodes": [
+     {
+      "type": "step",
+      "text": "קבצי zip שהגיעו לתיקיית המקור נפרסים, כל אחד לתיקייה משלו."
+     },
+     {
+      "type": "decision",
+      "text": "האם יש תיקיות שמתחילות ב-Rasham?",
+      "branches": [
+       {
+        "label": "לא",
+        "nodes": [
+         {
+          "type": "end",
+          "text": "הריצה מסתיימת בלי עדכון ב-CRM."
+         }
+        ]
+       },
+       {
+        "label": "כן",
+        "nodes": [
+         {
+          "type": "step",
+          "text": "כל תיקייה מעובדת בנפרד, לפי סדר השמות."
+         },
+         {
+          "type": "decision",
+          "text": "האם יש בתיקייה קובץ Rasham בסיומת txt?",
+          "branches": [
+           {
+            "label": "לא",
+            "nodes": [
+             {
+              "type": "step",
+              "text": "התיקייה אינה נקלטת ואינה מועברת לארכיון. היא נשארת בתיקיית המקור לריצה הבאה."
+             }
+            ]
+           },
+           {
+            "label": "כן",
+            "nodes": [
+             {
+              "type": "step",
+              "text": "נקלט הקובץ הראשון לפי סדר השמות: נקראים ממנו פרטי הלקוחות והיורשים, ונוצרים או מתעדכנים יורשים ב-CRM."
+             },
+             {
+              "type": "decision",
+              "text": "האם הקליטה הצליחה?",
+              "branches": [
+               {
+                "label": "כן",
+                "nodes": [
+                 {
+                  "type": "step",
+                  "text": "מתבצע ניסיון להעביר את התיקייה לארכיון לפי תאריך. ההעברה מתבצעת רק אם בארכיון של היום עדיין אין תיקייה באותו שם."
+                 }
+                ]
+               },
+               {
+                "label": "לא",
+                "nodes": [
+                 {
+                  "type": "step",
+                  "text": "התיקייה אינה מועברת לארכיון. הלולאה נעצרת, ותיקיות הרשם הבאות אינן מעובדות בריצה זו."
+                 }
+                ]
+               }
+              ]
+             }
+            ]
+           }
+          ]
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "type": "end",
+      "text": "תיקיות רשם שנקלטו בהצלחה מועברות לארכיון היומי, אם ההעברה התבצעה. תיקיות שלא הועברו נשארות בתיקיית המקור, ובהן תיקיות בלי קובץ Rasham בסיומת txt, תיקיות שכבר יש להן תיקייה באותו שם בארכיון של היום ותיקיות שלא עובדו בגלל כשל."
+     }
+    ]
+   },
+   "detailed": {
+    "nodes": [
+     {
+      "type": "step",
+      "text": "הגדרות הריצה (תיקיית המקור, נתיבי קבצי הביניים, שרת וארגון ה-CRM) נטענות מטבלת ההגדרות (מסגרת). ייתכן שקובץ תצורה חיצוני דורס חלק מהן.",
+      "tech": "Get Variables From SystemConfigurarion: gen_etlvariable where gen_scope='global' or gen_scope=System::PackageName; ReadWriteVariables=BackupPathFoldar, ConnStringSrsSsis_Logs, ContactDetailsFilePath, HeirDetailsFilePath, HeirSourceFilesPath, OrganizationName, ServerName; Configuration 1 = C:\\Generix\\SSISConfigFile.dtsConfig (DTSX:138, external_unknown)"
+     },
+     {
+      "type": "step",
+      "text": "כל קובץ zip בתיקיית המקור נפרס לתיקייה בשם הקובץ, והקובץ עצמו מועבר לתוך התיקייה.",
+      "tech": "Convert Zips Files To Folders ScriptMain.cs:96-160 @DTSX:380 — GetFiles(\"*.zip\"), Shell32 CopyHere, Directory.Move; try (98-114) עוטף את כל ה-foreach, catch ריק (115-118); כשהתהליכון אינו STA הפריסה רצה בתהליכון STA נפרד (129-135), וחריגה בו אינה נתפסת ב-catch זה"
+     },
+     {
+      "type": "step",
+      "text": "נאספות כל תיקיות המשנה ששמן מתחיל ב-Rasham, ממוינות לפי שם.",
+      "tech": "Get Heirs Folders ScriptMain.cs:48-57 @DTSX:13239 — Directory.GetDirectories(HeirSourceFilesPath, \"Rasham*\"); arr.Sort()"
+     },
+     {
+      "type": "decision",
+      "text": "האם נמצאה לפחות תיקייה אחת?",
+      "tech": "isFileExist=true ו-TaskResult=Success נקבעים רק בתוך if (arr.Count > 0) (ScriptMain.cs:51-57); בענף \"לא\" תוצאת המשימה אינה מוצגת בקבצים; Get Heirs Folders → Foreach Loop Container: Success AND @[User::isFileExist] (DTSX:14524); Get Heirs Folders → End ETL Process record: Success AND !@[User::isFileExist] (DTSX:14522)",
+      "branches": [
+       {
+        "label": "לא",
+        "nodes": [
+         {
+          "type": "end",
+          "text": "אין עיבוד ואין עדכון ב-CRM."
+         }
+        ]
+       },
+       {
+        "label": "כן",
+        "nodes": [
+         {
+          "type": "step",
+          "text": "התיקיות מעובדות אחת אחרי השנייה לפי סדר השמות.",
+          "tech": "Foreach Loop Container: ForEachFromVarEnumerator על User::DirectoriesArray → User::SelectedDirctoryPath (DTSX:3144-3148)"
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "type": "step",
+      "text": "בכל תיקייה נבחר הקובץ הראשון בסדר אלפביתי ששמו Rasham*.txt. קבצים נוספים באותה תיקייה אינם נקלטים.",
+      "tech": "Get File From Folder ScriptMain.cs:48-57 @DTSX:11093 — Directory.GetFiles(SelectedDirctoryPath, \"Rasham*.txt\"); arr.Sort(); SelectedFilePath = arr[0] או \"\""
+     },
+     {
+      "type": "decision",
+      "text": "האם נמצא קובץ כזה בתיקייה?",
+      "tech": "Get File From Folder → Split File: EvalOp=Expression בלבד, @[User::SelectedFilePath] != \"\" (DTSX:13082)",
+      "branches": [
+       {
+        "label": "לא",
+        "nodes": [
+         {
+          "type": "end",
+          "text": "התיקייה מדולגת ונשארת בתיקיית המקור, ותיבדק שוב בכל ריצה."
+         }
+        ]
+       },
+       {
+        "label": "כן",
+        "nodes": [
+         {
+          "type": "step",
+          "text": "הקובץ מפוצל לרשומות לקוח ולרשומות יורש, ואז נוצרים או מתעדכנים היורשים ב-CRM.",
+          "tech": "Split File → Create And Update Heir (Success, DTSX:13081)"
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "type": "decision",
+      "text": "האם קליטת היורשים הסתיימה בהצלחה?",
+      "tech": "Create And Update Heir → Move Folder To Archive: Success (DTSX:13083)",
+      "branches": [
+       {
+        "label": "כן",
+        "nodes": [
+         {
+          "type": "step",
+          "text": "מתבצע ניסיון להעביר את התיקייה לתיקיית ArchiveFiles של היום. ההעברה מתבצעת רק אם שם עדיין אין תיקייה באותו שם; אם יש, התיקייה נשארת בתיקיית המקור.",
+          "tech": "Move Folder To Archive ScriptMain.cs:92-115 @DTSX:11556 — HeirSourceFilesPath\\ArchiveFiles\\yyyyMMdd\\<folderName>; יצירת תיקיית התאריך (99-102) מחוץ ל-try; if (!Directory.Exists(destinationDateFolder)) Directory.Move בתוך try (104-110); Dts.TaskResult נקבע רק ב-catch (Success, 114); במסלול הרגיל אינו נקבע, ותוצאת המשימה אינה מוצגת בקבצים"
+         }
+        ]
+       },
+       {
+        "label": "לא",
+        "nodes": [
+         {
+          "type": "step",
+          "text": "התיקייה אינה מועברת לארכיון. כשל בפיצול הקובץ או בקליטת היורשים מכשיל גם את הלולאה, ולכן תיקיות הרשם הבאות אינן מעובדות בריצה זו, וסגירת תהליך ה-ETL אינה מתבצעת.",
+          "tech": "Success בלבד (DTSX:13081, 13083); אין MaximumErrorCount בחבילה, ולכן כשל משימה מכשיל את Foreach Loop Container (DTSX:3144); Foreach Loop Container → End ETL Process record: Success (DTSX:14521)"
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "type": "step",
+      "text": "כשהלולאה מסתיימת ב-Success נסגרת רשומת תהליך ה-ETL (מסגרת).",
+      "tech": "Foreach Loop Container → End ETL Process record (DTSX:14521) ו-Get Heirs Folders → End ETL Process record (DTSX:14522): לשני האילוצים אין DTS:LogicalAnd → OR; כך גם ב-evidence: logicalAnd=false (tools/dtsx-extract.mjs:181)"
+     },
+     {
+      "type": "end",
+      "text": "תיקיות הרשם שנקלטו בהצלחה מועברות לארכיון היומי, אם ההעברה התבצעה. תיקיות שלא הועברו נשארות בתיקיית המקור לריצה הבאה, ובהן תיקיות בלי קובץ Rasham*.txt, תיקיות שכבר יש להן תיקייה באותו שם בארכיון של היום ותיקיות שלא עובדו בגלל כשל."
+     }
+    ]
+   },
+   "detail_he": [
+    {
+     "h": "מקור ואוכלוסייה",
+     "t": "תיקיית HeirSourceFilesPath (מ-gen_etlvariable / קובץ תצורה חיצוני – הערך לא ידוע): קבצי zip נפרסים לתיקיות; מעובדות רק תיקיות ששמן מתחיל ב-Rasham, ובכל אחת רק הקובץ הראשון (בסדר אלפביתי) Rasham*.txt."
+    },
+    {
+     "h": "החלטות",
+     "t": "isFileExist (יש לפחות תיקיית Rasham*) קובע אם הלולאה רצה. SelectedFilePath != \"\" קובע אם התיקייה נקלטת. הצלחת Create And Update Heir קובעת אם התיקייה מועברת לארכיון. בנוסף, ההעברה מתבצעת רק אם בארכיון של היום אין עדיין תיקייה באותו שם."
+    },
+    {
+     "h": "כתיבה ל-CRM",
+     "t": "אין כתיבה עסקית בזרימת הבקרה עצמה; הכתיבה ל-gen_heir מתבצעת ברכיב Create And Update Heir."
+    },
+    {
+     "h": "תוצאה עסקית",
+     "t": "קבצי הרשם היומיים נקלטים פעם אחת ונשמרים בארכיון לפי תאריך. תיקייה שלא הועברה לארכיון תיקלט שוב בריצה הבאה."
+    }
+   ],
+   "decisions": [
+    {
+     "where": "Get Heirs Folders ScriptMain.cs:51",
+     "condition": "if (arr.Count > 0) { …; Dts.Variables[\"User::isFileExist\"].Value = true; }",
+     "meaning_he": "יש תיקיות Rasham*",
+     "outcome_he": "DirectoriesArray מתמלא והלולאה רצה"
+    },
+    {
+     "where": "Precedence Get Heirs Folders → Foreach Loop Container (DTSX:14524)",
+     "condition": "@[User::isFileExist] (EvalOp=3 ExpressionAndConstraint, Success)",
+     "meaning_he": "יש תיקיות לעיבוד",
+     "outcome_he": "הלולאה רצה"
+    },
+    {
+     "where": "Precedence Get Heirs Folders → End ETL Process record (DTSX:14522)",
+     "condition": "!@[User::isFileExist] (EvalOp=3, Success); ללא DTS:LogicalAnd → OR עם DTSX:14521",
+     "meaning_he": "אין תיקיות",
+     "outcome_he": "סגירת תהליך בלבד (מסגרת)"
+    },
+    {
+     "where": "Get File From Folder ScriptMain.cs:54-57",
+     "condition": "if (arr.Count > 0) SelectedFilePath = arr[0]; else SelectedFilePath = string.Empty;",
+     "meaning_he": "יש קובץ Rasham*.txt בתיקייה",
+     "outcome_he": "רק הקובץ הראשון לפי מיון נבחר"
+    },
+    {
+     "where": "Precedence Get File From Folder → Split File (DTSX:13082)",
+     "condition": "@[User::SelectedFilePath] != \"\" (EvalOp=1 Expression)",
+     "meaning_he": "נבחר קובץ",
+     "outcome_he": "Split File רץ; אחרת שום שלב נוסף בתיקייה אינו רץ"
+    },
+    {
+     "where": "Move Folder To Archive ScriptMain.cs:106",
+     "condition": "if (!Directory.Exists(destinationDateFolder)) Directory.Move(sourceFolder, destinationDateFolder);",
+     "meaning_he": "אין בארכיון של היום תיקייה באותו שם",
+     "outcome_he": "התיקייה מועברת; אחרת נשארת במקור"
+    }
+   ],
+   "crmEffects": [],
+   "evidence": [
+    "DTSX:14519-14524 precedence (Package) — DTS:LogicalAnd חסר ב-Constraint 2/3/5",
+    "DTSX:13081-13083 precedence (Foreach Loop Container)",
+    "Convert Zips Files To Folders ScriptMain.cs @DTSX:380 lines 96-160",
+    "Get Heirs Folders ScriptMain.cs @DTSX:13239 lines 46-59",
+    "Get File From Folder ScriptMain.cs @DTSX:11093 lines 46-60",
+    "Move Folder To Archive ScriptMain.cs @DTSX:11556 lines 92-116",
+    "DTSX:3144-3148 Foreach Loop Container (FEEFVE VariableName=User::DirectoriesArray)",
+    "DTSX:138 Configuration 1 = C:\\Generix\\SSISConfigFile.dtsConfig"
+   ],
+   "openQuestions_he": [
+    "ערכי HeirSourceFilesPath, ContactDetailsFilePath ו-HeirDetailsFilePath (gen_etlvariable או קובץ התצורה החיצוני) אינם בחבילה — לא ידוע.",
+    "האם שמות קבצי ה-zip מתחילים ב-Rasham, כך שהתיקיות שנפרסות מהם נקלטות? לא ניתן להוכיח מהחבילה."
+   ]
+  },
+  {
+   "refId": "Package\\Foreach Loop Container\\Split File",
+   "title_he": "פיצול קובץ הרשם לרשומות לקוח ולרשומות יורש",
+   "techName": "Split File",
+   "short_he": "כל שורה בקובץ Rasham מסווגת לפי סוג הרשומה: 1 = פרטי לקוח, 2 = פרטי יורש. כל סוג נכתב לקובץ ביניים משלו, ושורות מסוג אחר נזנחות.",
+   "flow_he": [
+    "קריאת קובץ ה-Rasham הנבחר (ברוחב קבוע).",
+    "הסרת רווחים מהשדות מחוז, תיק, בקשה וסוג בקשה.",
+    "סוג רשומה \"1\" → קובץ ביניים פרטי לקוח; \"2\" → קובץ ביניים פרטי יורש; אחר → נזנח."
+   ],
+   "short": {
+    "nodes": [
+     {
+      "type": "step",
+      "text": "כל שורה בקובץ הרשם נקראת, ורווחים מיותרים בשדות המפתח מוסרים."
+     },
+     {
+      "type": "decision",
+      "text": "מה סוג הרשומה?",
+      "branches": [
+       {
+        "label": "1 – פרטי לקוח",
+        "nodes": [
+         {
+          "type": "step",
+          "text": "השורה נשמרת בקובץ הביניים של פרטי הלקוחות."
+         }
+        ]
+       },
+       {
+        "label": "2 – פרטי יורש",
+        "nodes": [
+         {
+          "type": "step",
+          "text": "השורה נשמרת בקובץ הביניים של פרטי היורשים."
+         }
+        ]
+       },
+       {
+        "label": "אחר",
+        "nodes": [
+         {
+          "type": "step",
+          "text": "השורה נזנחת."
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "type": "end",
+      "text": "שני קבצי ביניים, של לקוחות ושל יורשים, מוכנים לשלב היצירה והעדכון של היורשים."
+     }
+    ]
+   },
+   "detailed": {
+    "nodes": [
+     {
+      "type": "step",
+      "text": "קובץ הרשם הנבחר נקרא כשורות ברוחב קבוע: מחוז, מספר תיק, מספר בקשה, סוג בקשה, סוג רשומה, ושאר השורה כטקסט אחד. השורה הראשונה בקובץ נחשבת לשורת כותרות ואינה נקלטת.",
+      "tech": "Read data (FlatFileSource, DTSX:12152): conn Source - Rasham = @[User::SelectedFilePath] (DTSX:121-124), RaggedRight cp1255, ColumnNamesInFirstDataRow=True, RetainNulls=true; עמודות MACHOZ, MIS_TIK, MIS_BAKASHA, SUG _BAKASHA, SUG_REC, Column 0"
+     },
+     {
+      "type": "step",
+      "text": "שגיאת קריאה או קיצוץ בשדה כלשהו מכשילה את השלב, ואז התיקייה אינה ממשיכה לקליטה.",
+      "tech": "Read data: errorRowDisposition / truncationRowDisposition = FailComponent לכל העמודות (DTSX:12163-12193)"
+     },
+     {
+      "type": "step",
+      "text": "רווחים בתחילת השדות ובסופם מוסרים מהשדות מחוז, מספר תיק, מספר בקשה וסוג בקשה.",
+      "tech": "Trim All Input Columns (Split File) main.cs:33-58 @DTSX:12221"
+     },
+     {
+      "type": "decision",
+      "text": "מה סוג הרשומה?",
+      "tech": "Check If Contact Or Heir (ConditionalSplit, DTSX:12051): SUG_REC == \"1\" (order 0) → Contact Details; SUG_REC == \"2\" (order 1) → Heir Details",
+      "branches": [
+       {
+        "label": "1 – פרטי לקוח",
+        "nodes": [
+         {
+          "type": "step",
+          "text": "השורה כולה נכתבת לקובץ הביניים של פרטי הלקוח, שנדרס בכל קובץ חדש.",
+          "tech": "Contact File Destination → [Contact Details] = @[User::ContactDetailsFilePath], Overwrite=true (DTSX:12092-12094)"
+         }
+        ]
+       },
+       {
+        "label": "2 – פרטי יורש",
+        "nodes": [
+         {
+          "type": "step",
+          "text": "השורה כולה נכתבת לקובץ הביניים של פרטי היורש, שנדרס בכל קובץ חדש.",
+          "tech": "Heir File Destination → [Heir Details] = @[User::HeirDetailsFilePath], Overwrite=true (DTSX:12122-12124)"
+         }
+        ]
+       },
+       {
+        "label": "אחר או ריק",
+        "nodes": [
+         {
+          "type": "step",
+          "text": "השורה נזנחת בלי תיעוד.",
+          "tech": "Conditional Split Default Output – אין נתיב"
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "type": "step",
+      "text": "שני קבצי הביניים נקראים מחדש בשלב הבא במבנה מפורט יותר, שבו \"שאר השורה\" מתפרק לשדות.",
+      "tech": "[Source - Contact Details] / [Source - Heir Details] — RaggedRight, 14 עמודות לכל אחד (פירוק השדות שייך למיפוי השדות)"
+     },
+     {
+      "type": "end",
+      "text": "הלקוחות והיורשים של הקובץ מופרדים לשני קבצי ביניים; אין כתיבה ל-CRM בשלב זה."
+     }
+    ]
+   },
+   "detail_he": [
+    {
+     "h": "מקור ואוכלוסייה",
+     "t": "כל שורות הקובץ שב-SelectedFilePath (קובץ Rasham*.txt אחד לתיקייה), פרט לשורה הראשונה, שנחשבת לשורת כותרות (ColumnNamesInFirstDataRow=True)."
+    },
+    {
+     "h": "החלטות",
+     "t": "SUG_REC == \"1\" → פרטי לקוח; SUG_REC == \"2\" → פרטי יורש; כל ערך אחר נזנח (ה-Default Output אינו מחובר)."
+    },
+    {
+     "h": "כתיבה ל-CRM",
+     "t": "אין. הכתיבה היא לשני קבצי ביניים מקומיים (Overwrite=true)."
+    },
+    {
+     "h": "תוצאה עסקית",
+     "t": "הפרדה בין רשומות הלקוח (מספר זהות הלקוח ותאריך הוצאת הצו) לבין רשומות היורשים, לפי מפתח משותף של מחוז, תיק ובקשה."
+    }
+   ],
+   "decisions": [
+    {
+     "where": "Check If Contact Or Heir (DTSX:12051)",
+     "condition": "SUG_REC == \"1\"",
+     "meaning_he": "רשומת פרטי לקוח",
+     "outcome_he": "Contact File Destination"
+    },
+    {
+     "where": "Check If Contact Or Heir (DTSX:12051)",
+     "condition": "SUG_REC == \"2\"",
+     "meaning_he": "רשומת פרטי יורש",
+     "outcome_he": "Heir File Destination"
+    },
+    {
+     "where": "Check If Contact Or Heir (DTSX:12051)",
+     "condition": "Default Output (אחרת)",
+     "meaning_he": "סוג רשומה אחר",
+     "outcome_he": "אין נתיב — השורה נזנחת"
+    }
+   ],
+   "crmEffects": [],
+   "evidence": [
+    "DTSX:12045 Split File; DTSX:12152 Read data (RetainNulls=true DTSX:12154)",
+    "DTSX:12051 Check If Contact Or Heir (FriendlyExpression SUG_REC == \"1\" / \"2\")",
+    "DTSX:12092-12124 Contact/Heir File Destination (Overwrite=true)",
+    "Trim All Input Columns main.cs @DTSX:12221"
+   ],
+   "openQuestions_he": [
+    "משמעות ערכי SUG_REC אחרים (אם קיימים בקובץ, כגון כותרת/סיכום) — לא ידוע; הם נזנחים.",
+    "האם השורה הראשונה בקובץ Rasham היא אכן שורת כותרת? מנהל החיבורים מוגדר ColumnNamesInFirstDataRow=True, כך שאם אין בקובץ כותרת, הרשומה הראשונה בכל קובץ אובדת."
+   ]
+  },
+  {
+   "refId": "Package\\Foreach Loop Container\\Create And Update Heir",
+   "title_he": "יצירה ועדכון של יורשים (gen_heir) המקושרים ללקוח",
+   "techName": "Create And Update Heir",
+   "short_he": "כל יורש מוצמד לרשומת הלקוח של אותה בקשה (מחוז, מספר תיק ומספר בקשה), והלקוח מאותר ב-CRM לפי תעודת הזהות שלו. יורש שאינו קיים נוצר ומקושר ללקוח, ויורש קיים מתעדכן בשדות שהשתנו. כל הכתיבה היא דרך ה-SDK.",
+   "flow_he": [
+    "קריאת רשומות יורש ורשומות לקוח מקבצי הביניים, ניקוי רווחים וערכים ריקים.",
+    "צירוף יורש ↔ לקוח לפי מחוז + תיק + בקשה (Inner).",
+    "גזירת שם מלא, מחוז מספרי וסטטוס (U/C → 1, ערך אחר שאינו ריק → 2, סוג פעולה ריק → ללא סטטוס, בתנאי שהשמת null בסקריפט הניקוי הופכת את העמודה ל-NULL – לפי התנהגות SSIS המתועדת, לא מוצג בקבצים); ריפוד ת״ז ל-9 ספרות; המרת תאריך הצו.",
+    "איתור איש הקשר לפי ת״ז הלקוח (לא נמצא → נזנח).",
+    "איתור יורש קיים לפי ת״ז יורש + תיק + בקשה + מחוז.",
+    "לא קיים → Create (ExecuteMultiple); קיים → השוואת שדות ו-Update (ExecuteMultiple)."
+   ],
+   "short": {
+    "nodes": [
+     {
+      "type": "step",
+      "text": "כל יורש מוצמד לרשומת הלקוח של אותה בקשה, לפי מחוז, מספר תיק ומספר בקשה. יורש בלי רשומת לקוח תואמת נזנח."
+     },
+     {
+      "type": "decision",
+      "text": "האם הלקוח קיים ב-CRM לפי תעודת הזהות שלו?",
+      "branches": [
+       {
+        "label": "לא",
+        "nodes": [
+         {
+          "type": "end",
+          "text": "היורש אינו נקלט, ואין לכך תיעוד."
+         }
+        ]
+       },
+       {
+        "label": "כן",
+        "nodes": [
+         {
+          "type": "decision",
+          "text": "האם היורש כבר קיים ב-CRM לאותה בקשה?",
+          "branches": [
+           {
+            "label": "לא",
+            "nodes": [
+             {
+              "type": "write",
+              "text": "נוצר יורש חדש ומקושר ללקוח."
+             }
+            ]
+           },
+           {
+            "label": "כן",
+            "nodes": [
+             {
+              "type": "write",
+              "text": "היורש מתעדכן רק בשדות שהשתנו."
+             }
+            ]
+           }
+          ]
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "type": "end",
+      "text": "רשומות היורשים ב-CRM תואמות לקובץ הרשם ומקושרות ללקוח."
+     }
+    ]
+   },
+   "detailed": {
+    "nodes": [
+     {
+      "type": "step",
+      "text": "רשומות היורשים נקראות מקובץ הביניים: מחוז, מספר תיק, מספר בקשה, ת״ז יורש, שם פרטי ושם משפחה, כתובת, עיר, מיקוד, ארץ, סוג קרבה וסוג פעולה. רווחים מוסרים, וסקריפט הניקוי מציב null בערך ריק; לפי התנהגות SSIS המתועדת, לא מוצג בקבצים, הערך נחשב בכך חסר (NULL).",
+      "tech": "Heir (FlatFileSource, DTSX:6641): Source - Heir Details = @[User::HeirDetailsFilePath]; Trim All Input Columns 1 main.cs:33-60 @DTSX:8048"
+     },
+     {
+      "type": "step",
+      "text": "שורת יורש שנכשלה בקריאה (המרה או קיצוץ) נזנחת בלי תיעוד.",
+      "tech": "Heir: errorRowDisposition=RedirectRow → Flat File Source Error Output → Derived Column (אין המשך)"
+     },
+     {
+      "type": "step",
+      "text": "רשומות הלקוח נקראות מקובץ הביניים: מחוז, מספר תיק, מספר בקשה, ת״ז הלקוח ותאריך הוצאת הצו. רווחים מוסרים, וסקריפט הניקוי מציב null בערך ריק; לפי התנהגות SSIS המתועדת, לא מוצג בקבצים, הערך נחשב בכך חסר (NULL). שגיאת קריאה כאן מכשילה את השלב.",
+      "tech": "Contact (FlatFileSource, DTSX:4325): Source - Contact Details = @[User::ContactDetailsFilePath], FailComponent; Trim All Input Columns main.cs:33-57 @DTSX:7159"
+     },
+     {
+      "type": "step",
+      "text": "כל יורש מוצמד לרשומת הלקוח של אותה בקשה, לפי מחוז + מספר תיק + מספר בקשה. יורש בלי רשומת לקוח, או לקוח בלי יורשים, אינם ממשיכים.",
+      "tech": "Sort / Sort 1 → Merge Join (DTSX:6752): JoinType=2 (Inner), NumKeyColumns=3, TreatNullsAsEqual=true; gen_region_STR_INT↔MACHOZ, gen_portfolionumber↔MIS_TIK, gen_requestnumber↔MIS_BAKASHA"
+     },
+     {
+      "type": "step",
+      "text": "נגזרים שלושה ערכים: שם מלא (שם פרטי, רווח ושם משפחה), מחוז כמספר, וסטטוס – 1 אם סוג הפעולה הוא U או C, ו-2 אם הוא ערך אחר. אם סוג הפעולה ריק, סקריפט הניקוי מציב בו null; רק אם בכך העמודה הופכת ל-NULL (לפי התנהגות SSIS המתועדת, לא מוצג בקבצים), הביטוי מחזיר NULL והסטטוס נשאר חסר. באותו אופן, אם השם הפרטי או שם המשפחה חסר (NULL), השם המלא הוא NULL (לפי התנהגות SSIS המתועדת, לא מוצג בקבצים), ולכן הוא אינו נכתב ביצירת יורש.",
+      "tech": "Set Heir Columns (DTSX:6885): gen_status = (SUG_PEULA == \"U\" || SUG_PEULA == \"C\") ? 1 : 2 — SUG_PEULA ריק (RetainNulls=false, DTSX:6643) מוחלף ב-null ב-Trim All Input Columns 1 (main.cs:53-57; p.SetValue שורה 45 → setter this[8] = value, DTSX:8565-8575); אם העמודה הופכת בכך ל-NULL (התנהגות SSIS, לא מוצג בקבצים), הביטוי מחזיר NULL; gen_name = gen_firstname + \" \" + gen_lastname; gen_region = (DT_I4)gen_region_STR_INT — כשל המרת מחוז = FailComponent; שגיאות status/name → Derived Column 1 (אין המשך)"
+     },
+     {
+      "type": "step",
+      "text": "מספרי הזהות של היורש ושל הלקוח מנוקים מנקודות ומרופדים באפסים מובילים ל-9 ספרות. לפי הקוד, ת״ז חסרה מטופלת כמחרוזת ריקה והופכת ל-000000000; כך יורש בלי ת״ז מאותר ונוצר עם ת״ז 000000000, ולקוח בלי ת״ז מאותר לפי 000000000. (לא אומת: זה נכון רק אם קריאת עמודה חסרה בסקריפט מחזירה null ולא זורקת חריגה.) תאריך הוצאת הצו (YYYYMMDD, או YYYYMM שמקבל את היום הראשון בחודש) מומר לתאריך; לתאריך לא תקין הסקריפט מציב null (לפי התנהגות SSIS המתועדת, לא מוצג בקבצים, הוא נחשב בכך חסר). גם תאריך צו ריק נקרא בסקריפט ההמרה אחרי שהניקוי הציב בו null, ולכן חל עליו אותו סייג (לא אומת). בסקריפטים של ריפוד הת״ז ושל המרת התאריך אין טיפול בחריגות (try/catch); אם קריאה כזו זורקת חריגה, לפי התנהגות SSIS המתועדת, לא מוצג בקבצים, כל שלב קליטת היורשים נכשל, ולא רק הערך נחשב חסר.",
+      "tech": "Append Zeros To Fields main.cs:38-66 @DTSX:3161 (gen_identitynumber, gen_customeridentitynumber): FormatField — if (String.IsNullOrEmpty(str)) str = \"\"; ריפוד ב-\"0\" עד 9 תווים (59-64); הקריאה ב-p.GetValue (שורה 48) עוברת דרך getter שמשתמש ב-Buffer.GetString; Format Dates main.cs:38-80 @DTSX:5855 (p.GetValue שורה 45; FormatYYYYMMDDtoDate 54-80); ב-Append Zeros (38-56) וב-Format Dates (38-53) אין try/catch"
+     },
+     {
+      "type": "decision",
+      "text": "האם קיים ב-CRM איש קשר עם תעודת הזהות של הלקוח?",
+      "tech": "Check If Contact Exist (Lookup, DTSX:4254): select gen_identitynumber, contactid from contact WHERE gen_identitynumber = gen_customeridentitynumber; NoMatchBehavior=1",
+      "branches": [
+       {
+        "label": "לא",
+        "nodes": [
+         {
+          "type": "end",
+          "text": "היורש אינו נקלט, ואין רישום אזהרה.",
+          "tech": "Lookup No Match Output → Derived Column 2 (אין המשך)"
+         }
+        ]
+       },
+       {
+        "label": "כן",
+        "nodes": [
+         {
+          "type": "step",
+          "text": "היורש יקושר לאיש הקשר שנמצא.",
+          "tech": "gen_contactname ← contactid"
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "type": "decision",
+      "text": "האם קיים יורש עם אותה ת״ז, אותו מספר תיק, אותו מספר בקשה ואותו מחוז?",
+      "tech": "Check If  Heir Exist (Lookup, DTSX:4070): gen_heir WHERE gen_identitynumberdb = gen_identitynumber AND gen_portfolionumberdb = gen_portfolionumber AND gen_requestnumberdb = gen_requestnumber AND gen_regiondb = gen_region; NoMatchBehavior=1",
+      "branches": [
+       {
+        "label": "לא – יורש חדש",
+        "nodes": [
+         {
+          "type": "write",
+          "text": "נוצר יורש חדש עם כל השדות שיש להם ערך: שם פרטי, שם משפחה, שם מלא, ת״ז יורש, ת״ז לקוח, מספר תיק, מספר בקשה, מחוז, כתובת, עיר, מיקוד, ארץ, סוג קרבה, סטטוס, תאריך הוצאת הצו וקישור ללקוח. היורש נוצר גם כשהסטטוס הוא 2.",
+          "tech": "gen_heir · Create · SDK ExecuteMultiple (Create Heir main.cs:125-236 @DTSX:4396; מנות של 1000; RequestType.Create)"
+         },
+         {
+          "type": "step",
+          "text": "תוצאות היצירה, הצלחה או כשל, אינן נאספות לשום יעד.",
+          "tech": "Create Heir Outputs Ok / CastingError / Error — אין נתיבים"
+         }
+        ]
+       },
+       {
+        "label": "כן – יורש קיים",
+        "nodes": [
+         {
+          "type": "step",
+          "text": "ערכים ריקים ביורש הקיים נחשבים חסרים, וכל שדה מהקובץ מושווה לערך הקיים, חוץ מהארץ: הערך שלה מושווה רק כשהעיר בקובץ אינה ריקה (התנאי בשורה 162 בודק את העיר). כשהעיר בקובץ ריקה, נבדק רק אם אחד מערכי הארץ ריק והשני לא. תאריך הצו מושווה ברמת יום, אחרי הוספת 3 שעות לערך הקיים.",
+          "tech": "change empty strings to null (DTSX:3983); Update Heir IsEqual main.cs:295-338 (DateTime: obj1.Date == obj2.AddHours(3).Date); ארץ: main.cs:162 — Row.gencountry_IsNull != Row.Gencountrydb_IsNull || (Row.gencity_IsNull == false && IsNeedToUpdate<String>(Row.gencountry, Row.Gencountrydb)) (DTSX:9612)"
+         },
+         {
+          "type": "decision",
+          "text": "האם השתנה לפחות שדה אחד?",
+          "tech": "Update Heir main.cs:131-230 — לכל שדה חוץ מארץ: file_IsNull != db_IsNull || (!file_IsNull && IsNeedToUpdate(file, db)); ארץ (main.cs:162): gencountry_IsNull != Gencountrydb_IsNull || (!gencity_IsNull && IsNeedToUpdate(gencountry, Gencountrydb))",
+          "branches": [
+           {
+            "label": "כן",
+            "nodes": [
+             {
+              "type": "write",
+              "text": "היורש מתעדכן בשדות שהשתנו: שם פרטי, שם משפחה, כתובת, עיר, מיקוד, ארץ, סוג קרבה, ת״ז יורש, ת״ז לקוח, סטטוס, קישור ללקוח ותאריך הוצאת הצו. כששדה התרוקן בקובץ (כולל סטטוס חסר), הקוד קורא אותו בכל זאת ומנסה לשלוח אותו לעדכון. גם תאריך צו חסר נקרא תמיד. לא אומת מה קורה בקריאה כזו (לפי התנהגות SSIS המתועדת, לא מוצג בקבצים). אם היא זורקת חריגה, כל השורה עוברת ל-CastingError בלי עדכון. אם היא אינה זורקת: בשדה טקסט שהקריאה מחזירה בו ערך ריק (null), השדה נמחק ב-CRM; בסטטוס, שהוא מספר שלם, נשלח הערך המספרי שהקריאה מחזירה ולא מחיקה; ותאריך צו חסר אינו נשלח, כי אינו ניתן לפענוח. השם המלא, המחוז, מספר התיק ומספר הבקשה אינם מתעדכנים. שינוי ארץ בין שני ערכים לא ריקים אינו מתעדכן כשהעיר בקובץ ריקה. כשהעיר בקובץ מלאה ושני ערכי הארץ ריקים, הקוד קורא את הארץ הריקה; מה שקורה בקריאה כזו לא אומת (לפי התנהגות SSIS המתועדת, לא מוצג בקבצים), ואם היא זורקת חריגה, השורה עוברת ל-CastingError בלי עדכון.",
+              "tech": "gen_heir · Update · SDK ExecuteMultiple (Update Heir main.cs:220-274 @DTSX:9184; מנות של 1000; RequestType.Update). סטטוס: heir[\"gen_status\"] = new OptionSetValue(Row.genstatus), Row.genstatus מטיפוס Int32 (main.cs:192); חריגה → catch → CastingError (233-242). ארץ: התנאי בשורה 162 בודק את gencity_IsNull (main.cs:162, DTSX:9612)"
+             }
+            ]
+           },
+           {
+            "label": "לא",
+            "nodes": [
+             {
+              "type": "step",
+              "text": "אין עדכון.",
+              "tech": "DontNeedToUpdate → no need to (אין המשך)"
+             }
+            ]
+           }
+          ]
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "type": "end",
+      "text": "יורשים חדשים נוצרים ויורשים קיימים מתעדכנים לפי קובץ הרשם, וכולם מקושרים ללקוח. שורות שנדחו (לקוח לא נמצא, שגיאות המרה, כשלי CRM) אינן מתועדות בשום מקום."
+     }
+    ]
+   },
+   "detail_he": [
+    {
+     "h": "מקור ואוכלוסייה",
+     "t": "רשומות יורש (SUG_REC=2) ורשומות לקוח (SUG_REC=1) מאותו קובץ Rasham, שהופרדו לשני קבצי ביניים. נכנסים לעיבוד רק יורשים שיש להם רשומת לקוח עם אותו מחוז, תיק ובקשה (Inner Join)."
+    },
+    {
+     "h": "התאמה לרשומות קיימות",
+     "t": "לקוח: contact.gen_identitynumber = ת״ז הלקוח מרופדת ל-9 ספרות. יורש: gen_heir לפי ת״ז היורש (מרופדת ל-9), gen_portfolionumber, gen_requestnumber ו-gen_region. ת״ז הלקוח אינה חלק ממפתח היורש. שני ה-Lookups ב-Full cache."
+    },
+    {
+     "h": "החלטות",
+     "t": "לקוח לא נמצא → נזנח בשקט. יורש לא נמצא → נוצר (ללא תלות בסוג הפעולה; הסטטוס נגזר: U/C → 1, ערך אחר שאינו ריק → 2, סוג פעולה ריק → סקריפט הניקוי מציב null; רק אם בכך העמודה הופכת ל-NULL (לפי התנהגות SSIS המתועדת, לא מוצג בקבצים), הביטוי מחזיר NULL והיורש נוצר בלי סטטוס). יורש נמצא → עדכון רק אם השתנה שדה כלשהו."
+    },
+    {
+     "h": "כתיבה ל-CRM",
+     "t": "gen_heir · Create · SDK ExecuteMultiple (מנות של 1000). gen_heir · Update · SDK ExecuteMultiple (מנות של 1000). אין SQL DML. ה-Lookups קוראים מ-[CRM], שמחרוזת החיבור שלו בחבילה (ערך זמן התכנון) היא Psql/ALTSHULER_MSCRM (DTSX:44-46); קובץ התצורה החיצוני C:\\Generix\\SSISConfigFile.dtsConfig (DTSX:138), שלא סופק, עשוי לדרוס אותה."
+    },
+    {
+     "h": "תוצאה עסקית",
+     "t": "ב-CRM מתוחזקת רשימת היורשים של כל לקוח, לפי בקשות הרשם: פרטים אישיים, כתובת, סוג קרבה, סטטוס ותאריך הוצאת הצו."
+    }
+   ],
+   "decisions": [
+    {
+     "where": "Merge Join (DTSX:6752)",
+     "condition": "JoinType=2 (Inner), NumKeyColumns=3 (region/MACHOZ, portfolionumber/MIS_TIK, requestnumber/MIS_BAKASHA), TreatNullsAsEqual=true",
+     "meaning_he": "יורש ולקוח של אותה בקשה",
+     "outcome_he": "רק זוגות תואמים ממשיכים"
+    },
+    {
+     "where": "Set Heir Columns (DTSX:6885)",
+     "condition": "(SUG_PEULA == \"U\" || SUG_PEULA == \"C\") ? 1 : 2",
+     "meaning_he": "סטטוס היורש לפי סוג הפעולה",
+     "outcome_he": "gen_status = 1 או 2; כש-SUG_PEULA ריק, Trim All Input Columns 1 מציב בו null; בהנחה שהשמת null דרך ה-setter הופכת את העמודה ל-NULL (לפי התנהגות SSIS המתועדת, לא מוצג בקבצים), התוצאה NULL ו-Create Heir אינו כותב gen_status (main.cs:173-174)"
+    },
+    {
+     "where": "Check If Contact Exist (DTSX:4254)",
+     "condition": "[refTable].[gen_identitynumber] = ? (gen_customeridentitynumber); NoMatchBehavior=1",
+     "meaning_he": "הלקוח קיים כאיש קשר",
+     "outcome_he": "Match → בדיקת יורש; No Match → Derived Column 2 (נזנח)"
+    },
+    {
+     "where": "Check If  Heir Exist (DTSX:4070)",
+     "condition": "[refTable].[gen_identitynumberdb] = ? and [refTable].[gen_portfolionumberdb] = ? and [refTable].[gen_requestnumberdb] = ? and [refTable].[gen_regiondb] = ?",
+     "meaning_he": "היורש כבר קיים לבקשה זו",
+     "outcome_he": "Match → Update Heir; No Match → Create Heir"
+    },
+    {
+     "where": "Update Heir main.cs:131-218",
+     "condition": "file_IsNull != db_IsNull || (file_IsNull == false && IsNeedToUpdate<T>(file, db)) לכל שדה; main.cs:162 משתמש ב-gencity_IsNull עבור gen_country",
+     "meaning_he": "שדה השתנה",
+     "outcome_he": "השדה נוסף לעדכון; needToUpdate=true"
+    },
+    {
+     "where": "Update Heir main.cs:211-218",
+     "condition": "genissueanceofanorderdate_IsNull != DB_IsNull || (...) → if (genissueanceofanorderdateParseResult) set",
+     "meaning_he": "תאריך הצו השתנה",
+     "outcome_he": "נשלח רק אם תאריך הקובץ ניתן לפענוח"
+    }
+   ],
+   "crmEffects": [
+    {
+     "entity": "gen_heir",
+     "verb": "create",
+     "mechanism": "SDK (ExecuteMultiple, Create Heir)",
+     "when_he": "הלקוח נמצא ואין יורש עם אותם ת״ז + תיק + בקשה + מחוז"
+    },
+    {
+     "entity": "gen_heir",
+     "verb": "update (שדות שהשתנו)",
+     "mechanism": "SDK (ExecuteMultiple, Update Heir)",
+     "when_he": "היורש קיים ולפחות שדה אחד שונה מהקובץ"
+    },
+    {
+     "entity": "contact, gen_heir",
+     "verb": "read",
+     "mechanism": "SQL (SELECT, Lookups על [CRM])",
+     "when_he": "טעינת cache בתחילת זרימת הנתונים"
+    }
+   ],
+   "evidence": [
+    "DTSX:6641 Heir source (RedirectRow); DTSX:4325 Contact source (FailComponent)",
+    "DTSX:6752 Merge Join (JoinType=2, NumKeyColumns=3); DTSX:6930/7082 Sort keys",
+    "DTSX:6885-6912 Set Heir Columns (FriendlyExpression; gen_region FailComponent)",
+    "Append Zeros To Fields main.cs @DTSX:3161; Format Dates main.cs @DTSX:5855",
+    "DTSX:4254-4282 Check If Contact Exist; DTSX:4070-4118 Check If  Heir Exist",
+    "DTSX:3983 change empty strings to null",
+    "Create Heir main.cs @DTSX:4396 lines 125-248 (sha 45958dc3af9f)",
+    "Update Heir main.cs @DTSX:9184 lines 123-351 (sha 3b80125943a0)",
+    "paths: Derived Column, Derived Column 1, Derived Column 2, casting error, error, no need to, updated — ללא נתיב יוצא; ל-Create Heir אין נתיבים יוצאים",
+    "connectionManagerRefId: Contact Don't Exist / Convertion Failed Error / Heir Load Failed Error אינם בשימוש אף רכיב"
+   ],
+   "openQuestions_he": [
+    "משמעות סוגי הפעולה (U, C ואחרים) ומשמעות ערכי gen_status 1/2 — לא ידוע. (השערה: 1 = פעיל, 2 = לא פעיל/נמחק.)",
+    "נענה מהקבצים: בהגדרת קובץ הלקוח (חיבור Source - Contact Details, DTSX:86-89) עמודות הרשומה מסומנות MIS_ZEHUT_MORISH, LAST_NAME_MORISH, FIRST_NAME_MORISH ו-TAARICH_PTIRA_MORISH, והלקוח מאותר ב-CRM לפי MIS_ZEHUT_MORISH (gen_customeridentitynumber, DTSX:4360). ברשומת היורש מופיעה העמודה KIRVA_EL_MANOCH (DTSX:115). כלומר בחבילה רשומת הלקוח מסומנת כרשומת המוריש.",
+    "ExecuteMultipleExtension (CRM.Proxy) הוא אסמבלי חיצוני — לא ידוע אם הוא משתמש ב-ContinueOnError, ומה קורה לשאר המנה אחרי כשל.",
+    "Update Heir קורא ערכי עמודות בלי לבדוק קודם אם הן ריקות: Row.genissueanceofanorderdate בשורה 209, Row.gencountry כשהעיר מלאה (שורה 162), ושדות שהתרוקנו (למשל שורה 133). לא אומת אם ריצת SSIS מחזירה במקרים אלה ערך ריק או זורקת חריגה, ש\"מסיטה\" את השורה ל-CastingError בלי עדכון.",
+    "הצירוף לפי מחוז+תיק+בקשה הוא רבים-לרבים: אם לאותה בקשה יש כמה רשומות לקוח, כל יורש משוכפל לכל אחת מהן — לא ידוע אם זה קורה בפועל."
+   ]
+  }
+ ],
+ "findings_he": [
+  {
+   "severity": "high",
+   "text": "שום שורה שנדחתה אינה מתועדת. השורות נעצרות ברכיבי Derived Column שאין להם המשך: לקוח שלא נמצא, שגיאת קריאה של יורש, שגיאת גזירה, וכשלי יצירה או עדכון ב-CRM (ל-Create Heir אין נתיבים יוצאים, ופלטי Error/CastingError של Update Heir מסתיימים בלי המשך). שלושה חיבורי קבצים שנראים מיועדים לתיעוד שגיאות (\"לקוח פרטי לא קיים.csv\", \"set Heir Columns.csv\", \"Heir Source Faults.csv\") מוגדרים, אך אף רכיב אינו משתמש בהם. גם אזהרות ETL אינן נרשמות בחבילה זו.",
+   "evidence": "survey paths של Create And Update Heir; ספירת connectionManagerRefId ב-DTSX (Contact Don't Exist / Convertion Failed Error / Heir Load Failed Error = 0)"
+  },
+  {
+   "severity": "medium",
+   "text": "התנאי לעדכון הארץ בשורה 162 משווה את ערך הארץ רק כשהעיר בקובץ אינה ריקה (הוא בודק את gencity_IsNull). לכן, אם העיר בקובץ ריקה ושני ערכי הארץ (בקובץ וביורש הקיים) אינם ריקים, שינוי ביניהם אינו מזוהה והארץ אינה מתעדכנת. אם אחד מערכי הארץ ריק והשני לא, השינוי מזוהה בלי תלות בעיר. אם העיר בקובץ מלאה ושני ערכי הארץ ריקים, הקוד קורא את ערך הארץ הריק; מה שקורה בקריאה כזו לא אומת (לפי התנהגות SSIS המתועדת, לא מוצג בקבצים).",
+   "evidence": "Update Heir main.cs:162 @DTSX:9184"
+  },
+  {
+   "severity": "medium",
+   "text": "השם המלא (gen_name) נכתב רק ביצירה. בעדכון יורש קיים השם המלא אינו מתעדכן גם כשהשם הפרטי או שם המשפחה משתנים, ולכן הוא עלול לא להתאים לשמות.",
+   "evidence": "Update Heir: אין gen_name בקלט (25 עמודות) ואין כתיבה שלו; Create Heir main.cs:150-151"
+  },
+  {
+   "severity": "medium",
+   "text": "יורש חדש נוצר בלי תלות בסוג הפעולה. הסטטוס נגזר כך: U או C → 1; כל ערך אחר שאינו ריק → 2. אם סוג הפעולה ריק, סקריפט הניקוי מציב בו null. רק אם השמה זו הופכת את העמודה ל-NULL (לפי התנהגות SSIS המתועדת, לא מוצג בקבצים), הביטוי מחזיר NULL והיורש נוצר בלי סטטוס. לכן אם מגיע סוג פעולה שאינו U/C ואינו ריק, נוצר יורש עם סטטוס 2 ולא מדלגים על היצירה. (השערה: פעולת מחיקה תיצור יורש לא פעיל במקום לא ליצור כלל.)",
+   "evidence": "Set Heir Columns gen_status DTSX:6903; Trim All Input Columns 1 main.cs:45,53-57 @DTSX:8046; DTSX:6643 RetainNulls=false; DTSX:8565-8575 setter this[8] = value; Create Heir main.cs:125-193 (אין תנאי ליצירה על gen_status), main.cs:173-174 (if (!Row.genstatus_IsNull))"
+  },
+  {
+   "severity": "medium",
+   "text": "מגבלות בטיפול בתיקיות: (1) מכל תיקייה נקלט רק הקובץ הראשון בסדר אלפביתי Rasham*.txt, ושאר הקבצים מועברים איתה לארכיון בלי שנקלטו. (2) תיקייה בלי קובץ כזה אינה מועברת לארכיון ונבדקת שוב בכל ריצה. (3) אם בארכיון של היום כבר יש תיקייה באותו שם, התיקייה אינה מועברת ותיקלט שוב בריצה הבאה.",
+   "evidence": "Get File From Folder ScriptMain.cs:50-57; DTSX:13082; Move Folder To Archive ScriptMain.cs:106-109"
+  },
+  {
+   "severity": "low",
+   "text": "הטיפול בחריגות בפריסת ה-zip ובהעברה לארכיון חלקי (מסגרת). (1) Convert Zips Files To Folders: כל הלולאה על קבצי ה-zip נמצאת בתוך try עם catch ריק. אם פריסה או העברה של zip אחד זורקת חריגה, שאר קבצי ה-zip אינם מטופלים באותה ריצה, ואין דיווח. המשימה אינה קובעת Dts.TaskResult בשום מסלול. כשהתהליכון אינו STA, הפריסה רצה בתהליכון STA נפרד, וחריגה בתוכו אינה נתפסת ב-catch הזה. (2) Move Folder To Archive: רק בדיקת הקיום וההעברה נמצאות בתוך try, וה-catch קובע TaskResult=Success בלי דיווח; במסלול הרגיל המשימה אינה קובעת Dts.TaskResult. קריאת המשתנים ויצירת תיקיית הארכיון היומית נמצאות מחוץ ל-try. תוצאת המשימות במקרים אלה, ולכן גם המשך הריצה, אינן מוצגות בקבצים.",
+   "evidence": "Convert Zips Files To Folders ScriptMain.cs:96-120 @DTSX:380 (try/catch ריק סביב ה-foreach 98-118; אין השמה ל-Dts.TaskResult), 125-135 (תהליכון STA); Move Folder To Archive ScriptMain.cs:92-116 @DTSX:11556 (94-102 מחוץ ל-try; 104-110 try; catch 111-115 → TaskResult=Success; אין השמה במסלול הרגיל)"
+  },
+  {
+   "severity": "low",
+   "text": "ההמרה (DT_I4) של המחוז מוגדרת FailComponent. אם בשורה כלשהי ערך המחוז אינו ניתן להמרה למספר, זרימת הנתונים של התיקייה נכשלת. שורות שעברו קודם לכן באותה זרימה, אם כבר השלימו מנה של 1000 ביצירה או בעדכון, כבר נשלחו ל-CRM; שאר השורות אינן נשלחות. הכשל מכשיל גם את הלולאה (MaximumErrorCount לא שונה בחבילה), ולכן התיקייה אינה מועברת לארכיון, תיקיות הרשם הבאות אינן מעובדות באותה ריצה, ו-End ETL Process record אינו רץ.",
+   "evidence": "Set Heir Columns gen_region errorRowDisposition=FailComponent (DTSX:6912); Create Heir main.cs:191-192; Update Heir main.cs:225-226; אין MaximumErrorCount בחבילה; Foreach Loop Container → End ETL Process record Success (DTSX:14521)"
+  },
+  {
+   "severity": "info",
+   "text": "לאילוצי הקדימות DTSX:14521, 14522 ו-14524 אין התכונה DTS:LogicalAnd, ובשאר האילוצים כתוב במפורש \"True\". היעדר התכונה פירושו OR, וכך גם מוצג ב-evidence (logicalAnd=false, לפי tools/dtsx-extract.mjs:181). המשמעות: End ETL Process record רץ כשאחד משני האילוצים מתקיים – הלולאה הסתיימה ב-Success, או ש-Get Heirs Folders הסתיים ב-Success ו-isFileExist=false. Get Heirs Folders קובע TaskResult=Success רק כשנמצאו תיקיות; כשאין תיקיות, תוצאת המשימה אינה מוצגת בקבצים. ההשפעה היא רק על סגירת תהליך ה-ETL (מסגרת).",
+   "evidence": "DTSX:14519-14524; tools/dtsx-extract.mjs:181; evidence/0013_Heir_Daily.json precedenceConstraints"
+  }
+ ]
+}

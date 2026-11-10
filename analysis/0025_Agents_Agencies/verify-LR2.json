@@ -1,0 +1,179 @@
+{
+  "verifier": "ssis-verifier",
+  "package": "0025_Agents_Agencies",
+  "scope": "logic-claims re-check round 2",
+  "checkedAt": "2026-11-07",
+  "source": "source/DailyProcess/0025_Agents_Agencies.dtsx sha256 829A8BDEFB30A1C25460DBA62A83427763EBF1EBEC1EE73F0CF1DE50E83D0B0B",
+  "checked": 11,
+  "results": [
+    {
+      "id": "L|finding#4",
+      "hash": "b6dcbd09f03e",
+      "verdict": "WRONG",
+      "detail": "Expression confirmed: having ABS(sum(isnull(gen_accountbalance,0)) - isnull(gen_agentvalue,0)+isnull(gen_agencyvalue,0)) > 1 (DTSX:5090); gen_agencyvalue is added. The ownership assumption is labelled. (א) is acceptable as the steady-state case (after a successful update and unchanged balances the term is ABS(2*sum)). The opposite-sign remark is correctly hedged ('עשוי'). But (ב) states an outcome that depends on data as unconditional: 'גם כשהסכום שווה ל-gen_agentvalue, התנאי הוא ABS(gen_agencyvalue) > 1, והצירוף נשלף ונכתב מחדש'. The combination is fetched and rewritten only IF |gen_agencyvalue| > 1; e.g. an agency whose gen_agencyvalue is NULL/0 (an agency that never got a no-agent row) gives ABS(0) = 0 and the row is not fetched. The standard requires data-dependent findings to be conditional.",
+      "evidence": "0025_Agents_Agencies.dtsx:5061-5090",
+      "wrongUnits": [
+        {
+          "unit": 1,
+          "problem": "(ב) presents 'הצירוף נשלף ונכתב מחדש' unconditionally.",
+          "correct": "גם כשהסכום שווה ל-gen_agentvalue התנאי מצטמצם ל-ABS(gen_agencyvalue) > 1; אם |gen_agencyvalue| > 1 אז הצירוף נשלף ונכתב מחדש עם אותו ערך, ואם לא – הוא אינו נשלף.",
+          "evidence": "0025_Agents_Agencies.dtsx:5090"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Update agents balance|short",
+      "hash": "16d505f0dfb7",
+      "verdict": "WRONG",
+      "detail": "[1],[3]-[10] match the SQL (union all of contract and parent-contract rows, group by agent/agency ids), Conditional Split (Update Agent = !ISNULL(gen_agentsid) order 0, Update Agency = !ISNULL(gen_agencieid) order 1, default output not connected) and the two OLE DB Commands. [2] describes the filter as 'תנאי הפער בין הסכום לבין שני ערכי השווי השמורים ... גדול מ-1'. The natural reading (gap between the sum and the two stored values, i.e. sum vs agentvalue+agencyvalue) does not match the SQL, which is |sum - agentvalue + agencyvalue| > 1. Counter-example: no-agent row with stored gen_agencyvalue = sum -> by the text there is no gap, by the SQL |sum + sum| > 1 and the row IS updated (exactly finding#4 (א)). The text therefore misstates which rows proceed to update.",
+      "evidence": "0025_Agents_Agencies.dtsx:5090, 5028-5037, 5217-5219",
+      "wrongUnits": [
+        {
+          "unit": 2,
+          "problem": "Filter described as a gap between the sum and both stored values; the actual expression adds gen_agencyvalue.",
+          "correct": "רק צירופים שבהם ABS(סכום − isnull(gen_agentvalue,0) + isnull(gen_agencyvalue,0)) > 1 ממשיכים לעדכון (gen_agencyvalue מתווסף, לא מחוסר; ראו ממצא 4).",
+          "evidence": "0025_Agents_Agencies.dtsx:5090"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Update agents balance|detailed",
+      "hash": "eac04bf47afa",
+      "verdict": "CONFIRMED",
+      "detail": "Re-derived: two union-all branches (contract's agent/agency; parent contract via ac.gen_agencycontractnumber), left joins gen_agents / Gen_agencie on unqualified gen_agentsid / gen_agencieid, group by ids + stored values, sum(isnull(gen_accountbalance,0)), having expression quoted verbatim with the add/subtract note, Conditional Split order and unconnected default output, Update Gen_agentsBase / Gen_agencieBase (Param_0 balance, Param_1 id) on [CRM]. Key ownership argued per the accepted form (Gen_agentsId DTSX:6007, Gen_agencieId DTSX:3946); value-column ownership correctly left unknown (no qualified reference in any supplied package - grep). The step-[12] reasoning (one no-agent row per agency, under the labelled uniqueness hypothesis) and the 'last processed combination wins, no ORDER BY' outcome are correct. [10]'s 'several update commands' is within the 'יש פער' branch, i.e. only filtered combinations.",
+      "evidence": "0025_Agents_Agencies.dtsx:5014-5047, 5061-5090, 5127-5131, 5171-5175, 5217-5219, 3946, 6007",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Update agents balance|detail",
+      "hash": "4e2cb85b53d7",
+      "verdict": "CONFIRMED",
+      "detail": "Population, id matching with ownership argument, exact filter expression, split order, direct UPDATE on Gen_agentsBase.gen_agentvalue / Gen_agencieBase.gen_agencyvalue via [CRM] with design-time connection string and config-override caveat (EnableConfig=True, C:\\Generix\\SSISConfigFile.dtsConfig), Unsupported, and the conditional business outcome all match.",
+      "evidence": "0025_Agents_Agencies.dtsx:1 (EnableConfig), 4-7, 17, 5061-5090, 5127-5131, 5171-5175",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Update agents balance|open",
+      "hash": "cf8c366fffc0",
+      "verdict": "CONFIRMED",
+      "detail": "[1] conclusion (gen_accountbalance is gen_fundmain's) is correct, but the cited proof is weak: 0004:61789-61792 shows the base table Gen_fundmainbase, not the queried object gen_fundmain, and [3] of the same claim treats the analogous base-table inference as only a hypothesis. Direct proof exists in the supplied files: 0023_Employers.dtsx:7797 (gen_fundmain.gen_accountbalance) and 0026_Expectedtransfervalue.dtsx:172 (Gen_fundmain.Gen_AccountBalance); recommend citing these. [2] genuine open question. [3] correct: gen_agentvalue / gen_agencyvalue appear only in 0025, never qualified (grep of all source/DailyProcess/*.dtsx).",
+      "evidence": "0023_Employers.dtsx:7797; 0026_Expectedtransfervalue.dtsx:172; 0025_Agents_Agencies.dtsx:5063-5090, 5131, 5175",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\update agents commissionpostponed field|short",
+      "hash": "160d2af4f937",
+      "verdict": "WRONG",
+      "detail": "Mechanics match (gen_commissionpostponed != 1, three date tests, reason 5/4, SDK update, fault rows not marked). But [1] and [2] interpret a NULL expiry date as the license / approval being 'חסר' (missing). The SQL only tests 'gen_licenseexpdate is null' etc.; that an empty expiry date means the document is missing (rather than e.g. no expiry recorded) is a meaning not shown in the files and is not labelled השערה. The package's own detail claim correctly says 'ריק'.",
+      "evidence": "0025_Agents_Agencies.dtsx:6007-6012, 6047-6055",
+      "wrongUnits": [
+        {
+          "unit": 1,
+          "problem": "'הרישיון, אישור ניהול הספרים או אישור ניכוי המס שלהם חסר' - meaning of a NULL date stated as fact.",
+          "correct": "שאחד משלושת תאריכי התפוגה (gen_licenseexpdate, gen_bookkeepingexpdate, gen_taxdeductionexpdate) ריק, או מוקדם מהיום אחרי הוספת 3 שעות (משמעות תאריך ריק – לא ידועה/השערה).",
+          "evidence": "0025_Agents_Agencies.dtsx:6009-6012"
+        },
+        {
+          "unit": 2,
+          "problem": "'הרישיון ... חסר או פג' - same interpretation of ISNULL(gen_licenseexpdate).",
+          "correct": "האם gen_licenseexpdate ריק, או שתאריכו (אחרי הוספת 3 שעות) לפני היום (DATEDIFF ימים < 0)?",
+          "evidence": "0025_Agents_Agencies.dtsx:6047-6055"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\update agents commissionpostponed field|detailed",
+      "hash": "7ea480f673c7",
+      "verdict": "WRONG",
+      "detail": "Source SQL, NULL semantics of != 1, the +3h shift, the derived expression replacing gen_pausereason, entity['gen_commissionpostponed'] = true and OptionSetValue(pausereason) (written only if not null; never null here), batches of 1000, fault handling paths: all re-derived. Two wrong units: (a) [2], [6], [9], [18] present a NULL expiry date as a missing document ('אחד מהמסמכים של הסוכן חסר', 'אישור ...'), a meaning not shown in the files; (b) [15] says 'השורה מועברת לפלט השגיאות' - the code does not move the agent's row: on resultItem.Fault it adds a NEW row to the asynchronous 'Error' output containing only Description = Fault.Message (no agent id). Failure-handling statements must be correct. Note: [6] deduction 'לא = selected because of bookkeeping/tax' assumes the SQL GETDATE() and the SSIS host GETDATE() use the same clock (not shown in files).",
+      "evidence": "0025_Agents_Agencies.dtsx:6007-6012, 6047-6055, 6379-6390 (ErrorBuffer.AddRow at 6385), 7045-7047 (Error output has only column Description)",
+      "wrongUnits": [
+        {
+          "unit": 2,
+          "problem": "NULL expiry date rendered as 'document missing' (also [6] 'הרישיון חסר', [9] 'אישור ניהול ספרים/ניכוי מס', [18] 'ממסמכיו חסר').",
+          "correct": "האם אחד מתאריכי התפוגה ריק (NULL) או שתאריכו בתוספת 3 שעות מוקדם מהיום? (משמעות תאריך ריק – השערה)",
+          "evidence": "0025_Agents_Agencies.dtsx:6009-6012"
+        },
+        {
+          "unit": 15,
+          "problem": "'השורה מועברת לפלט השגיאות' is not what the code does.",
+          "correct": "נוספת שורה חדשה לפלט Error ובה רק הודעת השגיאה (Description); שורת הסוכן עצמה ומזהה הסוכן אינם מועברים.",
+          "evidence": "0025_Agents_Agencies.dtsx:6385-6386, 7045-7047"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\update agents commissionpostponed field|detail",
+      "hash": "eaa12621ea25",
+      "verdict": "WRONG",
+      "detail": "[1]-[4] correct ([1] correctly says the dates are 'ריק או מוקדם מהיום אחרי הוספת 3 שעות'; [4] literal true at main.cs:73, OptionSetValue at 74-75, Supported). [5] reintroduces the unproven meaning 'מסמך חסר או פג' for an empty expiry date, inconsistent with [1].",
+      "evidence": "0025_Agents_Agencies.dtsx:6007-6012, 6349-6353",
+      "wrongUnits": [
+        {
+          "unit": 5,
+          "problem": "'מסמך חסר או פג' - meaning of NULL date stated as fact.",
+          "correct": "סוכנים שנשלפו (דגל שאינו 1 ואינו ריק, ואחד מתאריכי התפוגה ריק או מוקדם מהיום אחרי הוספת 3 שעות) נשלחים לסימון.",
+          "evidence": "0025_Agents_Agencies.dtsx:6009-6012"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\update agencies commissionpostponed field|short",
+      "hash": "7901026fee8c",
+      "verdict": "WRONG",
+      "detail": "Same as the agents short: mechanics correct (Gen_agencie, gen_bookkeepingexp / gen_taxdeductionexp, identical script except Entity('gen_agencie') and Row.GenagencieId - diff confirmed), but [1]/[2] state that a NULL expiry date means the license/approval is 'חסר'.",
+      "evidence": "0025_Agents_Agencies.dtsx:3946-3951, 3986-3994",
+      "wrongUnits": [
+        {
+          "unit": 1,
+          "problem": "NULL expiry date rendered as missing license/approval.",
+          "correct": "שאחד משלושת תאריכי התפוגה (gen_licenseexpdate, gen_bookkeepingexp, gen_taxdeductionexp) ריק או מוקדם מהיום אחרי הוספת 3 שעות.",
+          "evidence": "0025_Agents_Agencies.dtsx:3948-3951"
+        },
+        {
+          "unit": 2,
+          "problem": "'הרישיון של הסוכנות חסר או פג' - same interpretation.",
+          "correct": "האם gen_licenseexpdate ריק או שתאריכו (אחרי הוספת 3 שעות) לפני היום?",
+          "evidence": "0025_Agents_Agencies.dtsx:3986-3994"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\update agencies commissionpostponed field|detailed",
+      "hash": "dc5eaa3e74a2",
+      "verdict": "WRONG",
+      "detail": "Source SQL (Gen_agencie, gen_bookkeepingexp, gen_taxdeductionexp), derived expression, SDK update and batching re-derived; script identical to the agents script except lines 71-72 (entity name and id). Wrong units as in the agents flow: [2]/[6]/[9]/[17] interpret NULL dates as missing documents; [14] 'השורה מועברת לפלט השגיאות' is incorrect - a new Error row with only Description is added (ErrorBuffer.AddRow DTSX:4306; Error output columns DTSX:4984-4986). Note: [6] does not say that gen_licenseexpdate in the derived column is already shifted +3h by the source query (DTSX:3946), as the agents version does.",
+      "evidence": "0025_Agents_Agencies.dtsx:3946-3951, 3986-3994, 4300-4312, 4984-4986",
+      "wrongUnits": [
+        {
+          "unit": 2,
+          "problem": "NULL expiry date rendered as 'document missing' (also [6], [9], [17]).",
+          "correct": "האם אחד מתאריכי התפוגה ריק (NULL) או שתאריכו בתוספת 3 שעות מוקדם מהיום? (משמעות תאריך ריק – השערה)",
+          "evidence": "0025_Agents_Agencies.dtsx:3948-3951"
+        },
+        {
+          "unit": 14,
+          "problem": "'השורה מועברת לפלט השגיאות' is not what the code does.",
+          "correct": "נוספת שורה חדשה לפלט Error ובה רק הודעת השגיאה; שורת הסוכנות ומזהה הסוכנות אינם מועברים.",
+          "evidence": "0025_Agents_Agencies.dtsx:4306-4307, 4984-4986"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\update agencies commissionpostponed field|detail",
+      "hash": "7aad1b47d640",
+      "verdict": "WRONG",
+      "detail": "[1]-[4] correct. [5] 'ומסמך חסר או פג' states the unproven meaning of an empty expiry date, inconsistent with [1] ('ריק').",
+      "evidence": "0025_Agents_Agencies.dtsx:3946-3951",
+      "wrongUnits": [
+        {
+          "unit": 5,
+          "problem": "'מסמך חסר או פג' - meaning of NULL date stated as fact.",
+          "correct": "סוכנויות שנשלפו (דגל שאינו 1 ואינו ריק, ואחד מתאריכי התפוגה ריק או מוקדם מהיום אחרי הוספת 3 שעות) נשלחות לסימון.",
+          "evidence": "0025_Agents_Agencies.dtsx:3948-3951"
+        }
+      ]
+    }
+  ],
+  "missingWrites": []
+}

@@ -1,0 +1,672 @@
+{
+ "verifier": "ssis-verifier",
+ "package": "0009_LeumiFile-BY",
+ "scope": "logic-claims 1/2",
+ "checkedAt": "2026-11-07T11:46:52.137Z",
+ "checked": 75,
+ "results": [
+  {
+   "id": "L|summary",
+   "hash": "6318bae991d8",
+   "verdict": "WRONG",
+   "detail": "Unit [1] omits two active SDK CRM writes: contact Create in the ftrequest data flow and annotation Create on gen_customercare in Create transferout; it also says ftrequests are closed if they did not appear in the file, but requests that appear in the file and fail Case 1 or the employer lookup are closed too (see finding#5). Unit [2]: a failing step does not only stop the later steps of the same file. No MaximumErrorCount is set (default 1), and the only inner OnError handler is empty with Propagate=-1, so the Foreach container fails and the remaining files are not processed either. Units [3]-[13] verified: 0 disabled executables, event handlers DTSX:42831-42838/198645, ascending LastWriteTime sort (Set Files ScriptMain.cs:69), and the six flat-file side outputs (Overwrite=true, FolderForTextFiles CM expressions DTSX:346-571; MenualTN CM referenced nowhere else).",
+   "evidence": "Create Contact 1 main.cs:129-132 (DTSX:50806); Create transferout\\Create Annotations main.cs:101-111; PCs DTSX:195311-195330 (no MaximumErrorCount attribute in file); DTSX:42831-42838",
+   "wrongUnits": [
+    {
+     "unit": 1,
+     "problem": "CRM writes list incomplete; closure wording too narrow",
+     "correct": "Also: creates contact (SDK service.Create, gen_identitynumber + gen_recordsorce=1) for missing customers in the ftrequest flow, and creates annotation records linked to gen_customercare in Create transferout. ftrequests are closed when not re-marked existinfile=1, which includes requests present in the file that fail Case 1 or the employer lookup.",
+     "evidence": "Create Contact 1-5 main.cs:129-132; Create transferout\\Create Annotations main.cs:101-111; DTSX:189416, 189422"
+    },
+    {
+     "unit": 2,
+     "problem": "\"(in the same file)\" understates the effect of a failure",
+     "correct": "All constraints are Success; a failed task fails the Foreach Loop Container (default MaximumErrorCount=1, no Propagate=false handler), so the loop stops: later steps of that file AND all remaining files are not processed (file not archived).",
+     "evidence": "DTSX:195311-195330, 198638-198642; DTSX:42831-42838 (Propagate=-1)"
+    }
+   ]
+  },
+  {
+   "id": "L|exec",
+   "hash": "e4868023eb90",
+   "verdict": "CONFIRMED",
+   "detail": "All 27 steps and triggers re-derived from the PrecedenceConstraints: package level 198638 (Org Vars->Set Files), 198639 (Set Files->Get closer dates, EvalOp=3 expression @[User::isFileExist] AND Success), 198642, 198640, 198641; in-loop 195321, 195322, 195320, 195311, 195324, 195326, 195325, 195327, 195328, 195329, 195312, 195330, 195313, 195315, 195319, 195314, 195323, 195316, 195318, 195317. Truncate BY_FileData_1 has no incoming constraint. Foreach uses ADO enumerator over User::FilesArray (DTSX:724-728). All LogicalAnd=True, no Failure/Completion constraints.",
+   "evidence": "DTSX:195311-195330, 198638-198642, 724-728"
+  },
+  {
+   "id": "L|ignored",
+   "hash": "8f3520684ad7",
+   "verdict": "CONFIRMED",
+   "detail": "Each listed executable checked: Get Organization Variables reads gen_etlvariable (DTSX:195355); Create ETL Process record creates gen_etlprocess; Write Errors Step 1-6 create gen_etlprocesscounter; End ETL Process record updates gen_etlprocess; OnError handler updates gen_etlprocess and adds an annotation on gen_etlprocess (ScriptMain.cs:36-51); the inner OnError handler is empty; Truncate tasks only truncate the staging tables (DTSX:177854, 177860); Move file To Archive is a FileSystemTask. ETL Warning components create gen_etlprocesswarning only. None writes business CRM data or filters business rows.",
+   "evidence": "DTSX:195355, 177854, 177860, 177776; ETL scripts LogicalName lines (gen_etlprocess/counter/warning)"
+  },
+  {
+   "id": "L|finding#1",
+   "hash": "a6aa66e57685",
+   "verdict": "CONFIRMED",
+   "detail": "Confirmed: INSERT INTO gen_ftrequestbase in Create Fund Transaction Request 1-5 (DTSX:54688, 54934, 55180, 55426, 55672), UPDATE gen_ftrequestbase SET gen_existinfile=1 in 5 OLE DB Commands (DTSX:70614-70770), Execute SQL tasks at DTSX:189416 and 189422, all on CM CRM = psql/ALTSHULER_MSCRM (DTSX:380-382).",
+   "evidence": "DTSX:54688, 70614, 189416, 189422, 380"
+  },
+  {
+   "id": "L|finding#2",
+   "hash": "d008a0605039",
+   "verdict": "CONFIRMED",
+   "detail": "Confirmed: Update TransferIn 1-5 main.cs:136-138 assigns Row.genrequestrejectreason inside the branch where _IsNull is true; the BufferWrapper getter is Buffer.GetInt32 (index 22 in 1-2, 21 in 3-5). catch(Exception) at main.cs:186-190 routes to CastingError. The consequence is worded conditionally (\"עלולים\", requires runtime check).",
+   "evidence": "Update TransferIn 3 main.cs:134-139, 186-190; BufferWrapper genrequestrejectreason getter"
+  },
+  {
+   "id": "L|finding#3",
+   "hash": "f5c9c4765559",
+   "verdict": "CONFIRMED",
+   "detail": "Confirmed: Compare Fields Before Update main.cs:158-168 sets 45/46/47 only when DB value not null and different, else -1 when DB not null (including equal). Update TransferIn main.cs:134-139 writes only -1 (null); values 45/46/47 fall through neither branch.",
+   "evidence": "Compare Fields Before Update main.cs:158-168, 332-355; Update TransferIn main.cs:134-139"
+  },
+  {
+   "id": "L|finding#4",
+   "hash": "0e4d7b39d72f",
+   "verdict": "CONFIRMED",
+   "detail": "Confirmed: ScriptMain.cs:102-108 sets Failure in catch then Success unconditionally; LastWorkingDay default 12/4/2008 11:34:00 AM (DTSX:668), only written at ScriptMain.cs:100. DaysCount = ISNULL(Gen_transferinId) || excluded==TRUE ? 10 : 120 (DTSX:104482+); window DATEDIFF(...) within +/-DaysCount (DTSX:94116); child-saving Lookup Match bypasses the window (path Lookup Child Saving Match -> Union All 2). Note: strictly, rows whose Creation_Date_70 lies within the window around the 2008 default would still pass; with current-dated files that is practically none.",
+   "evidence": "ScriptMain.cs:91-108; DTSX:668, 94116, 104482"
+  },
+  {
+   "id": "L|finding#5",
+   "hash": "09f08d20af93",
+   "verdict": "CONFIRMED",
+   "detail": "Confirmed: step 19 sets existinfile=0 for gen_status=1 (DTSX:189416); only rows that pass Case 1 (Default output unconnected) and Check IF account Exist (NoMatchBehavior=1, No Match unconnected) reach the INSERT/UPDATE paths that set existinfile=1; step 21 sets treatmentstatus=4, gen_status=0 where (gen_status=1 or null) and existinfile=0 (DTSX:189422).",
+   "evidence": "DTSX:189416, 189422, 50704, 47734"
+  },
+  {
+   "id": "L|finding#6",
+   "hash": "fb08117da3a0",
+   "verdict": "WRONG",
+   "detail": "Most items verified (all listed Lookups have NoMatchBehavior=1 with unconnected No Match; Old records / window / Seconed / Third / Duplicate outputs unconnected). But the competitor drop in \"external - create\" is not caused by a Lookup without a No Match path: Get source competitor ignore failue has NoMatchBehavior=0 with IgnoreFailure, so non-matching rows continue with NULL CompetitorId and are dropped by the Conditional Split \"Check if SourceCompetitor exists\" (CompetitorNotExists output unconnected).",
+   "evidence": "DTSX:94465 (NoMatchBehavior 0, IgnoreFailure); Check if SourceCompetitor exists outputs (only Competitor Exists connected)",
+   "wrongUnits": [
+    {
+     "unit": 1,
+     "problem": "Wrong drop mechanism for the competitor (external transfer-in create)",
+     "correct": "Competitor no-match passes the lookup (IgnoreFailure) and is dropped silently by Conditional Split \"Check if SourceCompetitor exists\" whose CompetitorNotExists output is not connected.",
+     "evidence": "DTSX:94465; outside-source path list: only Check if SourceCompetitor exists.Outputs[Competitor Exists] => Multicast 4"
+    }
+   ]
+  },
+  {
+   "id": "L|finding#7",
+   "hash": "cbc635304fad",
+   "verdict": "CONFIRMED",
+   "detail": "Confirmed: Get contact (Contact by gen_identitynumber = Id_Number_4) -> Set current state (5) -> Union All Input 1 maps contactid->contactid while gen_contactname is fed only by Input 2 (customer-account branch). Create TransferOut main.cs:148-149 writes gen_contactname only from gencontactname; Row.contactid is never used; Update TransferOut writes contact only from gencontactname (main.cs:166-167).",
+   "evidence": "Create TransferOut 1 main.cs:148-149 (DTSX:145169); Union All (transferout) input mapping"
+  },
+  {
+   "id": "L|finding#8",
+   "hash": "0875c7c1e5b2",
+   "verdict": "CONFIRMED",
+   "detail": "Confirmed: Update TransferOut 1 main.cs:114-125 sets gen_requestdate, gen_deliverydate, gen_lastpreservationdate whenever Registration_Date_75 is not null, and main.cs:180-188 sets gen_receivedfundtreasurynumber whenever non-empty after TrimStart(0); no DB comparison, so Attributes.Count>0 and service.Update runs. Rows reach Update only when gen_currentstateDB not null and != 3.",
+   "evidence": "Update TransferOut 1 main.cs:114-125, 180-197; check if currentstate equal 3 expression"
+  },
+  {
+   "id": "L|finding#9",
+   "hash": "df721dc52968",
+   "verdict": "WRONG",
+   "detail": "The technical inconsistency is real (Create gen_fundmain main.cs:162-163 uses account/contact; SDK Create gen_coursepartition main.cs:120-124 uses gen_agents/gen_agencie for the same Gen_fundmain.gen_agentname/gen_agencyname values). But \"which one is wrong is unknown (metadata not supplied)\" can be narrowed from the supplied files: 0030/0031 join Contact.ContactId = poa.Gen_agentname (-- agent) and Account.AccountId = poa.Gen_agencyname (-- agency), and 0024 compares gen_powerofattorney.Gen_agentname = gen_fundmain.gen_agentname / Gen_agencyname = gen_fundmain.gen_agencyname. So Gen_fundmain.gen_agentname holds contact ids and gen_agencyname account ids; the gen_fundmain typing matches; the coursepartition EntityReference(\"gen_agents\"/\"gen_agencie\") is the inconsistent one.",
+   "evidence": "0030_PoaAccountUpdateDailyTest.dtsx:4218-4219; 0031_PoaAccountUpdateDaily.dtsx:18204-18205; 0024_AgentFundInformation.dtsx:2046, 2078-2080",
+   "wrongUnits": [
+    {
+     "unit": 1,
+     "problem": "Open point is settleable from supplied files",
+     "correct": "Cross-package SQL shows Gen_fundmain.gen_agentname = contact id and gen_agencyname = account id; Create gen_fundmain is consistent, SDK Create gen_coursepartition (gen_agents/gen_agencie) is the likely wrong reference.",
+     "evidence": "0030:4218-4219; 0024:2078-2080"
+    }
+   ]
+  },
+  {
+   "id": "L|finding#10",
+   "hash": "4b55011a30b4",
+   "verdict": "CONFIRMED",
+   "detail": "Confirmed: SQL is \"Update gen_ftrequestbase set gen_existinfile=0, ModifiedOn = GETUTCDATE() where gen_status =1\"; gen_status is only in the WHERE.",
+   "evidence": "DTSX:189416"
+  },
+  {
+   "id": "L|finding#11",
+   "hash": "dbe3491aa586",
+   "verdict": "CONFIRMED",
+   "detail": "Confirmed: Set Final Fields main.cs:262 gen_status=true; Compare main.cs:158 marks change when DB status differs; Update Fund Transaction Request main.cs:188-191 writes gen_status and gen_existinfile only; gen_treatmentstatus is never written in the update path (step 21 had set it to 4).",
+   "evidence": "Set Final Fields main.cs:262; Compare filed from db before update main.cs:158; Update Fund Transaction Request 1 main.cs:134-191"
+  },
+  {
+   "id": "L|finding#12",
+   "hash": "ddbc80b958de",
+   "verdict": "CONFIRMED",
+   "detail": "Confirmed: fundmain Read SQL (DTSX:38690) selects Action_Type_56 but not Action_Operation_Type_57, and Filter for transfer between courses (DTSX:38127) has no \"04\" test; Maslulim filter has Action_Type_57 != \"04\" (DTSX:125648). Impact labelled השערה.",
+   "evidence": "DTSX:38690, 38127, 125648"
+  },
+  {
+   "id": "L|finding#13",
+   "hash": "86b9c36bd6ea",
+   "verdict": "CONFIRMED",
+   "detail": "Confirmed: Filter for transferin from outsource requires Subject_56 == \"56\" (DTSX:94070 area) and the downstream Filter Financial Course output requires Subject_56 == \"57\" (DTSX:94024-94058), so it can never be true.",
+   "evidence": "DTSX:94024-94075"
+  },
+  {
+   "id": "L|finding#14",
+   "hash": "087b0def52b4",
+   "verdict": "CONFIRMED",
+   "detail": "Confirmed: Remove 0's main.cs:117-120 trims leading zeros of Source_Curator_Course_Id_18, which runs after the competitor lookup and is not an input of SDK Create gen_TransferIn 1 (28 inputs, none is Source_Curator_Course_Id_18); gen_fundfinanceid written from gen_sourcefundfinanceid (main.cs:128-129) which comes from Competitor SQL RIGHT('000000' + Gen_FundFinanceID, 6) (DTSX:94467).",
+   "evidence": "DTSX:95399 main.cs:115-128; DTSX:94467; SDK Create gen_TransferIn 1 main.cs:128-129"
+  },
+  {
+   "id": "L|finding#15",
+   "hash": "9a3ecb345d01",
+   "verdict": "WRONG",
+   "detail": "Technical fact correct: Create Contact 1-5 catch(Exception) body is commented out (main.cs:136-141), so a failed create is not reported. But the stated consequence \"the ftrequest will be created without a contact\" is not supported: Create Contact output is synchronous, the row continues with ContactId NULL through the Merge Join, and Set Final Fields main.cs:130 reads Row.ContactId (BufferWrapper Buffer.GetGuid) without an _IsNull check - by the same SSIS behaviour the analysis relies on in finding#2/#28, this is expected to throw and fail the data flow rather than create a request without contact. The outcome is unverified either way and must be stated conditionally.",
+   "evidence": "Create Contact 2 main.cs:122-141; Set Final Fields main.cs:130; Set Final Fields BufferWrapper ContactId getter (GetGuid)",
+   "wrongUnits": [
+    {
+     "unit": 1,
+     "problem": "Definitive runtime consequence that conflicts with finding#28",
+     "correct": "Contact create failure is swallowed; the row continues with NULL ContactId and Set Final Fields reads it without a null check, so the ftrequest data flow may fail (or, if no exception, the request would lack a contact) - requires runtime verification.",
+     "evidence": "Set Final Fields main.cs:130; Create Contact 1 main.cs:137-142"
+    }
+   ]
+  },
+  {
+   "id": "L|finding#16",
+   "hash": "30e03d1386da",
+   "verdict": "CONFIRMED",
+   "detail": "Confirmed: remove duplications main.cs:121-131 keeps the first row per Dest_Account_Number_47 (rows with NULL account are neither output); Duplicate output unconnected. The next-run part is labelled השערה (DaysCount = 10 when no transferin exists).",
+   "evidence": "DTSX:96203 main.cs:119-133; DaysCount expression"
+  },
+  {
+   "id": "L|finding#17",
+   "hash": "d0fb2b08ba2b",
+   "verdict": "CONFIRMED",
+   "detail": "Confirmed: Set Files ScriptMain.cs:68-69 comment says sort desc to get the latest, code sorts ascending by LastWriteTime; all files are put into FilesArray and enumerated.",
+   "evidence": "Set Files ScriptMain.cs:68-81 (DTSX:197647)"
+  },
+  {
+   "id": "L|finding#18",
+   "hash": "8f06e55cc398",
+   "verdict": "CONFIRMED",
+   "detail": "Confirmed: Primary Conditions Case 1 expression ends with (DT_I4)Employer_Details_Phone_121 > 1 and the output has errorRowDisposition=FailComponent (DTSX:179755-179758). Consequence worded conditionally.",
+   "evidence": "DTSX:179755-179758"
+  },
+  {
+   "id": "L|finding#19",
+   "hash": "318d4bf83bc9",
+   "verdict": "CONFIRMED",
+   "detail": "Confirmed: Update Account 1 main.cs:48-67 compares file values with DB values without checking DB _IsNull; catch only SoapException (main.cs:83-87). Worded conditionally.",
+   "evidence": "Update Account 1 main.cs:48-87"
+  },
+  {
+   "id": "L|finding#20",
+   "hash": "7edea00a5dd8",
+   "verdict": "CONFIRMED",
+   "detail": "Confirmed: get dest fund SQL \"gen_contactname, c.Gen_Identitynumber gen_fundtypename, gen_fundtypenumber\" (DTSX:4693); lookup output gen_fundtypename_D is an input of SDK Create gen_coursepartition 1-5 but is never read in main.cs:67-146.",
+   "evidence": "DTSX:4693; SDK Create gen_coursepartition 1 main.cs:67-146"
+  },
+  {
+   "id": "L|finding#21",
+   "hash": "60a32f35e8fc",
+   "verdict": "CONFIRMED",
+   "detail": "Confirmed: all 15 Split Rows For MultiThread conditions are ProcessNumber == 1..4 (+ default); Add Row Number code counter % 5; sibling writers differ only in whitespace/help regions (own LCS diff: Update FTR 1 vs 2/5 = 0 lines; Update TransferIn 1 vs 3, Update TransferOut 1 vs 2, Update Account 1 vs 2/3 whitespace only).",
+   "evidence": "Add Row Number main.cs:117-151; Split Rows conditions; dupes.json"
+  },
+  {
+   "id": "L|finding#22",
+   "hash": "2dd898b9bc7e",
+   "verdict": "CONFIRMED",
+   "detail": "Confirmed: Update TransferOut 1 main.cs:94-102 if/else-if chain: when the first test fails because DB already 2, the else-if branches set 3 or 1; when DB already 3, the last branch sets 1. Same in 2-5 (whitespace-only diff).",
+   "evidence": "Update TransferOut 1 main.cs:94-102 (DTSX:163788)"
+  },
+  {
+   "id": "L|finding#23",
+   "hash": "70824617fed2",
+   "verdict": "CONFIRMED",
+   "detail": "Confirmed: currentstate = gencurrentstate ?? 1 (main.cs:69); gen_currentstate comes only from Set current state = 5 in the no-customer-account branch; state 4 only when gen_isfulltransfer changes (main.cs:73-82); main.cs:88-89 writes currentstate whenever DB differs. Rows reach update only when DB state not null and != 3.",
+   "evidence": "Update TransferOut 1 main.cs:69-89; Set current state expression 5"
+  },
+  {
+   "id": "L|finding#24",
+   "hash": "49f74eb056e1",
+   "verdict": "CONFIRMED",
+   "detail": "Confirmed: BY source 2 columns are \"Employer_Details _First_Name_119\"/\"Employer_Details _Last_Name_120\" (DTSX:331-332); Insert To BY_FileData_2 has input columns only for Phone/Email/Mobile (DTSX:189979-189981) while external columns First/Last exist (DTSX:190107-190108); Update Account writes names only when not NULL (main.cs:48-55).",
+   "evidence": "DTSX:331-332, 189979-189981, 190107-190108; Update Account 1 main.cs:48-55"
+  },
+  {
+   "id": "L|finding#25",
+   "hash": "4161b5362740",
+   "verdict": "CONFIRMED",
+   "detail": "Confirmed: Union All (DTSX:108245) Input 3 (from Multicast 7 after Union All - created1) carries only ProcessNumber and TransferinID; Create Annotation main.cs:68-88 creates notes only when Doc*_Code/Doc*_Mislaka_Name are not null. Next-run part labelled השערה.",
+   "evidence": "DTSX:108245; Create Annotation main.cs:68-88"
+  },
+  {
+   "id": "L|finding#26",
+   "hash": "20bb8962e0d8",
+   "verdict": "CONFIRMED",
+   "detail": "Confirmed: Convert Data Types main.cs:117-138 routes to Error only when none of the three parses; Error -> Derived Column with no downstream path. Convert gen_isActive main.cs:135-168 Error output unconnected. Filter Last Two Month main.cs:31-37 routes only LastTwoMonth. RetainNulls=false and Trim leaves \"\" (labelled השערה).",
+   "evidence": "Convert Data Types main.cs:117-138; Convert gen_isActive main.cs:135-168; Filter Last Two Month main.cs:29-42; DTSX:190133"
+  },
+  {
+   "id": "L|finding#27",
+   "hash": "3c051017df57",
+   "verdict": "CONFIRMED",
+   "detail": "Confirmed: set additional fields (Create Acount Courses...) expressions (DT_I4)(ISNULL(Action_Type_57) ? 1 : (((DT_I4)Action_Type_57) == 2) ? 1 : 2) and (DT_BOOL)(...) with errorRowDisposition FailComponent and no error path (DTSX:19544-19553); same pattern at DTSX:104352 (outside source). Note: no blocking component sits between set additional fields and the SDK writers, so with a multi-buffer file earlier rows could already have been created; with buffers of 50000 rows a daily file normally fits one buffer.",
+   "evidence": "DTSX:19544-19553, 104349-104352, 734"
+  },
+  {
+   "id": "L|finding#28",
+   "hash": "509989a8c3fb",
+   "verdict": "CONFIRMED",
+   "detail": "Confirmed: Convert gen_isActive main.cs:121-123 int.Parse without try; Convert Dates (sha c14379468673, account courses and Maslulim) sets str=null for empty then str.Trim() (main.cs:55-58) while sha 6d3380bc8853 returns early; Set Final Fields main.cs:130 reads Row.ContactId without null check; calc diff main.cs:132 reads str.Length before the null/empty check at 135. Worded conditionally.",
+   "evidence": "Convert gen_isActive main.cs:121-123; Convert Dates main.cs:53-58; Set Final Fields main.cs:130; calc diff main.cs:118, 132-136"
+  },
+  {
+   "id": "L|finding#29",
+   "hash": "ddc85870547b",
+   "verdict": "CONFIRMED",
+   "detail": "Confirmed: SDK Create gen_TransferIn main.cs:84-85 writes OptionSetValue(MapLeumiStatus()) whose default is 0 (main.cs:215); Compare main.cs:230 requires requestStatus > 0; Create TransferOut MapLeumiStatus returns null for unmapped codes (main.cs:215-245) and main.cs:101-102 assigns it.",
+   "evidence": "SDK Create gen_TransferIn 1 main.cs:84-85, 193-217; Compare main.cs:230; Create TransferOut 1 main.cs:101-102, 215-245"
+  },
+  {
+   "id": "L|finding#30",
+   "hash": "67843cce3a15",
+   "verdict": "CONFIRMED",
+   "detail": "Confirmed: SDK Create gen_TransferIn main.cs:100-101 ToLocalTime for gen_appendixdsent vs main.cs:104-106 no ToLocalTime for gen_bankingreceiveddate from the same field; Compare main.cs:177 compares genfixtransferdateDB.ToLocalTime() with raw genvaluedateDB (both read from base views, DTSX:94545, 94715); TransferOut uses DateTime.Parse(...).ToLocalTime(). Worded conditionally.",
+   "evidence": "SDK Create gen_TransferIn 1 main.cs:98-106; Compare main.cs:177; Create TransferOut 1 main.cs:110-135"
+  },
+  {
+   "id": "L|finding#31",
+   "hash": "c54a9c5d150f",
+   "verdict": "CONFIRMED",
+   "detail": "Confirmed: Append Zeros FormatField main.cs:57-65 turns null/empty into \"\" and pads to column length; inputs include Dest_Account_Number_47 (transferout) and Source_Account_Number_20 (outside source); Create TransferOut writes gen_destbankaccountnumber unconditionally (main.cs:158) and SDK Create gen_TransferIn writes gen_transferid/gen_accountnumbersrctext/gen_sourcefundnumber (main.cs:119-126); Is_Active_92 = \"\" is not NULL and leads to status 3 or 1 (main.cs:93-100).",
+   "evidence": "Append Zeros To Fields main.cs:57-65; Create TransferOut 1 main.cs:93-100, 158; SDK Create gen_TransferIn 1 main.cs:119-126"
+  },
+  {
+   "id": "L|Package\\Foreach Loop Container\\Create or update  Fund Trunsaction Request|title",
+   "hash": "80cf8d21c671",
+   "verdict": "WRONG",
+   "detail": "short_he says the population is \"בקשות פיצויים\" (compensation). The code labels Subject 68 as \"pitzulim\" (= פיצולים, splits), 67 \"memshak masikim\", 53 \"afkadot\" (Set Final Fields main.cs:162-169); the analyst's own detail claim also says 68 = פיצולים. Rest of the title/flow verified (Case 1 DTSX:50704, lookups 47734/47794/48645/56687/56776, INSERT 54688, SDK Update, existinfile UPDATE 70614).",
+   "evidence": "Set Final Fields main.cs:162-169 (DTSX:57947)",
+   "wrongUnits": [
+    {
+     "unit": 2,
+     "problem": "\"פיצויים\" (compensation) is not supported",
+     "correct": "Subject 68 is labelled pitzulim (פיצולים) in code; the population is פיצולים, ממשק מעסיקים והפקדות.",
+     "evidence": "Set Final Fields main.cs:163 //pitzulim"
+    }
+   ]
+  },
+  {
+   "id": "L|Package\\Foreach Loop Container\\Create or update  Fund Trunsaction Request|short",
+   "hash": "c465e1b470b8",
+   "verdict": "WRONG",
+   "detail": "Unit [1] repeats \"בקשות פיצויים\"; code comment for Subject 68 is pitzulim (פיצולים). Unit [12] \"the list reflects the file\" is too strong: requests in the file that fail Case 1 / employer lookup are closed (finding#5); the short does not show that branch for Case 1. Other units verified.",
+   "evidence": "Set Final Fields main.cs:163; DTSX:50704, 189422",
+   "wrongUnits": [
+    {
+     "unit": 1,
+     "problem": "פיצויים vs code label pitzulim",
+     "correct": "פיצולים, ממשק מעסיקים והפקדות (Subject 68/67/53).",
+     "evidence": "Set Final Fields main.cs:162-169"
+    },
+    {
+     "unit": 12,
+     "problem": "Overstated end state",
+     "correct": "Only rows that pass Case 1 and have an employer in CRM are created/updated/marked; other requests in the file that are active get closed in step 21.",
+     "evidence": "DTSX:50704, 47734, 189416, 189422"
+    }
+   ]
+  },
+  {
+   "id": "L|Package\\Foreach Loop Container\\Create or update  Fund Trunsaction Request|detailed",
+   "hash": "2b8bbb7ce884",
+   "verdict": "CONFIRMED",
+   "detail": "All units re-derived: checkIdentitynumberLength main.cs:117-137 runs before check for last row (DTSX:47701); calc diff main.cs:117-118; Checl If FTR Exist joins Request_Id_73 = gen_requsetidentifier, full cache, no state filter (DTSX:48647); Case 1 expression matches DTSX:50704 verbatim; Check IF account Exist / Check If Contact Exist NoMatchBehavior=1, account No Match unconnected; contact No Match -> Aggregate (group by identityNumber) -> Create Contact -> Merge Join; estatecode and agentAgencyType lookups (SQL comments -- Internal / -- External prove the meaning); Set Final Fields mappings; INSERT params mapped correctly (Param_0..29); Compare 18 fields; UPDATE existinfile.",
+   "evidence": "DTSX:47701, 47851, 46854, 48645-48670, 50704, 47734, 47794, 46816, 56687-56707, 56776, 57947, 54685, 48841, 70614"
+  },
+  {
+   "id": "L|Package\\Foreach Loop Container\\Create or update  Fund Trunsaction Request|detail",
+   "hash": "85b8fc680bc4",
+   "verdict": "CONFIRMED",
+   "detail": "Verified: population and closure effect; match keys (incl. right(000000000+...,9) padding); 18 compared fields (Compare main.cs:118-158); mappings (Set Final Fields main.cs:128-276, AGENT_AGENCY_TYPE_EXTERNAL=1 at main.cs:28); INSERT column list and params incl. getutcdate() and existinfile=1 (DTSX:54688); Add System Columns main.cs:117-127; SDK ExecuteMultiple batches of 10 with gen_existinfile=true (Update FTR main.cs:191-200); contact create gen_identitynumber + gen_recordsorce=1.",
+   "evidence": "DTSX:54688; Add System Columns main.cs:117-127; Update Fund Transaction Request 1 main.cs:128-217; Set Final Fields main.cs:28, 128-276"
+  },
+  {
+   "id": "L|Package\\Foreach Loop Container\\Create or update  Fund Trunsaction Request|decisions",
+   "hash": "55d7b7f535c9",
+   "verdict": "CONFIRMED",
+   "detail": "All 10 decisions match the DTSX: padding code, last-row split, DiffDays (input < 8 chars -> 1900-01-01), Case 1 expression verbatim, account/contact lookups, Is Create Or Update !ISNULL(gen_ftrequestid), Compare logic, NeedToUpdateAll == TRUE, multithread split by ProcessNumber (Add Row Number counter % 5).",
+   "evidence": "DTSX:47851, 47701, 46854, 50704, 47734, 47794, 56831, 48841, 56864; Add Row Number main.cs:117-151"
+  },
+  {
+   "id": "L|Package\\Foreach Loop Container\\Create or update  Fund Trunsaction Request|crm",
+   "hash": "978a8c6f8a8c",
+   "verdict": "INCOMPLETE",
+   "detail": "Entities, verbs and mechanisms are correct. The when_he of [4] (contact Create) says only \"no contact found for the ID\"; contacts are created only for rows that passed Case 1 AND whose employer was found (Check If Contact Exist sits after Conditional Split Case 1 and Check IF account Exist Match). [2]/[3] likewise rely on the same population. Without this, [4] reads as contact creation for any file row.",
+   "evidence": "Path: Conditional Split[Case 1] -> Check IF account Exist[Match] -> Check If Contact Exist[No Match] -> Multicast 1 -> Aggregate -> Create Contact",
+   "wrongUnits": [
+    {
+     "unit": 0,
+     "problem": "Missing condition in when_he of [4] (and implicitly [2],[3])",
+     "correct": "contact Create only for rows that pass Case 1, have an employer account in CRM and no contact with the padded ID; once per ID per run.",
+     "evidence": "DTSX:50704, 47734, 47794, 46816"
+    }
+   ]
+  },
+  {
+   "id": "L|Package\\Foreach Loop Container\\Create or update  Fund Trunsaction Request|open",
+   "hash": "f0a6c491f972",
+   "verdict": "CONFIRMED",
+   "detail": "[1] No dedup by Request_Id_73 exists before the INSERT (Sorts EliminateDuplicates=false, Aggregate only for contacts); whether duplicate rows occur depends on file data - open question is legitimate. [2] Meanings of 0015/0228/0000 and status codes are not defined in the supplied files; correctly labelled.",
+   "evidence": "DTSX:61767, 62733, 46816"
+  },
+  {
+   "id": "L|Package\\Foreach Loop Container\\Create fundmain for transferin|title",
+   "hash": "a0206f67ce06",
+   "verdict": "CONFIRMED",
+   "detail": "Verified: BY_FileData_2 read (DTSX:38690, CheckLastRow alias), last-row split, Filter for transfer between courses expression (DTSX:38127; meaning from component name), Filter Financial Course (DTSX:38093), Split Transfer Direction + Merge Join inner on Request_ID_74, Append Zeros, get dest fundtype (Product JOIN gen_banks, banknumber 10), get dest fund No Match only path, gen_fundnumber expression, remove duplicate, get source fund (bank 10, existinfile=1), ExecuteMultiple batches of 10 x5 identical (dupes.json).",
+   "evidence": "DTSX:38690, 38127, 38093, 40429, 38584, 38229, 38167, 37290, 38771, 38292, 26888"
+  },
+  {
+   "id": "L|Package\\Foreach Loop Container\\Create fundmain for transferin|short",
+   "hash": "43b214b76f58",
+   "verdict": "INCOMPLETE",
+   "detail": "The decision shown is correct, but the \"no\" branch says a new fund is always created and the end state says a target fund exists. Creation additionally requires a Product for the target course in bank 10 (get dest fundtype) and a source fund in bank 10 with gen_existinfile = 1 (get source fund); otherwise the row is dropped silently and no fund is created.",
+   "evidence": "DTSX:38227-38229, 38290-38292 (NoMatchBehavior=1, No Match unconnected)",
+   "wrongUnits": [
+    {
+     "unit": 0,
+     "problem": "Missing conditions for creation",
+     "correct": "Fund is created only if the target product (bank 10) and the source fund (bank 10, existinfile=1) are found; otherwise nothing is created and no message is written.",
+     "evidence": "DTSX:38229, 38292"
+    }
+   ]
+  },
+  {
+   "id": "L|Package\\Foreach Loop Container\\Create fundmain for transferin|detailed",
+   "hash": "c537334cd915",
+   "verdict": "CONFIRMED",
+   "detail": "All units verified incl. branches for missing product and missing source fund; fixed values in Create gen_fundmain main.cs:132-206 (existinfile=true, inputsource=1, 14 Money fields = 0, weightedmanagementfeepercentage 0.0, modifiedbybank = Now) and Set Fields literals (\"נתוני קופה זמניים\", \"ראשי\", \"\" x3); gen_fundcreationdate = getdate() from the source-fund SQL.",
+   "evidence": "Create gen_fundmain 1 main.cs:123-216; DTSX:38292; Set Fields expressions"
+  },
+  {
+   "id": "L|Package\\Foreach Loop Container\\Create fundmain for transferin|detail",
+   "hash": "8c7a179c679d",
+   "verdict": "WRONG",
+   "detail": "Units [1]-[4] verified (renames at OLE DB Source output, lookups, CacheType=2, No Match handling, fixed values). Unit [5] states the target fund is guaranteed (\"מובטח\") before steps 13 and 17. Not true: no fund is created when the target product or the source fund (bank 10, existinfile=1) is missing, when the SDK ExecuteMultiple item faults (routed to error), or for rows that step 13 accepts but this filter treats differently (step 13 converts fund type 5006->1025 before its filter; this flow does not).",
+   "evidence": "DTSX:38229, 38292; Create gen_fundmain 1 main.cs:229-259; Childe Saving handel (Maslulim) main.cs:120-129",
+   "wrongUnits": [
+    {
+     "unit": 5,
+     "problem": "Overclaims a guarantee",
+     "correct": "The step tries to create a missing target fund; it is not guaranteed (silent drops when product/source fund not found, SDK faults go to error rows, and step 13 uses a different population).",
+     "evidence": "DTSX:38229, 38292; main.cs:246-250"
+    }
+   ]
+  },
+  {
+   "id": "L|Package\\Foreach Loop Container\\Create fundmain for transferin|decisions",
+   "hash": "28c6d3f4add6",
+   "verdict": "CONFIRMED",
+   "detail": "All 8 decisions match the DTSX expressions/properties (last row, transfer-between-courses filter, financial course, direction split, Merge Join JoinType=2 NumKeyColumns=1 on Request_ID_74, get dest fund params, gen_fundnumber expression, multithread split).",
+   "evidence": "DTSX:26808, 38127, 38093, 40429, 38584, 38165, 37290, 40372"
+  },
+  {
+   "id": "L|Package\\Foreach Loop Container\\Create fundmain for transferin|crm",
+   "hash": "ce9faeda9cfd",
+   "verdict": "CONFIRMED",
+   "detail": "Verified: gen_fundmain Create via SDK ExecuteMultipleExtension RequestType.Create (main.cs:231) only on the get dest fund No Match path after product and source fund found.",
+   "evidence": "Create gen_fundmain 1 main.cs:125, 229-259; DTSX:38165-38292"
+  },
+  {
+   "id": "L|Package\\Foreach Loop Container\\Create fundmain for transferin|open",
+   "hash": "26e112b2b837",
+   "verdict": "WRONG",
+   "detail": "[2] bank 10 = Leumi is not defined in any supplied file (searched) - correctly labelled. [3] storage format of account/product numbers in CRM cannot be settled - correctly labelled. [1] is answerable: package 0004 reads Gen_fundmain.gen_weightedmanagementfeepercentage through a CRM lookup whose output column type is r8 (DT_R8 = SQL float), i.e. a floating-point (Double) attribute, so sending double 0.0 matches.",
+   "evidence": "0004_LeumiFile-MY.dtsx:60252, 60686 (gen_weightedmanagementfeepercentageDB dataType=\"r8\")",
+   "wrongUnits": [
+    {
+     "unit": 1,
+     "problem": "Unknown that the files answer",
+     "correct": "The DB column is float (lookup output r8 in 0004), i.e. a Double attribute; double 0.0 is the matching type.",
+     "evidence": "0004_LeumiFile-MY.dtsx:60686"
+    }
+   ]
+  },
+  {
+   "id": "L|Package\\Foreach Loop Container\\Create transferin Maslulim|title",
+   "hash": "7f6f0dd43b64",
+   "verdict": "CONFIRMED",
+   "detail": "Verified: Read BY_FileData_1 (DTSX:126656) -> Childe Saving handel 5006->1025 (main.cs:120-129) -> last-row split -> Filter for transfer between courses (DTSX:125648) -> Filter Financial Course -> get tranferin (no state filter, DTSX:126489) No Match only -> direction split -> Sort/Sort 1 EliminateDuplicates=true -> Merge Join inner 3 keys -> Filter Last Two Month -> Get source customer account -> Set Additional fields (5, 1) -> ExecuteMultiple batches of 20 x5. gen_currentstate 1 = in progress is proven by CURRENT_STATE_IN_PROGRESS = 1 (Compare main.cs:32).",
+   "evidence": "DTSX:126656, 123048, 125648, 125614, 126489, 133879, 133954, 126537, 125689, 126404; SDK Create main.cs:140"
+  },
+  {
+   "id": "L|Package\\Foreach Loop Container\\Create transferin Maslulim|short",
+   "hash": "85020694a3f1",
+   "verdict": "CONFIRMED",
+   "detail": "Units verified against the same chain; branches (existing request -> nothing; date / customer account not found -> not created) and the write (state in progress, linked to customer account and its contact) are correct.",
+   "evidence": "DTSX:126487, 125689, 126402; SDK Create gen_TransferIn 1 main.cs:78-133"
+  },
+  {
+   "id": "L|Package\\Foreach Loop Container\\Create transferin Maslulim|detailed",
+   "hash": "72fdaf87c53e",
+   "verdict": "CONFIRMED",
+   "detail": "All units verified incl. filter expressions, Merge Join JoinType=2 NumKeyColumns=3, Filter Last Two Month (TryParse he-IL, > UtcNow.AddMonths(-2)), customer-account lookup keys gen_id/gen_bankaccountnumber, and written attributes (gen_transfertype 5, gen_currentstate 1, gen_transferincreationsource 1, gen_deliverydate, gen_bankingreceiveddate, gen_requestidentifier, gen_identitynumber, account and contact references, currency).",
+   "evidence": "DTSX:123013, 125648, 125614, 126487, 123924, 126537, 125689 main.cs:29-42, 126402; SDK Create gen_TransferIn 1 main.cs:69-143"
+  },
+  {
+   "id": "L|Package\\Foreach Loop Container\\Create transferin Maslulim|detail",
+   "hash": "b27a229ad92e",
+   "verdict": "WRONG",
+   "detail": "Units [2]-[5] verified. Unit [1] lists \"gen_transferid <- Transaction_Id_91\" as a source mapping, but that staging alias is dropped at the Merge Join (output columns: gen_requestidentifier, gen_deliverydate, Appendix_D_Sended_153, gen_id, gen_bankaccountnumber) and never reaches CRM; CRM gen_transferid is written from Source_Account_Number_20 (main.cs:109-110), as unit [4] says. Unit [1] contradicts [4] and is misleading.",
+   "evidence": "Merge Join (DTSX:126537) output columns; SDK Create gen_TransferIn 1 main.cs:109-110",
+   "wrongUnits": [
+    {
+     "unit": 1,
+     "problem": "Implies Transaction_Id_91 feeds gen_transferid",
+     "correct": "Transaction_Id_91 (alias gen_transferid) is read but discarded at the Merge Join; gen_transferid in CRM = padded Source_Account_Number_20.",
+     "evidence": "DTSX:126537; main.cs:109-110"
+    }
+   ]
+  },
+  {
+   "id": "L|Package\\Foreach Loop Container\\Create transferin Maslulim|decisions",
+   "hash": "41f83b4618da",
+   "verdict": "CONFIRMED",
+   "detail": "All 8 decisions match DTSX expressions and code (incl. Merge Join output mapping gen_id <- Source_Fund_Type_16, gen_bankaccountnumber <- Source_Account_Number_20).",
+   "evidence": "DTSX:123013, 125648, 125614, 126487, 123924, 126537, 125689; Add Row Number main.cs:117-151"
+  },
+  {
+   "id": "L|Package\\Foreach Loop Container\\Create transferin Maslulim|crm",
+   "hash": "b9c4654651b3",
+   "verdict": "CONFIRMED",
+   "detail": "Verified: gen_transferin Create via SDK ExecuteMultiple (RequestType.Create, batches of 20) under the stated conditions.",
+   "evidence": "SDK Create gen_TransferIn 1 main.cs:54, 69-143"
+  },
+  {
+   "id": "L|Package\\Foreach Loop Container\\Create transferin Maslulim|open",
+   "hash": "ca7bbd4ab3c8",
+   "verdict": "WRONG",
+   "detail": "Both hypotheses can be settled from the supplied files. [1] gen_transfertype 5 = between courses: 0029_POA.dtsx:40249 \"where tr.Gen_transferType = 5 -- between courses\" and 0005_Customer Account.dtsx:70706/77202 \"tr.Gen_transferType = 5--בין מסלולים\". [2] 5006->1025: 0008_LeumiFile-PY.dtsx:42754-42755 defines GEMEL_TO_INVEST_BY_BANK = \"5006\" and GEMEL_TO_INVEST_BY_CRM = \"1025\" - the conversion maps the bank's fund-type code for gemel-to-invest to the CRM code; the child-saving link is only the component name.",
+   "evidence": "0029_POA.dtsx:40249; 0005_Customer Account.dtsx:70706, 77202; 0008_LeumiFile-PY.dtsx:42754-42755",
+   "wrongUnits": [
+    {
+     "unit": 1,
+     "problem": "Labelled hypothesis but answered by supplied files",
+     "correct": "gen_transfertype 5 = transfer between courses (comments in 0029 and 0005).",
+     "evidence": "0029_POA.dtsx:40249; 0005_Customer Account.dtsx:70706"
+    },
+    {
+     "unit": 2,
+     "problem": "Hypothesis ignores the explicit meaning in 0008",
+     "correct": "5006 = bank code and 1025 = CRM code for gemel-to-invest (קופת גמל להשקעה) per constants in 0008; relation to child saving remains unproven.",
+     "evidence": "0008_LeumiFile-PY.dtsx:42754-42755"
+    }
+   ]
+  },
+  {
+   "id": "L|Package\\Set lastWorkingDate variable to corect last working date|title",
+   "hash": "bfbe526e0d62",
+   "verdict": "CONFIRMED",
+   "detail": "Verified: ScriptMain.cs:93-100 fills DataTable from NonWorkingDays (CalendarRule starttime,name - DTSX:195340), stores NotWorkingDaysTable, GetLastWorkingDay starts at Now-1 day, loop max 7 with Select(starttime = currDate and name <> BlackHole). NotWorkingDaysTable is consumed only by Create/Update TransferOut AddWorkingDays.",
+   "evidence": "ScriptMain.cs:89-126 (DTSX:198163); DTSX:195340"
+  },
+  {
+   "id": "L|Package\\Set lastWorkingDate variable to corect last working date|short",
+   "hash": "973fbb8f82ea",
+   "verdict": "CONFIRMED",
+   "detail": "Verified; LastWorkingDay is used only in the outside-source window expression (DTSX:94115-94116).",
+   "evidence": "ScriptMain.cs:111-126; DTSX:94116"
+  },
+  {
+   "id": "L|Package\\Set lastWorkingDate variable to corect last working date|detailed",
+   "hash": "f633fde16f44",
+   "verdict": "CONFIRMED",
+   "detail": "Verified incl. catch -> Failure + Dts.Log then unconditional Success (ScriptMain.cs:102-108) and default 12/4/2008 11:34:00 AM (DTSX:668).",
+   "evidence": "ScriptMain.cs:91-126; DTSX:667-668"
+  },
+  {
+   "id": "L|Package\\Set lastWorkingDate variable to corect last working date|detail",
+   "hash": "8713fe1b8d0d",
+   "verdict": "CONFIRMED",
+   "detail": "Verified decisions, uses (DTSX:94116; TransferOut AddWorkingDays) and error handling.",
+   "evidence": "ScriptMain.cs:100-123; DTSX:94116"
+  },
+  {
+   "id": "L|Package\\Set lastWorkingDate variable to corect last working date|decisions",
+   "hash": "ef505b290200",
+   "verdict": "CONFIRMED",
+   "detail": "Verified ScriptMain.cs:117-120.",
+   "evidence": "ScriptMain.cs:117-120"
+  },
+  {
+   "id": "L|Package\\Set lastWorkingDate variable to corect last working date|open",
+   "hash": "85cdac8e6883",
+   "verdict": "CONFIRMED",
+   "detail": "Correctly labelled hypothesis; depends on CalendarRule data/culture not in the files.",
+   "evidence": "ScriptMain.cs:117"
+  },
+  {
+   "id": "L|Package\\Foreach Loop Container\\Write By File To Staging|title",
+   "hash": "685c2d686a15",
+   "verdict": "CONFIRMED",
+   "detail": "Verified: both CMs RaggedRight, CodePage 1255, ConnectionString expression @[User::FullFileName] (DTSX:4-5, 204-205); 191 / 132 columns; fixed part ends at char 2162 followed by Filler_End delimited by CRLF; two direct paths Read -> Insert (fast load AccessMode 3) into BY_FileData_1/2 on GENERIX_STAGING, no transformation.",
+   "evidence": "DTSX:4-5, 204-205, 189430-189433, 189841-189844, 190131, 191481"
+  },
+  {
+   "id": "L|Package\\Foreach Loop Container\\Write By File To Staging|short",
+   "hash": "2333fc558503",
+   "verdict": "CONFIRMED",
+   "detail": "Verified (two layouts, no filter, staging tables used by later steps).",
+   "evidence": "Write By File To Staging paths"
+  },
+  {
+   "id": "L|Package\\Foreach Loop Container\\Write By File To Staging|detailed",
+   "hash": "26b17cdc54f4",
+   "verdict": "CONFIRMED",
+   "detail": "Verified offsets by summing ColumnWidth: Subject_56/Action_Type_56 chars 342-343 (1-based; the claim uses 0-based 341-342), Request id 453-467, direction 436, Employer_Details_* 1765-1894 inside Filler_207 1765-2123 of layout 1; consumers: BY_FileData_1 read by account courses, ftrequest, outside source, Maslulim, transferout; BY_FileData_2 by fundmain and Update Account.",
+   "evidence": "DTSX:4-344 FlatFileColumns; OpenRowset/SQL reads DTSX:5143, 38688, 57510, 95192, 126654, 156045, 179796"
+  },
+  {
+   "id": "L|Package\\Foreach Loop Container\\Write By File To Staging|detail",
+   "hash": "8f970734fbca",
+   "verdict": "CONFIRMED",
+   "detail": "Verified layout equivalences and that file column TransferBetweenCoursesType_210 is inserted into external column TransferBetweenCoursesType_208 in both tables.",
+   "evidence": "Insert To BY_FileData_1/2 inputColumn TransferBetweenCoursesType_210 -> ExternalColumns[TransferBetweenCoursesType_208]"
+  },
+  {
+   "id": "L|Package\\Foreach Loop Container\\update gen_ftrequest,gen_status from 1(active) to 0|title",
+   "hash": "8375572d092e",
+   "verdict": "WRONG",
+   "detail": "SQL and connection verified (DTSX:189416, CM CRM DTSX:380). Unit [2] says the flag will be set back to 1 for requests that appear in the file. Only requests whose row passes Case 1 and the employer lookup (and whose INSERT/UPDATE succeeds) are re-marked; active requests that appear in the file but fail those checks keep existinfile = 0 and are closed in step 21 (the analysis itself states this in finding#5).",
+   "evidence": "DTSX:189416, 189422, 50704, 47734, 70614",
+   "wrongUnits": [
+    {
+     "unit": 2,
+     "problem": "Overgeneralises who is re-marked",
+     "correct": "Re-marked to 1 only for requests whose file row passes Case 1 and has an employer in CRM; others (including ones present in the file) are closed in step 21.",
+     "evidence": "DTSX:50704, 47734, 189422"
+    }
+   ]
+  },
+  {
+   "id": "L|Package\\Foreach Loop Container\\update gen_ftrequest,gen_status from 1(active) to 0|short",
+   "hash": "8d680389ba9f",
+   "verdict": "WRONG",
+   "detail": "Units [1]-[2] verified. Unit [3] \"requests that appear in the file will be marked again\" is the same overgeneralisation: only rows passing Case 1 + employer lookup are re-marked.",
+   "evidence": "DTSX:50704, 47734, 189422",
+   "wrongUnits": [
+    {
+     "unit": 3,
+     "problem": "Overgeneralisation",
+     "correct": "Only requests whose row passes Case 1 and the employer lookup are re-marked; other active ones (even if in the file) are closed.",
+     "evidence": "DTSX:50704, 47734, 189422"
+    }
+   ]
+  },
+  {
+   "id": "L|Package\\Foreach Loop Container\\update gen_ftrequest,gen_status from 1(active) to 0|detailed",
+   "hash": "248b8974daf7",
+   "verdict": "WRONG",
+   "detail": "Units [1]-[9] verified (PC 195330 -> task -> 195313; WHERE gen_status =1; NULL status not reset; direct SQL on CRM DB; task name misleading). Unit [10] repeats \"requests that appear in the file will be marked again\".",
+   "evidence": "DTSX:189416, 195330, 195313, 50704, 47734",
+   "wrongUnits": [
+    {
+     "unit": 10,
+     "problem": "Overgeneralisation",
+     "correct": "Only requests that pass Case 1 and the employer lookup in step 20 are re-marked; the rest of the active ones are closed in step 21.",
+     "evidence": "DTSX:50704, 47734, 189422"
+    }
+   ]
+  },
+  {
+   "id": "L|Package\\Foreach Loop Container\\update gen_ftrequest,gen_status from 1(active) to 0|detail",
+   "hash": "71b6392ed413",
+   "verdict": "CONFIRMED",
+   "detail": "Verified: direct SQL on gen_ftrequestbase via CM CRM (psql/ALTSHULER_MSCRM); SQL changes gen_existinfile and ModifiedOn only.",
+   "evidence": "DTSX:189416, 380"
+  },
+  {
+   "id": "L|Package\\Foreach Loop Container\\update gen_ftrequest,gen_status from 1(active) to 0|decisions",
+   "hash": "39dbede1c631",
+   "verdict": "CONFIRMED",
+   "detail": "Verified WHERE gen_status =1 -> gen_existinfile = 0.",
+   "evidence": "DTSX:189416"
+  },
+  {
+   "id": "L|Package\\Foreach Loop Container\\update gen_ftrequest,gen_status from 1(active) to 0|crm",
+   "hash": "ca339aba29e3",
+   "verdict": "CONFIRMED",
+   "detail": "Verified entity/verb/mechanism and condition; task runs every loop iteration.",
+   "evidence": "DTSX:189416"
+  },
+  {
+   "id": "L|Package\\Get Sytem User Id|title",
+   "hash": "3eeb482f187d",
+   "verdict": "CONFIRMED",
+   "detail": "Verified: Get User Id SQL (DTSX:196427), Derived Column \"שקל חדש\" and LOWER(@[User::OrganizationName]), lookups TransactionCurrency by CurrencyName, OrganizationBase by LOWER(Name), OwnerBase by OwnerId=systemuserid; Set Varibales PostExecute writes BusinessUnitId, TransactionCurrencyId, OwnerIdType, SystemUserId, UserId (OrganizationId is fetched but not saved). Consumers: Add System Columns (ftrequest INSERT) and SDK Create gen_TransferIn (Maslulim and outside source) for currency.",
+   "evidence": "DTSX:196257-196427, 197460-197470; Set Varibales main.cs:105-113; Add System Columns main.cs:117-127"
+  },
+  {
+   "id": "L|Package\\Get Sytem User Id|short",
+   "hash": "5649c5e629c2",
+   "verdict": "CONFIRMED",
+   "detail": "Verified.",
+   "evidence": "DTSX:196427, 196369; Add System Columns main.cs:117-127"
+  },
+  {
+   "id": "L|Package\\Get Sytem User Id|detailed",
+   "hash": "ce3c58242372",
+   "verdict": "CONFIRMED",
+   "detail": "Verified all units; note the variable assignment is in PostExecute (main.cs:105-113), ProcessInputRow main.cs:125-139 collects the values.",
+   "evidence": "Set Varibales main.cs:125-139, 105-113"
+  },
+  {
+   "id": "L|Package\\Get Sytem User Id|detail",
+   "hash": "c6b3ee3a6a87",
+   "verdict": "CONFIRMED",
+   "detail": "Verified: no CRM write; feeds CreatedBy/ModifiedBy/OwnerId/OwnerIdType/OwningBusinessUnit/TransactionCurrencyId of the ftrequest INSERT and transactioncurrencyid in SDK Create gen_TransferIn.",
+   "evidence": "Add System Columns main.cs:117-127; SDK Create gen_TransferIn 1 main.cs:129-133"
+  }
+ ]
+}

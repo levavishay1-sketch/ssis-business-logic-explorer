@@ -1,0 +1,69 @@
+{
+  "verifier": "ssis-verifier",
+  "package": "0034_SetMaxRevaluationDate",
+  "scope": "mapping-A.json",
+  "checked": 10,
+  "results": [
+    {
+      "id": "Execute SQL Task|gen_systemconfiguration|UPDATE|gen_value",
+      "verdict": "CONFIRMED",
+      "detail": "SQL: Declare @PrmMaxRevaluationDate varchar(30); select @Prm = CONVERT(varchar(10), Max(dateadd(hh,3,gen_revaluationdate)),103) from Gen_fundmain where gen_existinfile = 1 and gen_revaluationdate < cast(YEAR(GETDATE()) as nvarchar)+'/'+CAST(MONTH(GETDATE()) as nvarchar)+'/'+'1'; Update [gen_SystemConfigurationBase] set [gen_Value] = @Prm where gen_name = 'MaxRevaluationDate'. Value role: Gen_fundmain.gen_revaluationdate (MAX, +3h fixed, style 103 text); condition roles: gen_existinfile = 1 and raw gen_revaluationdate < month start; record key gen_name literal. Not a fixed value (expression). UPDATE is unconditional -> NULL when no row qualifies. SQLTask:Connection {BED24F94-...} = DTSID of [PCRM] = PSQL/ALTSHULER_MSCRM -> Unsupported. No other SET clause. Minor: mapping note calls Gen_fundmain 'the CRM view' as fact; the object is not supplied (logic.json correctly labels it a hypothesis).",
+      "evidence": "0034_SetMaxRevaluationDate.dtsx:4-6, :12, :15"
+    },
+    {
+      "id": "LOGIC summary / scopeNote (target DB, single task, consumer unknown)",
+      "verdict": "CONFIRMED",
+      "detail": "Single ExecuteSQLTask, no constraints, no configurations, no handlers/log. Target DB from connection GUID. 'MaxRevaluationDate' occurs only in 0034 among supplied DTSX (grep).",
+      "evidence": "0034_SetMaxRevaluationDate.dtsx:1-39; grep source/DailyProcess"
+    },
+    {
+      "id": "LOGIC detailed nodes (filter, MAX+3h, NULL branch, no INSERT)",
+      "verdict": "CONFIRMED",
+      "detail": "All nodes match the SQL text. No INSERT, so a missing 'MaxRevaluationDate' row means nothing is written, without error. All rows named 'MaxRevaluationDate' (if more than one) would be updated.",
+      "evidence": "0034_SetMaxRevaluationDate.dtsx:15"
+    },
+    {
+      "id": "LOGIC finding#1 (direct SQL on gen_SystemConfigurationBase = Unsupported)",
+      "verdict": "CONFIRMED",
+      "detail": "Proven by [PCRM] connection (ALTSHULER_MSCRM) and UPDATE on a Base table.",
+      "evidence": "0034_SetMaxRevaluationDate.dtsx:6, :15"
+    },
+    {
+      "id": "LOGIC finding#2 (NULL overwrite when no rows match)",
+      "verdict": "CONFIRMED",
+      "detail": "MAX over an empty set returns NULL; CONVERT(NULL) is NULL; the UPDATE has no guard (no IF / ISNULL / COALESCE) so gen_Value is set to NULL.",
+      "evidence": "0034_SetMaxRevaluationDate.dtsx:15"
+    },
+    {
+      "id": "LOGIC finding#3 (month bound string depends on DATEFORMAT)",
+      "verdict": "CONFIRMED",
+      "detail": "Bound is built as a string 'yyyy/m/1' and implicitly converted; interpretation for datetime depends on session DATEFORMAT/language, which is not in the package. Correctly hedged as unknown.",
+      "evidence": "0034_SetMaxRevaluationDate.dtsx:15"
+    },
+    {
+      "id": "LOGIC finding#4 (+3h not applied in filter; fixed offset, no DST)",
+      "verdict": "CONFIRMED",
+      "detail": "Filter compares raw gen_revaluationdate, output uses dateadd(hh,3,...). Consequence worth stating explicitly: a raw value on the last day of the previous month at >= 21:00 passes the filter but, after +3h, is printed as day 1 of the current month.",
+      "evidence": "0034_SetMaxRevaluationDate.dtsx:15"
+    },
+    {
+      "id": "LOGIC finding#5 (stored as text dd/mm/yyyy)",
+      "verdict": "CONFIRMED",
+      "detail": "CONVERT(varchar(10), ..., 103) -> 'dd/mm/yyyy'.",
+      "evidence": "0034_SetMaxRevaluationDate.dtsx:15"
+    },
+    {
+      "id": "LOGIC executionOrder",
+      "verdict": "CONFIRMED",
+      "detail": "Single executable, no precedence constraints.",
+      "evidence": "0034_SetMaxRevaluationDate.dtsx:11-18; evidence precedenceConstraints=[]"
+    },
+    {
+      "id": "LOGIC openQuestions",
+      "verdict": "CONFIRMED",
+      "detail": "Consumer, gen_existinfile meaning, +3h intent and DATEFORMAT are correctly left open.",
+      "evidence": "0034_SetMaxRevaluationDate.dtsx:15"
+    }
+  ],
+  "missingWrites": []
+}

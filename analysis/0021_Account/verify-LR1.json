@@ -1,0 +1,85 @@
+{
+  "verifier": "ssis-verifier",
+  "package": "0021_Account",
+  "scope": "logic-claims re-check after fixes",
+  "checkedAt": "2026-11-07T12:07:01.054Z",
+  "checked": 6,
+  "results": [
+    {
+      "id": "L|Package\\Update internal Agent account|detailed",
+      "hash": "c680bb505763",
+      "verdict": "INCOMPLETE",
+      "detail": "Re-derived: account LEFT JOIN funds subquery (gen_fundmain JOIN gen_agentcontract ON gen_brokernumber=gen_agentcontractid JOIN gen_agents ON gen_agentname=gen_agentsid JOIN gen_estatecodeid), WHERE gen_agenttype=1 AND gen_estatetypeid NOT IN ('0210','3'); computed flag case funds.gen_accountname is null then 0 else 1; stored isnull(gen_isfundinternalagent,0) (resolves to account because the derived table funds exposes only gen_accountname); filter computed != stored; Sort on accountid EliminateDuplicates=false; OLE DB Command 'Update accountbase set gen_isfundinternalagent = ? where accountid = ?' Param_0<-gen_isfundinternalagent, Param_1<-accountid on [CRM]; FailComponent; Success constraint to 'Update no Agent account'. NULL and INNER JOIN exclusions are now correct. Remaining gap: unit [2] settles the owner of the unqualified join column gen_estatecodeidid without stating the ambiguity reasoning required by the standard.",
+      "evidence": "source/DailyProcess/0021_Account.dtsx:3294-3310, 3306, 3343-3345, 3385-3399, 3496, 3643-3645",
+      "wrongUnits": [
+        {
+          "unit": 2,
+          "problem": "The join 'join gen_estatecodeid on gen_estatecodeidid = gen_fundmain.gen_estatetype' uses the unqualified column gen_estatecodeidid. The text treats it as the key of gen_estatecodeid (a fund 'without a matching estate-code record' is not counted / 'its estate type'), but does not state how the owning table is known.",
+          "correct": "State the reasoning explicitly: the same package references Gen_estatecodeid.Gen_estatecodeidId qualified (DTSX:3496), so gen_estatecodeid has this column; if gen_fundmain, gen_agentcontract or gen_agents also had a column of that name the query would fail on an ambiguous column name; per the user the package runs in production, so the join is on gen_estatecodeid's own id.",
+          "evidence": "source/DailyProcess/0021_Account.dtsx:3306, 3496"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Update internal Agent account|detail",
+      "hash": "5fc801206d08",
+      "verdict": "INCOMPLETE",
+      "detail": "Units [2]-[5] verified (no file, CRM-sourced, computed/stored comparison, direct UPDATE accountbase via [CRM], FailComponent). Unit [1] population is correct, including INNER JOIN and NULL NOT IN exclusions and no state filter, but it says a fund without a matching gen_estatecodeid is not counted, which relies on the unqualified gen_estatecodeidid being gen_estatecodeid's key; the reasoning is not stated.",
+      "evidence": "source/DailyProcess/0021_Account.dtsx:3294-3310, 3306, 3496",
+      "wrongUnits": [
+        {
+          "unit": 1,
+          "problem": "The join 'join gen_estatecodeid on gen_estatecodeidid = gen_fundmain.gen_estatetype' uses the unqualified column gen_estatecodeidid. The text treats it as the key of gen_estatecodeid (a fund 'without a matching estate-code record' is not counted / 'its estate type'), but does not state how the owning table is known.",
+          "correct": "State the reasoning explicitly: the same package references Gen_estatecodeid.Gen_estatecodeidId qualified (DTSX:3496), so gen_estatecodeid has this column; if gen_fundmain, gen_agentcontract or gen_agents also had a column of that name the query would fail on an ambiguous column name; per the user the package runs in production, so the join is on gen_estatecodeid's own id.",
+          "evidence": "source/DailyProcess/0021_Account.dtsx:3306, 3496"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Update internal Agent account|decisions",
+      "hash": "a57ee0583071",
+      "verdict": "INCOMPLETE",
+      "detail": "Both conditions quoted exactly; NULL handling (NOT IN and isnull(...,0)) correct; code meaning correctly left unknown. meaning_he of [1] speaks of the fund's own estate type ('סוג העיזבון שלה'), which depends on the unqualified join column gen_estatecodeidid belonging to gen_estatecodeid; the ambiguity reasoning is not stated.",
+      "evidence": "source/DailyProcess/0021_Account.dtsx:3306-3308, 3496",
+      "wrongUnits": [
+        {
+          "unit": 1,
+          "problem": "The join 'join gen_estatecodeid on gen_estatecodeidid = gen_fundmain.gen_estatetype' uses the unqualified column gen_estatecodeidid. The text treats it as the key of gen_estatecodeid (a fund 'without a matching estate-code record' is not counted / 'its estate type'), but does not state how the owning table is known.",
+          "correct": "State the reasoning explicitly: the same package references Gen_estatecodeid.Gen_estatecodeidId qualified (DTSX:3496), so gen_estatecodeid has this column; if gen_fundmain, gen_agentcontract or gen_agents also had a column of that name the query would fail on an ambiguous column name; per the user the package runs in production, so the join is on gen_estatecodeid's own id.",
+          "evidence": "source/DailyProcess/0021_Account.dtsx:3306, 3496"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Update no Agent account|detailed",
+      "hash": "c6ced03a45ab",
+      "verdict": "INCOMPLETE",
+      "detail": "Re-derived: funds subquery gen_fundmain JOIN Gen_estatecodeid ON Gen_estatecodeid.Gen_estatecodeidId = Gen_fundmain.gen_estatetype (fully qualified), WHERE gen_fundmain.gen_brokernumbername = '00000004000' AND Gen_EstateTypeID NOT IN ('0210','3'); flag case ... 0/1; stored isnull(gen_fundwithoutagent,0); filter !=; Sort accountid; 'Update accountbase set gen_fundwithoutagent= ? where accountid = ?' Param_0<-gen_isfundwithoutagent, Param_1<-accountid; FailComponent; Success to End ETL. All units correct except unit [3], which restates the condition as the fund's agent number ('מספר הסוכן שלה הוא 00000004000'). The code compares the string column gen_brokernumbername (the name column of the lookup, as unit [2] and the decisions claim correctly say), not a broker-number attribute; the file does not prove that this name is the agent number.",
+      "evidence": "source/DailyProcess/0021_Account.dtsx:3486-3500, 3497, 3535-3537, 3588-3602, 3645",
+      "wrongUnits": [
+        {
+          "unit": 3,
+          "problem": "Condition paraphrased as 'the fund's agent number is 00000004000'.",
+          "correct": "The fund's gen_brokernumbername (name of the broker-number lookup) equals the string '00000004000', and its estate-type code is not NULL, '0210' or '3'.",
+          "evidence": "source/DailyProcess/0021_Account.dtsx:3497"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Update no Agent account|detail",
+      "hash": "8cbdbb274bc4",
+      "verdict": "CONFIRMED",
+      "detail": "Population (all accounts, gen_accountname = accountid, gen_brokernumbername = '00000004000', Gen_EstateTypeID not '0210'/'3', INNER JOIN and NULL exclusions; join fully qualified), CRM-sourced matching by accountid, computed vs isnull(gen_fundwithoutagent,0), direct UPDATE accountbase SET gen_fundwithoutagent via [CRM] (Unsupported), FailComponent stopping the package, conditional business outcome: all verified against the DTSX.",
+      "evidence": "source/DailyProcess/0021_Account.dtsx:3486-3500, 3588-3602, 3645",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Update no Agent account|decisions",
+      "hash": "a98ac31fa70f",
+      "verdict": "CONFIRMED",
+      "detail": "Both conditions quoted exactly. meaning_he states the string comparison on gen_brokernumbername, the NULL NOT IN exclusion, labels the 'no agent' reading as hypothesis, and isnull(...,0) for the stored value. Join to Gen_estatecodeid is fully qualified, so no ownership issue.",
+      "evidence": "source/DailyProcess/0021_Account.dtsx:3486-3500",
+      "wrongUnits": []
+    }
+  ]
+}

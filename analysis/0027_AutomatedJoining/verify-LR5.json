@@ -1,0 +1,105 @@
+{
+  "verifier": "ssis-verifier",
+  "package": "0027_AutomatedJoining",
+  "scope": "logic-claims re-check round 5",
+  "checkedAt": "2026-11-07",
+  "checked": 12,
+  "results": [
+    {
+      "id": "L|summary",
+      "hash": "7c6a2861869d",
+      "verdict": "CONFIRMED",
+      "detail": "Re-derived from raw DTSX (sha256 5A6CAEB4...). Close step: Get Joining To Close selects right('0000000000000' + gen_bankaccountnumbername,12), gen_automatedjoiningid WHERE gen_joiningstatus = 7 (single table); full-cache Lookup Get customer accounts joins on right('0000000000000' + gen_bankaccountnumber,12) from Gen_customeraccount WHERE gen_bankaccountnumber IS NOT NULL, copies Gen_customeraccountId, NoMatchBehavior 1 with no path from No Match; Set columns gen_joiningstatus = 8; script (DTSX:1370-1376) updates gen_joiningstatus and gen_customeraccountid = EntityReference(gen_customeraccount). Suspicion step: WHERE gen_joiningstatus = 7 AND gen_sendtobankdate IS NOT NULL AND datediff(day, ?, gen_sendtobankdate) <= 0 with ? = User::LastThreeWorkingDays ({81CBF82A...}, DTSX:42); derived 12; script DTSX:5935-5939 sets only gen_joiningstatus. Hypotheses and unproven meanings are labelled. scopeNote: only SDK writers for business (DTSX:1376, 5939); every [CRM] use (two OLE DB sources, two Lookups, Get SystemConfigurations, Execute SQL Get NonWorkingDays) is a SELECT; Configuration type 1 file C:\\Generix\\SSISConfigFile.dtsConfig; ServerName/OrganizationName set by Set Variables from gen_etlvariable rows (DTSX:4106-4110, PostExecute loop).",
+      "evidence": "DTSX:914-957; DTSX:980-988; DTSX:1027; DTSX:1370-1376; DTSX:5541-5549; DTSX:5584; DTSX:5935-5939; DTSX:4-17; DTSX:4106-4110",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|exec",
+      "hash": "ce6abf86cede",
+      "verdict": "CONFIRMED",
+      "detail": "Constraint lines verified: 6508 Get Variables -> Create ETL; 6506 Create ETL -> Close Joining processes; 6510 Close -> Get NonWorkingDays; 6509 Get NonWorkingDays -> Update LastThreeWorkingDays; 6511 -> Update SuspicionAsEmitted; 6507 -> End ETL. No DTS:Value/Expression attributes (all Success, LogicalAnd); nothing disabled. Event handlers OnError (Error ETL Process record) and OnPostExecute (Cancel ETL Process record, whose body is fully commented out, DTSX:7224-7246) are ETL framing and not listed - not business logic.",
+      "evidence": "DTSX:6506-6511; DTSX:7224-7246",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Update LastThreeWorkingDays Variable|title",
+      "hash": "5aabf48823ac",
+      "verdict": "CONFIRMED",
+      "detail": "Traced ScriptMain (DTSX:5237-5264): counter starts at 1, currDate = DateTime.Now.AddDays(-1).Date; a day with no matching row increments the counter or breaks at 3; the date is decremented only when not breaking. No rules: D-1 (1->2), D-2 (2->3), D-3 break -> D-3. Loop i<21 checks D-1..D-21; without break currDate ends at D-22. Match is dt.Select(\"starttime = '\" + currDate.ToString() + \"'\") - exact equality to local midnight via a culture-dependent string. Get NonWorkingDays SQL (DTSX:4090): starttime between GetutcDate()-21 and GetutcDate() AND LTRIM(RTRIM(ISNULL(Name,''))) in ('Friday','Saturday','Holiday'). Meanings labelled as names/hypothesis.",
+      "evidence": "DTSX:4090; DTSX:5237-5264",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Update LastThreeWorkingDays Variable|short",
+      "hash": "741b8de61c32",
+      "verdict": "CONFIRMED",
+      "detail": "All three units match the SQL (DTSX:4090) and the loop (DTSX:5241-5263), including the 3-calendar-day result with no matching rule and the D-22 fallback.",
+      "evidence": "DTSX:4090; DTSX:5241-5263",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Update LastThreeWorkingDays Variable|detailed",
+      "hash": "e1ac7893470a",
+      "verdict": "CONFIRMED",
+      "detail": "[1] SQL and Full result set -> User::NonWorkingDays (DTSX:4090-4091). [2]-[9] match the code. [10] Main (DTSX:5222-5235): catch sets Failure then Dts.TaskResult = Success is set unconditionally after the try/catch; the exception occurs before the assignment, so the variable keeps its prior value; the only ReadWriteVariables user of User::LastThreeWorkingDays is this task (DTSX:4904), design value 10/2/2017 5:29:05 PM (DTSX:43), config file may set it (external_unknown).",
+      "evidence": "DTSX:4090-4091; DTSX:4904; DTSX:5222-5264; DTSX:42-43",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Update LastThreeWorkingDays Variable|detail",
+      "hash": "628573effe9e",
+      "verdict": "CONFIRMED",
+      "detail": "Source CalendarRule with trimmed names Friday/Saturday/Holiday in the last 21 days by GetutcDate(); no CRM write (only Dts.Variables assignment); outcome units match the loop.",
+      "evidence": "DTSX:4090; DTSX:5226; DTSX:5249-5263",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Update LastThreeWorkingDays Variable|decisions",
+      "hash": "0e3f85f41d18",
+      "verdict": "CONFIRMED",
+      "detail": "Condition quoted exactly from DTSX:5253-5258; outcomes (third counted day, or D-22 when the 21-iteration loop ends without break) are correct.",
+      "evidence": "DTSX:5249-5263",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Update SuspicionAsEmitted Joinings|title",
+      "hash": "bfa8936ac475",
+      "verdict": "CONFIRMED",
+      "detail": "SQL DTSX:5541-5544 with ParameterMapping Parameter0 -> {81CBF82A...} = User::LastThreeWorkingDays (DTSX:5549, 42); derived column expression 12 (DTSX:5584); script sets gen_joiningstatus only. 'Not later (day level)' = datediff(day, threshold, gen_sendtobankdate) <= 0.",
+      "evidence": "DTSX:5541-5549; DTSX:5584; DTSX:5935-5939",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Update SuspicionAsEmitted Joinings|short",
+      "hash": "81a0338cf30b",
+      "verdict": "CONFIRMED",
+      "detail": "Population, ordering after Close Joining processes (Success chain 6510, 6509, 6511) and the write of 12 are correct; NULL gen_sendtobankdate is excluded both by the explicit IS NOT NULL and by datediff returning NULL. Meaning of 12 left unproven.",
+      "evidence": "DTSX:5541-5544; DTSX:6509-6511",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Update SuspicionAsEmitted Joinings|detailed",
+      "hash": "8ce81980e9ba",
+      "verdict": "CONFIRMED",
+      "detail": "[1] the stage runs only after Close Joining processes succeeds; records updated there to 8 no longer match gen_joiningstatus = 7. [2]-[4] verbatim. [5]-[9] Update Joinings catches SoapException/Exception and calls DirectRowToError (DTSX:5940-5949); the paths list has no path from Update Joinings' Error output, so the package records nothing and the record keeps status 7; external CRM.Proxy behaviour stated unknown.",
+      "evidence": "DTSX:5541-5549; DTSX:5584; DTSX:5933-5950; paths DTSX:6498-6499",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Update SuspicionAsEmitted Joinings|decisions",
+      "hash": "729519cf2e68",
+      "verdict": "CONFIRMED",
+      "detail": "Condition verbatim (XML &lt; decoded), parameter correctly identified as User::LastThreeWorkingDays (single positional parameter), meaning and outcome correct.",
+      "evidence": "DTSX:5541-5549",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Update SuspicionAsEmitted Joinings|crm",
+      "hash": "18f873bcebff",
+      "verdict": "CONFIRMED",
+      "detail": "gen_automatedjoining, Update via CrmProxy.GetCrmService().Update (SDK), gen_joiningstatus = OptionSetValue(12); when_he matches the SQL.",
+      "evidence": "DTSX:5935-5939; DTSX:5541-5544",
+      "wrongUnits": []
+    }
+  ]
+}

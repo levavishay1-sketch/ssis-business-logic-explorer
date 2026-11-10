@@ -1,0 +1,136 @@
+{
+  "verifier": "ssis-verifier",
+  "package": "0028_Fund Enrolment",
+  "scope": "logic-claims re-check after fixes",
+  "checkedAt": "2026-11-07T00:00:00Z",
+  "checked": 10,
+  "results": [
+    {
+      "id": "L|finding#8",
+      "hash": "ea03d04c081c",
+      "verdict": "CONFIRMED",
+      "detail": "Create FundEnrolment For Transfer Request has DTS:Disabled=True (DTSX:8160). Its Insert To TemporaryTable runs 'insert into ##TblFundEnrolments (gen_fundenrolmentid) values(?)' on [CRM], with errorRowDisposition=FailComponent (DTSX:10191-10199). The other two flows insert into TblFundEnrolments on [SRS.GENERIX_STAGING] (DTSX:3578-3583, 7098-7103). Update FundEnrolment reads 'select * from TblFundEnrolments' on [SRS.GENERIX_STAGING] (DTSX:13755-13756) and sets gen_ismailsend = 0 (main.cs:122-126). A grep of all 35 supplied DTSX finds ##TblFundEnrolments only at DTSX:10191, so nothing creates it. Constraints 6 and 7 are Success (no Value) and lead to Update Reject Management and Update FundEnrolment (DTSX:15645-15646). The '##' = tempdb statement is standard SQL Server behaviour. Note: the claim correctly avoids saying whether the failure would occur at validation/prepare time or per row.",
+      "evidence": "DTSX:8160; 10191-10199; 3578-3583; 7098-7103; 13755-13756; 15645-15646; grep source/DailyProcess/*.dtsx",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Create Fundenrolment|short",
+      "hash": "61af70ecc6f3",
+      "verdict": "WRONG",
+      "detail": "Units 1-8 are correct. [1] where (gen_lastsyncdate is null or gen_lastsyncdate < aj.ModifiedOn) and aj.gen_joiningstatus = 2 (DTSX:3357-3418). [2]-[4] Is Fundenrolment Exits is a full-cache Lookup on gen_fundenrolment.gen_automatedjoining, and only its No Match output is connected. [6] the 'No CreateRow' condition requires JoiningStatus != 2, which can never happen. [8] Update Owner sets OwnerId = RejectTeamId, OwnerIdType = 9 (DTSX:4696). The 1:N left join to gen_transferrequest in [9] is correct. Unit 9, however, states unconditionally that every source row gets a record. Create gen_fundEnrolment catches every exception (SoapException or Exception, main.cs:282-291) and sends the row to CastingError, and that output is not connected. Rows whose creation fails therefore produce no record and leave no trace. Possible causes are a CRM fault, DateTime.ParseExact on gen_closedate/gen_receivingdate, and Guid.Parse(Variables.RejectTeamId). This is the same reason the Pension short was made conditional ('כשהיצירה מצליחה').",
+      "evidence": "DTSX:1505 Create gen_fundEnrolment main.cs:130-292 (DTSX:1914, 1919 DirectRowToCastingError); data-flow paths (only Result -> Multicast); DTSX:3357-3418; 3612-3638; 4696",
+      "wrongUnits": [
+        {
+          "unit": 9,
+          "problem": "The outcome is stated unconditionally ('לכל שורת מקור ... נפתחת רשומת טיפול'), but failed creations are silently dropped through the unconnected CastingError output.",
+          "correct": "When creation succeeds, each source row (an automated joining in status 2 without a Fund Enrolment) gets a new record. The record is reassigned by SQL to the reject team, and its id is stored for the gen_ismailsend marking. If creation fails, the row is dropped without a record or a log. A joining with several transfer requests appears in several rows and can get several records in the same run.",
+          "evidence": "main.cs:279-291; CastingError output not connected"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Create FundEnrolment For Pension|short",
+      "hash": "02bf2804c5a9",
+      "verdict": "CONFIRMED",
+      "detail": "[1] matches the WHERE clause at DTSX:6934-6937. [2]-[6] match main.cs:136-151: the referent with OwnerIdType 8 and joiningstatus 17, or else RejectTeamId with type 9 and the pj status copied when it is not null. [7]-[8] match the field set and the multicast to Update Fund Enrolment Owner and Upate Pension Joining (DTSX:8100, 8056). [9] is correctly conditional on success. It says one record per joining: the source has one row per pension joining, because the rm subquery is limited to Row_Num = 1 and the other joins go to primary keys. Repeats in later runs are prevented by gen_fundenrolmentid is null. See the Set gen_note caveat on |detailed; this short stays correct only because it is conditional on success.",
+      "evidence": "DTSX:6872-6937; DTSX:4758 main.cs:130-335; DTSX:8053-8060; 8097-8104",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Create FundEnrolment For Pension|detailed",
+      "hash": "c86164a9e650",
+      "verdict": "INCOMPLETE",
+      "detail": "All stated facts check out against the source. Source WHERE: DTSX:6934-6937. Product subqueries: '200003' and '200004'. Owner and status branches: main.cs:136-151. Product branch: 166-173. Fields: 153-278. Newsletter, pension and employers-file flags: 281-294. Underwriting branches: 296-325 (123456). try/catch: 132/330-334, with CustingError not connected. Unchecked null reads: main.cs:138 (DTSX:5020) and 169/171. SQL updates: DTSX:8100 OwnerId=?, OwnerIdType=? and DTSX:8056. Staging insert: DTSX:7098. What is missing: unit 30 rests on the premise that reading a NULL buffer column throws, for the Guid at main.cs:138. The upstream Set gen_note script (DTSX:7153, code at DTSX:7396-7406, main.cs:119-128) reads Row.genrejectionreason1Name..4Name and Row.genrejectreasonsnotes inside String.IsNullOrWhiteSpace(...) without any _IsNull check, and it has no try/catch and no error output. By the generated wrapper these reads are Buffer.GetString(...) (DTSX:7621ff). Under the same premise, any row with a NULL in any of those five columns throws in Set gen_note. That is typical, because the WHERE needs only one of the reasons, the notes or a reject-management row. The exception fails the component and the whole data flow. Then, via the Success chain, Close FundEnrolments For Pension, Update Reject Management With Fund Enrolment, Update FundEnrolment (gen_ismailsend) and End ETL do not run. Unit 3 presents note-building as safe, and units 30 and 36 omit this failure path. If GetString on NULL does not throw, the premise of unit 30 for main.cs:138 would also need re-examination. Either way the text is not internally consistent. The SSIS runtime assembly is not in scope, so the claim must at least state this conditionally.",
+      "evidence": "Set gen_note DTSX:7153, DTSX:7396-7406 (main.cs:119-128), wrapper Buffer.GetString DTSX:7621; Create Fund Enrolment main.cs:138 (DTSX:5020); Constraints 4/5/6/7/9 DTSX:15643-15648",
+      "wrongUnits": [
+        {
+          "unit": 3,
+          "problem": "Note-building is described without its failure mode: the reason names and notes are read without _IsNull checks, outside any try.",
+          "correct": "Set gen_note builds '1: <reason 1>; ...' plus the reject notes. It reads the four reason names and the notes without an _IsNull check and without try/catch. By the same rule the claim applies at main.cs:138, a NULL in any of them throws, the data flow fails, and the later Success-chained steps (closing, reject-management linking, gen_ismailsend marking, End ETL) do not run.",
+          "evidence": "DTSX:7396-7406; DTSX:7621"
+        },
+        {
+          "unit": 36,
+          "problem": "The outcome omits the data-flow-level failure path. Units 28-30 cover only exceptions caught inside Create Fund Enrolment.",
+          "correct": "Add: if Set gen_note throws on a NULL column, the whole data flow fails. Joinings in later buffers are not processed, and the downstream steps of the package are skipped in that run.",
+          "evidence": "DTSX:7396-7406; DTSX:15643-15648"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Create FundEnrolment For Pension|detail",
+      "hash": "1e28161361fb",
+      "verdict": "INCOMPLETE",
+      "detail": "[1]-[4] and [6] are correct. [1]: DTSX:6872-6937, with nolock; the rm subquery keeps the first row by createdon and includes rm of any statecode. [2]: no Lookup, de-duplication through gen_fundenrolmentid is null plus the SQL update at DTSX:8056. [3]: main.cs:136-151, 166-173, 287-325. [4]: SDK create, SQL updates at DTSX:8100 and 8056, staging insert at DTSX:7098. [6]: no supplied package creates gen_pensionjoining (0029_POA only updates it, DTSX 0029:31614-31617), and this is correctly labelled as a hypothesis. [5] lists silent create failures 'for example', but omits the failure that matters most. Set gen_note reads the reason names and notes without _IsNull checks, outside any try (DTSX:7396-7406). Under the same null-read rule used for gen_updatedbyreferent, a NULL there fails the entire data flow and the remaining steps of the package do not run. It is not a silent per-row loss.",
+      "evidence": "DTSX:6872-6937; 7396-7406; 5020; 8056; 8100; 7098; 0029_POA.dtsx:31614-31617",
+      "wrongUnits": [
+        {
+          "unit": 5,
+          "problem": "The business outcome omits the case where the pension flow aborts in Set gen_note.",
+          "correct": "When creation succeeds, a pension joining with a reject gets a handling record assigned to the relevant owner. If Create fails (for example, passed-and-reject with an empty updating referent, or a missing pension product), no record is created and the failure is not logged. If Set gen_note meets a NULL reason name or a NULL note (read without an _IsNull check), the whole data flow fails and the later steps of the package do not run in that run.",
+          "evidence": "DTSX:7396-7406; main.cs:132-334"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Create FundEnrolment For Pension|decisions",
+      "hash": "01228473df87",
+      "verdict": "CONFIRMED",
+      "detail": "[1] matches DTSX:6934-6937 exactly. [2] matches main.cs:136-151 (type 8 / 17, else RejectTeamId type 9 and the pj status). [3] matches 166-173. [4] matches 287-294 (3 or 4). [5] matches 296-325: health declaration 1, or 2 with underwriting status 2/3, gives true + '123456'; 2 with status 1 gives false. [6] matches the catch at 330-334 and the unchecked reads at 138, 169 and 171; CustingError is not connected. The Set gen_note issue raised under |detailed is outside Create Fund Enrolment and is not a decision row.",
+      "evidence": "DTSX:6934-6937; DTSX:4758 main.cs:130-335",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Close FundEnrolments For Pension|detail",
+      "hash": "373585531483",
+      "verdict": "CONFIRMED",
+      "detail": "Get Pension Joinings (DTSX:909-921) is gen_pensionjoining join Gen_fundenrolment on pj.gen_fundenrolmentid = Gen_fundenrolmentid, where gen_enrolmentstatus = 1 and (joiningstatus in (5,6,7,8,13) or (joiningstatus = 9 and isnull(gen_existsreject,1)=1 and reasons 1-4 null and notes null)) and joiningsource != 4 and fellowsignature != 2. The operator precedence matches unit 3. The query has no owner condition, so the corrected unit 5 is right. Close Fund Enrolment main.cs:121-127 calls service.Update per row with gen_enrolmentstatus = 3 and has no try (see finding#5). gen_fundenrolment is created in this package, and the link is set at DTSX:8056.",
+      "evidence": "DTSX:904-923; DTSX:85 main.cs:119-129 (service.Update at DTSX:345)",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Create FundEnrolment For Transfer Request|detailed",
+      "hash": "70103c5c2592",
+      "verdict": "WRONG",
+      "detail": "Units 1 and 3-12 check out: Disabled at DTSX:8160; the case-when agent contract; contact/account branches at main.cs:145-223, with the contact city commented out and the account city taken through new Guid(...); the fixed values at 136-142, 226-232, 273, 288 and 315; the SQL updates at DTSX:11069 (OwnerIdType = 9) and DTSX:11114; and the ## insert at DTSX:10191-10199. Unit 2 misstates the exclusion. The SQL is not (tr.gen_feedbackstatus in(3,4) and tc.gen_transferrequestId is not null) (DTSX:10039). When gen_feedbackstatus is NULL and an active course has error 11879018, the inner expression is UNKNOWN, NOT UNKNOWN is UNKNOWN, and the row is also excluded. Minor additional point: Set gen_note 1 reads Row.genrejectdescription without an _IsNull check, outside any try (DTSX:10501). Under the null-read rule used elsewhere in this package's claims, enabling the flow would make it fail on a NULL rejection description. The flow is disabled, so neither point has a current effect.",
+      "evidence": "DTSX:8160; 9954-10043 (WHERE at 10039); 10501; Create Fund Enrolment main.cs:124-328; DTSX:10191-10199; 11069; 11114",
+      "wrongUnits": [
+        {
+          "unit": 2,
+          "problem": "NULL handling is omitted. Requests with a NULL feedback status that have an active course whose error contains 11879018 are also excluded.",
+          "correct": "Population (if enabled): active (statecode 0) transfer requests of type 5, with transfer status 2 and no Fund Enrolment. Excluded: requests that have an active course whose error contains 11879018 and whose feedback status is 3, 4 or NULL. With NULL, the NOT(...) evaluates to UNKNOWN and the row is dropped.",
+          "evidence": "DTSX:10039"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Create FundEnrolment For Transfer Request|crm",
+      "hash": "d2eee462c395",
+      "verdict": "CONFIRMED",
+      "detail": "With the flow disabled (DTSX:8160) there are three CRM writes. (1) gen_fundenrolment Create through SDK (main.cs:317), per row that does not throw. (2) Update Fund Enrolment Owner: update Gen_fundenrolmentBase set OwnerId = ? (RejectTeamId, Param_0), OwnerIdType = 9 where Gen_fundenrolmentId = ? (FundEnrolmentId, Param_1), on [CRM] (DTSX:11066-11072). (3) Update Transfer Request: update gen_transferrequestBase set gen_fundenrolmentid = ? (Param_0 FundEnrolmentId) where gen_transferrequestid = ? (Param_1) (DTSX:11111-11116). Both SQL updates run from the Success output through the Multicast, so they happen after each successful create. This flow has no other CRM writes; the ## insert is not a CRM entity.",
+      "evidence": "DTSX:8160; 11066-11072; 11111-11116; main.cs:317-318",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Update Reject Management With Fund Enrolment|detailed",
+      "hash": "098e66773139",
+      "verdict": "INCOMPLETE",
+      "detail": "Units 1-9 match the 3-part UNION (DTSX:14666-14686): the isoldrejectmethod filter (!= 1 or null) on aj, pj and tr; rm with gen_fundenrolmentid null and statecode 0; and the script at main.cs:120-127, an SDK Update of gen_rejectmanagement.gen_fundenrolmentid. Two things are missing. (a) Part 1 joins gen_fundenrolmentbase on fe.Gen_automatedjoining = aj id, and an automated joining can have several Fund Enrolments: finding#4 and Create Fundenrolment|short [9] say several can be created in one run. The UNION then yields one (rm, fe) row per Fund Enrolment, and the same reject-management record is updated once per row. The final link is whichever update runs last, in an undefined order. Unit 11 ('attached to its source's handling record', singular) omits this. (b) Unit 10: the Failure output column ErrorMessage is wstr(200) (DTSX:15623). The catch assigns ex.Message (main.cs:133, DTSX:15057), and a message longer than 200 characters throws inside the catch. That fails the component and the data flow, so Update FundEnrolment (gen_ismailsend) and End ETL do not run (Constraints 7 and 9). So a failure is not always just 'routed to a dead-end column'. This is the same pattern the 0032 analysis documents for wstr(100).",
+      "evidence": "DTSX:14666-14686; 14715 main.cs:116-136 (DTSX:15057); Failure.ErrorMessage wstr(200) DTSX:15623; DTSX:15646-15648; finding#4",
+      "wrongUnits": [
+        {
+          "unit": 10,
+          "problem": "This holds only if the exception message fits in 200 characters.",
+          "correct": "An update failure is routed to the Failure output, an empty Derived Column with no continuation, if ex.Message fits in ErrorMessage wstr(200). Otherwise the assignment throws inside the catch, the data flow fails, and the gen_ismailsend marking (Update FundEnrolment) does not run.",
+          "evidence": "DTSX:15623; DTSX:15057"
+        },
+        {
+          "unit": 11,
+          "problem": "Omits the case of an automated joining with several Fund Enrolments.",
+          "correct": "Add: if an automated joining has more than one Fund Enrolment, which can happen when it has several transfer requests, its reject-management record is updated once per Fund Enrolment. The last update wins, and the order is not defined.",
+          "evidence": "DTSX:14666-14669; finding#4 (DTSX:3357 left join gen_transferrequest)"
+        }
+      ]
+    }
+  ]
+}

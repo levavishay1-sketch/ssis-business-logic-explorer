@@ -1,0 +1,59 @@
+# 0036_TransferRequest.dtsx · 3834C0CD6435E3D2E320BE8EF4990B333CCFB6948AAB942E82B5869E134E0E3B
+
+## Connection managers
+- [Psql] OLEDB Data Source=Psql;Initial Catalog=ALTSHULER_MSCRM;Integrated Security=SSPI;  
+
+## Executables (disabled marked !)
+-   Create ETL Process record | Microsoft.ScriptTask  
+-   End ETL Process record | Microsoft.Pipeline  
+-   Get NonWorkingDays | Microsoft.ExecuteSQLTask  | SQL: select starttime FROM CalendarRule where starttime between GetutcDate()-21 and GetutcDate() AND LTRIM(RTRIM(ISNULL(CalendarRule.Name,''))) in ('Friday','Saturda
+-   Get Variables From Etl Variables | Microsoft.Pipeline  
+-   Update LastThreeWorkingDays Variable | Microsoft.ScriptTask  
+-   Update SuspicionAsEmitted Transfer Request | Microsoft.Pipeline  
+
+## Precedence
+- Get Variables From Etl Variables -> Create ETL Process record | Success Constraint   
+- Create ETL Process record -> Get NonWorkingDays | Success Constraint   
+- Get NonWorkingDays -> Update LastThreeWorkingDays Variable | Success Constraint   
+- Update LastThreeWorkingDays Variable -> Update SuspicionAsEmitted Transfer Request | Success Constraint   
+- Update SuspicionAsEmitted Transfer Request -> End ETL Process record | Success Constraint   
+
+## DataFlow End ETL Process record
+  - ETL Record Finish | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 2 out 0
+  - Get gen_etlprocessid | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 0 out 1
+  - Lookup | Lookup  | conn [Psql]  | in 1 out 1
+     path Lookup.Outputs[Lookup Match Output] => ETL Record Finish.Inputs[Input 0]
+     path Get gen_etlprocessid.Outputs[Output 0] => Lookup.Inputs[Lookup Input]
+
+## DataFlow Get Variables From Etl Variables
+  - Get SystemConfigurations | OLEDBSource  | conn [Psql]  | in 0 out 2
+  - Set Variables | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 2 out 0
+     path Get SystemConfigurations.Outputs[OLE DB Source Output] => Set Variables.Inputs[Input 0]
+
+## DataFlow Update SuspicionAsEmitted Transfer Request
+  - Get Transfer Requests From DB | OLEDBSource  | conn [Psql]  | in 0 out 1
+  - Set Status As SuspicionAsEmitted | DerivedColumn  | conn   | in 0 out 1
+  - Update Transfer Requests | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 2 out 1
+     path Set Status As SuspicionAsEmitted.Outputs[Derived Column Output] => Update Transfer Requests.Inputs[Input 0]
+     path Get Transfer Requests From DB.Outputs[OLE DB Source Output] => Set Status As SuspicionAsEmitted.Inputs[Derived Column Input]
+
+## SQL statements
+- End ETL Process record\Lookup | Microsoft.Lookup.SqlCommand | [Psql] 
+    select p.gen_etlprocessid , case when pw.gen_etlprocessid is null then 0 else 1 end as isWarningExist from gen_etlprocess p left join (select distinct gen_etlprocessId from gen_etlprocesswarning ) as pw on p.gen_etlprocessId = pw.gen_etlprocessId
+- End ETL Process record\Lookup | Microsoft.Lookup.SqlCommandParam | [Psql] 
+    select * from (select p.gen_etlprocessid , case when pw.gen_etlprocessid is null then 0 else 1 end as isWarningExist from gen_etlprocess p left join (select distinct gen_etlprocessId from gen_etlprocesswarning ) as pw on p.gen_etlprocessId = pw.gen_etlprocessId) [refTable] where [refTable].[gen_etlprocessid] = ?
+- Get NonWorkingDays | ExecuteSQLTask | [Psql] 
+    select starttime FROM CalendarRule where starttime between GetutcDate()-21 and GetutcDate() AND LTRIM(RTRIM(ISNULL(CalendarRule.Name,''))) in ('Friday','Saturday','Holiday') ORDER BY starttime DESC
+- Get Variables From Etl Variables\Get SystemConfigurations | Microsoft.OLEDBSource.SqlCommand | [Psql] 
+    SELECT gen_key ,gen_Value FROM gen_etlvariable where gen_scope ='global' or gen_scope = ?
+- Update SuspicionAsEmitted Transfer Request\Get Transfer Requests From DB | Microsoft.OLEDBSource.SqlCommand | [Psql] 
+    select gen_transferrequestId from gen_transferrequest where gen_tanferinstatus = 7 and gen_SendToBankDate is not null and datediff(day, ? , gen_SendToBankDate) <=0
+
+## Code write candidates (per owner)
+- Create ETL Process record {"crm-entity":1,"crm-sdk-create":1,"variables-write":1}
+- End ETL Process record\ETL Record Finish {"sql-command":2,"crm-entity":3,"output-buffer":1,"crm-sdk-update":1}
+- End ETL Process record\Get gen_etlprocessid {"sql-command":2,"output-buffer":2}
+- Update LastThreeWorkingDays Variable {"variables-write":2,"sql-command":1}
+- Update SuspicionAsEmitted Transfer Request\Update Transfer Requests {"sql-command":2,"crm-entity":2,"crm-sdk-update":1,"output-buffer":2}
+
+## External refs (non-framework) CRM2015.Proxy

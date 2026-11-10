@@ -1,0 +1,371 @@
+{
+ "package": "0038_EmployerEnrolment",
+ "analyst": "ssis-business-logic",
+ "source": {
+  "file": "source/DailyProcess/0038_EmployerEnrolment.dtsx",
+  "sha256": "EE81202D1055BC8499F5E40CDA63F17C6D610F25057154E97841E2C0C9C981D3"
+ },
+ "scopeNote_he": "מנהל חיבור יחיד [PSQL] (DTSX:4-6, DTSID {CA59E303-2122-4859-91CF-3884185A3889}): Data Source=PSQL;Initial Catalog=ALTSHULER_MSCRM. הוא משמש לקריאה בלבד: שאילתת המקור DTSX:6076 ו-gen_etlvariable. אין בחבילה כתיבת SQL. כל הכתיבה ל-CRM היא דרך CRM SDK (CrmProxy, ספריית CRM2015.Proxy שלא סופקה), אל השרת והארגון שבמשתנים ServerName/OrganizationName. הערכים נטענים מ-gen_etlvariable ואינם ידועים. ב-DTSX אין DTS:Configuration (evidence.configurations = []). הקובץ C:\\Generix\\SSISConfigFile.dtsConfig, שלא סופק, או ה-Job, יכולים לדרוס חיבורים בזמן ריצה. external_unknown.",
+ "summary_he": "החבילה מאתרת הצטרפויות מעסיק (Gen_employerenrolment) מ-7 הימים האחרונים שיש להן 'סכום הפקדה שגוי', ומתאימה אותן לקופה של אותו לקוח (לפי ת.ז.) שמסומנת Gen_existinfile = 1 (משמעות הדגל לא ידועה; השערה: קופה שהופיעה בקובץ). לכל התאמה שעומדת בכללי שכיר/עצמאי נוצר ב-CRM מייל התראה ('התראה בגין מסך שגויים') שמשויך להצטרפות, והוא נשלח מתור ה'מעסיקים' אל תור ה'גבייה' (סוג הפקדה 1) או אל תור ה'מעסיקים' (סוג הפקדה 2). שמות התורים נגזרים משמות המשתנים (השערה). החבילה לא מעדכנת את רשומת ההצטרפות עצמה.",
+ "executionOrder": [
+  {
+   "step": 1,
+   "refId": "Package\\Send Email",
+   "title_he": "שליחת התראות על הפקדה שגויה של מעסיק",
+   "trigger": "אחרי Package\\Create ETL Process record · Success (Constraint 1, DTSX:7459). שרשרת קודמת: Get Variables From Etl Varibles → Create ETL Process record · Success (DTSX:7458). אחריו: End ETL Process record · Success (DTSX:7460)"
+  }
+ ],
+ "ignoredAsFramework": [
+  "Package\\Create ETL Process record",
+  "Package\\End ETL Process record",
+  "Package\\Send Email\\Adding Error message 1",
+  "Package\\Send Email\\Adding Error message 1 1",
+  "Package\\Send Email\\ETL Warning 1 2 1",
+  "Package\\Send Email\\ETL Warning 1 2 1 1 (עותק זהה, dupes.json)"
+ ],
+ "components": [
+  {
+   "refId": "Package\\Send Email",
+   "title_he": "התראות על הפקדה שגויה של מעסיק",
+   "techName": "Send Email",
+   "short_he": "לכל הצטרפות מעסיק מהשבוע האחרון שיש בה סכום הפקדה שגוי ושמתאימה לקופה של הלקוח, נוצר ונשלח מייל התראה מתוך CRM לתור המתאים.",
+   "flow_he": [
+    "שליפת הצטרפויות מעסיק מ-7 הימים האחרונים, מצורפות לקופות של אותו לקוח (לפי ת.ז.)",
+    "בדיקת שכיר/עצמאי מול סוג הקופה, התאמת מעסיק וקיום סכום שגוי",
+    "יצירת מייל ב-CRM על ההצטרפות ושליחתו: סוג הפקדה 1 לתור גבייה, סוג הפקדה 2 לתור מעסיקים"
+   ],
+   "short": {
+    "nodes": [
+     {
+      "type": "step",
+      "text": "החבילה שולפת הצטרפויות מעסיק שנוצרו בשבוע האחרון, ומצרפת לכל אחת את הקופות של אותו לקוח לפי תעודת זהות, שמסומנות בדגל 'קיים בקובץ' (משמעות הדגל: השערה)."
+     },
+     {
+      "type": "decision",
+      "text": "האם ההצטרפות מתאימה לקופה (לא-עצמאי מול קופה מסוג 1 עם אותו מעסיק, או עצמאי מול קופה מסוג 2; פירוש הסוגים כשכיר/עצמאי הוא השערה), ויש בה סכום הפקדה שגוי?",
+      "branches": [
+       {
+        "label": "כן",
+        "nodes": [
+         {
+          "type": "write",
+          "text": "נוצר ב-CRM מייל התראה על הפקדה שגויה, משויך להצטרפות, ונשלח: בסוג הפקדה 1 לתור הגבייה, בסוג הפקדה 2 לתור המעסיקים."
+         }
+        ]
+       },
+       {
+        "label": "לא",
+        "nodes": [
+         {
+          "type": "step",
+          "text": "לא נשלח מייל."
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "type": "end",
+      "text": "התורים המתאימים (לפי שמות המשתנים, השערה: מחלקות המעסיקים/גבייה) מקבלים התראה על כל לקוח שהופקד עבורו סכום שגוי. החבילה לא מסמנת שההתראה נשלחה."
+     }
+    ]
+   },
+   "detailed": {
+    "nodes": [
+     {
+      "type": "step",
+      "text": "האוכלוסייה היא הצטרפויות מעסיק שנוצרו ב-7 הימים האחרונים ושמצבן הנוכחי הוא 1. כל אחת מצורפת לקופות של אותו לקוח שמסומנות Gen_existinfile = 1 (משמעות הדגל לא ידועה), כשתאריך ההפקדה של המעסיק אינו מאוחר מתאריך פתיחת הקופה.",
+      "tech": "from Gen_employerenrolment ee JOIN Gen_fundmain fm ON ת.ז. ללא אפסים מובילים שווה; where gen_currentstate = 1 and gen_employerdepositdate <= fm.Gen_FundCreationDate and ee.CreatedOn >= GETDATE()-7 and fm.Gen_existinfile = 1",
+      "evidence": "Get Data From Employer Enrolment & Fundmain DTSX:6076"
+     },
+     {
+      "type": "step",
+      "text": "רק צירופים שבהם סוג המוצר בהצטרפות תואם לתת-המוצר של הקופה נשארים: 1 עם 1, 2 עם 4, 3 עם 2. משמעות הקודים לא ידועה.",
+      "tech": "(p.gen_subproduct in (1) and ee.gen_producttype = 1) or (p.gen_subproduct in (4) and ee.gen_producttype = 2) or (p.gen_subproduct in (2) and ee.gen_producttype = 3); product p on p.ProductId = fm.gen_fundtypename",
+      "evidence": "DTSX:6076"
+     },
+     {
+      "type": "step",
+      "text": "המעסיק של ההצטרפות מזוהה כחשבון (Account), ומספר החשבון שלו משמש כ'ח.פ מעסיק'. מעסיק הקופה מזוהה רק אם מספר התאגיד שלו שווה למספר החשבון של מעסיק ההצטרפות.",
+      "tech": "JOIN Account a on ee.gen_employersnumber = a.AccountId; left join Gen_employers e on e.Gen_employersId = fm.gen_employernumber and (a.AccountNumber = e.Gen_CorporateNumber)",
+      "evidence": "DTSX:6076"
+     },
+     {
+      "type": "decision",
+      "text": "איזה צירוף של שכיר/עצמאי וסוג קופה יש להצטרפות?",
+      "tech": "Check If To Send Mail main.cs:117-141. אם gen_producttype או gen_fundestateid הם NULL, השורה נזרקת. gen_selfemployed נקרא בלי בדיקת _IsNull (Buffer.GetBoolean, DTSX:3942-3947): ערך NULL זורק ColumnIsNullException (התנהגות SSIS כללית). בסקריפט אין try/catch, ולכן הרכיב וזרימת הנתונים נכשלים.",
+      "branches": [
+       {
+        "label": "לא עצמאי וקופה מסוג 1 (השערה: שכיר)",
+        "nodes": [
+         {
+          "type": "decision",
+          "text": "האם מעסיק הקופה הוא מעסיק ההצטרפות, ויש סכום הפקדה שגוי?",
+          "tech": "!eemployersId_IsNull && !fmemployernumber_IsNull && eemployersId == fmemployernumber && !genincorrectamount_IsNull (main.cs:121-127)",
+          "branches": [
+           {
+            "label": "כן",
+            "nodes": [
+             {
+              "type": "step",
+              "text": "ההצטרפות עוברת לשליחת מייל."
+             }
+            ]
+           },
+           {
+            "label": "לא",
+            "nodes": [
+             {
+              "type": "step",
+              "text": "השורה נזרקת בשקט: אין מייל ואין רישום שגיאה."
+             }
+            ]
+           }
+          ]
+         }
+        ]
+       },
+       {
+        "label": "עצמאי וקופה מסוג 2 (השערה: עצמאי)",
+        "nodes": [
+         {
+          "type": "decision",
+          "text": "האם יש סכום הפקדה שגוי?",
+          "tech": "!genincorrectamount_IsNull (main.cs:134)",
+          "branches": [
+           {
+            "label": "כן",
+            "nodes": [
+             {
+              "type": "step",
+              "text": "ההצטרפות עוברת לשליחת מייל."
+             }
+            ]
+           },
+           {
+            "label": "לא",
+            "nodes": [
+             {
+              "type": "step",
+              "text": "השורה נזרקת בשקט."
+             }
+            ]
+           }
+          ]
+         }
+        ]
+       },
+       {
+        "label": "כל צירוף אחר",
+        "nodes": [
+         {
+          "type": "step",
+          "text": "לא נשלח מייל. נרשמת אזהרת תהליך 'לא נשלח מייל בקשר ללקוח'.",
+          "tech": "Row.DirectRowToErrors() (main.cs:141) → Adding Error message 1 → ETL Warning (מסגרת)"
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "type": "decision",
+      "text": "מה סוג ההפקדה של ההצטרפות?",
+      "tech": "Send Email To Maasikim main.cs:86-95, Row.gendeposittype",
+      "branches": [
+       {
+        "label": "1",
+        "nodes": [
+         {
+          "type": "write",
+          "text": "נוצר מייל ב-CRM מתור המעסיקים אל תור הגבייה (שמות התורים לפי שמות המשתנים, השערה), משויך להצטרפות, ונשלח מתוך CRM.",
+          "tech": "email · Create (to=queue User::GviaQueueId, from=queue User::MaasikimQueueId, regardingobjectid=gen_employerenrolment, directioncode=true) + Execute SendEmail(IssueSend=true) · SDK",
+          "evidence": "main.cs:89, 126-174"
+         }
+        ]
+       },
+       {
+        "label": "2",
+        "nodes": [
+         {
+          "type": "write",
+          "text": "נוצר מייל ב-CRM מתור המעסיקים אל תור המעסיקים, משויך להצטרפות, ונשלח מתוך CRM.",
+          "tech": "email · Create (to=from=queue User::MaasikimQueueId) + Execute SendEmail · SDK",
+          "evidence": "main.cs:94"
+         }
+        ]
+       },
+       {
+        "label": "אחר",
+        "nodes": [
+         {
+          "type": "step",
+          "text": "לא נשלח מייל ולא נרשמת שגיאה. אם סוג ההפקדה הוא NULL, הקריאה שלו נכשלת, והרכיב נכשל (ראה הצעד הבא)."
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "type": "step",
+      "text": "נושא המייל: מספר הקופה, שם הלקוח, ת.ז. והטקסט 'התראה בגין מסך שגויים'. גוף המייל: ת.ז., שם הלקוח, ח.פ המעסיק, מספר הקופה שנפתחה וסכום ההפקדה השגוי, בחתימת 'מחלקת מעסיקים'.",
+      "tech": "subject = FundNumber + \",\" + CustomerName + \",\" + CustomerId + \"-התראה בגין מסך שגויים \"; body: main.cs:183-195",
+      "evidence": "main.cs:176-195"
+     },
+     {
+      "type": "step",
+      "text": "אם חסר בשורה מספר קופה, שם לקוח, ח.פ מעסיק או סוג הפקדה, או שמזהה תור בהגדרות אינו GUID תקין, נוצרת חריגה. בלוק ה-catch ניגש ל-InnerException.Message, שהוא null במקרה הזה, ולכן גם הוא נכשל. התוצאה: הרכיב וזרימת הנתונים נכשלים, אין מייל, ושלב סיום התהליך לא רץ.",
+      "tech": "BufferWrapper getters: return Buffer.GetString(...) (DTSX:6819-6825) זורק ColumnIsNullException על NULL (התנהגות SSIS כללית); new Guid(Variables.MaasikimQueueId/GviaQueueId) (DTSX:6406-6407); catch: ex.InnerException.Message (main.cs:112, DTSX:6402-6452) → NullReferenceException (התנהגות .NET כללית)",
+      "evidence": "DTSX:6402-6452, 6819-6825"
+     },
+     {
+      "type": "step",
+      "text": "בשגיאת token, הקוד מתחבר מחדש ומעבד את השורה שוב מההתחלה. אם המייל כבר נוצר והשליחה היא שנכשלה, ייווצר מייל שני לאותה הצטרפות.",
+      "tech": "reConectCrmService → Input0_ProcessInputRow(Row) (main.cs:101-103, 112-114, 196-202); service.Create לפני SendMail (main.cs:154-156)",
+      "evidence": "DTSX:6402-6452, 6485-6502, 6527-6533"
+     },
+     {
+      "type": "end",
+      "text": "התור המתאים מקבל מייל התראה על כל צירוף הצטרפות-קופה שעמד בכללים. רשומת ההצטרפות לא מתעדכנת, ולכן ההצטרפות תיבחר שוב בכל ריצה במהלך 7 הימים."
+     }
+    ]
+   },
+   "detail_he": [
+    {
+     "h": "מקור ואוכלוסייה",
+     "t": "Gen_employerenrolment (ee) עם gen_currentstate = 1 ו-CreatedOn >= GETDATE()-7. כל רשומה מצורפת ל-Gen_fundmain (fm) לפי ת.ז. בלי אפסים ורווחים מובילים בשני הצדדים, בתנאים fm.Gen_existinfile = 1 ו-gen_employerdepositdate <= fm.Gen_FundCreationDate, ולפי זוגות התאמה של gen_producttype ↔ product.gen_subproduct: 1↔1, 2↔4, 3↔2 (DTSX:6076). משמעות gen_currentstate=1, קודי המוצר ו-Gen_existinfile לא ידועה. ההצטרפות נבחרת רק אם ee.gen_employersnumber מצביע על Account קיים (JOIN Account as a on ee.gen_employersnumber = a.AccountId – INNER JOIN). הצטרפות בלי Account תואם, גם של עצמאי (gen_selfemployed = true), לא נבחרת: לא נשלח עליה מייל ולא נרשמת אזהרה."
+    },
+    {
+     "h": "התאמה לרשומות קיימות",
+     "t": "ההצטרפות מותאמת לקופה לפי ת.ז. בלבד, ולכן ללקוח עם כמה קופות מתאימות ייווצרו כמה שורות וכמה מיילים. מעסיק: Account לפי ee.gen_employersnumber (INNER JOIN, חובה), ו-Gen_employers של הקופה רק כאשר Gen_CorporateNumber = a.AccountNumber (left join). אין חיפוש של מייל קיים ואין סימון שההתראה נשלחה."
+    },
+    {
+     "h": "החלטות",
+     "t": "Check If To Send Mail (main.cs:117-141): (genselfemployed == false && genfundestateid == 1) מחייב מעסיק תואם וסכום שגוי. (genselfemployed == true && genfundestateid == 2) מחייב סכום שגוי. כל צירוף אחר של ערכים שאינם NULL הולך ל-Errors (אזהרת ETL); ערך NULL ב-gen_selfemployed אינו מגיע ל-Errors (ראו ממצא 1). שורות שנכשלות בבדיקות הפנימיות, או ש-gen_producttype/gen_fundestateid שלהן NULL, נזרקות בלי רישום. Send Email To Maasikim (main.cs:86-95): gendeposittype == 1 נשלח אל Gvia, ‏2 נשלח אל Maasikim, ערך אחר שאינו NULL לא נשלח (NULL – ראו ממצאים 2 ו-8)."
+    },
+    {
+     "h": "כתיבה ל-CRM",
+     "t": "SDK בלבד: service.Create(email) עם regardingobjectid → gen_employerenrolment, subject = '<מספר קופה>,<שם לקוח>,<ת.ז.>-התראה בגין מסך שגויים' ו-description = גוף HTML עם ת.ז., שם מלא לקוח, ח.פ מעסיק (a.AccountNumber), מספר קופה שנפתחה וסכום הפקדה שגוי (gen_incorrectamount), בחתימת 'מחלקת מעסיקים' (main.cs:133-134, 176-195), from/to כ-activityparty על ישות queue: השולח (from) הוא תמיד התור MaasikimQueueId, בשני סוגי ההפקדה; הנמען (to) הוא GviaQueueId כאשר gen_deposittype = 1 ו-MaasikimQueueId כאשר gen_deposittype = 2. directioncode=true. אחר כך Execute של SendEmail עם IssueSend=true ו-TrackingToken ריק (main.cs:126-174). מזהי התורים (השולח והנמען) נטענים בשלב הראשון של החבילה, Get Variables From Etl Varibles, מהטבלה gen_etlvariable, רק משורות שבהן gen_scope = 'global' או gen_scope = ? כאשר ? = System::PackageName (DTSX:2394-2398, 2403), אל User::GviaQueueId ו-User::MaasikimQueueId (ערכי ברירת המחדל בחבילה ריקים, DTSX:20-25; DTSX:3283). הערכים עצמם לא ידועים. השורות נטענות למילון שאינו רגיש לאותיות (StringComparer.OrdinalIgnoreCase, DTSX:2643); אם אותו gen_key מופיע יותר מפעם אחת בשורות האלה (גם בהבדלי אותיות, או פעם ב-global ופעם בהיקף החבילה), Dictionary.Add זורק חריגה (DTSX:2676; התנהגות .NET כללית). ב-PostExecute, אם אחד ממשתני ה-ReadWrite (GviaQueueId, MaasikimQueueId, OrganizationName, ServerName) לא נמצא בשורות האלה, כולל מפתח שקיים רק בהיקף אחר, נזרקת חריגה (DTSX:2654-2660). בשני המקרים השלב נכשל, ושלבי ההמשך, שמותנים ב-Success, לא רצים (DTSX:7458-7459). אין עדכון של gen_employerenrolment."
+    },
+    {
+     "h": "תוצאה עסקית",
+     "t": "התראת מייל פנימית (מחלקת מעסיקים/גבייה) על הצטרפויות שבהן gen_incorrectamount אינו ריק (בגוף המייל השדה מוצג בתווית 'סכום הפקדה שגוי'). משמעות 'Gvia'=גבייה ו-'Maasikim'=מעסיקים נגזרת משמות המשתנים (השערה). המסירה בפועל תלויה בהגדרות הדואר של CRM, שלא ידועות."
+    }
+   ],
+   "decisions": [
+    {
+     "where": "Get Data From Employer Enrolment & Fundmain (DTSX:6076)",
+     "condition": "(gen_currentstate = 1) and (gen_employerdepositdate <= fm.Gen_FundCreationDate) and (ee.CreatedOn >= GETDATE()-7) and ((p.gen_subproduct in (1) and ee.gen_producttype = 1) or (p.gen_subproduct in (4) and ee.gen_producttype = 2) or (p.gen_subproduct in (2) and ee.gen_producttype = 3)) and fm.Gen_existinfile = 1",
+     "meaning_he": "הצטרפויות מהשבוע האחרון שמתאימות לקופה של אותו לקוח המסומנת Gen_existinfile = 1 (משמעות לא ידועה) ובסוג מוצר תואם.",
+     "outcome_he": "נכנסות לבדיקת שליחה."
+    },
+    {
+     "where": "Check If To Send Mail main.cs:119-129",
+     "condition": "Row.genselfemployed == false && Row.genfundestateid == 1 && !eemployersId_IsNull && !fmemployernumber_IsNull && eemployersId == fmemployernumber && !genincorrectamount_IsNull",
+     "meaning_he": "שכיר (השערה), עם מעסיק הקופה זהה למעסיק ההצטרפות, ויש סכום שגוי.",
+     "outcome_he": "נשלח מייל."
+    },
+    {
+     "where": "Check If To Send Mail main.cs:132-137",
+     "condition": "Row.genselfemployed == true && Row.genfundestateid == 2 && !genincorrectamount_IsNull",
+     "meaning_he": "עצמאי (השערה) עם סכום שגוי.",
+     "outcome_he": "נשלח מייל."
+    },
+    {
+     "where": "Check If To Send Mail main.cs:140-141",
+     "condition": "else (צירוף selfemployed/fundestateid אחר)",
+     "meaning_he": "אי-התאמה בין סוג הלקוח לסוג הקופה.",
+     "outcome_he": "לא נשלח מייל. נרשמת אזהרת ETL 'לא נשלח מייל בקשר ללקוח'."
+    },
+    {
+     "where": "Send Email To Maasikim main.cs:86-95",
+     "condition": "Row.gendeposittype == 1 / Row.gendeposittype == 2",
+     "meaning_he": "סוג ההפקדה קובע את התור הנמען.",
+     "outcome_he": "1: אל GviaQueueId; ‏2: אל MaasikimQueueId; השולח תמיד MaasikimQueueId; ערך אחר: אין מייל."
+    },
+    {
+     "where": "Check If To Send Mail main.cs:119, 132",
+     "condition": "Row.genselfemployed == false / == true (נקרא בלי בדיקת genselfemployed_IsNull)",
+     "meaning_he": "סיווג עצמאי/לא-עצמאי.",
+     "outcome_he": "ערך NULL זורק ColumnIsNullException (התנהגות SSIS כללית). אין try/catch, ולכן זרימת הנתונים נכשלת."
+    }
+   ],
+   "crmEffects": [
+    {
+     "entity": "email (regarding gen_employerenrolment; activityparty from/to queue)",
+     "verb": "Create",
+     "mechanism": "SDK",
+     "when_he": "לכל שורה שעברה את Check If To Send Mail ושסוג ההפקדה שלה 1 או 2."
+    },
+    {
+     "entity": "email",
+     "verb": "Execute SendEmail (IssueSend=true)",
+     "mechanism": "SDK",
+     "when_he": "מיד אחרי יצירת המייל (main.cs:156, 161-174)."
+    }
+   ],
+   "evidence": [
+    "DTSX:4-6 ConnectionManager [PSQL]: Data Source=PSQL;Initial Catalog=ALTSHULER_MSCRM",
+    "DTSX:3313 Executable Package\\Send Email",
+    "DTSX:6071/6076 Get Data From Employer Enrolment & Fundmain SqlCommand",
+    "DTSX:3417 Check If To Send Mail, main.cs (DTSX:3419, sha 88d8f129fc75) lines 117-141",
+    "DTSX:6207 Send Email To Maasikim, main.cs (DTSX:6209, sha 9e657abcbef9) lines 71-201; ReadOnlyVariables DTSX:7396",
+    "DTSX:3335 Adding Error message 1 expression: employerenrolment_customeridnumber + \"תעודת זהות\" + Gen_customername + \"לא נשלח מייל בקשר ללקוח   \"",
+    "DTSX:7458-7460 Precedence constraints (Success)",
+    "DTSX:2384-2396, 2650-2658, 3283 Get Variables From Etl Varibles: טוען את User::GviaQueueId ו-User::MaasikimQueueId (מזהי תורי השולח/הנמען של המייל) מ-gen_etlvariable"
+   ],
+   "openQuestions_he": [
+    "באיזו תדירות החבילה רצה? אם יותר מפעם אחת בתוך 7 ימים, אותה הצטרפות תקבל מייל שוב. התיקייה DailyProcess מרמזת על ריצה יומית (השערה).",
+    "משמעות הקודים gen_currentstate=1, gen_producttype 1/2/3, gen_subproduct 1/2/4, gen_fundestateid 1/2 ו-gen_deposittype 1/2: לא ידועה מהחבילה.",
+    "ערכי GviaQueueId ו-MaasikimQueueId ב-gen_etlvariable: לא ידועים.",
+    "המימוש של CrmProxy (CRM2015.Proxy.dll) לא סופק."
+   ]
+  }
+ ],
+ "findings_he": [
+  {
+   "severity": "high",
+   "text": "רכיב 'Check If To Send Mail' קורא את gen_selfemployed בלי בדיקת NULL ואין בו try/catch. הצטרפות עם gen_selfemployed = NULL (כאשר gen_producttype ו-gen_fundestateid אינם NULL) זורקת ColumnIsNullException (התנהגות SSIS כללית). הרכיב וזרימת הנתונים נכשלים, ושלב End ETL לא רץ. ייתכן שמיילים לשורות שעובדו לפני הקריסה (ב-buffers קודמים) כבר נוצרו ונשלחו. לשאר השורות בריצה לא יישלח מייל.",
+   "evidence": "DTSX:3656-3688, 3942-3947; precedence DTSX:7460"
+  },
+  {
+   "severity": "high",
+   "text": "ב-'Send Email To Maasikim' יש כמה מצבים שמכשילים את הרכיב ואת זרימת הנתונים, ושלב End ETL לא רץ: ערך NULL ב-gen_fundnumber, Gen_customername, EmployerNumber או gen_deposittype (ה-getters זורקים ColumnIsNullException, התנהגות SSIS כללית), או מזהה תור לא תקין ב-GviaQueueId/MaasikimQueueId (FormatException). בכל המקרים בלוק ה-catch ניגש ל-ex.InnerException.Message, שהוא null, וזורק NullReferenceException (התנהגות .NET כללית).",
+   "evidence": "DTSX:6402-6452, 6406-6407, 6819-6825"
+  },
+  {
+   "severity": "medium",
+   "text": "מנגנון ה-retry לשגיאת token מעבד את כל השורה מחדש (reConectCrmService → Input0_ProcessInputRow). אם service.Create הצליח ו-SendEmail נכשל בשגיאת token, ייווצר וישלח מייל שני לאותה הצטרפות.",
+   "evidence": "main.cs:99-115, 154-156, 196-202 (DTSX:6402-6452, 6485-6502, 6527-6533)"
+  },
+  {
+   "severity": "medium",
+   "text": "החבילה לא מסמנת שההתראה נשלחה ולא מעדכנת את ההצטרפות. החלון הוא CreatedOn >= GETDATE()-7, ולכן כל ריצה בתוך 7 הימים תשלח את אותו מייל שוב (התדירות לא ידועה).",
+   "evidence": "DTSX:6076; Send Email To Maasikim main.cs (אין Update)"
+  },
+  {
+   "severity": "medium",
+   "text": "ההצטרפות מוצמדת לקופות לפי ת.ז. בלבד. ללקוח עם כמה קופות שעומדות בתנאים יישלחו כמה מיילים, אחד לכל קופה.",
+   "evidence": "DTSX:6076 JOIN Gen_fundmain ON ... gen_customeridnumber"
+  },
+  {
+   "severity": "medium",
+   "text": "בבלוקי catch, ניגשים ל-InnerException.Message בלי בדיקת null. חריגה בלי InnerException תגרום ל-NullReferenceException בתוך ה-catch ולכשל הרכיב. בנוסף, ב-SoapException שאינה קשורה ל-token, ErrorMessage נקבע אבל השורה לא מופנית ל-Error, ולכן השגיאה לא נרשמת כאזהרה.",
+   "evidence": "Send Email To Maasikim main.cs:99-122"
+  },
+  {
+   "severity": "low",
+   "text": "שורות שעוברות את בדיקת סוג הלקוח אבל נכשלות בהתאמת מעסיק או בלי סכום שגוי, או ש-gen_producttype/gen_fundestateid שלהן NULL, נזרקות בלי רישום. רק אי-התאמת סוג נרשמת כאזהרה.",
+   "evidence": "Check If To Send Mail main.cs:117-141"
+  },
+  {
+   "severity": "low",
+   "text": "סוג הפקדה שאינו 1 או 2 (ואינו NULL) לא נשלח ולא נרשם. ערך NULL מכשיל את הרכיב (ראה ממצא קודם).",
+   "evidence": "Send Email To Maasikim main.cs:86-95"
+  },
+  {
+   "severity": "info",
+   "text": "מונה Retry הוא ברמת הרכיב ולא מתאפס בין שורות. אחרי 3 התחברויות מחדש, שגיאות token נוספות לא יטופלו בהתחברות מחדש.",
+   "evidence": "main.cs:32, 196-202"
+  }
+ ]
+}

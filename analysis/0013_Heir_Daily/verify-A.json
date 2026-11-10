@@ -1,0 +1,279 @@
+{
+ "verifier": "ssis-verifier",
+ "package": "0013_Heir_Daily",
+ "scope": "mapping-A.json",
+ "note": "Independent re-derivation against raw source/DailyProcess/0013_Heir_Daily.dtsx. The file->intermediate-file->re-read bridge was re-built from the Flat File connection managers: Source - Rasham (DTSX 121-135: 1/9/9/3/1 fixed + 'Column 0' CRLF from pos 24, header row), Heir Details / Contact Details (written, DTSX 49-63 / 4-18: same layout, no header), Source - Heir Details (DTSX 98-120) and Source - Contact Details (DTSX 75-97) re-reading the same @[User::HeirDetailsFilePath] / @[User::ContactDetailsFilePath]. Positions recomputed from ColumnWidth; Column 0 char k = file pos 23+k. All 28 claims, all 5 --fields entries, every declaredSources offset, declaredRowFilters, excludeFromValue, recordKeyColumns and readWriteModifications checked; all code scanned for CRM writes.",
+ "checked": 44,
+ "counts": { "CONFIRMED": 42, "FIXED": 2, "WRONG": 0, "INCOMPLETE": 0, "UNVERIFIABLE": 0 },
+ "recheck": "2026-11-05 re-check after analyst fix + recompose (mapping-A.json / fieldmap.json 20:03): both non-CONFIRMED items FIXED. `node tools/claims.mjs 0013_Heir_Daily mapping-A.json` differs from round 1 only by 45 added chain[I] lines (Rasham MACHOZ / MIS_TIK / MIS_BAKASHA declared keys); no line removed, all mechanism / expression / VALUE / INFLUENCE lines identical, so the 28 claims stay CONFIRMED. --fields and fieldmap stats unchanged. New spot-check SPOT-R2 added for the 45 key declarations.",
+ "results": [
+  {
+   "id": "SPOT declaredRowFilter Rasham 'Column 0' (Create Heir and Update Heir) - SUG_PEULA truncation threshold",
+   "verdict": "FIXED",
+   "previousVerdict": "WRONG",
+   "detail": "RE-CHECK: both entries now read 'a heir record whose Column 0 is longer than 167 characters (SUG_PEULA = character 167 = position 190, MaximumWidth 1; trailing spaces count) truncates SUG_PEULA -> row redirected/dropped (a normal 167-character record is kept)' - matches Source - Heir Details (fixed widths sum to 189, SUG_PEULA CRLF-delimited MaximumWidth 1, RedirectRow). No '166' threshold remains in mapping-A.json. ROUND 1 (WRONG): Both entries said a Rasham 'Column 0' remainder 'longer than 166 characters' (Update: '> 166 characters') truncates SUG_PEULA and drops the row. Off by one: in [Source - Heir Details] Column 0 characters 1-166 are the fixed fields MIS_ZEHUT..KIRVA_EL_MANOCH (pos 24-189) and character 167 is SUG_PEULA (pos 190, CRLF-delimited, MaximumWidth 1). A normal heir record has a 167-character Column 0 and is NOT dropped; truncation (RedirectRow -> 'Derived Column' sink) happens only when Column 0 is longer than 167 characters (anything, including trailing spaces, after character 167). The separate 'Source - Heir Details' SUG_PEULA entry ('remainder after position 189 longer than 1 character') is correct. The rest of the Column 0 entry (chars 9-17 = MIS_ZEHUT_MORISH key of 'Check If Contact Exist'; chars 1-9 = MIS_ZEHUT key of 'Check If  Heir Exist') is correct.",
+   "evidence": "conn Source - Heir Details DTSX 103-116 (widths 1,9,9,3,1,9,50,50,20,12,7,12,6 = 189; SUG_PEULA MaximumWidth 1); Heir source SUG_PEULA trunc=RedirectRow DTSX 6718; mapping-A.json lines 101 and 392"
+  },
+  {
+   "id": "SPOT Rasham MACHOZ / MIS_TIK / MIS_BAKASHA (+ Column 0 chars 1-9) as KEY sources",
+   "verdict": "FIXED",
+   "previousVerdict": "INCOMPLETE",
+   "detail": "RE-CHECK: 45 new declaredSources role 'key' (Source - Rasham MACHOZ, MIS_TIK, MIS_BAKASHA) = 12 Update Heir attributes x 3 + Create Heir gen_customeridentitynumber / gen_issueanceofanorderdate / gen_contactname x 3. Recomposed fieldmap: Rasham MACHOZ / MIS_TIK / MIS_BAKASHA now have influence on all 12 UPDATE attributes and the 3 CREATE contact-derived attributes, besides their CREATE value (gen_region / gen_portfolionumber / gen_requestnumber); dispositions unchanged (crm_value). Residual, non-blocking: Rasham 'Column 0' (heir chars 1-9 = MIS_ZEHUT, the 4th record-key part) is named as key only inside the text of the new entries; on the Update attributes it keeps its existing role (value, or condition for gen_identitynumber/gen_status, key for gen_contactname), so the Column 0 -> attribute link exists but its record-key role is not a separate structured entry. ROUND 1 (INCOMPLETE): Rasham MACHOZ, MIS_TIK, MIS_BAKASHA were declared only as declaredRowFilters, never as key declaredSources. They are (a) together with Rasham Column 0 chars 1-9 the origin of the 4 lookup keys of 'Check If  Heir Exist' that select the gen_heir record updated (heir.Id = gen_heiriddb) for all 12 Update Heir attributes, and (b) the Merge Join keys (both sides) that choose which contact record supplies gen_customeridentitynumber / gen_issueanceofanorderdate / gen_contactname (Create and Update). Result in the composed fieldmap: Rasham MACHOZ/MIS_TIK/MIS_BAKASHA have crm = [value:CREATE.gen_region|gen_portfolionumber|gen_requestnumber] plus rowFilterOf only - the Rasham->CRM direction does not show that they identify the updated record, and Update gen_firstname/lastname/address/city/postalcode/country/relationtype/customeridentitynumber/issueanceofanorderdate show the record-key influence only via the intermediate [Source - Heir Details] fields. Add role 'key' declaredSources (Rasham MACHOZ, MIS_TIK, MIS_BAKASHA, Column 0) on the Update attributes and (MACHOZ, MIS_TIK, MIS_BAKASHA) on the three merge-join-dependent attributes. Field dispositions do not change (all already crm_value).",
+   "evidence": "Check If  Heir Exist ParameterMap DTSX 4118, keys DTSX 4128-4146; Merge Join keys DTSX 6762-6764 / 6779-6781; Update Heir main.cs:129; fieldmap.json sources (Source - Rasham)"
+  },
+  {
+   "id": "SPOT-R2 new Rasham key declaredSources (45) - sample check",
+   "verdict": "CONFIRMED",
+   "detail": "Checked against the DTSX: Update gen_firstname / gen_identitynumber / gen_customeridentitynumber / gen_contactname (MACHOZ, MIS_TIK, MIS_BAKASHA) and Create gen_customeridentitynumber / gen_issueanceofanorderdate / gen_contactname. Positions correct (Rasham MACHOZ pos 1, MIS_TIK 2-10, MIS_BAKASHA 11-19, DTSX 126-128); all three are trimmed by Split File\\Trim All Input Columns (DTSX 12219, inputs 13055-13057) and written unchanged by both destinations (DTSX 12104-12106, 12134-12136). Update path: Heir Details MACHOZ -> (DT_I4) gen_region (DTSX 6915) / MIS_TIK -> gen_portfolionumber / MIS_BAKASHA -> gen_requestnumber are keys gen_regiondb / gen_portfolionumberdb / gen_requestnumberdb of full-cache 'Check If  Heir Exist' (ParameterMap DTSX 4118, inputs 4128-4146), whose gen_heiriddb becomes heir.Id (Update main.cs:129). Merge-join role: INNER Merge Join keys 1-3 on both sides (DTSX 6754-6756, 6762-6764, 6779-6781) select the contact row that supplies the contact-derived attributes. Role 'key' is right for every sampled entry (no value effect); evidence pointers resolve.",
+   "evidence": "DTSX 126-128, 4118-4146, 6754-6781, 6915, 12104-12136, 13055-13057; Update Heir main.cs:129"
+  },
+  {
+   "id": "Create Heir|gen_heir|CREATE|gen_address",
+   "verdict": "CONFIRMED",
+   "detail": "Create Heir main.cs:132-133 (only if not NULL). Input gen_address <= Merge Join (left) <= Sort <= Heir output gen_address (ext KTOVET, pos 133-152), trimmed with \"\" -> NULL by Trim All Input Columns 1. Declared Rasham Column 0 chars 110-129 verified (133-23 .. 152-23). Entity('gen_heir'), ExecuteMultipleExtension RequestType.Create batches of 1000 (main.cs:127, 189-192, 209).",
+   "evidence": "main.cs:127-133; DTSX 6688, 5736, 111"
+  },
+  {
+   "id": "Create Heir|gen_heir|CREATE|gen_country",
+   "verdict": "CONFIRMED",
+   "detail": "main.cs:135-136. ext EREZ pos 172-183 = Column 0 chars 149-160. Trim -> Sort -> Merge Join -> writer.",
+   "evidence": "main.cs:135-136; DTSX 6706, 5737, 114"
+  },
+  {
+   "id": "Create Heir|gen_heir|CREATE|gen_city",
+   "verdict": "CONFIRMED",
+   "detail": "main.cs:138-139. ext IR pos 153-164 = Column 0 chars 130-141.",
+   "evidence": "main.cs:138-139; DTSX 6694, 5738, 112"
+  },
+  {
+   "id": "Create Heir|gen_heir|CREATE|gen_customeridentitynumber",
+   "verdict": "CONFIRMED",
+   "detail": "main.cs:141-142. gen_customeridentitynumber <= Merge Join RIGHT input (InputColumnID DTSX 6831) <= Sort 1 <= Contact output (ext MIS_ZEHUT_MORISH, pos 32-40 = Column 0 chars 9-17 of the SUG_REC==\"1\" record) trimmed/\"\"->NULL by Trim All Input Columns, then Append Zeros To Fields (readWrite, length 9: NULL/\"\" -> \"\", '.' removed, left-pad '0' to 9) -> never NULL. Contact/Heir MACHOZ, MIS_TIK, MIS_BAKASHA as Merge Join keys (influence) correct.",
+   "evidence": "main.cs:141-142; Append Zeros main.cs:38-66; DTSX 4360, 3953, 6831"
+  },
+  {
+   "id": "Create Heir|gen_heir|CREATE|gen_firstname",
+   "verdict": "CONFIRMED",
+   "detail": "main.cs:144-145. ext FIRST_NAME pos 83-132 = Column 0 chars 60-109.",
+   "evidence": "main.cs:144-145; DTSX 6682, 110"
+  },
+  {
+   "id": "Create Heir|gen_heir|CREATE|gen_lastname",
+   "verdict": "CONFIRMED",
+   "detail": "main.cs:147-148. ext LAST_NAME pos 33-82 = Column 0 chars 10-59.",
+   "evidence": "main.cs:147-148; DTSX 6676, 109"
+  },
+  {
+   "id": "Create Heir|gen_heir|CREATE|gen_name",
+   "verdict": "CONFIRMED",
+   "detail": "main.cs:150-151. Set Heir Columns gen_name = gen_firstname + \" \" + gen_lastname (DTSX 6909, wstr(101), RedirectRow -> Derived Column 1) on trimmed values; NULL propagation -> not written when either is NULL. VALUE FIRST_NAME, LAST_NAME, Column 0 correct.",
+   "evidence": "main.cs:150-151; DTSX 6906-6909, 5741"
+  },
+  {
+   "id": "Create Heir|gen_heir|CREATE|gen_identitynumber",
+   "verdict": "CONFIRMED",
+   "detail": "main.cs:153-154. ext MIS_ZEHUT pos 24-32 = Column 0 chars 1-9; trimmed, then Append Zeros (length 9, DTSX 3952) -> never NULL (blank -> '000000000').",
+   "evidence": "main.cs:153-154; DTSX 6670, 3952, 5742"
+  },
+  {
+   "id": "Create Heir|gen_heir|CREATE|gen_portfolionumber",
+   "verdict": "CONFIRMED",
+   "detail": "main.cs:156-157. Heir ext MIS_TIK pos 2-10, trimmed; declared Rasham MIS_TIK (pos 2-10) trimmed by Split File\\Trim All Input Columns (inputs MACHOZ, MIS_TIK, MIS_BAKASHA, SUG _BAKASHA only, DTSX 13055-13058) and written to [Heir Details] MIS_TIK - verified.",
+   "evidence": "main.cs:156-157; DTSX 6658, 12135, 13056"
+  },
+  {
+   "id": "Create Heir|gen_heir|CREATE|gen_postalcode",
+   "verdict": "CONFIRMED",
+   "detail": "main.cs:159-160. ext MIKUD pos 165-171 = Column 0 chars 142-148.",
+   "evidence": "main.cs:159-160; DTSX 6700, 113"
+  },
+  {
+   "id": "Create Heir|gen_heir|CREATE|gen_requestnumber",
+   "verdict": "CONFIRMED",
+   "detail": "main.cs:162-163. Heir ext MIS_BAKASHA pos 11-19; declared Rasham MIS_BAKASHA pos 11-19 (trimmed in Split File) verified.",
+   "evidence": "main.cs:162-163; DTSX 6664, 12136, 13057"
+  },
+  {
+   "id": "Create Heir|gen_heir|CREATE|gen_relationtype",
+   "verdict": "CONFIRMED",
+   "detail": "main.cs:165-166 plain string. ext KIRVA_EL_MANOCH pos 184-189 = Column 0 chars 161-166.",
+   "evidence": "main.cs:165-166; DTSX 6712, 115"
+  },
+  {
+   "id": "Create Heir|gen_heir|CREATE|gen_region",
+   "verdict": "CONFIRMED",
+   "detail": "main.cs:170-171 OptionSetValue(Row.genregion). Set Heir Columns gen_region = (DT_I4)gen_region_STR_INT (DTSX 6915, errorRowDisposition FailComponent DTSX 6912); gen_region_STR_INT = Heir ext MACHOZ (pos 1), trimmed/\"\"->NULL; Rasham MACHOZ pos 1 declared - verified.",
+   "evidence": "main.cs:170-171; DTSX 6652, 6912-6915, 12134"
+  },
+  {
+   "id": "Create Heir|gen_heir|CREATE|gen_status",
+   "verdict": "CONFIRMED",
+   "detail": "main.cs:173-174. gen_status = (SUG_PEULA == \"U\" || SUG_PEULA == \"C\") ? 1 : 2 (DTSX 6903) on trimmed SUG_PEULA (pos 190 = Column 0 char 167); NULL -> NULL -> not written. VALUE '—' / INFLUENCE SUG_PEULA follows the project convention for literals chosen by a rule (cf. 0009 gen_actionstatus).",
+   "evidence": "main.cs:173-174; DTSX 6900-6903, 6718"
+  },
+  {
+   "id": "Create Heir|gen_heir|CREATE|gen_issueanceofanorderdate",
+   "verdict": "CONFIRMED",
+   "detail": "main.cs:178-182: written only if not NULL and DateTime.TryParse succeeds. Contact ext TAARICH_MATAN_ZAV_RASHAM (pos 157-164 = Column 0 chars 134-141 of SUG_REC==\"1\" record, wstr(8)) -> Trim -> Sort 1 -> Merge Join (output wstr(50)) -> Format Dates (input length 50 at DTSX 6630, so the fieldSize<10 guard does not fire): Trim().Length 8 -> yyyy/MM/dd, 6 -> yyyy/MM/01, else NULL; NULL if !TryParse. Merge Join keys as influence correct.",
+   "evidence": "main.cs:178-182; Format Dates main.cs:38-80; DTSX 4354, 6630, 6836"
+  },
+  {
+   "id": "Create Heir|gen_heir|CREATE|gen_contactname",
+   "verdict": "CONFIRMED",
+   "detail": "main.cs:185-186 EntityReference('contact', gencontactname) = contactid from full-cache Lookup 'Check If Contact Exist' (select gen_identitynumber, contactid from contact; key = zero-padded gen_customeridentitynumber, DTSX 4256-4292); rows reach Create only via its Match output -> non-NULL. No file VALUE; MIS_ZEHUT_MORISH / Column 0 chars 9-17 / Merge Join keys as influence correct.",
+   "evidence": "main.cs:185-186; DTSX 4254-4292, 5747"
+  },
+  {
+   "id": "Update Heir|gen_heir|UPDATE|gen_firstname",
+   "verdict": "CONFIRMED",
+   "detail": "Update Heir main.cs:131-135: set when NULL flags differ or (not NULL and IsNeedToUpdate<String>) - String.Equals ordinal. Gen_firstnamedb from Check If  Heir Exist Match, blank -> NULL by 'change empty strings to null' (DTSX 4014). heir.Id = gen_heiriddb (main.cs:129); ExecuteMultipleExtension RequestType.Update (main.cs:247), sent only if needToUpdate. Heir-Details record-key influences correct (see INCOMPLETE item for the Rasham-level keys).",
+   "evidence": "main.cs:123-135, 220-230, 295-338; DTSX 4011-4014, 10824-10825"
+  },
+  {
+   "id": "Update Heir|gen_heir|UPDATE|gen_lastname",
+   "verdict": "CONFIRMED",
+   "detail": "main.cs:138-142, same pattern; LAST_NAME / Column 0 chars 10-59.",
+   "evidence": "main.cs:138-142; DTSX 4020, 10823, 10826"
+  },
+  {
+   "id": "Update Heir|gen_heir|UPDATE|gen_address",
+   "verdict": "CONFIRMED",
+   "detail": "main.cs:144-148; KTOVET / Column 0 chars 110-129.",
+   "evidence": "main.cs:144-148; DTSX 4026, 10828, 10831"
+  },
+  {
+   "id": "Update Heir|gen_heir|UPDATE|gen_city",
+   "verdict": "CONFIRMED",
+   "detail": "main.cs:150-154; IR / Column 0 chars 130-141.",
+   "evidence": "main.cs:150-154; DTSX 4032, 10829, 10832"
+  },
+  {
+   "id": "Update Heir|gen_heir|UPDATE|gen_postalcode",
+   "verdict": "CONFIRMED",
+   "detail": "main.cs:156-160; MIKUD / Column 0 chars 142-148.",
+   "evidence": "main.cs:156-160; DTSX 4038, 10830, 10833"
+  },
+  {
+   "id": "Update Heir|gen_heir|UPDATE|gen_country",
+   "verdict": "CONFIRMED",
+   "detail": "main.cs:162-166: condition is gencountry_IsNull != Gencountrydb_IsNull || (gencity_IsNull == false && IsNeedToUpdate(gencountry, Gencountrydb)) - the gen_city NULL-flag bug is real; IR correctly listed as INFLUENCE. EREZ / Column 0 chars 149-160.",
+   "evidence": "main.cs:162-166; DTSX 4044, 10834, 10837"
+  },
+  {
+   "id": "Update Heir|gen_heir|UPDATE|gen_relationtype",
+   "verdict": "CONFIRMED",
+   "detail": "main.cs:169-173; KIRVA_EL_MANOCH / Column 0 chars 161-166; plain string.",
+   "evidence": "main.cs:169-173; DTSX 4050, 10835-10836"
+  },
+  {
+   "id": "Update Heir|gen_heir|UPDATE|gen_identitynumber",
+   "verdict": "CONFIRMED",
+   "detail": "Assignment exists (main.cs:175-179) but can never fire: rows reach Update Heir only from the Match output of full-cache 'Check If  Heir Exist', whose key 1 joins this same padded gen_identitynumber to gen_identitynumberdb (exact in-memory compare); 'change empty strings to null' (DTSX 3990) returns the value unchanged when not blank, and the padded id is never blank -> equal, non-NULL -> condition false. VALUE '—' with excludeFromValue MIS_ZEHUT is correct.",
+   "evidence": "main.cs:175-179; DTSX 4070-4146 (CacheType 0), 3987-3990, 10822, 10827"
+  },
+  {
+   "id": "Update Heir|gen_heir|UPDATE|gen_customeridentitynumber",
+   "verdict": "CONFIRMED",
+   "detail": "main.cs:182-186 vs Gen_customeridentitynumberdb (blank -> NULL, DTSX 4008); value = contact MIS_ZEHUT_MORISH trimmed + zero-padded (Column 0 chars 9-17 of SUG_REC==\"1\" record); Merge Join keys influence.",
+   "evidence": "main.cs:182-186; DTSX 4005-4008, 10844-10845"
+  },
+  {
+   "id": "Update Heir|gen_heir|UPDATE|gen_status",
+   "verdict": "CONFIRMED",
+   "detail": "main.cs:190-194 IsNeedToUpdate<Int32> vs Gen_statusdb; value = SUG_PEULA rule (DTSX 6903); SUG_PEULA/Column 0 char 167 as influence.",
+   "evidence": "main.cs:190-194; DTSX 10838, 10841"
+  },
+  {
+   "id": "Update Heir|gen_heir|UPDATE|gen_contactname",
+   "verdict": "CONFIRMED",
+   "detail": "main.cs:199-203 IsNeedToUpdate<Guid> vs Gen_contactnamedb; value = contactid from 'Check If Contact Exist'. No file VALUE.",
+   "evidence": "main.cs:199-203; DTSX 10839-10840"
+  },
+  {
+   "id": "Update Heir|gen_heir|UPDATE|gen_issueanceofanorderdate",
+   "verdict": "CONFIRMED",
+   "detail": "main.cs:208-218: TryParse executed before any NULL check; written when (NULL flags differ or parsed.Date != DB.AddHours(3).Date, IsEqual main.cs:309-313) and parse succeeded - file NULL never clears. Chain as for Create.",
+   "evidence": "main.cs:208-218, 309-313; DTSX 10843, 10846"
+  },
+  {
+   "id": "FIELD MACHOZ #1",
+   "verdict": "CONFIRMED",
+   "detail": "Source - Contact Details MACHOZ (pos 1): trimmed, Sort 1 key 1, Merge Join right key 1 only (not a Merge Join output column) -> crm_influence_only on gen_customeridentitynumber, gen_issueanceofanorderdate, gen_contactname (+ row filter). Correct.",
+   "evidence": "DTSX 4336, 7090-7093, 6779"
+  },
+  {
+   "id": "FIELD MIS_TIK #2",
+   "verdict": "CONFIRMED",
+   "detail": "Source - Contact Details MIS_TIK (pos 2-10): Merge Join right key 2 only -> crm_influence_only.",
+   "evidence": "DTSX 4342, 7096-7099, 6780"
+  },
+  {
+   "id": "FIELD MIS_BAKASHA #3",
+   "verdict": "CONFIRMED",
+   "detail": "Source - Contact Details MIS_BAKASHA (pos 11-19): Merge Join right key 3 only -> crm_influence_only.",
+   "evidence": "DTSX 4348, 7102-7105, 6781"
+  },
+  {
+   "id": "FIELD SUG_PEULA #14",
+   "verdict": "CONFIRMED",
+   "detail": "Source - Heir Details SUG_PEULA (pos 190, CRLF-delimited): only the condition of gen_status (Create and Update) and truncation row filter -> crm_influence_only.",
+   "evidence": "DTSX 116, 6718, 6903"
+  },
+  {
+   "id": "FIELD SUG _BAKASHA #4",
+   "verdict": "CONFIRMED",
+   "detail": "Source - Rasham 'SUG _BAKASHA' (pos 20-22): trimmed in Split File and written to both intermediate files (pos 20-22) but neither re-read source exposes that column -> logic_only_no_crm.",
+   "evidence": "DTSX 129, 12107, 12137, 13058; Heir/Contact source outputs DTSX 6652-6718, 4336-4360"
+  },
+  {
+   "id": "SPOT declaredSources character offsets and field identities (file->intermediate-file->re-read bridge)",
+   "verdict": "CONFIRMED",
+   "detail": "Split File: Read data (Source - Rasham) -> Trim All Input Columns (MACHOZ, MIS_TIK, MIS_BAKASHA, SUG _BAKASHA only; Column 0 and SUG_REC untouched) -> Check If Contact Or Heir (SUG_REC==\"1\" -> Contact File Destination [Contact Details]; ==\"2\" -> Heir File Destination [Heir Details]; Default unconnected) with each destination column mapped to the same-named ext column (MACHOZ, MIS_TIK, MIS_BAKASHA, SUG _BAKASHA, SUG_REC, Column 0), Overwrite=true, no header. Same ConnectionString variables are re-read by Source - Heir Details / Source - Contact Details; precedence Split File -> Create And Update Heir (DTSX 13081). All offsets verified: Heir MIS_ZEHUT 24-32 = chars 1-9, LAST_NAME 33-82 = 10-59, FIRST_NAME 83-132 = 60-109, KTOVET 133-152 = 110-129, IR 153-164 = 130-141, MIKUD 165-171 = 142-148, EREZ 172-183 = 149-160, KIRVA_EL_MANOCH 184-189 = 161-166, SUG_PEULA 190 = 167; Contact MIS_ZEHUT_MORISH 32-40 = 9-17, TAARICH_MATAN_ZAV_RASHAM 157-164 = 134-141. Output-column-to-file-column mapping of both re-read sources verified via externalMetadataColumnId.",
+   "evidence": "DTSX 4-18, 49-63, 75-120, 121-135, 12051-12151, 13055-13058, 13081; Heir DTSX 6652-6718; Contact DTSX 4336-4360"
+  },
+  {
+   "id": "SPOT declaredRowFilter SUG_REC (Check If Contact Or Heir)",
+   "verdict": "CONFIRMED",
+   "detail": "SUG_REC == \"1\" / == \"2\" (DTSX 12064 / 12072), untrimmed; Default output has no path.",
+   "evidence": "DTSX 12051-12090; Split File paths"
+  },
+  {
+   "id": "SPOT declaredRowFilter Merge Join (Contact/Heir MACHOZ, MIS_TIK, MIS_BAKASHA)",
+   "verdict": "CONFIRMED",
+   "detail": "JoinType=2 (INNER), NumKeyColumns=3, TreatNullsAsEqual=true; left keys gen_region_STR_INT/gen_portfolionumber/gen_requestnumber (cachedSortKeyPosition 1-3, DTSX 6762-6764) = right MACHOZ/MIS_TIK/MIS_BAKASHA (6779-6781); Sort/Sort 1 EliminateDuplicates=false (6932, 7084) -> multiplication as noted.",
+   "evidence": "DTSX 6752-6790, 6932-6953, 7084-7105"
+  },
+  {
+   "id": "SPOT declaredRowFilter Source - Heir Details SUG_PEULA",
+   "verdict": "CONFIRMED",
+   "detail": "Last column CRLF-delimited, MaximumWidth 1 (DTSX 116); all Heir output columns errorRowDisposition/truncationRowDisposition=RedirectRow (DTSX 6652-6718); error output -> 'Derived Column' sink.",
+   "evidence": "DTSX 116, 6652-6746; path Heir error -> Derived Column"
+  },
+  {
+   "id": "SPOT excludeFromValue Update Heir gen_identitynumber (MIS_ZEHUT)",
+   "verdict": "CONFIRMED",
+   "detail": "See claim Update Heir|gen_identitynumber: full cache (CacheType 0) exact match on the same column, change-empty-to-null leaves non-blank values unchanged, Append Zeros guarantees non-blank -> condition always false.",
+   "evidence": "DTSX 4112-4128, 3990, 3952; main.cs:175-179"
+  },
+  {
+   "id": "SPOT recordKeyColumns (Update [gen_heiriddb], Create [])",
+   "verdict": "CONFIRMED",
+   "detail": "heir.Id = Row.genheiriddb (main.cs:129) <= Check If  Heir Exist CopyFromReferenceColumn gen_heiriddb (gen_heirid); keys gen_identitynumber, gen_portfolionumber, gen_requestnumber, gen_region (ParameterMap DTSX 4118). Create builds new Entity('gen_heir') without Id; Ok.CreatedAccountId never assigned (main.cs:219).",
+   "evidence": "Update main.cs:125-129; Create main.cs:127, 219; DTSX 4070-4146, 10842"
+  },
+  {
+   "id": "SPOT readWriteModifications (Trim All Input Columns 1, Trim All Input Columns, Append Zeros To Fields, Format Dates)",
+   "verdict": "CONFIRMED",
+   "detail": "Trim All Input Columns 1: 12 readWrite heir columns (Trim, \"\"->null); Trim All Input Columns: 5 readWrite contact columns (same code); Append Zeros: readWrite gen_identitynumber, gen_customeridentitynumber, length 9 (DTSX 3952-3953); Format Dates: readWrite gen_issueanceofanorderdate length 50 (DTSX 6630, Merge Join output wstr(50) although the contact column is wstr(8)). Expressions match code literally.",
+   "evidence": "Trim 1 main.cs:33-60 (DTSX 8046); Trim main.cs:33-57 (DTSX 7157); Append Zeros main.cs:18-66; Format Dates main.cs:38-80"
+  },
+  {
+   "id": "SPOT routing / write conditions",
+   "verdict": "CONFIRMED",
+   "detail": "Paths: Merge Join -> Set Heir Columns (gen_status/gen_name RedirectRow -> Derived Column 1; gen_region FailComponent) -> Append Zeros -> Format Dates -> Check If Contact Exist (No Match -> Derived Column 2) -> Check If  Heir Exist (No Match -> Create Heir; Match -> change empty strings to null -> Update Heir). Foreach: Get File From Folder -> (@[User::SelectedFilePath] != \"\") -> Split File -> Create And Update Heir -> Move Folder To Archive. CastingError outputs unconnected for Create; Update CastingError -> 'casting error' sink. Stated conditions match.",
+   "evidence": "component.mjs --list 'Create And Update Heir'; DTSX 6900-6915, 13081-13083"
+  }
+ ],
+ "missingWrites": [],
+ "missingWritesNote": "All code files scanned. Only CRM writes besides Create Heir / Update Heir are ETL plumbing: Create ETL Process record (gen_etlprocess Create), End ETL Process record\\ETL Record Finish (gen_etlprocess Update). Other script tasks only move/unzip files; the only destinations are the two intermediate Flat File Destinations (hops, covered). No OLE DB Command, no disabled executables. Connections 'Contact Don't Exist', 'Convertion Failed Error', 'Heir Load Failed Error' are unused."
+}

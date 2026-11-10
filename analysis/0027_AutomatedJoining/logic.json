@@ -1,0 +1,540 @@
+{
+ "package": "0027_AutomatedJoining",
+ "analyst": "ssis-business-logic",
+ "source": {
+  "file": "source/DailyProcess/0027_AutomatedJoining.dtsx",
+  "sha256": "5A6CAEB48ACA544F938C452989B8E57F011631CC76A39E10E3A3A8B43938D556",
+  "lines": 8077
+ },
+ "scopeNote_he": "כל הכתיבות העסקיות ל-CRM עוברות דרך SDK (CrmProxy.GetCrmService().Update) ברכיבי סקריפט. בחבילה אין כתיבת SQL עסקית. [CRM] = Psql/ALTSHULER_MSCRM (DTSX:4) משמש לקריאה בלבד (OLE DB Source, Lookup ו-Execute SQL של select). לחבילה יש Package Configuration מסוג קובץ, C:\\Generix\\SSISConfigFile.dtsConfig (DTSX:17). הקובץ לא סופק (external_unknown), ובזמן ריצה הוא יכול לדרוס חיבורים ומשתנים. ServerName ו-OrganizationName של ה-SDK נטענים מ-gen_etlvariable. CRM.Proxy הוא אסמבלי חיצוני שלא נבדק. נותח קוד המקור (C#) בלבד, ה-DLL לא פוענח.",
+ "summary_he": "החבילה מטפלת בבקשות הצטרפות אוטומטיות (gen_automatedjoining) בסטטוס 7. בקשה שמספר חשבון הבנק המנורמל שלה תואם לחשבון לקוח ב-CRM עוברת לסטטוס 8 (לפי שמות הרכיבים: סגירה – השערה) ומקושרת לחשבון הלקוח. בקשה שנשארה בסטטוס 7 ושתאריך gen_sendtobankdate שלה (לפי שם השדה: תאריך שליחה לבנק – השערה) אינו ריק ואינו מאוחר (ברמת יום) מתאריך הסף LastThreeWorkingDays (לפי שם המשתנה: שלושה ימי עבודה אחורה; הדילוג על ימים שאינם ימי עבודה תלוי בנתונים ולא הוכח) מסומנת בסטטוס 12. לפי שמות הרכיבים זה סימון 'SuspicionAsEmitted', אבל המשמעות העסקית של הקוד לא מוכחת.",
+ "executionOrder": [
+  {
+   "step": 1,
+   "refId": "Package\\Get Variables From Etl Variables",
+   "title_he": "טעינת משתני ארגון (מסגרת)",
+   "trigger": "start (no incoming constraint)"
+  },
+  {
+   "step": 2,
+   "refId": "Package\\Create ETL Process record",
+   "title_he": "רשומת תהליך ETL (מסגרת)",
+   "trigger": "after Get Variables From Etl Variables · Success (DTSX:6508)"
+  },
+  {
+   "step": 3,
+   "refId": "Package\\Close Joining processes",
+   "title_he": "מעבר בקשות הצטרפות שנמצא להן חשבון לקוח לסטטוס 8 (לפי שמות הרכיבים: סגירה – השערה)",
+   "trigger": "after Create ETL Process record · Success (DTSX:6506)"
+  },
+  {
+   "step": 4,
+   "refId": "Package\\Get NonWorkingDays",
+   "title_he": "שליפת כללי לוח שנה בשם Friday/Saturday/Holiday (לפי שם המשימה: ימים שאינם ימי עבודה)",
+   "trigger": "after Close Joining processes · Success (DTSX:6510)"
+  },
+  {
+   "step": 5,
+   "refId": "Package\\Update LastThreeWorkingDays Variable",
+   "title_he": "חישוב תאריך הסף LastThreeWorkingDays (לפי שם המשתנה: שלושה ימי עבודה אחורה)",
+   "trigger": "after Get NonWorkingDays · Success (DTSX:6509)"
+  },
+  {
+   "step": 6,
+   "refId": "Package\\Update SuspicionAsEmitted Joinings",
+   "title_he": "סימון בסטטוס 12 של בקשות שנשארו בסטטוס 7, לפי תאריך הסף LastThreeWorkingDays",
+   "trigger": "after Update LastThreeWorkingDays Variable · Success (DTSX:6511)"
+  },
+  {
+   "step": 7,
+   "refId": "Package\\End ETL Process record",
+   "title_he": "סיום רשומת תהליך ETL (מסגרת)",
+   "trigger": "after Update SuspicionAsEmitted Joinings · Success (DTSX:6507)"
+  }
+ ],
+ "ignoredAsFramework": [
+  "Package\\Get Variables From Etl Variables",
+  "Package\\Create ETL Process record",
+  "Package\\End ETL Process record",
+  "Package\\Close Joining processes\\Set Warning columns 1 2 1",
+  "Package\\Close Joining processes\\ETL Warning 1 2 1",
+  "Package.EventHandlers[OnError]\\Error ETL Process record",
+  "Package.EventHandlers[OnPostExecute]\\Cancel ETL Process record",
+  "LogProvider: SSIS log provider for SQL Server → [SRS.SSIS_Logs]"
+ ],
+ "components": [
+  {
+   "refId": "Package\\Close Joining processes",
+   "title_he": "מעבר בקשות הצטרפות שנמצא להן חשבון לקוח לסטטוס 8 (לפי שמות הרכיבים: סגירה – השערה)",
+   "techName": "Close Joining processes",
+   "short_he": "בקשות הצטרפות בסטטוס 7 מותאמות לחשבון לקוח לפי מספר חשבון הבנק. כשנמצא חשבון, הבקשה עוברת לסטטוס 8 ומקושרת אליו.",
+   "flow_he": [
+    "שליפת בקשות הצטרפות בסטטוס 7",
+    "חיפוש חשבון לקוח עם אותו מספר חשבון בנק",
+    "נמצא: עדכון הסטטוס ל-8 וקישור לחשבון",
+    "לא נמצא: הבקשה לא משתנה"
+   ],
+   "short": {
+    "nodes": [
+     {
+      "type": "step",
+      "text": "נשלפות כל בקשות ההצטרפות האוטומטיות שנמצאות בסטטוס 7."
+     },
+     {
+      "type": "decision",
+      "text": "האם יש ב-CRM חשבון לקוח עם אותו מספר חשבון בנק?",
+      "branches": [
+       {
+        "label": "כן",
+        "nodes": [
+         {
+          "type": "write",
+          "text": "הבקשה עוברת לסטטוס 8 ומקושרת לחשבון הלקוח שנמצא."
+         }
+        ]
+       },
+       {
+        "label": "לא",
+        "nodes": [
+         {
+          "type": "step",
+          "text": "הבקשה לא משתנה ונשארת בסטטוס 7."
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "type": "end",
+      "text": "בקשות בסטטוס 7 שקיים ב-CRM חשבון לקוח עם אותו מספר חשבון בנק (מנורמל ל-12 תווים) עוברות לסטטוס 8 (לפי שמות הרכיבים: סגירה – השערה) ומקושרות לחשבון. אין בדיקה מתי החשבון נוצר, ולכן גם חשבון שהיה קיים לפני הבקשה מתאים."
+     }
+    ]
+   },
+   "detailed": {
+    "nodes": [
+     {
+      "type": "step",
+      "text": "האוכלוסייה היא כל בקשות ההצטרפות האוטומטיות בסטטוס 7, בלי סינון נוסף.",
+      "tech": "Get Joining To Close DTSX:975-988 · [CRM] · select ... from gen_automatedjoining where gen_joiningstatus = 7"
+     },
+     {
+      "type": "step",
+      "text": "מספר חשבון הבנק של הבקשה מנורמל ל-12 ספרות עם אפסים מובילים.",
+      "tech": "right('0000000000000' + gen_bankaccountnumbername, 12)"
+     },
+     {
+      "type": "step",
+      "text": "באותו אופן נבנית רשימה של כל חשבונות הלקוח שיש להם מספר חשבון בנק, גם הוא מנורמל ל-12 ספרות.",
+      "tech": "Get customer accounts DTSX:912-919 · select right('0000000000000' + gen_bankaccountnumber,12), Gen_customeraccountId from Gen_customeraccount where Gen_bankaccountnumber is not null · CacheType=0 (Full)"
+     },
+     {
+      "type": "decision",
+      "text": "האם מספר חשבון הבנק המנורמל של הבקשה תואם לחשבון לקוח?",
+      "tech": "Lookup JoinToReferenceColumn=gen_bankaccountnumber · NoMatchBehavior=1 (redirect to No Match output) · No Match output not connected",
+      "branches": [
+       {
+        "label": "כן, נמצא חשבון",
+        "nodes": [
+         {
+          "type": "step",
+          "text": "נקבע הסטטוס החדש של הבקשה, 8.",
+          "tech": "Set columns DTSX:1016 · gen_joiningstatus = 8"
+         },
+         {
+          "type": "write",
+          "text": "הבקשה מעודכנת ב-CRM: הסטטוס הופך ל-8, והיא מקושרת לחשבון הלקוח שנמצא.",
+          "tech": "Update to close joining main.cs:69-75 (DTSX:1094) · gen_automatedjoining · Update · SDK · gen_joiningstatus=OptionSetValue(8), gen_customeraccountid=EntityReference(gen_customeraccount)"
+         },
+         {
+          "type": "decision",
+          "text": "האם העדכון הצליח?",
+          "tech": "catch SoapException / Exception → DirectRowToError (main.cs:77-86)",
+          "branches": [
+           {
+            "label": "כן",
+            "nodes": [
+             {
+              "type": "step",
+              "text": "הבקשה בסטטוס 8 ומקושרת לחשבון הלקוח."
+             }
+            ]
+           },
+           {
+            "label": "לא",
+            "nodes": [
+             {
+              "type": "step",
+              "text": "הבקשה נשארת בסטטוס 7, והשגיאה נרשמת כאזהרת ETL (מסגרת).",
+              "tech": "Error → Set Warning columns 1 2 1 → ETL Warning 1 2 1"
+             }
+            ]
+           }
+          ]
+         }
+        ]
+       },
+       {
+        "label": "לא נמצא חשבון",
+        "nodes": [
+         {
+          "type": "step",
+          "text": "השורה לא ממשיכה לשום מקום. הבקשה לא מתעדכנת ונשארת בסטטוס 7.",
+          "tech": "Lookup No Match Output — no path (DTSX:1876-1880)"
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "type": "end",
+      "text": "בקשות שנמצא להן חשבון לקוח לפי מספר חשבון הבנק עוברות לסטטוס 8 (לפי שמות הרכיבים: סגירה – השערה) ומקושרות לחשבון. השאר נשארות בסטטוס 7 ועוברות לבדיקת שלושת ימי העבודה."
+     }
+    ]
+   },
+   "detail_he": [
+    {
+     "h": "מקור ואוכלוסייה",
+     "t": "gen_automatedjoining עם gen_joiningstatus = 7, דרך חיבור [CRM]. מחרוזת החיבור בזמן תכנון היא Psql/ALTSHULER_MSCRM; קובץ התצורה C:\\Generix\\SSISConfigFile.dtsConfig שלא סופק (EnableConfig=True) עשוי לדרוס אותה בזמן ריצה (external_unknown)."
+    },
+    {
+     "h": "התאמה לרשומות קיימות",
+     "t": "ההתאמה היא לפי מספר חשבון בנק מנורמל ל-12 ספרות: gen_automatedjoining.gen_bankaccountnumbername מול Gen_customeraccount.gen_bankaccountnumber. ה-Lookup עובד ב-Full cache, ואם כמה חשבונות לקוח חולקים מספר, לוקחים רק התאמה אחת."
+    },
+    {
+     "h": "החלטות",
+     "t": "יש התאמה: עדכון. אין התאמה: לא קורה כלום, כי פלט ה-No Match לא מחובר. כשל בעדכון (SoapException/Exception) מפנה את השורה לפלט Error, שמחובר לאזהרת ETL (מסגרת), והבקשה נשארת בסטטוס 7."
+    },
+    {
+     "h": "כתיבה ל-CRM",
+     "t": "gen_automatedjoining · Update · SDK: gen_joiningstatus=8, gen_customeraccountid=החשבון שנמצא."
+    },
+    {
+     "h": "תוצאה עסקית",
+     "t": "בקשות הצטרפות בסטטוס 7 שמספר חשבון הבנק המנורמל שלהן תואם לחשבון לקוח כלשהו ב-CRM עוברות לסטטוס 8 ומקושרות לחשבון שנמצא. אין בדיקה שהחשבון נפתח בעקבות הבקשה או אחריה."
+    }
+   ],
+   "decisions": [
+    {
+     "where": "Get Joining To Close",
+     "condition": "where gen_joiningstatus = 7",
+     "meaning_he": "רק בקשות בסטטוס 7 נבדקות. המשמעות העסקית של 7 לא מוכחת בחבילה.",
+     "outcome_he": "בקשות בסטטוס אחר לא מטופלות."
+    },
+    {
+     "where": "Get customer accounts (Lookup)",
+     "condition": "right('0000000000000' + gen_bankaccountnumbername,12) = right('0000000000000' + Gen_customeraccount.gen_bankaccountnumber,12) · NoMatchBehavior=1, No Match output unconnected",
+     "meaning_he": "האם קיים חשבון לקוח עם אותו מספר חשבון בנק.",
+     "outcome_he": "יש התאמה: הבקשה עוברת לסטטוס 8 ומקושרת לחשבון. אין התאמה: הבקשה לא משתנה."
+    }
+   ],
+   "crmEffects": [
+    {
+     "entity": "gen_automatedjoining",
+     "verb": "Update (gen_joiningstatus=8, gen_customeraccountid)",
+     "mechanism": "SDK",
+     "when_he": "כשהבקשה בסטטוס 7 ונמצא חשבון לקוח עם אותו מספר חשבון בנק (מנורמל ל-12 ספרות)."
+    }
+   ],
+   "evidence": [
+    "DTSX:134 Close Joining processes",
+    "DTSX:975-988 Get Joining To Close",
+    "DTSX:912-932 Get customer accounts (NoMatchBehavior DTSX:927, CacheType DTSX:926)",
+    "DTSX:1016 Set columns gen_joiningstatus=8",
+    "DTSX:1092 Update to close joining · main.cs:65-90 (DTSX:1094, sha 825ce358b9ad)",
+    "DTSX:1876-1880 paths (no No-Match path)",
+    "DTSX:4 [CRM] = Psql/ALTSHULER_MSCRM"
+   ],
+   "openQuestions_he": [
+    "המשמעות העסקית של סטטוסים 7 ו-8 ב-gen_joiningstatus לא מוכחת בחבילה. רק שם הרכיב ('Update to close joining') מרמז ש-8 פירושו 'סגור' (השערה).",
+    "השם gen_bankaccountnumbername (עם הסיומת name) עשוי להיות שדה תצוגה של lookup ולא מספר גולמי (השערה). החבילה לא מראה מאיפה הוא מתמלא."
+   ]
+  },
+  {
+   "refId": "Package\\Update LastThreeWorkingDays Variable",
+   "title_he": "חישוב תאריך הסף LastThreeWorkingDays (לפי שם המשתנה: שלושה ימי עבודה אחורה)",
+   "techName": "Get NonWorkingDays + Update LastThreeWorkingDays Variable",
+   "short_he": "החבילה מחשבת תאריך סף: היא סופרת אחורה מאתמול (תאריך שרת ה-SSIS, בלי שעה) שלושה ימים שנחשבים ימי עבודה, ומחזירה את השלישי. הבדיקה מוגבלת ל-21 ימים (אתמול ואחורה); אם בהם לא נמצאו שלושה ימים כאלה, מוחזר התאריך 22 ימים לפני היום. יום מדולג רק אם בכללי לוח השנה שנשלפו מה-CRM (שם Friday, Saturday או Holiday, ו-starttime בין GetutcDate()-21 ל-GetutcDate()) יש כלל ש-starttime שלו שווה בדיוק לחצות של אותו יום לפי שעון שרת ה-SSIS. ההשוואה נעשית דרך מחרוזת שתלויה בהגדרות האזוריות של השרת. אם אין כלל כזה, אף יום אינו מדולג והסף הוא 3 ימים קלנדריים לפני היום. האם הימים שהכללים האלה מייצגים (לפי שמות הכללים: שישי, שבת וחג) אכן מדולגים בפועל תלוי בנתוני ה-CRM ובהגדרות זמן הריצה, ולא הוכח מהקבצים. התאריך הזה הוא הסף לסימון בסטטוס 12 של בקשות שנשארו בסטטוס 7.",
+   "flow_he": [
+    "שליפת starttime של כללי לוח שנה (CalendarRule) בשם Friday, Saturday או Holiday שהתחילו ב-21 הימים האחרונים",
+    "ספירה אחורה מאתמול של שלושה ימים שאין להם כלל כזה; אם לא נמצאו שלושה ב-21 ימים, התוצאה היא 22 ימים לפני היום",
+    "שמירת התאריך במשתנה"
+   ],
+   "short": {
+    "nodes": [
+     {
+      "type": "step",
+      "text": "מה-CRM נשלפים כללי לוח שנה (CalendarRule) בשם Friday, Saturday או Holiday שתאריך ההתחלה שלהם ב-21 הימים האחרונים. לפי שמות הכללים והמשימה אלה ימים שאינם ימי עבודה (השערה)."
+     },
+     {
+      "type": "step",
+      "text": "מתחילים מאתמול וסופרים אחורה שלושה ימי עבודה. יום מדולג רק אם יש לו ברשימה כלל ש-starttime שלו שווה בדיוק לחצות של אותו יום לפי שעון שרת ה-SSIS (השוואת מחרוזת שתלויה בהגדרות האזוריות); אחרת הוא נספר כיום עבודה. אם אין אף התאמה כזו, הסף יוצא 3 ימים קלנדריים לפני היום. אם ב-21 הימים (אתמול ואחורה) לא נמצאו שלושה ימים שנספרים, מוחזר התאריך 22 ימים לפני היום."
+     },
+     {
+      "type": "end",
+      "text": "התאריך שמתקבל, היום השלישי שנספר כיום עבודה (או 22 ימים לפני היום אם לא נמצאו שלושה בתוך 21 ימים), הוא הסף לבדיקת הבקשות."
+     }
+    ]
+   },
+   "detailed": {
+    "nodes": [
+     {
+      "type": "step",
+      "text": "נשלפים מה-CRM כללי לוח השנה בשם Friday, Saturday או Holiday (לפי השמות: שישי, שבת וחג), עם תאריך התחלה ב-21 הימים האחרונים.",
+      "tech": "Get NonWorkingDays DTSX:4086-4091 · [CRM] · select starttime FROM CalendarRule where starttime between GetutcDate()-21 and GetutcDate() AND LTRIM(RTRIM(ISNULL(Name,''))) in ('Friday','Saturday','Holiday') · Full result set → User::NonWorkingDays"
+     },
+     {
+      "type": "step",
+      "text": "נקודת ההתחלה היא אתמול (תאריך השרת המקומי, בלי שעה).",
+      "tech": "ScriptMain.cs:116 DateTime.Now.AddDays(-1).Date (DTSX:5131)"
+     },
+     {
+      "type": "decision",
+      "text": "האם ברשימה שנשלפה יש כלל ש-starttime שלו שווה בדיוק לתאריך הנבדק (חצות לפי שעון שרת ה-SSIS, בהשוואת מחרוזת שתלויה בהגדרות האזוריות)?",
+      "tech": "dt.Select(\"starttime = '\" + currDate.ToString() + \"'\") (ScriptMain.cs:121)",
+      "branches": [
+       {
+        "label": "כן (נמצא כלל Friday/Saturday/Holiday שמתחיל בדיוק בחצות של התאריך)",
+        "nodes": [
+         {
+          "type": "step",
+          "text": "היום לא נספר, ועוברים ליום הקודם."
+         }
+        ]
+       },
+       {
+        "label": "לא (היום נחשב יום עבודה)",
+        "nodes": [
+         {
+          "type": "step",
+          "text": "אם זה יום העבודה השלישי, הספירה נעצרת. אחרת הוא נספר ועוברים ליום הקודם.",
+          "tech": "threeWorkingDays starts at 1; if ==3 break else ++ (ScriptMain.cs:111, 123-130)"
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "type": "step",
+      "text": "הבדיקה נמשכת לכל היותר 21 ימים אחורה.",
+      "tech": "for (int i = 0; i < 21; i++) (ScriptMain.cs:119)"
+     },
+     {
+      "type": "step",
+      "text": "התאריך שמתקבל הוא היום השלישי שנספר כיום עבודה, כשאתמול נספר כראשון אם לא נמצא לו כלל. אם אחרי 21 ימים לא נמצא היום השלישי, הלולאה מסתיימת בלי עצירה ומוחזר התאריך 22 ימים לפני היום. התאריך נשמר במשתנה.",
+      "tech": "Dts.Variables[\"LastThreeWorkingDays\"] (ScriptMain.cs:96) · return currDate (ScriptMain.cs:133); without break: 21 decrements from D-1 → D-22"
+     },
+     {
+      "type": "step",
+      "text": "אם החישוב נכשל, הכישלון לא נחשב: המשימה מדווחת הצלחה, והמשתנה לא מתעדכן. הוא נשאר בערך שנקבע בזמן התכנון, או בערך שקובץ ה-Configuration (שלא סופק) אולי קבע.",
+      "tech": "catch sets Failure (line 100) but line 104 sets Success unconditionally · design value 10/2/2017 5:29:05 PM (DTSX:42-43) · EnableConfig=True, Configuration C:\\Generix\\SSISConfigFile.dtsConfig (DTSX:1, 17) — external_unknown"
+     },
+     {
+      "type": "end",
+      "text": "תאריך הסף מוכן לשלב הסימון."
+     }
+    ]
+   },
+   "detail_he": [
+    {
+     "h": "מקור ואוכלוסייה",
+     "t": "CalendarRule במסד הנתונים של ה-CRM, בשמות Friday, Saturday ו-Holiday, ב-21 הימים האחרונים (UTC)."
+    },
+    {
+     "h": "התאמה לרשומות קיימות",
+     "t": "לא רלוונטי."
+    },
+    {
+     "h": "החלטות",
+     "t": "יום שיש לו ברשימה שנשלפה כלל ש-starttime שלו שווה בדיוק לתאריך (כללים בשם Friday, Saturday או Holiday) לא נספר. הספירה נעצרת ביום השלישי שנספר; אם הוא לא נמצא בתוך 21 ימים, מוחזר התאריך 22 ימים לפני היום."
+    },
+    {
+     "h": "כתיבה ל-CRM",
+     "t": "אין. התוצאה נשמרת רק במשתנה User::LastThreeWorkingDays."
+    },
+    {
+     "h": "תוצאה עסקית",
+     "t": "תאריך סף: היום השלישי שנספר אחורה מאתמול (לפי שם המשתנה: שלושה ימי עבודה אחורה; הדילוג על ימים שאינם ימי עבודה תלוי בנתונים ולא הוכח), או 22 ימים לפני היום אם לא נמצאו שלושה בתוך 21 ימים."
+    }
+   ],
+   "decisions": [
+    {
+     "where": "Update LastThreeWorkingDays Variable ScriptMain.cs:121-129",
+     "condition": "result == null || result.Length <= 0 → if (threeWorkingDays == 3) break; else threeWorkingDays++",
+     "meaning_he": "ספירה אחורה מאתמול של ימים שאין להם כלל תואם ברשימה.",
+     "outcome_he": "מתקבל התאריך של היום השלישי שנספר; אם הלולאה (21 ימים) מסתיימת בלי עצירה, מתקבל התאריך 22 ימים לפני היום."
+    }
+   ],
+   "crmEffects": [],
+   "evidence": [
+    "DTSX:4086-4091 Get NonWorkingDays (Connection {E2C17CCD...} = [CRM] DTSX:4)",
+    "DTSX:4900 Update LastThreeWorkingDays Variable · ScriptMain.cs:92-134 (DTSX:5131, sha 8f1b6cc302b5)",
+    "DTSX:42-46 User::LastThreeWorkingDays, User::NonWorkingDays",
+    "DTSX:1 EnableConfig=True; DTSX:17 Configuration 1"
+   ],
+   "openQuestions_he": [
+    "starttime ב-CalendarRule נשמר כנראה ב-UTC (השערה). אם הוא לא בדיוק חצות מקומית, ההשוואה בשורה 121 לא תמצא אותו, וכל הימים ייחשבו ימי עבודה. צריך לבדוק על נתונים אמיתיים.",
+    "האם C:\\Generix\\SSISConfigFile.dtsConfig (לא סופק) קובע ערך ל-User::LastThreeWorkingDays או לחיבור [CRM]? לא ידוע."
+   ]
+  },
+  {
+   "refId": "Package\\Update SuspicionAsEmitted Joinings",
+   "title_he": "סימון בסטטוס 12 של בקשות שנשארו בסטטוס 7, לפי תאריך הסף LastThreeWorkingDays",
+   "techName": "Update SuspicionAsEmitted Joinings",
+   "short_he": "בקשות הצטרפות שנשארו בסטטוס 7 ושתאריך gen_sendtobankdate שלהן (לפי שם השדה: תאריך שליחה לבנק – השערה) אינו ריק ואינו מאוחר (ברמת יום) מתאריך הסף LastThreeWorkingDays (לפי שם המשתנה: שלושה ימי עבודה אחורה; הדילוג על ימים שאינם ימי עבודה תלוי בנתונים ולא הוכח) עוברות לסטטוס 12.",
+   "flow_he": [
+    "שליפת בקשות בסטטוס 7 שתאריך gen_sendtobankdate שלהן אינו ריק ואינו מאוחר מתאריך הסף",
+    "עדכון הסטטוס ל-12"
+   ],
+   "short": {
+    "nodes": [
+     {
+      "type": "step",
+      "text": "נשלפות בקשות ההצטרפות שעדיין בסטטוס 7 אחרי שלב 'Close Joining processes', ושתאריך gen_sendtobankdate שלהן (לפי שם השדה: תאריך שליחה לבנק – השערה) אינו מאוחר (ברמת יום) מתאריך הסף LastThreeWorkingDays (לפי שם המשתנה: שלושה ימי עבודה אחורה; הדילוג על ימים שאינם ימי עבודה תלוי בנתונים ולא הוכח)."
+     },
+     {
+      "type": "write",
+      "text": "כל בקשה כזו מעודכנת ב-CRM לסטטוס 12."
+     },
+     {
+      "type": "end",
+      "text": "בקשות שנשארו בסטטוס 7 ושתאריך gen_sendtobankdate שלהן אינו מאוחר מתאריך הסף מקבלות סטטוס 12. לפי שמות הרכיבים זה סימון 'SuspicionAsEmitted'; המשמעות העסקית של סטטוס 12 ומה שקורה אחריו לא מוכחים בחבילה."
+     }
+    ]
+   },
+   "detailed": {
+    "nodes": [
+     {
+      "type": "step",
+      "text": "השלב רץ אחרי שלב 'Close Joining processes' (המעבר 7→8). בקשות שעברו בהצלחה לסטטוס 8 כבר לא בסטטוס 7 ולכן לא נבחרות כאן.",
+      "tech": "precedence DTSX:6510, 6509, 6511"
+     },
+     {
+      "type": "step",
+      "text": "נשלפות בקשות בסטטוס 7 שיש להן ערך ב-gen_sendtobankdate (לפי שם השדה: תאריך שליחה לבנק – השערה), והתאריך הזה לא אחרי תאריך הסף.",
+      "tech": "Get Joinings From DB DTSX:5536-5549 · select gen_automatedjoiningId from gen_automatedjoining where gen_joiningstatus = 7 and gen_sendtobankdate is not null and datediff(day, ?, gen_sendtobankdate) <= 0 · ? = User::LastThreeWorkingDays"
+     },
+     {
+      "type": "step",
+      "text": "לכל בקשה נקבע הסטטוס החדש, 12.",
+      "tech": "Set Status As SuspicionAsEmitted DTSX:5573 · gen_suspicionAsEmitted = 12"
+     },
+     {
+      "type": "write",
+      "text": "הבקשה מעודכנת ב-CRM לסטטוס 12. החבילה אינה כותבת שום שדה אחר.",
+      "tech": "Update Joinings main.cs:118-122 (DTSX:5602) · gen_automatedjoining · Update · SDK · gen_joiningstatus=OptionSetValue(12)"
+     },
+     {
+      "type": "decision",
+      "text": "האם העדכון הצליח?",
+      "tech": "catch → DirectRowToError (main.cs:124-133); Error output has no path (DTSX:6498-6499)",
+      "branches": [
+       {
+        "label": "כן",
+        "nodes": [
+         {
+          "type": "step",
+          "text": "הבקשה מסומנת בסטטוס 12."
+         }
+        ]
+       },
+       {
+        "label": "לא",
+        "nodes": [
+         {
+          "type": "step",
+          "text": "החבילה עצמה אינה רושמת את השגיאה (לפלט ה-Error אין נתיב), והבקשה נשארת בסטטוס 7. האם ספריית CRM.Proxy החיצונית רושמת את השגיאה בעצמה – לא ידוע."
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "type": "end",
+      "text": "בקשות שנשארו בסטטוס 7 ושתאריך gen_sendtobankdate שלהן אינו מאוחר (ברמת יום) מתאריך הסף LastThreeWorkingDays מסומנות בסטטוס 12. לפי שם המשתנה הסף הוא שלושה ימי עבודה אחורה, אבל הדילוג על ימים שאינם ימי עבודה תלוי בנתונים ולא הוכח."
+     }
+    ]
+   },
+   "detail_he": [
+    {
+     "h": "מקור ואוכלוסייה",
+     "t": "gen_automatedjoining עם gen_joiningstatus=7, gen_sendtobankdate לא ריק, ו-datediff(day, LastThreeWorkingDays, gen_sendtobankdate) <= 0, כלומר הערך של gen_sendtobankdate (לפי שם השדה: תאריך שליחה לבנק – השערה) לא מאוחר מתאריך הסף."
+    },
+    {
+     "h": "התאמה לרשומות קיימות",
+     "t": "העדכון נעשה ישירות לפי gen_automatedjoiningId. אין חיפוש נוסף."
+    },
+    {
+     "h": "החלטות",
+     "t": "הבחירה העסקית נעשית רק בשאילתה. הפיצול היחיד הוא כשל עדכון: ב-SoapException/Exception השורה מופנית לפלט Error (DirectRowToError) שאינו מחובר לשום רכיב, ולכן השורה נזרקת, הבקשה נשארת בסטטוס 7 והחבילה עצמה אינה רושמת את הכשל (האם CRM.Proxy החיצוני רושם אותו – לא ידוע)."
+    },
+    {
+     "h": "כתיבה ל-CRM",
+     "t": "gen_automatedjoining · Update · SDK: gen_joiningstatus=12."
+    },
+    {
+     "h": "תוצאה עסקית",
+     "t": "סימון בסטטוס 12 של בקשות שנשארו בסטטוס 7 ושתאריך gen_sendtobankdate שלהן (לפי שם השדה: תאריך שליחה לבנק – השערה) אינו ריק ואינו מאוחר מתאריך הסף. שם הרכיב, SuspicionAsEmitted, מרמז על חשד (השערה); המשמעות המדויקת ומה שקורה אחרי הסימון לא מוכחים."
+    }
+   ],
+   "decisions": [
+    {
+     "where": "Get Joinings From DB",
+     "condition": "gen_joiningstatus = 7 and gen_sendtobankdate is not null and datediff(day, ? ,gen_sendtobankdate) <= 0  (? = User::LastThreeWorkingDays)",
+     "meaning_he": "בקשה שעדיין בסטטוס 7 (לא עברה ל-8) ושתאריך gen_sendtobankdate שלה אינו מאוחר (ברמת יום) מתאריך הסף LastThreeWorkingDays (לפי שם המשתנה: שלושה ימי עבודה אחורה; הדילוג על ימים שאינם ימי עבודה תלוי בנתונים ולא הוכח).",
+     "outcome_he": "הבקשה עוברת לסטטוס 12."
+    }
+   ],
+   "crmEffects": [
+    {
+     "entity": "gen_automatedjoining",
+     "verb": "Update (gen_joiningstatus=12)",
+     "mechanism": "SDK",
+     "when_he": "כשהבקשה בסטטוס 7 אחרי שלב 'Close Joining processes', ותאריך gen_sendtobankdate שלה אינו ריק ואינו מאוחר (ברמת יום) מתאריך הסף LastThreeWorkingDays."
+    }
+   ],
+   "evidence": [
+    "DTSX:5530 Update SuspicionAsEmitted Joinings",
+    "DTSX:5536-5549 Get Joinings From DB (ParameterMapping → {81CBF82A...} = User::LastThreeWorkingDays DTSX:42)",
+    "DTSX:5573 Set Status As SuspicionAsEmitted = 12",
+    "DTSX:5600 Update Joinings · main.cs:114-134 (DTSX:5602, sha 4502503e70d0)",
+    "DTSX:6498-6499 paths"
+   ],
+   "openQuestions_he": [
+    "המשמעות העסקית של סטטוס 12 ב-gen_joiningstatus לא מוכחת. השם 'SuspicionAsEmitted' לקוח משמות הרכיבים בלבד.",
+    "gen_sendtobankdate הוא כנראה תאריך UTC (השערה), ואילו תאריך הסף מחושב לפי השעון המקומי של השרת. ההשוואה ברמת יום עלולה לזוז ביום אחד."
+   ]
+  }
+ ],
+ "findings_he": [
+  {
+   "severity": "medium",
+   "text": "בקשה בסטטוס 7 שלא נמצא לה חשבון לקוח לא מתעדכנת בשלב 'Close Joining processes' ולא נרשמת, כי פלט ה-No Match של ה-Lookup לא מחובר. בהמשך אותה ריצה היא עוברת לסטטוס 12 רק אם gen_sendtobankdate שלה אינו ריק ואינו מאוחר מתאריך הסף (User::LastThreeWorkingDays). אם gen_sendtobankdate ריק, הבקשה נשארת בסטטוס 7 והחבילה לא רושמת עליה דבר.",
+   "evidence": "Get customer accounts NoMatchBehavior=1 DTSX:927; paths DTSX:1876-1880; Get Joinings From DB DTSX:5546-5549"
+  },
+  {
+   "severity": "medium",
+   "text": "בשלב הסימון, אם עדכון דרך ה-SDK נכשל, השורה מופנית לפלט ה-Error של Update Joinings, שאינו מחובר, והחבילה עצמה אינה רושמת אזהרה או שגיאה (האם CRM.Proxy החיצוני רושם – לא ידוע). בשלב 'Close Joining processes', לעומת זאת, כשלים כן נרשמים כאזהרת ETL.",
+   "evidence": "DTSX:6498-6499 (2 paths only); Update Joinings main.cs:124-133"
+  },
+  {
+   "severity": "medium",
+   "text": "בחישוב תאריך הסף כישלון מוסתר. ה-catch מגדיר Failure, אבל שורה 104 מגדירה Success בכל מקרה. אם החישוב נכשל, הסימון רץ עם ערך המשתנה שלא עודכן: ערך התכנון (10/2/2017) או ערך שנקבע מ-Configuration. לחבילה מוגדר Configuration פעיל (EnableConfig=True) מהקובץ C:\\Generix\\SSISConfigFile.dtsConfig, שלא סופק (DTSX:1, 17). ייתכן שהקובץ קובע ערך ל-User::LastThreeWorkingDays, ולכן הערך בפועל במקרה של כישלון לא ידוע.",
+   "evidence": "Update LastThreeWorkingDays Variable ScriptMain.cs:94-104 (DTSX:5131); DTSX:42-43; DTSX:1, 17 (EnableConfig/Configuration)"
+  },
+  {
+   "severity": "low",
+   "text": "ה-Lookup של חשבונות הלקוח עובד ב-Full cache. אם כמה חשבונות לקוח חולקים מספר חשבון בנק (מנורמל ל-12 ספרות), הבקשה מקושרת לאחד מהם, ואין קביעה מפורשת לאיזה.",
+   "evidence": "Get customer accounts CacheType=0 DTSX:926"
+  },
+  {
+   "severity": "info",
+   "text": "סדר השלבים חשוב. המעבר 7→8 (שלב 'Close Joining processes'; לפי שמות הרכיבים: סגירה – השערה) רץ לפני הסימון 7→12, ולכן בסטטוס 12 מסומנות רק בקשות שעדיין בסטטוס 7 כשהסימון רץ (לא עברו ל-8, כולל כאלה שעדכונן נכשל).",
+   "evidence": "precedence DTSX:6506, 6510, 6509, 6511"
+  },
+  {
+   "severity": "info",
+   "text": "Configuration מסוג קובץ, C:\\Generix\\SSISConfigFile.dtsConfig, יכול לדרוס בזמן ריצה את מחרוזת החיבור [CRM] ומשתנים. הקובץ לא סופק (external_unknown).",
+   "evidence": "DTSX:17"
+  }
+ ]
+}

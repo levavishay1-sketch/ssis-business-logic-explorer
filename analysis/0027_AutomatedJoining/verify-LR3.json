@@ -1,0 +1,128 @@
+{
+  "verifier": "ssis-verifier",
+  "package": "0027_AutomatedJoining",
+  "scope": "logic-claims re-check round 3",
+  "checkedAt": "2026-11-07",
+  "checked": 13,
+  "results": [
+    {
+      "id": "L|summary",
+      "hash": "6da703e3272e",
+      "verdict": "CONFIRMED",
+      "detail": "Unit 1, step 1: Get Joining To Close selects gen_joiningstatus = 7 with right('0000000000000'+gen_bankaccountnumbername,12) (DTSX:980). Get customer accounts uses the same padding over Gen_customeraccount where gen_bankaccountnumber is not null (DTSX:914), full cache, NoMatchBehavior=1. Set columns sets 8. Update to close joining main.cs:69-75 sets gen_joiningstatus and gen_customeraccountid. Step 2: Get Joinings From DB, gen_joiningstatus = 7 and gen_sendtobankdate is not null and datediff(day,?,gen_sendtobankdate)<=0 with ? = User::LastThreeWorkingDays, then Set Status = 12. Meanings are labelled as hypotheses. Unit 2: the connection managers are only [CRM] and SRS.SSIS_Logs (log provider). [CRM] is used by 3 OLE DB Sources, 2 Lookups and the Execute SQL select, all reads. Configuration 1 is ConfigurationType=1 at C:\\Generix\\SSISConfigFile.dtsConfig. ServerName/OrganizationName are ReadWrite variables of Get Variables From Etl Variables, which reads gen_etlvariable.",
+      "evidence": "source/DailyProcess/0027_AutomatedJoining.dtsx sha256 5A6CAEB4…: DTSX:4, 17, 912-932, 975-988, 1016, 5536-5549, 5573; Update to close joining main.cs:65-90; Update Joinings main.cs:114-134",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|exec",
+      "hash": "58f35f3e6091",
+      "verdict": "CONFIRMED",
+      "detail": "Constraints DTSX:6506-6511, all default Success, no expressions: Get Variables From Etl Variables -> Create ETL Process record -> Close Joining processes -> Get NonWorkingDays -> Update LastThreeWorkingDays Variable -> Update SuspicionAsEmitted Joinings -> End ETL Process record. Nothing is disabled. The OnError and OnPostExecute handlers are framework and are not listed, which is acceptable.",
+      "evidence": "DTSX:6506-6511",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|finding#1",
+      "hash": "4ac460bf0f7e",
+      "verdict": "CONFIRMED",
+      "detail": "Get customer accounts has NoMatchBehavior=1 (DTSX:927), and the No Match output has no path. The only paths are Match -> Set columns -> Update, and Update.Error -> Set Warning columns 1 2 1 -> ETL Warning 1 2 1. In the later step, selection needs gen_sendtobankdate is not null and datediff(day,?,gen_sendtobankdate)<=0. The text is conditional and matches.",
+      "evidence": "DTSX:927, 1876-1880, 5546-5549",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|finding#2",
+      "hash": "7a59c1b5ef41",
+      "verdict": "CONFIRMED",
+      "detail": "Update Joinings main.cs:124-133 catches SoapException/Exception and calls DirectRowToError. The data flow has only 2 paths, and none leaves Update Joinings.Error. Close Joining processes: Update to close joining.Error -> Set Warning columns 1 2 1 -> ETL Warning 1 2 1.",
+      "evidence": "DTSX:6498-6499; component.mjs --list for both data flows",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|finding#5",
+      "hash": "bb695e620a96",
+      "verdict": "CONFIRMED",
+      "detail": "The order Close Joining processes -> Get NonWorkingDays -> Update LastThreeWorkingDays -> Update SuspicionAsEmitted is all Success. The step-6 query re-reads status 7 from CRM, so requests whose 7->8 update failed are still candidates.",
+      "evidence": "DTSX:6506, 6510, 6509, 6511; DTSX:5546-5549",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Close Joining processes|title",
+      "hash": "108b7001a278",
+      "verdict": "CONFIRMED",
+      "detail": "Status 7 source; both sides padded to 12 digits; match -> gen_joiningstatus = 8 (Set columns DTSX:1016) plus gen_customeraccountid = EntityReference(gen_customeraccount, matched id) (main.cs:72-73); no match -> no path, no change. The title meaning is labelled השערה.",
+      "evidence": "DTSX:912-932, 975-988, 1016; main.cs:65-90",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Update LastThreeWorkingDays Variable|title",
+      "hash": "31cabf505779",
+      "verdict": "WRONG",
+      "detail": "short_he states as fact that the threshold is computed 'בלי שישי, שבת וחגים לפי לוח השנה של ה-CRM'. The files do not prove this. The code (ScriptMain.cs:107-133, DTSX:5131) treats a date as non-working only if dt.Select(\"starttime = '\" + currDate.ToString() + \"'\") finds a row. That means a CalendarRule.starttime exactly equal to currDate, which is DateTime.Now.AddDays(-1).Date (local midnight on the SSIS server), matched through a culture-dependent string literal. The rows come from CalendarRule where starttime between GetutcDate()-21 and GetutcDate() and Name in ('Friday','Saturday','Holiday') (DTSX:4090). Whether the stored starttime values fall exactly on local midnight, and so whether any day is actually skipped, depends on CRM data and runtime culture that are not in the files. The text must be conditional, for example: 'יום נחשב לא-יום-עבודה רק אם ב-CalendarRule (שם Friday/Saturday/Holiday, 21 הימים האחרונים לפי GetutcDate) יש שורה ש-starttime שלה שווה בדיוק לחצות של אותו יום לפי שעון שרת ה-SSIS; אם הערכים השמורים אינם בחצות מקומית, אף יום אינו מדולג והסף הוא 3 ימים קלנדריים אחורה (לא הוכח מהקבצים)'. Plumbing note, not counted: Main sets TaskResult=Success even after the catch (lines 98-104). If the calculation throws, User::LastThreeWorkingDays keeps its value from before the task (design-time default 10/2/2017 5:29:05 PM, DTSX:42-46, which the unsupplied config may override) and step 6 runs with it. flow[1]-[3] are otherwise correct: the counting starts from yesterday, and the third counted day (D-3 when no day is skipped) is returned.",
+      "evidence": "DTSX:4086-4091; Update LastThreeWorkingDays ScriptMain.cs:92-134 (DTSX:5131, sha 8f1b6cc302b5); DTSX:42-46",
+      "wrongUnits": [
+        {
+          "unit": 2,
+          "problem": "Exclusion of Fri/Sat/holidays stated as fact; it only happens when a CalendarRule.starttime equals the local-midnight date exactly (string match via DataTable.Select), which is data/runtime-dependent and not shown",
+          "correct": "Conditional wording: skipped only if CalendarRule.starttime == that date 00:00 (SSIS server local), otherwise counted as a working day",
+          "evidence": "ScriptMain.cs:116-131; DTSX:4090"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Update SuspicionAsEmitted Joinings|title",
+      "hash": "a8b7c9bf6350",
+      "verdict": "CONFIRMED",
+      "detail": "The SQL condition and the Set Status value 12 match (DTSX:5546-5549, 5573). 'אינו מאוחר מתאריך הסף' is correct for DATEDIFF(day, threshold, date) <= 0, which compares day boundaries. 'שלושה ימי עבודה' is the label of the threshold variable; the caveat on how it is computed is in the LastThreeWorkingDays claim.",
+      "evidence": "DTSX:5546-5549, 5573",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Update SuspicionAsEmitted Joinings|short",
+      "hash": "a51627024c2a",
+      "verdict": "CONFIRMED",
+      "detail": "The selection and the status-12 write match. Meanings are labelled. Same label note as the title claim.",
+      "evidence": "DTSX:5546-5549, 5573; Update Joinings main.cs:118-122",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Update SuspicionAsEmitted Joinings|detailed",
+      "hash": "cacd7d317764",
+      "verdict": "WRONG",
+      "detail": "Units [1]-[8] and [10] are correct: precedence, the SQL with the ? parameter mapped to {81CBF82A…} = User::LastThreeWorkingDays, gen_suspicionAsEmitted = 12, and Update setting only gen_joiningstatus (main.cs:118-122). Unit [9], 'השגיאה לא נרשמת בשום מקום', is an absolute failure-handling statement that the files do not prove. The package does not record it, because Update Joinings.Error has no path. But the call goes through the external CRM.Proxy (GetCrmService().Update), whose own logging is external_unknown. The same package's scopeNote says CRM.Proxy was not examined, and package 0018 uses the conditional form for the same case. Correct wording: 'החבילה אינה רושמת את השגיאה (אין נתיב מפלט ה-Error); האם CRM.Proxy רושם – לא ידוע'.",
+      "evidence": "Update Joinings main.cs:114-134 (DTSX:5602); DTSX:6498-6499; scopeNote (CRM.Proxy external)",
+      "wrongUnits": [
+        {
+          "unit": 9,
+          "problem": "'לא נרשמת בשום מקום' overstates; only the package's own non-recording is proven",
+          "correct": "The package does not record the failure; external CRM.Proxy behaviour unknown",
+          "evidence": "main.cs:124-133; DTSX:6498-6499"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Update SuspicionAsEmitted Joinings|detail",
+      "hash": "81e0047875e0",
+      "verdict": "CONFIRMED",
+      "detail": "[1] SQL is exact. [2] Update by gen_automatedjoiningId (entity.Id). [3] SoapException/Exception -> DirectRowToError, output not connected. 'הכשל לא נרשם' is read as 'not recorded by the package'. [4] gen_joiningstatus = OptionSetValue(12). [5] The meaning is labelled השערה.",
+      "evidence": "DTSX:5546-5549; main.cs:114-134; DTSX:6498-6499",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Update SuspicionAsEmitted Joinings|decisions",
+      "hash": "1411a3305f66",
+      "verdict": "CONFIRMED",
+      "detail": "The condition is quoted verbatim (DTSX:5546-5548) and the parameter mapping is checked (DTSX:5549, Parameter0 -> {81CBF82A…} = User::LastThreeWorkingDays). The outcome is status 12 via Set Status + Update Joinings.",
+      "evidence": "DTSX:5546-5549, 42",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Update SuspicionAsEmitted Joinings|crm",
+      "hash": "accb57d71d8f",
+      "verdict": "CONFIRMED",
+      "detail": "Entity gen_automatedjoining, Update via CrmProxy.GetCrmService().Update (SDK), only gen_joiningstatus=12. The 'when' clause matches the SQL; 'עד תאריך הסף' is inclusive at day level.",
+      "evidence": "main.cs:118-122; DTSX:5546-5549",
+      "wrongUnits": []
+    }
+  ],
+  "missingWrites": []
+}

@@ -1,0 +1,84 @@
+{
+  "verifier": "ssis-verifier",
+  "package": "0030_PoaAccountUpdateDailyTest",
+  "scope": "mapping-A.json",
+  "checked": 12,
+  "results": [
+    {
+      "id": "Update NeedToSendMailBit|gen_powerofattorney|UPDATE|gen_iscancellationemailrequired",
+      "verdict": "CONFIRMED",
+      "detail": "OLE DB Command SQL: 'update Gen_powerofattorneyBase set gen_iscancellationemailrequired = case when Gen_appendixtype = 2 then 1 when Gen_appendixtype = 3 then 1 when Gen_appendixtype = 5 then 1 else 0 end where Gen_powerofattorneyId = ?' - exactly one '?' -> Param_0; the single input column PowerOfAttorneyIdPa has externalMetadataColumnId ...ExternalColumns[Param_0] and lineageId = Lookup 'Match PowerOfAttorney By CustomerAccount Or CustomerProgram' Match Output column PowerOfAttorneyIdPa (pa.Gen_powerofattorneyId of a Gen_currentstate = 1 POA). The value is computed from the TARGET row's own Gen_appendixtype (unqualified column of the single table being updated), not from the waiting POA's gen_appendixtype (which is only used later by the AppendixType split). Connection [CRM] = psql/ALTSHULER_MSCRM; this package has no DTS:Configurations, so it does NOT load C:\\Generix\\SSISConfigFile.dtsConfig. Unsupported direct SQL - correct. Row path verified: Get Waiting Poa -> Lookup (Match) -> Is Renewal (Not Renewal) -> Update NeedToSendMailBit -> AppendixType. Input errorRowDisposition=FailComponent. Edge case not mentioned (hypothesis, per documented SSIS full-cache behaviour that NULL keys can match NULL keys): the reference query has no NOT NULL filter on CustomerAccountProgramPa, so a waiting POA with both Gen_CustomerAccount and gen_customerprogram NULL could match an unrelated active POA whose key is also NULL and update it. Does not change the mapping itself.",
+      "evidence": "0030_PoaAccountUpdateDailyTest.dtsx:6658-6668 (SqlCommand), 6672 (connection [CRM]), 6675-6684 (input, Param_0), 5541-5610 (Lookup SQL 5543-5550, CacheType 0, NoMatchBehavior 1), 5507-5540 (Is Renewal), DTSX:4-8 ([CRM])"
+    },
+    {
+      "id": "LOGIC scopeNote / summary",
+      "verdict": "CONFIRMED",
+      "detail": "Only business CRM write = direct SQL UPDATE on Gen_powerofattorneyBase via [CRM]; both OLE DB Destinations write [dbo].[PowerOfAttorneySendEmails] on [SQL.GENERIX_STAGING] (psql/GENERIX_STAGING); SDK writes are only gen_etlprocess / gen_etlprocesscounter. No DTS:Configurations (no SSISConfigFile), no event handlers, log provider to [SRS.SSIS_Logs] (psrs/SSIS_Logs).",
+      "evidence": "DTSX:4-18, 21, 119, 456-461, 995-1003, 5219-5240, 6701-6720, 7824-7835"
+    },
+    {
+      "id": "LOGIC executionOrder",
+      "verdict": "CONFIRMED",
+      "detail": "Constraint GetOrgVars->Create; 1 Create->Get Valid Optionsets; 12 Get Valid->Set Queue; 15 Set Queue->Handle Wait; 16 Handle Wait->Handle Active; 2 Handle Active->Write Counter End; 10 Write Counter End->End ETL. All Success (no DTS:Value). Wait flow (writes the flag) runs before the cancel flow (reads it).",
+      "evidence": "DTSX:8218-8224"
+    },
+    {
+      "id": "LOGIC Package\\Handle Wait Status - For Active",
+      "verdict": "CONFIRMED",
+      "detail": "Re-check: the earlier claim that a NULL Is Renewal result goes to Not Renewal is gone. logic.json now gives explicit NULL branches for Is Renewal (agentcyIdNumberPa NULL -> component and data flow fail, FailComponent DTSX:5518) and AppendixType (waiting POA gen_appendixtype NULL -> flow fails after the SQL UPDATE already ran, FailComponent DTSX:5317), labelled as general SSIS behaviour, plus a matching new finding. Raw DTSX re-checked: Renewal output errorRowDisposition=FailComponent at line 5518 and AppendixTypeNeedToSendMail errorRowDisposition=FailComponent at line 5317; path Update NeedToSendMailBit -> AppendixType confirms the UPDATE runs first. The rest of the component was already verified.",
+      "evidence": "DTSX:5317, 5518; logic.json lines 160, 183, 228-247, 279, 307, 319, 574",
+      "previousVerdict": "WRONG",
+      "previousDetail": "Is Renewal node tech says 'NULL result is not considered true and the row goes to Not Renewal'. The DTSX sets errorRowDisposition=\"FailComponent\" on the Renewal output; in SSIS a Conditional Split condition that evaluates to NULL is an error handled by that disposition (FailComponent -> component and data flow fail; only IgnoreFailure would treat it as False). So a matched active POA with NULL agentcyIdNumberPa fails the data flow rather than reaching Update NeedToSendMailBit (mapping-A states this correctly, as hypothesis per SSIS semantics). Same omission for AppendixType: its condition gen_appendixtype == 2 || == 3 || == 5 has FailComponent disposition, so a waiting POA with NULL gen_appendixtype fails the flow (after its SQL UPDATE already executed) instead of going to 'No Email' as the 'else' branch implies. Everything else in the component (population, 6 excluded ids, NOT IN dropping NULL ids, Lookup keys, letter versions 1/2, No Email values, staging destination) verified.",
+      "recheckedOn": "2026-11-06"
+    },
+    {
+      "id": "LOGIC Package\\Handle Active Status - For Cancel",
+      "verdict": "CONFIRMED",
+      "detail": "Get Active Poa (Gen_enddate <= GETDATE() and Gen_currentstate = 1, same 6 ids), Is Need To Send Cancellation Mail (!ISNULL(..) && .. == TRUE), Check Format, Get Agency (keys gen_customerprogram, Gen_CustomerAccount, Gen_appendixtype; '3 --waiting', 'Gen_ContractType = 1 --bank'; NoMatch=1), letter versions 3/8, No Email NewStatus=2, destination staging - all match paths and expressions. No CRM write in this flow.",
+      "evidence": "DTSX:4187-4235, 4326-4360 (comments 4338-4339), 4408-4440, 4052-4140, 5219-5240"
+    },
+    {
+      "id": "LOGIC finding#1 (direct SQL on CRM base table)",
+      "verdict": "CONFIRMED",
+      "detail": "UPDATE Gen_powerofattorneyBase via [CRM] Initial Catalog=ALTSHULER_MSCRM.",
+      "evidence": "DTSX:4-8, 6661-6672"
+    },
+    {
+      "id": "LOGIC finding#2 (state never changed, rows re-selected)",
+      "verdict": "CONFIRMED",
+      "detail": "No component in either flow changes gen_currentstate; re-selection on later runs correctly labelled as hypothesis.",
+      "evidence": "component list DTSX:4047-6787"
+    },
+    {
+      "id": "LOGIC finding#3 (NULL agentcyIdNumber never selected)",
+      "verdict": "CONFIRMED",
+      "detail": "NOT IN with NULL left operand is UNKNOWN -> filtered.",
+      "evidence": "DTSX:5408-5415, 4224-4231"
+    },
+    {
+      "id": "LOGIC finding#4 (differences vs 0031)",
+      "verdict": "CONFIRMED",
+      "detail": "(1) 0030 has 8 executables, 0031 has 19 (grep of DTS:Executable refIds); the six listed 0031-only executables plus 5 extra 'Write To ETLProcessCounter*' tasks. (2) 0031 Handle Wait/Active Status contain SDK scripts 'Update gen_powerofattorney ACTIVE' and '...CANCELED And Status Transfer To Bank'; 0030 parallel flows have no script components. (3) 0031 Update NeedToSendMailBit sets gen_receivingdateofcancelpoa = CASE ... THEN ? END (no ELSE) WHERE Gen_powerofattorneyId = ? (Param_0 Gen_receivingdatePoa, Param_1 PowerOfAttorneyIdPa); 0030 sets gen_iscancellationemailrequired with ELSE 0 and one '?'. (4) grep 'gen_iscancellationemailrequired' in 0031 = 0 hits.",
+      "evidence": "0031_PoaAccountUpdateDaily.dtsx:21671, 30214, 31299-31340; 0030 DTSX:6661-6668"
+    },
+    {
+      "id": "LOGIC finding#5 (ValidOptionsetsValues / AgentDescQueueId unused)",
+      "verdict": "CONFIRMED",
+      "detail": "Variables only appear in their declaration, the setting script and its ReadWriteVariables property (also DTSX:7595 for AgentDescQueueId, not listed but same component).",
+      "evidence": "DTSX:28, 70, 3410-3545, 3978, 7061, 7178-7186, 7595"
+    },
+    {
+      "id": "LOGIC finding#6 (fixed +3h shift)",
+      "verdict": "CONFIRMED",
+      "detail": "dateadd(HH,3,...) on start/end/receiving dates in both sources.",
+      "evidence": "DTSX:5381-5395, 4196-4210"
+    },
+    {
+      "id": "LOGIC ignoredAsFramework",
+      "verdict": "CONFIRMED",
+      "detail": "Create ETL Process Record (gen_etlprocess create), ETL Record Finish (gen_etlprocess update), Write To ETLProcessCounter End (gen_etlprocesscounter create with counters only), Get Organization Variables, Get Valid Optionsets Values and Set Queue Id Variable (no Create/Update/Execute calls) are plumbing.",
+      "evidence": "DTSX:456-461, 995-1003, 7824-7835"
+    }
+  ],
+  "missingWrites": []
+}

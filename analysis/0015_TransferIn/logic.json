@@ -1,0 +1,2392 @@
+{
+  "package": "0015_TransferIn",
+  "analyst": "ssis-business-logic",
+  "source": {
+    "file": "source/DailyProcess/0015_TransferIn.dtsx",
+    "sha256": "AE7047787D737B84F33A4FCA2542A335C0FA14DB1128786C3BF969353ED14992",
+    "lines": 124020
+  },
+  "scopeNote_he": "נותח קוד המקור (C#) של רכיבי הסקריפט בלבד; ה-DLL המקומפל לא פוענח. CRM.Proxy / ExecuteMultipleExtension הם אסמבלי חיצוני (external_unknown). אין קובצי תצורה (configurations ריק). מנהל החיבורים [CRM] = Data Source=psql; Initial Catalog=ALTSHULER_MSCRM (DTSX:4) משמש לכל הקריאות העסקיות (כל המקורות הם שאילתות על טבלאות CRM, לא טבלאות Staging), וגם להוספת אזהרות ETL ב-SQL ישיר: INSERT ל-gen_etlprocesswarningBase ברכיב Insert Etl process warning של כל אחת מ-10 זרימות הנתונים (מסגרת, Unsupported; DTSX:11303, 14277, 24924, 42727, 46353, 68630, 75658, 83859, 92119, 99571). דרך [CRM] אין כתיבה עסקית. כל הכתיבה העסקית ל-CRM היא דרך ה-SDK (ExecuteMultiple, Supported).",
+  "summary_he": "החבילה מנהלת את מחזור החיים של בקשות העברה נכנסות (gen_transferin) ופיצולי המסלול שלהן (gen_coursepartition) על בסיס נתונים שכבר נמצאים ב-CRM: היא משכפלת בקשה מחשבון מקור לחשבון לקוח חדש, יוצרת פיצולי מסלול לקופות בחשבונות היעד של בקשות העברה פתוחות מסוג 1 או 7, רק לקופות שיש להן מוצר וחוזה סוכן, שיש בהן תנועות 56, ושאין עדיין אף פיצול מסלול שקופת היעד שלו היא הקופה הזו (DTSX:46144-46208) (השערה לפי שמות ה-Data Flow Close TI External / Update CoursePartition external: חיצוניות), מעדכנת סכומים ותאריכים בפועל לפי תנועות 56/57 ואת הסכום הצפוי בהעברות פנימיות, וסוגרת בקשות פנימיות (סוג 5 או 6; 'העברה בין מסלולים' / 'העברה בין קופותינו' לפי הערת החבילה, DTSX:115790) ובקשות מסוג 1 או 7 שיש להן פיצולים עם סכום ותאריך בפועל, ורק אם יש בבקשה חותמת 'נתקבל' ותאריך ההעברה המוקדם בפיצולים מאוחר ממנה (DTSX:14395); אחרת הבקשה נשארת במצב 1. בנוסף היא יוצרת בקשות 'הצטרפות בלבד' ופיצולי מסלול מהצטרפויות ממוכנות, ומעדכנת בבקשות מסוג 1 בסטטוס פעולה 11 שהשדה gen_appendixdsent שלהן ריק (IS NULL, בשני חלקי ה-UNION, DTSX:92029-92080) מועד קובע ותאריך שיוך כספים לפי תנועת 53 עם תאריך הערך המוקדם בקופות היעד של הפיצולים שלהן, ומעבירה אותן לסטטוס פעולה 12 (ערך קבוע, Update TransferIn By Transaction main.cs:53). כל הכתיבה העסקית ל-CRM נעשית ב-SDK; רשומות אזהרות ETL (מסגרת) נוספות ב-SQL ישיר דרך [CRM].",
+  "executionOrder": [
+    {
+      "step": 1,
+      "refId": "Package\\Get Variables From SystemConfigurarion",
+      "title_he": "טעינת משתני ETL (מסגרת)",
+      "trigger": "start (no incoming constraint)"
+    },
+    {
+      "step": 2,
+      "refId": "Package\\Get selected server to ServerName Variable",
+      "title_he": "בחירת שרת CRM (מסגרת)",
+      "trigger": "after Get Variables From SystemConfigurarion · Success (DTSX:110984)"
+    },
+    {
+      "step": 3,
+      "refId": "Package\\Get Sytem User Id And OrganizationName",
+      "title_he": "איתור משתמש המערכת והארגון (מסגרת)",
+      "trigger": "after Get selected server to ServerName Variable · Success (DTSX:110988)"
+    },
+    {
+      "step": 4,
+      "refId": "Package\\Create ETL Process record",
+      "title_he": "רשומת תהליך ETL (מסגרת)",
+      "trigger": "after Get Sytem User Id And OrganizationName · Success (DTSX:110989)"
+    },
+    {
+      "step": 5,
+      "refId": "Package\\Clone TransferIn",
+      "title_he": "שכפול בקשת העברה מחשבון מקור לחשבון חדש",
+      "trigger": "after Create ETL Process record · Success (DTSX:110996)"
+    },
+    {
+      "step": 6,
+      "refId": "Package\\Write to ETLProcessCounter - Step 1",
+      "title_he": "מוני ETL (מסגרת)",
+      "trigger": "after Clone TransferIn · Success (DTSX:110986)"
+    },
+    {
+      "step": 7,
+      "refId": "Package\\Create CP for Fund With FT 56",
+      "title_he": "יצירת פיצולי מסלול לקופות עם תנועות 56 בבקשות מסוג 1 או 7",
+      "trigger": "after Write to ETLProcessCounter - Step 1 · Success (DTSX:110990)"
+    },
+    {
+      "step": 8,
+      "refId": "Package\\Write to ETLProcessCounter - Step 2",
+      "title_he": "מוני ETL (מסגרת)",
+      "trigger": "after Create CP for Fund With FT 56 · Success (DTSX:111003)"
+    },
+    {
+      "step": 9,
+      "refId": "Package\\Update CoursePartition internal",
+      "title_he": "סכום ותאריך בפועל בפיצולים של העברות פנימיות (תנועה 57)",
+      "trigger": "after Write to ETLProcessCounter - Step 2 · Success (DTSX:110991)"
+    },
+    {
+      "step": 10,
+      "refId": "Package\\Write to ETLProcessCounter - Step 3",
+      "title_he": "מוני ETL (מסגרת)",
+      "trigger": "after Update CoursePartition internal · Success (DTSX:111001)"
+    },
+    {
+      "step": 11,
+      "refId": "Package\\Update CoursePartition external",
+      "title_he": "סכום ותאריך בפועל לפי תנועות 56 בפיצולים של בקשות מסוג 1 או 7",
+      "trigger": "after Write to ETLProcessCounter - Step 3 · Success (DTSX:110992)"
+    },
+    {
+      "step": 12,
+      "refId": "Package\\Write to ETLProcessCounter - Step 4",
+      "title_he": "מוני ETL (מסגרת)",
+      "trigger": "after Update CoursePartition external · Success (DTSX:111005)"
+    },
+    {
+      "step": 13,
+      "refId": "Package\\Update TI intrnal expectes",
+      "title_he": "סכום צפוי בהעברות פנימיות לפי מסלולי החשבון",
+      "trigger": "after Write to ETLProcessCounter - Step 4 · Success (DTSX:110993)"
+    },
+    {
+      "step": 14,
+      "refId": "Package\\Write to ETLProcessCounter - Step 5",
+      "title_he": "מוני ETL (מסגרת)",
+      "trigger": "after Update TI intrnal expectes · Success (DTSX:111006)"
+    },
+    {
+      "step": 15,
+      "refId": "Package\\Close TI internal",
+      "title_he": "סגירת בקשות העברה פנימיות",
+      "trigger": "after Write to ETLProcessCounter - Step 5 · Success (DTSX:110994)"
+    },
+    {
+      "step": 16,
+      "refId": "Package\\Write to ETLProcessCounter - Step 6",
+      "title_he": "מוני ETL (מסגרת)",
+      "trigger": "after Close TI internal · Success (DTSX:110985)"
+    },
+    {
+      "step": 17,
+      "refId": "Package\\Close TI External",
+      "title_he": "סגירת בקשות העברה מסוג 1 או 7 (השערה לפי שם ה-Data Flow: חיצוניות)",
+      "trigger": "after Write to ETLProcessCounter - Step 6 · Success (DTSX:110995)"
+    },
+    {
+      "step": 18,
+      "refId": "Package\\Write to ETLProcessCounter - Step 7",
+      "title_he": "מוני ETL (מסגרת)",
+      "trigger": "after Close TI External · Success (DTSX:111002)"
+    },
+    {
+      "step": 19,
+      "refId": "Package\\Create TI - Joining Only",
+      "title_he": "יצירת בקשות 'הצטרפות בלבד' מהצטרפות ממוכנת",
+      "trigger": "after Write to ETLProcessCounter - Step 7 · Success (DTSX:110997)"
+    },
+    {
+      "step": 20,
+      "refId": "Package\\Write to ETLProcessCounter - Step 8",
+      "title_he": "מוני ETL (מסגרת)",
+      "trigger": "after Create TI - Joining Only · Success (DTSX:111004)"
+    },
+    {
+      "step": 21,
+      "refId": "Package\\Create CP - Joining Only",
+      "title_he": "יצירת פיצולי מסלול לבקשות 'הצטרפות בלבד'",
+      "trigger": "after Write to ETLProcessCounter - Step 8 · Success (DTSX:110998)"
+    },
+    {
+      "step": 22,
+      "refId": "Package\\Write to ETLProcessCounter - Step 9",
+      "title_he": "מוני ETL (מסגרת)",
+      "trigger": "after Create CP - Joining Only · Success (DTSX:111007)"
+    },
+    {
+      "step": 23,
+      "refId": "Package\\Update TI - first transaction (53)",
+      "title_he": "מועד קובע ותאריך שיוך כספים לפי תנועה 53",
+      "trigger": "after Write to ETLProcessCounter - Step 9 · Success (DTSX:110999)"
+    },
+    {
+      "step": 24,
+      "refId": "Package\\Write to ETLProcessCounter - Step 10",
+      "title_he": "מוני ETL (מסגרת)",
+      "trigger": "after Update TI - first transaction (53) · Success (DTSX:110987)"
+    },
+    {
+      "step": 25,
+      "refId": "Package\\End ETL Process record",
+      "title_he": "סגירת תהליך ETL (מסגרת)",
+      "trigger": "after Write to ETLProcessCounter - Step 10 · Success (DTSX:111000)"
+    },
+    {
+      "step": 26,
+      "refId": "Package.EventHandlers[OnError]\\Error ETL Process record",
+      "title_he": "רישום כשל בתהליך ETL (מסגרת)",
+      "trigger": "OnError event handler (DTSX:111010-111017)"
+    }
+  ],
+  "ignoredAsFramework": [
+    "Package\\Create ETL Process record",
+    "Package\\End ETL Process record",
+    "Package\\Get selected server to ServerName Variable",
+    "Package\\Get Sytem User Id And OrganizationName",
+    "Package\\Get Variables From SystemConfigurarion",
+    "Package\\Write to ETLProcessCounter - Step 1",
+    "Package\\Write to ETLProcessCounter - Step 10",
+    "Package\\Write to ETLProcessCounter - Step 2",
+    "Package\\Write to ETLProcessCounter - Step 3",
+    "Package\\Write to ETLProcessCounter - Step 4",
+    "Package\\Write to ETLProcessCounter - Step 5",
+    "Package\\Write to ETLProcessCounter - Step 6",
+    "Package\\Write to ETLProcessCounter - Step 7",
+    "Package\\Write to ETLProcessCounter - Step 8",
+    "Package\\Write to ETLProcessCounter - Step 9",
+    "Package.EventHandlers[OnError]",
+    "Package.EventHandlers[OnError]\\Error ETL Process record",
+    "Package\\Clone TransferIn\\Add Column for etl process warning",
+    "Package\\Clone TransferIn\\Add Row Number",
+    "Package\\Clone TransferIn\\Component Task Name",
+    "Package\\Clone TransferIn\\Insert Etl process warning",
+    "Package\\Clone TransferIn\\Multicast",
+    "Package\\Clone TransferIn\\Row Count",
+    "Package\\Clone TransferIn\\Row Count Create",
+    "Package\\Clone TransferIn\\Row Count Error",
+    "Package\\Clone TransferIn\\Set Error columns",
+    "Package\\Clone TransferIn\\Split Rows For MultiThread",
+    "Package\\Clone TransferIn\\Union All Create",
+    "Package\\Clone TransferIn\\Union All Error",
+    "Package\\Close TI External\\Add Column for etl process warning",
+    "Package\\Close TI External\\Add Row Number",
+    "Package\\Close TI External\\Component Task Name",
+    "Package\\Close TI External\\Insert Etl process warning",
+    "Package\\Close TI External\\Multicast",
+    "Package\\Close TI External\\Row Count",
+    "Package\\Close TI External\\Row Count All Not Need To Update",
+    "Package\\Close TI External\\Row Count Error",
+    "Package\\Close TI External\\Row Count Update",
+    "Package\\Close TI External\\Set Error columns",
+    "Package\\Close TI External\\Sort",
+    "Package\\Close TI External\\Split Rows For MultiThread",
+    "Package\\Close TI External\\Union All",
+    "Package\\Close TI External\\Union All Error",
+    "Package\\Close TI External\\Union All Not Need To Update",
+    "Package\\Close TI External\\Union All Update",
+    "Package\\Close TI internal\\Add Column for etl process warning",
+    "Package\\Close TI internal\\Add Row Number",
+    "Package\\Close TI internal\\Component Task Name",
+    "Package\\Close TI internal\\Insert Etl process warning",
+    "Package\\Close TI internal\\Multicast",
+    "Package\\Close TI internal\\Row Count",
+    "Package\\Close TI internal\\Row Count All Not Need To Update",
+    "Package\\Close TI internal\\Row Count Error",
+    "Package\\Close TI internal\\Row Count Update",
+    "Package\\Close TI internal\\Set Error columns",
+    "Package\\Close TI internal\\Sort",
+    "Package\\Close TI internal\\Split Rows For MultiThread",
+    "Package\\Close TI internal\\Union All",
+    "Package\\Close TI internal\\Union All 1",
+    "Package\\Close TI internal\\Union All 2",
+    "Package\\Close TI internal\\Union All Error",
+    "Package\\Close TI internal\\Union All Not Need To Update",
+    "Package\\Close TI internal\\Union All Update",
+    "Package\\Create CP - Joining Only\\Add Column for etl process warning",
+    "Package\\Create CP - Joining Only\\Add Row Number",
+    "Package\\Create CP - Joining Only\\Component Task Name",
+    "Package\\Create CP - Joining Only\\Insert Etl process warning",
+    "Package\\Create CP - Joining Only\\Multicast",
+    "Package\\Create CP - Joining Only\\Row Count",
+    "Package\\Create CP - Joining Only\\Row Count Create",
+    "Package\\Create CP - Joining Only\\Row Count Error",
+    "Package\\Create CP - Joining Only\\Set Error columns",
+    "Package\\Create CP - Joining Only\\Split Rows For MultiThread",
+    "Package\\Create CP - Joining Only\\Union All Create",
+    "Package\\Create CP - Joining Only\\Union All Error",
+    "Package\\Create CP for Fund With FT 56\\Add Column for etl process warning",
+    "Package\\Create CP for Fund With FT 56\\Add Row Number",
+    "Package\\Create CP for Fund With FT 56\\Add Row Number 1",
+    "Package\\Create CP for Fund With FT 56\\Component Task Name",
+    "Package\\Create CP for Fund With FT 56\\Insert Etl process warning",
+    "Package\\Create CP for Fund With FT 56\\Multicast",
+    "Package\\Create CP for Fund With FT 56\\Row Count",
+    "Package\\Create CP for Fund With FT 56\\Row Count Error",
+    "Package\\Create CP for Fund With FT 56\\Row Count Error Update",
+    "Package\\Create CP for Fund With FT 56\\Row Count Insert",
+    "Package\\Create CP for Fund With FT 56\\Row Count Update",
+    "Package\\Create CP for Fund With FT 56\\Set Error columns",
+    "Package\\Create CP for Fund With FT 56\\Set Error columns 1",
+    "Package\\Create CP for Fund With FT 56\\Split Rows For MultiThread",
+    "Package\\Create CP for Fund With FT 56\\Split Rows For MultiThread 1",
+    "Package\\Create CP for Fund With FT 56\\Union All",
+    "Package\\Create CP for Fund With FT 56\\Union All Craete",
+    "Package\\Create CP for Fund With FT 56\\Union All Error",
+    "Package\\Create CP for Fund With FT 56\\Union All Error Create",
+    "Package\\Create CP for Fund With FT 56\\Union All Error Update",
+    "Package\\Create CP for Fund With FT 56\\Union All Update",
+    "Package\\Create TI - Joining Only\\Add Column for etl process warning",
+    "Package\\Create TI - Joining Only\\Add Row Number",
+    "Package\\Create TI - Joining Only\\Component Task Name",
+    "Package\\Create TI - Joining Only\\Insert Etl process warning",
+    "Package\\Create TI - Joining Only\\Multicast",
+    "Package\\Create TI - Joining Only\\Row Count",
+    "Package\\Create TI - Joining Only\\Row Count Error",
+    "Package\\Create TI - Joining Only\\Row Count Update",
+    "Package\\Create TI - Joining Only\\Set Error columns",
+    "Package\\Create TI - Joining Only\\Split Rows For MultiThread",
+    "Package\\Create TI - Joining Only\\Union All Create",
+    "Package\\Create TI - Joining Only\\Union All Error",
+    "Package\\Update CoursePartition external\\Add Column for etl process warning",
+    "Package\\Update CoursePartition external\\Add Row Number",
+    "Package\\Update CoursePartition external\\Component Task Name",
+    "Package\\Update CoursePartition external\\Insert Etl process warning",
+    "Package\\Update CoursePartition external\\Multicast",
+    "Package\\Update CoursePartition external\\Row Count",
+    "Package\\Update CoursePartition external\\Row Count Error",
+    "Package\\Update CoursePartition external\\Row Count No Need To Update",
+    "Package\\Update CoursePartition external\\Row Count Update",
+    "Package\\Update CoursePartition external\\Set Error columns",
+    "Package\\Update CoursePartition external\\Split Rows For MultiThread",
+    "Package\\Update CoursePartition external\\Union All Error Course Partition",
+    "Package\\Update CoursePartition external\\Union All No Need To Update Course Partition",
+    "Package\\Update CoursePartition external\\Union All Update Course Partition",
+    "Package\\Update CoursePartition internal\\Add Column for etl process warning",
+    "Package\\Update CoursePartition internal\\Add Row Number",
+    "Package\\Update CoursePartition internal\\Component Task Name",
+    "Package\\Update CoursePartition internal\\Insert Etl process warning",
+    "Package\\Update CoursePartition internal\\Multicast",
+    "Package\\Update CoursePartition internal\\Row Count",
+    "Package\\Update CoursePartition internal\\Row Count Error",
+    "Package\\Update CoursePartition internal\\Row Count No Need To Update",
+    "Package\\Update CoursePartition internal\\Row Count Update",
+    "Package\\Update CoursePartition internal\\Set Error columns",
+    "Package\\Update CoursePartition internal\\Split Rows For MultiThread",
+    "Package\\Update CoursePartition internal\\Union All Error Update Course Partition",
+    "Package\\Update CoursePartition internal\\Union All No Need To Update",
+    "Package\\Update CoursePartition internal\\Union All Update Course Partition",
+    "Package\\Update TI - first transaction (53)\\Add Column for etl process warning",
+    "Package\\Update TI - first transaction (53)\\Add Row Number",
+    "Package\\Update TI - first transaction (53)\\Component Task Name",
+    "Package\\Update TI - first transaction (53)\\Insert Etl process warning",
+    "Package\\Update TI - first transaction (53)\\Multicast",
+    "Package\\Update TI - first transaction (53)\\Row Count",
+    "Package\\Update TI - first transaction (53)\\Row Count Error",
+    "Package\\Update TI - first transaction (53)\\Row Count No Need To Update",
+    "Package\\Update TI - first transaction (53)\\Row Count Update",
+    "Package\\Update TI - first transaction (53)\\Set Error columns",
+    "Package\\Update TI - first transaction (53)\\Split Rows For MultiThread",
+    "Package\\Update TI - first transaction (53)\\Union All Error",
+    "Package\\Update TI - first transaction (53)\\Union All No Need To Update",
+    "Package\\Update TI - first transaction (53)\\Union All Update",
+    "Package\\Update TI intrnal expectes\\Add Column for etl process warning",
+    "Package\\Update TI intrnal expectes\\Add Row Number",
+    "Package\\Update TI intrnal expectes\\Component Task Name",
+    "Package\\Update TI intrnal expectes\\Insert Etl process warning",
+    "Package\\Update TI intrnal expectes\\Multicast",
+    "Package\\Update TI intrnal expectes\\Row Count",
+    "Package\\Update TI intrnal expectes\\Row Count Error",
+    "Package\\Update TI intrnal expectes\\Row Count No Need To Update",
+    "Package\\Update TI intrnal expectes\\Row Count Update",
+    "Package\\Update TI intrnal expectes\\Set Error columns",
+    "Package\\Update TI intrnal expectes\\Sort",
+    "Package\\Update TI intrnal expectes\\Split Rows For MultiThread",
+    "Package\\Update TI intrnal expectes\\Union All Error",
+    "Package\\Update TI intrnal expectes\\Union All No Need To Update",
+    "Package\\Update TI intrnal expectes\\Union All Update",
+    "LogProvider: SSIS log provider for SQL Server (DTSX:16)"
+  ],
+  "components": [
+    {
+      "refId": "Package (control flow)",
+      "title_he": "זרימת בקרה: שרשרת טיפול בבקשות העברה נכנסות",
+      "techName": "Package",
+      "short_he": "עשרה שלבים עסקיים רצים בשרשרת אחת, וכל שלב מתחיל רק אחרי שהקודם הצליח: שכפול בקשות לחשבון חדש, פיצולי מסלול ועדכוני סכומים, סגירת בקשות פנימיות (סוג 5 או 6) ובקשות מסוג 1 או 7, בקשות ופיצולים להצטרפות בלבד, ועדכון לפי תנועה 53.",
+      "flow_he": [
+        "טעינת הגדרות, בחירת שרת, משתמש מערכת ופתיחת תהליך ETL (מסגרת).",
+        "Clone TransferIn → Create CP for Fund With FT 56 → Update CoursePartition internal → Update CoursePartition external → Update TI intrnal expectes.",
+        "Close TI internal → Close TI External.",
+        "Create TI - Joining Only → Create CP - Joining Only → Update TI - first transaction (53).",
+        "בין כל שני שלבים עסקיים – מוני ETL; בסוף – סגירת תהליך ETL (מסגרת)."
+      ],
+      "short": {
+        "nodes": [
+          {
+            "type": "step",
+            "text": "בקשות העברה נכנסות משוכפלות מחשבון מקור לחשבון לקוח חדש."
+          },
+          {
+            "type": "step",
+            "text": "לבקשות פתוחות נוצרים פיצולי מסלול, ומתעדכנים בהם הסכומים והתאריכים בפועל לפי תנועות הכסף בקופות; בהעברות פנימיות מתעדכן גם הסכום הצפוי."
+          },
+          {
+            "type": "step",
+            "text": "בקשות פנימיות (סוג 5 או 6) ובקשות מסוג 1 או 7 שהכסף שלהן התקבל בפיצולים נסגרות או מקבלות סטטוס המשך, לפי התנאים של כל סוג."
+          },
+          {
+            "type": "step",
+            "text": "מהצטרפויות ממוכנות נוצרות בקשות 'הצטרפות בלבד' ופיצולי מסלול שלהן."
+          },
+          {
+            "type": "step",
+            "text": "בקשות מסוג 1 בסטטוס פעולה 11 שבקופות היעד של הפיצולים שלהן נמצאה תנועת 53 מקבלות מועד קובע ותאריך שיוך כספים."
+          },
+          {
+            "type": "end",
+            "text": "כל שלב רץ רק אם הקודם הצליח, ולכן כשל באחד השלבים עוצר את כל השלבים שאחריו."
+          }
+        ]
+      },
+      "detailed": {
+        "nodes": [
+          {
+            "type": "step",
+            "text": "בתחילת הריצה נטענות ההגדרות, נבחר שרת ה-CRM, מאותר משתמש המערכת ונפתחת רשומת תהליך ETL (מסגרת).",
+            "tech": "DTSX:110984, 110988, 110989"
+          },
+          {
+            "type": "step",
+            "text": "שלב 1: בקשת העברה נכנסת מסוג 1 או 7 משוכפלת מחשבון המקור לחשבון לקוח שנוצר עד 24 מעברי שעה לפני זמן הריצה.",
+            "tech": "Clone TransferIn (DTSX:133) · after Create ETL Process record Success (DTSX:110996)"
+          },
+          {
+            "type": "step",
+            "text": "שלב 2: לקופות של חשבון היעד של בקשות פתוחות מסוג 1 או 7, שיש בהן תנועות 56 ואין להן פיצול מסלול, נוצרים פיצולי מסלול, והבקשה מתעדכנת בפרטי הפיגור ובתאריך הביצוע. השאילתה לא מקשרת את התנועות לבקשה.",
+            "tech": "Create CP for Fund With FT 56 (DTSX:43158) · DTSX:110990"
+          },
+          {
+            "type": "step",
+            "text": "שלב 3: בפיצולים של העברות פנימיות מתעדכנים הסכום והתאריך בפועל לפי תנועות 57.",
+            "tech": "Update CoursePartition internal (DTSX:81538) · DTSX:110991"
+          },
+          {
+            "type": "step",
+            "text": "שלב 4: בפיצולים של בקשות פתוחות מסוג 1 או 7 מתעדכנים הסכום והתאריך בפועל לפי תנועות 56.",
+            "tech": "Update CoursePartition external (DTSX:73422) · DTSX:110992"
+          },
+          {
+            "type": "step",
+            "text": "שלב 5: בהעברות פנימיות שעוד לא התקבל בהן כסף מתעדכן הסכום הצפוי לפי מסלולי החשבון.",
+            "tech": "Update TI intrnal expectes (DTSX:98020) · DTSX:110993"
+          },
+          {
+            "type": "step",
+            "text": "שלב 6: העברות פנימיות (סוג 5 או 6) פתוחות שהפיצולים שלהן קיבלו סכום ותאריך בפועל, ושתאריך ההעברה המוקדם בפיצולים רחוק פחות מ-30 מעברי יום מתאריך יצירת הבקשה, נסגרות או מקבלות סטטוס פעולה 22; בכולן מתעדכנים גם הסכום והתאריך בפועל.",
+            "tech": "Close TI internal (DTSX:22386) · DTSX:110994; SQL: Gen_CurrentState = 1 AND gen_transfertype IN (5,6) AND cp.gen_actualtransferamount/gen_actualtransferdate IS NOT NULL ... HAVING ABS(DATEDIFF(day, min(cp.gen_actualtransferdate), ti.CreatedOn)) < 30 (DTSX:24826-24843)"
+          },
+          {
+            "type": "step",
+            "text": "שלב 7: העברות מסוג 1 או 7 שהכסף שלהן התקבל אחרי חותמת 'נתקבל' נסגרות; בכולן מתעדכנים הסכום והתאריך בפועל.",
+            "tech": "Close TI External (DTSX:11733) · DTSX:110995"
+          },
+          {
+            "type": "step",
+            "text": "שלב 8: מהצטרפויות ממוכנות נוצרות בקשות העברה מסוג 'הצטרפות בלבד'.",
+            "tech": "Create TI - Joining Only (DTSX:59772) · DTSX:110997"
+          },
+          {
+            "type": "step",
+            "text": "שלב 9: לבקשות 'הצטרפות בלבד' נוצרים פיצולי מסלול לפי פיצולי ההצטרפות הממוכנת.",
+            "tech": "Create CP - Joining Only (DTSX:33959) · DTSX:110998"
+          },
+          {
+            "type": "step",
+            "text": "שלב 10: בבקשות מסוג 1 בסטטוס פעולה 11 שבקופות היעד של הפיצולים שלהן נמצאה תנועת 53 נרשמים מועד קובע ותאריך שיוך כספים לפי תנועת 53 עם תאריך הערך המוקדם, והסטטוס עובר ל-12.",
+            "tech": "Update TI - first transaction (53) (DTSX:89809) · DTSX:110999"
+          },
+          {
+            "type": "decision",
+            "text": "האם השלב הסתיים בהצלחה?",
+            "tech": "כל האילוצים הם Success Constraint עם נכנס יחיד (logicalAnd=true, DTSX:110984-111007)",
+            "branches": [
+              {
+                "label": "כן",
+                "nodes": [
+                  {
+                    "type": "step",
+                    "text": "השלב הבא מתחיל, ובסוף נסגר תהליך ה-ETL (מסגרת).",
+                    "tech": "End ETL Process record (DTSX:111000)"
+                  }
+                ]
+              },
+              {
+                "label": "לא",
+                "nodes": [
+                  {
+                    "type": "end",
+                    "text": "השלבים שאחרי השלב שנכשל אינם רצים באותה ריצה, והכשל נרשם ברשומת התהליך (מסגרת).",
+                    "tech": "Package.EventHandlers[OnError]\\Error ETL Process record (DTSX:111017)"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "detail_he": [
+        {
+          "h": "מקור ואוכלוסייה",
+          "t": "אין קבצים. כל השלבים קוראים טבלאות CRM דרך [CRM] (psql / ALTSHULER_MSCRM)."
+        },
+        {
+          "h": "החלטות",
+          "t": "שרשרת לינארית של אילוצי Success בלבד."
+        },
+        {
+          "h": "כתיבה ל-CRM",
+          "t": "כל הכתיבה העסקית ל-CRM נעשית ב-SDK: gen_transferin (Create/Update), gen_coursepartition (Create/Update). רשומות אזהרות ETL (מסגרת) נוספות ב-SQL ישיר ל-gen_etlprocesswarningBase דרך [CRM] (10 רכיבי OLE DB Command 'insert gen_etlprocesswarningBase', DTSX:11303, 14277, 24924, 42727, 46353, 68630, 75658, 83859, 92119, 99571), כמו שנאמר בתקציר."
+        },
+        {
+          "h": "תוצאה עסקית",
+          "t": "פיצולי המסלול מקבלים סכום ותאריך בפועל לפי תנועות 56/57; אף שלב לא סוגר פיצול מסלול: בעדכון פיצולים קיימים (Update CoursePartition external / internal) נכתבים רק gen_actualtransferamount ו-gen_actualtransferdate (DTSX:76304-76305, 84504-84505); ביצירת פיצולים נכתבים יותר שדות – ב-Create CP for Fund With FT 56 עד 13 שדות (DTSX:46704 ואילך), וב-Create CP - Joining Only 14 שדות אפשריים, עד 13 בשורה כי סוכן או סוכנות (else if) (DTSX:35628 ואילך) – ואף אחד מהם אינו שדה מצב או סטטוס. בקשות ההעברה הנכנסות נסגרות (מצב 3) לפי תנאי הסגירה של כל סוג: בסוג 1 או 7 רק כשיש חותמת 'נתקבל' ותאריך ההעברה המוקדם בפיצולים מאוחר ממנה (DTSX:14395); בסוגים 5 ו-6 לפי התנאים שב-Close TI internal."
+        }
+      ],
+      "decisions": [
+        {
+          "where": "Precedence constraints (DTSX:110984-111007)",
+          "condition": "Success (logicalAnd=true, single incoming per task)",
+          "meaning_he": "כל שלב תלוי בהצלחת הקודם",
+          "outcome_he": "כשל עוצר את המשך השרשרת"
+        }
+      ],
+      "crmEffects": [],
+      "evidence": [
+        "DTSX:110984-111007 PrecedenceConstraints",
+        "DTSX:111010-111017 OnError",
+        "survey_0015_TransferIn.txt"
+      ],
+      "openQuestions_he": [
+        "שלב השכפול בוחר חשבונות לפי DATEDIFF(HOUR, ca.CreatedOn, GETUTCDATE()) <= 24, כלומר לפי זמן יצירת החשבון ולא לפי ריצה. אם ריצה נכשלה או דולגה, הריצה המוצלחת הבאה עדיין משכפלת לחשבונות שנוצרו עד 24 מעברי שעה לפניה (כ-24 עד 25 שעות). חשבון שיצא מהחלון לפני הריצה המוצלחת הבאה לא ישוכפל בשלב זה. האם לוח הזמנים מבטיח ריצה בתוך החלון? לוח הזמנים אינו בקבצים."
+      ]
+    },
+    {
+      "refId": "Package\\Clone TransferIn",
+      "title_he": "שכפול בקשת העברה נכנסת מחשבון המקור לחשבון לקוח חדש",
+      "techName": "Clone TransferIn",
+      "short_he": "לכל חשבון לקוח שנוצר עד 24 מעברי שעה לפני זמן הריצה (כ-24 עד 25 שעות) ויש לו חשבון מקור: אם לחשבון המקור יש בקשת העברה נכנסת מסוג 1 או 7 שנספח ד' שלה נשלח עד 6 מעברי חודש לפני חודש הריצה (עד כמעט 7 חודשים) או בתאריך עתידי, ולחשבון החדש אין עדיין בקשה כזו, הבקשה האחרונה משוכפלת לחשבון החדש.",
+      "flow_he": [
+        "חשבונות עם gen_sourceaccount שעומדים בתנאי DATEDIFF(HOUR, CreatedOn, GETUTCDATE()) <= 24 (עד 24 מעברי שעה).",
+        "בקשת ההעברה האחרונה של חשבון המקור (סוג 1/7, DATEDIFF(MONTH, gen_appendixdsent, GETUTCDATE()) <= 6 – עד 6 מעברי חודש, כולל תאריכים עתידיים); לחשבון החדש אין בקשה מסוג 1/7.",
+        "המרת תאריכים לשעון מקומי.",
+        "יצירת gen_transferin חדש לחשבון החדש ב-SDK, עם ערכים קבועים, עם זמן הריצה בתאריך קבלת הדחייה ועם תיאור שנבנה מהבקשה המקורית."
+      ],
+      "short": {
+        "nodes": [
+          {
+            "type": "step",
+            "text": "נבחרים חשבונות לקוח שנוצרו עד 24 מעברי שעה לפני זמן הריצה (כ-24 עד 25 שעות) ושיש להם חשבון מקור."
+          },
+          {
+            "type": "decision",
+            "text": "האם לחשבון המקור יש בקשת העברה נכנסת מסוג 1 או 7 שנספח ד' שלה נשלח עד 6 מעברי חודש לפני חודש הריצה (או בתאריך עתידי), ולחשבון החדש עוד אין בקשה כזו?",
+            "branches": [
+              {
+                "label": "כן",
+                "nodes": [
+                  {
+                    "type": "write",
+                    "text": "בקשת ההעברה האחרונה של חשבון המקור משוכפלת לחשבון החדש, עם תיאור 'חשבון מקור', סימון גיליון זיכוי ושדות דחייה: סוג דחייה 3, סיבת דחיית בקשה 39 ותאריך קבלת דחייה = השעה הנוכחית בזמן העיבוד."
+                  }
+                ]
+              },
+              {
+                "label": "לא",
+                "nodes": [
+                  {
+                    "type": "step",
+                    "text": "לא נוצרת בקשה."
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "type": "end",
+            "text": "לחשבון החדש נוצרת בקשת העברה נכנסת שהיא העתק של הבקשה האחרונה של חשבון המקור, עם שדות דחייה וסימון גיליון זיכוי. המשמעות העסקית של ההעתק (המשך הבקשה, רישום דחייה או משהו אחר) לא ידועה מהקבצים."
+          }
+        ]
+      },
+      "detailed": {
+        "nodes": [
+          {
+            "type": "step",
+            "text": "נבחרים חשבונות לקוח שמוגדר להם חשבון מקור ושזמן היצירה שלהם עומד בתנאי DATEDIFF(HOUR, CreatedOn, GETUTCDATE()) <= 24: עד 24 מעברי שעה לפני זמן הריצה ב-UTC, כלומר כ-24 עד 25 שעות (גם זמן יצירה עתידי עומד בתנאי).",
+            "tech": "Get TransferIn (OLEDBSource, DTSX:11131; SQL DTSX:11136): FROM Gen_customeraccount ca WHERE DATEDIFF(HOUR, ca.CreatedOn, GETUTCDATE()) <= 24 AND ca.gen_sourceaccount IS NOT NULL"
+          },
+          {
+            "type": "decision",
+            "text": "האם לחשבון המקור יש בקשת העברה נכנסת מסוג 1 או 7 שתאריך שליחת נספח ד' שלה עומד בתנאי DATEDIFF(MONTH, gen_appendixdsent, GETUTCDATE()) <= 6, כלומר עד 6 מעברי חודש לפני חודש הריצה (עד כמעט 7 חודשים), כולל תאריכים עתידיים?",
+            "tech": "JOIN Gen_transferin ti ON ca.gen_sourceaccount = ti.gen_customeraccountdest WHERE ti.Gen_transferType IN (1,7) AND DATEDIFF(MONTH, ti.gen_appendixdsent, GETUTCDATE()) <= 6 (נספח ד' ריק → לא נבחר)",
+            "branches": [
+              {
+                "label": "לא",
+                "nodes": [
+                  {
+                    "type": "step",
+                    "text": "החשבון לא מטופל."
+                  }
+                ]
+              },
+              {
+                "label": "כן",
+                "nodes": [
+                  {
+                    "type": "decision",
+                    "text": "האם לחשבון החדש כבר יש בקשת העברה נכנסת מסוג 1 או 7?",
+                    "tech": "LEFT JOIN Gen_transferin cloned_ti ON ca.Gen_customeraccountid = cloned_ti.gen_customeraccountdest AND cloned_ti.Gen_transferType IN (1,7) WHERE cloned_ti.gen_transferinId IS NULL",
+                    "branches": [
+                      {
+                        "label": "כן",
+                        "nodes": [
+                          {
+                            "type": "step",
+                            "text": "לא נוצרת בקשה נוספת."
+                          }
+                        ]
+                      },
+                      {
+                        "label": "לא",
+                        "nodes": [
+                          {
+                            "type": "step",
+                            "text": "נבחרת הבקשה האחרונה שנוצרה בחשבון המקור.",
+                            "tech": "ROW_NUMBER() OVER (PARTITION BY Gen_customeraccountid ORDER BY ti.createdon DESC) = 1"
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "type": "step",
+            "text": "הלקוח ותעודת הזהות נלקחים מהחשבון החדש, ואם הם ריקים – מהבקשה המקורית.",
+            "tech": "isnull(ca.gen_contactname, ti.gen_contactname), isnull(ca.Gen_customeridnumber, ti.gen_identitynumber)"
+          },
+          {
+            "type": "step",
+            "text": "תשעת התאריכים של הבקשה מומרים לשעון מקומי (תאריך לפני 2005 מקבל תוספת של שעתיים).",
+            "tech": "Dates To Local (DTSX:10066) main.cs:35-73"
+          },
+          {
+            "type": "write",
+            "text": "נוצרת בקשת העברה נכנסת חדשה בחשבון החדש, עם פרטי הבקשה המקורית: סוג העברה, חתימה אלקטרונית ותאריך חתימה, תיקוני 190 ו-8, gen_centralcompensationfundforpersonal, סטטוס לקוח, הפקדות שוטפות, תאריכים, gen_investhousename, קופה מקורית וסוגה, gen_fundfinanceid, gen_isfulltransfer, סכום צפוי, נספח ד', מקור הבקשה, סטטוס לאומי, מספר מסלקה, וחשבון המקור. שדה שיש לו בדיקת ערך ריק נכתב רק כשיש בו ערך.",
+            "tech": "Clone TransferIn 1-5 (DTSX:934, 2621, 4308, 5995, 7682; קוד זהה) main.cs:39-96; ExecuteMultiple Create · gen_transferin · Create · SDK"
+          },
+          {
+            "type": "step",
+            "text": "בבקשה החדשה נקבעים ערכים קבועים: מקור יצירה 2, מצב 1, סטטוס פעולה 6, סוג דחייה 3, סיבת דחיית בקשה 39 וגיליון זיכוי = כן. בנוסף נכתבים שני ערכים שאינם קבועים: תאריך קבלת דחייה = השעה הנוכחית במחשב שמריץ את החבילה בזמן עיבוד השורה, ותיאור שמורכב מהטקסט 'חשבון מקור – ' ומשם חשבון היעד של הבקשה המקורית.",
+            "tech": "main.cs:40-48. קבועים: gen_transferincreationsource=2, gen_currentstate=1, gen_rejecttype=3, gen_requestrejectreason=39, gen_actionstatus=6, gen_iscreditsheet=true. לא קבועים: gen_rejectreceivedate = DateTime.Now (main.cs:42); gen_description = Row.gendescription (main.cs:47), מה-SQL: N'חשבון מקור – ' + ti.gen_customeraccountdestName (ערך שורה)"
+          },
+          {
+            "type": "step",
+            "text": "כמה שדות נקראים בלי בדיקת ערך ריק (תיאור, לקוח, תעודת זהות, gen_investhousename, מספר קופה מקורית, סוג קופה מקורית, gen_fundfinanceid, מספר מסלקה). תעודת הזהות ריקה אם היא ריקה גם בחשבון וגם בבקשה המקורית, והתיאור ריק אם שם חשבון היעד בבקשה המקורית ריק. אם אחד מהשדות האלה ריק, הקריאה נכשלת והבקשה לא נוצרת; הכשל נרשם כאזהרת ETL.",
+            "tech": "main.cs:47, 50-51, 73-76, 95: גישה ל-Row.X בלי X_IsNull; catch (Exception) → ErrorBuffer (main.cs:111-117)"
+          },
+          {
+            "type": "end",
+            "text": "לחשבון החדש נוצרת בקשת העברה נכנסת שהיא העתק של הבקשה האחרונה של חשבון המקור, עם שדות דחייה (סוג דחייה 3, סיבת דחיית בקשה 39, תאריך קבלת דחייה) וסימון גיליון זיכוי. המשמעות העסקית של ההעתק (המשך הבקשה, רישום דחייה או משהו אחר) לא ידועה מהקבצים."
+          }
+        ]
+      },
+      "detail_he": [
+        {
+          "h": "מקור ואוכלוסייה",
+          "t": "Gen_customeraccount ⋈ Gen_transferin (טבלאות CRM, לא Staging). חשבונות עם gen_sourceaccount שעומדים בתנאי DATEDIFF(HOUR, ca.CreatedOn, GETUTCDATE()) <= 24 (עד 24 מעברי שעה לפני זמן הריצה, כ-24 עד 25 שעות). חשבונות הלקוח נוצרים כנראה בחבילה 0005_Customer Account (השערה), ו-gen_sourceaccount נכתב בחבילה 0006_LeumiFile-MY-Distributor (מוכח: SDK Update, 0006 DTSX:9817-9821; אין כותב אחר של השדה בקבצים שסופקו). בקשות ההעברה המקוריות נוצרות כנראה בחבילות 0008_LeumiFile-PY / 0009_LeumiFile-BY (השערה)."
+        },
+        {
+          "h": "התאמה לרשומות קיימות",
+          "t": "בקשת המקור: ti.gen_customeraccountdest = ca.gen_sourceaccount. בדיקת כפילות: אין לחשבון החדש בקשה מסוג 1 או 7."
+        },
+        {
+          "h": "החלטות",
+          "t": "סוג 1 או 7; DATEDIFF(MONTH, ti.gen_appendixdsent, GETUTCDATE()) <= 6 – נספח ד' נשלח עד 6 מעברי חודש לפני חודש הריצה (עד כמעט 7 חודשים), כולל תאריכים עתידיים, ונספח ד' ריק – לא נבחר; לחשבון החדש אין בקשה כזו; הבקשה האחרונה לפי createdon."
+        },
+        {
+          "h": "כתיבה ל-CRM",
+          "t": "gen_transferin Create ב-SDK (ExecuteMultiple במנות של 10)."
+        },
+        {
+          "h": "תוצאה עסקית",
+          "t": "לחשבון לקוח שנוצר עד 24 מעברי שעה לפני זמן הריצה ויש לו חשבון מקור (gen_sourceaccount), הבקשה האחרונה המתאימה (סוג 1 או 7) של חשבון המקור מועתקת לחשבון החדש. הפירוש העסקי \"החלפת חשבון\" הוא השערה."
+        }
+      ],
+      "sourceFeed": {
+        "component": "Get TransferIn (DTSX:11131)",
+        "tables": [
+          "gen_customeraccount",
+          "gen_transferin"
+        ],
+        "isStaging": false,
+        "upstream_he": "gen_customeraccount – כנראה 0005_Customer Account (השערה); gen_sourceaccount – 0006_LeumiFile-MY-Distributor (מוכח, 0006 DTSX:9817-9821); gen_transferin – כנראה 0008_LeumiFile-PY / 0009_LeumiFile-BY (השערה)."
+      },
+      "decisions": [
+        {
+          "where": "Get TransferIn (DTSX:11136)",
+          "condition": "cloned_ti.gen_transferinId is null and DATEDIFF(HOUR,ca.CreatedOn,GETUTCDATE()) <= 24 and ca.gen_sourceaccount is not null and ti.Gen_transferType in (1,7) and DATEDIFF(MONTH, ti.gen_appendixdsent, GETUTCDATE()) <= 6",
+          "meaning_he": "חשבון שנוצר עד 24 מעברי שעה לפני זמן הריצה, עם חשבון מקור שיש לו בקשה מסוג 1 או 7 שנספח ד' שלה נשלח עד 6 מעברי חודש לפני חודש הריצה (כולל תאריך עתידי), ובלי בקשה מסוג 1 או 7 משלו",
+          "outcome_he": "נבחר לשכפול"
+        },
+        {
+          "where": "Get TransferIn (DTSX:11136)",
+          "condition": "ROW_NUMBER() OVER (PARTITION BY Gen_customeraccountid ORDER BY ti.createdon DESC) = 1",
+          "meaning_he": "הבקשה האחרונה של חשבון המקור",
+          "outcome_he": "בקשה אחת לכל חשבון חדש"
+        }
+      ],
+      "crmEffects": [
+        {
+          "entity": "gen_transferin",
+          "verb": "Create",
+          "mechanism": "SDK",
+          "when_he": "לכל חשבון חדש שעומד בתנאים"
+        }
+      ],
+      "evidence": [
+        "DTSX:11136 SQL Get TransferIn",
+        "DTSX:10066 Dates To Local",
+        "Clone TransferIn 1 main.cs (sha 604339a40fb2):39-96",
+        "dupes.json + cmp: ×5 זהים"
+      ],
+      "openQuestions_he": [
+        "מה משמעות הערכים הקבועים מקור יצירה 2, סוג דחייה 3 וסיבת דחיית בקשה 39? לא נמצאו להם תוויות בקבצים. סטטוס פעולה 6 מסומן בקוד של חבילה זו \"עדכון עצמי\" (הערה ב-Create TI - Joining Only, create transferin (joining only) main.cs:83).",
+        "תשובה מהקבצים: את gen_sourceaccount בחשבון הלקוח כותבת חבילה 0006_LeumiFile-MY-Distributor (Update Details from employer Fields CustomerAccount, SDK Update). הערך הוא gensourceaccount מה-Lookup \"Get Source Account\", והוא נכתב רק כששדה הקובץ SourceAccount160 אינו ריק ואינו אפסים בלבד, וכשהערך שונה מהערך השמור (0006 DTSX:9817-9821)."
+      ]
+    },
+    {
+      "refId": "Package\\Create CP for Fund With FT 56",
+      "title_he": "יצירת פיצולי מסלול לקופות עם תנועות 56 בבקשות מסוג 1 או 7",
+      "techName": "Create CP for Fund With FT 56",
+      "short_he": "בבקשות העברה נכנסות פתוחות (מצב 1) מסוג 1 או 7, לכל קופה של חשבון היעד שיש בה תנועות מסוג 56 ואין לה עדיין פיצול מסלול, נוצר פיצול מסלול מסוג 2. אחר כך הבקשה מתעדכנת בסכום ריבית הפיגורים, במספר ימי הפיגור המרבי ובתאריך הביצוע המוקדם.",
+      "flow_he": [
+        "בקשות במצב 1 מסוג 1/7 → חשבון יעד → קופות → מוצר → חוזה סוכן.",
+        "סיכום תנועות 56 לכל קופה (שנה נוכחית ושנה קודמת).",
+        "רק קופות בלי פיצול מסלול → יצירת gen_coursepartition (סוג 2) ב-SDK.",
+        "קיבוץ לפי בקשה (סכום ריבית פיגורים, מקסימום ימי פיגור, מינימום תאריך ביצוע) → עדכון gen_transferin ב-SDK."
+      ],
+      "short": {
+        "nodes": [
+          {
+            "type": "step",
+            "text": "נבחרות בקשות העברה נכנסות פתוחות (מצב 1) מסוג 1 או 7, וכל קופה של חשבון היעד שיש לה מוצר וחוזה סוכן ושיש בה תנועות כסף מסוג 56 (השאילתה לא מקשרת את התנועות לבקשה עצמה)."
+          },
+          {
+            "type": "decision",
+            "text": "האם לקופה כבר יש פיצול מסלול?",
+            "branches": [
+              {
+                "label": "לא",
+                "nodes": [
+                  {
+                    "type": "write",
+                    "text": "נוצר פיצול מסלול לקופה, עם פרטי הבקשה, הלקוח, המוצר, הסוכן והמפקח."
+                  },
+                  {
+                    "type": "write",
+                    "text": "הבקשה מתעדכנת בסכום ריבית הפיגורים, במספר ימי הפיגור ובתאריך הביצוע המוקדם."
+                  }
+                ]
+              },
+              {
+                "label": "כן",
+                "nodes": [
+                  {
+                    "type": "step",
+                    "text": "לא נוצר פיצול לקופה, והתנועות שלה לא נכללות בסיכומי הבקשה. הבקשה מתעדכנת רק אם קופה אחרת שלה נבחרה בריצה הזו."
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "type": "end",
+            "text": "לקופות של חשבון היעד שיש בהן תנועות 56 ואין להן פיצול נוצר פיצול מסלול, והבקשה מתעדכנת בפרטי הפיגור. שהכסף הגיע מההעברה הזו – השערה."
+          }
+        ]
+      },
+      "detailed": {
+        "nodes": [
+          {
+            "type": "step",
+            "text": "נבחרות בקשות העברה נכנסות במצב 1 מסוג 1 או 7. לכל בקשה נלקחות כל הקופות של חשבון היעד שיש להן מוצר וחוזה סוכן.",
+            "tech": "Get All course partitions ft totals (OLEDBSource, DTSX:46139; SQL DTSX:46144): gen_transferin ti ⋈ Gen_customeraccount ca (ti.gen_customeraccountdest) ⋈ Gen_fundmain fm (fm.Gen_customeraccountname = ca.id) ⋈ Product ⋈ Gen_agentcontract (FM.gen_brokernumber, INNER) WHERE ti.Gen_CurrentState = 1 AND ti.gen_transfertype IN (1,7)"
+          },
+          {
+            "type": "step",
+            "text": "לכל קופה מסוכמות תנועות הכסף מסוג 56 (קבוצת תנועה 01 או 02, רק תנועות שבהן modeldependage מלא ושונה מ-2; תנועות שבהן הוא ריק לא נספרות), בנפרד לשנה הנוכחית ולשנה הקודמת: סכום ריבית הפיגורים, ימי הפיגור המרביים ותאריך הביצוע המוקדם. קופה בלי תנועה כזו לא נבחרת.",
+            "tech": "INNER JOIN (gen_ftcurrentyear ... UNION ALL gen_ftpreviousyear ...) ft ON fm.Gen_fundmainId = ft.gen_fundnumber; gen_transtypeid = '56' AND Gen_modeldependage != 2 AND Gen_transgrouptypeid IN ('01','02'); JOIN Gen_fundtransactiontype ו-gen_banks"
+          },
+          {
+            "type": "decision",
+            "text": "האם לקופה כבר יש פיצול מסלול כלשהו?",
+            "tech": "LEFT JOIN gen_coursepartition cp ON fm.Gen_fundmainId = cp.gen_fundnumberdest WHERE cp.gen_coursepartitionId IS NULL",
+            "branches": [
+              {
+                "label": "כן",
+                "nodes": [
+                  {
+                    "type": "step",
+                    "text": "הקופה לא נבחרת: לא נוצר פיצול לקופה, והתנועות שלה לא נכללות בסיכומי הבקשה. הבקשה מתעדכנת רק אם קופה אחרת שלה נבחרה בריצה הזו."
+                  }
+                ]
+              },
+              {
+                "label": "לא",
+                "nodes": [
+                  {
+                    "type": "step",
+                    "text": "תאריך יצירת הקופה ותאריך פתיחת הקופה מומרים לשעון מקומי.",
+                    "tech": "Dates To Local (DTSX:45390)"
+                  },
+                  {
+                    "type": "write",
+                    "text": "נוצר פיצול מסלול מסוג 2, עם הבקשה, הלקוח, הקופה, המוצר, הסוכן, הסוכנות, המפקח, הבנק המייעץ, תעודת הזהות, gen_fundfinanceid ומספר הסוכן. תאריך היצירה בפיצול הוא תאריך יצירת רשומת הקופה, והוא נכתב רק כשתאריך פתיחת הקופה קיים.",
+                    "tech": "SDK Create gen_coursepartition ×5 (DTSX:46546, 47885, 49134, 50383, 51632; קוד זהה) main.cs:34-87: gen_coursepartitiontype = 2 (קבוע ב-SQL), gen_creationdate = Row.CreatedOn כש-!genfundcreationdate_IsNull (main.cs:41-42), gen_supervisor = EntityReference(\"systemuser\") · gen_coursepartition · Create · SDK"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "type": "step",
+            "text": "כל שורות המקור – גם אלה שיצירת הפיצול שלהן נכשלה – מקובצות לפי בקשה: סכום ריבית הפיגורים, ימי הפיגור המרביים ותאריך הביצוע המוקדם.",
+            "tech": "SDK Create .Result (sync, כל השורות) → Union All → Derived Column (DTSX:46109): gen_arrearsdays_int = ISNULL(gen_arrearsdays) || TRIM(gen_arrearsdays) == \"\" ? 0 : (DT_I4)TRIM(gen_arrearsdays) → Group by TransferIn (Aggregate, DTSX:46286): GroupBy gen_transferinId; Sum gen_arrearsinterestamount; Min gen_actualexecutiondate; Max gen_arrearsdays_int"
+          },
+          {
+            "type": "write",
+            "text": "הבקשה מתעדכנת: תאריך ההעברה בפועל = תאריך הביצוע המוקדם, סכום ריבית הפיגורים, ומספר ימי הפיגור (כטקסט).",
+            "tech": "Update Transfer In ×5 (DTSX:53938...; קוד זהה) main.cs:46-75: gen_actualtransferdate, gen_arrearsinterestamount (Money), gen_arrearsdays (ToString) · gen_transferin · Update · SDK"
+          },
+          {
+            "type": "step",
+            "text": "קופה שיש לה תנועות 56 גם בשנה הנוכחית וגם בשנה הקודמת מופיעה בשתי שורות, ואין איחוד לפני היצירה. לכן ייתכן שייווצרו לה שני פיצולים באותה ריצה (השערה לפי מבנה השאילתה).",
+            "tech": "UNION ALL של שתי השנים, בלי DISTINCT/Aggregate לפני SDK Create"
+          },
+          {
+            "type": "end",
+            "text": "לקופות של חשבון היעד של בקשה פתוחה (מצב 1) מסוג 1 או 7, שיש להן מוצר וחוזה סוכן, שיש בהן תנועת 56 העומדת בסינון שבשלב 2 (קבוצת תנועה 01 או 02, modeldependage מלא ושונה מ-2, עם סוג תנועה ובנק תואמים), ושאין להן פיצול – נוצר פיצול מסלול, והבקשה נושאת את פרטי הפיגור. השאילתה לא מקשרת את התנועות לבקשה (אין סינון לפי תאריך או לפי הבקשה), ולכן שהכסף הגיע מההעברה הזו היא השערה."
+          }
+        ]
+      },
+      "detail_he": [
+        {
+          "h": "מקור ואוכלוסייה",
+          "t": "שאילתה על טבלאות CRM (לא Staging): gen_transferin, Gen_customeraccount, Gen_fundmain, Product, Gen_agentcontract, gen_ftcurrentyear, gen_ftpreviousyear, Gen_fundtransactiontype, gen_banks, gen_coursepartition. gen_ftcurrentyear נטענת כנראה על ידי 0008_LeumiFile-PY (השערה: בחבילה זו יש INSERT ל-Gen_ftCurrentYearBase). לא נמצא בחבילות שסופקו רכיב שכותב ל-gen_ftpreviousyear (external_unknown)."
+        },
+        {
+          "h": "התאמה לרשומות קיימות",
+          "t": "פיצול קיים מזוהה לפי gen_fundnumberdest = הקופה בלבד, בלי קשר לבקשה."
+        },
+        {
+          "h": "החלטות",
+          "t": "בקשה במצב 1 מסוג 1 או 7; לקופה יש מוצר (INNER JOIN ל-Product לפי Product.ProductId = fm.gen_fundtypename – קופה בלי מוצר תואם נשמטת) וחוזה סוכן (INNER JOIN ל-Gen_agentcontract לפי fm.gen_brokernumber – קופה בלי חוזה נשמטת); לקופה יש תנועות 56 (01/02, modeldependage מלא ושונה מ-2), בלי סינון לפי תאריך או לפי הבקשה; לקופה אין פיצול. קופה שנשמטת לא מקבלת פיצול והתנועות שלה לא נכללות בעדכון הבקשה; הבקשה מתעדכנת רק אם לפחות קופה אחת שלה נבחרה."
+        },
+        {
+          "h": "כתיבה ל-CRM",
+          "t": "gen_coursepartition Create (SDK); gen_transferin Update (SDK): gen_actualtransferdate, gen_arrearsinterestamount, gen_arrearsdays."
+        },
+        {
+          "h": "תוצאה עסקית",
+          "t": "פתיחת פיצולי מסלול לקופות של חשבון היעד שיש בהן תנועות 56 ואין להן פיצול, ורישום פרטי הפיגור בבקשה. שהכסף הגיע מההעברה הזו – השערה (השאילתה לא מקשרת תנועה לבקשה)."
+        }
+      ],
+      "sourceFeed": {
+        "component": "Get All course partitions ft totals (DTSX:46139)",
+        "tables": [
+          "gen_transferin",
+          "gen_customeraccount",
+          "gen_fundmain",
+          "product",
+          "gen_agentcontract",
+          "gen_ftcurrentyear",
+          "gen_ftpreviousyear",
+          "gen_fundtransactiontype",
+          "gen_banks",
+          "gen_coursepartition"
+        ],
+        "isStaging": false,
+        "upstream_he": "gen_ftcurrentyear – כנראה 0008_LeumiFile-PY (השערה); gen_ftpreviousyear – לא ידוע; gen_transferin – כנראה 0008/0009 ושלב השכפול בחבילה זו; gen_fundmain – כנראה 0004_LeumiFile-MY (השערה)."
+      },
+      "decisions": [
+        {
+          "where": "Get All course partitions ft totals (DTSX:46144)",
+          "condition": "(ti.Gen_CurrentState = 1) and (ti.gen_transfertype in (1, 7)) and cp.gen_coursepartitionId is null",
+          "meaning_he": "בקשה פתוחה (מצב 1) מסוג 1 או 7 וקופה בלי פיצול",
+          "outcome_he": "נוצר פיצול"
+        },
+        {
+          "where": "ft subquery (DTSX:46144)",
+          "condition": "gen_transtypeid = '56' AND Gen_modeldependage != 2 and Gen_transgrouptypeid in ('01','02')",
+          "meaning_he": "תנועות כסף מסוג 56",
+          "outcome_he": "הקופה נכללת"
+        },
+        {
+          "where": "SDK Create gen_coursepartition main.cs:41-42",
+          "condition": "!Row.genfundcreationdate_IsNull",
+          "meaning_he": "יש תאריך פתיחת קופה",
+          "outcome_he": "gen_creationdate = Row.CreatedOn (תאריך יצירת רשומת הקופה)"
+        },
+        {
+          "where": "Get All course partitions ft totals (DTSX:46144)",
+          "condition": "inner Join Product with(nolock) on Product.ProductId = fm.gen_fundtypename inner Join Gen_agentcontract with(nolock) on FM.gen_brokernumber = Gen_agentcontract.Gen_agentcontractId",
+          "meaning_he": "לקופה יש מוצר תואם וחוזה סוכן",
+          "outcome_he": "אחרת הקופה נשמטת: לא נוצר לה פיצול והיא לא נכללת בסיכומי הבקשה"
+        }
+      ],
+      "crmEffects": [
+        {
+          "entity": "gen_coursepartition",
+          "verb": "Create",
+          "mechanism": "SDK",
+          "when_he": "לכל שורת קופה (ושנה) בלי פיצול קיים"
+        },
+        {
+          "entity": "gen_transferin",
+          "verb": "Update",
+          "mechanism": "SDK",
+          "when_he": "לכל בקשה שהופיעה במקור, גם אם יצירת הפיצול נכשלה"
+        }
+      ],
+      "evidence": [
+        "DTSX:46144 SQL",
+        "DTSX:46109 Derived Column; DTSX:46286 Group by TransferIn",
+        "SDK Create gen_coursepartition main.cs (sha e6b745a25142):34-87",
+        "Update Transfer In main.cs (sha dfd3ba84a8dc):46-75",
+        "dupes.json: ×5 זהים בכל קבוצה"
+      ],
+      "openQuestions_he": [
+        "האם gen_creationdate בפיצול אמור לקבל את תאריך פתיחת הקופה (gen_fundcreationdate, כמו ב-Create CP - Joining Only) או את תאריך יצירת הרשומה (CreatedOn)?",
+        "קופה בלי חוזה סוכן (gen_brokernumber ריק) נשמטת בגלל INNER JOIN ל-Gen_agentcontract, וקופה בלי מוצר תואם נשמטת בגלל INNER JOIN ל-Product (Product.ProductId = fm.gen_fundtypename). האם זה מכוון?"
+      ]
+    },
+    {
+      "refId": "Package\\Update CoursePartition internal",
+      "title_he": "סכום ותאריך בפועל בפיצולים של העברות פנימיות (תנועה 57)",
+      "techName": "Update CoursePartition internal",
+      "short_he": "לכל פיצול מסלול של בקשת העברה פנימית פתוחה (סוג 5 או 6) מסכמים את תנועות 57 בקופת היעד שנרשמו מיום לפני יצירת הבקשה ועד חמישה ימים אחריה. אם הסכום חיובי, והסכום או תאריך הערך שונים מהקיים בפיצול, הפיצול מתעדכן.",
+      "flow_he": [
+        "פיצולים של בקשות במצב 1 מסוג 5/6 שקופת היעד שלהם שייכת לחשבון היעד.",
+        "סכום תנועות 57 (01/02, modeldependage מלא ו-≠ 2) עם תאריך רישום בחלון של יום לפני עד 5 ימים אחרי יצירת הבקשה.",
+        "סכום > 0 ושונה מהקיים, או תאריך ערך שונה → עדכון gen_coursepartition ב-SDK."
+      ],
+      "short": {
+        "nodes": [
+          {
+            "type": "step",
+            "text": "נבחרים פיצולי מסלול של בקשות העברה פנימיות פתוחות."
+          },
+          {
+            "type": "step",
+            "text": "לכל פיצול מסוכמות תנועות הכסף מסוג 57 בקופת היעד שנרשמו בסמוך ליצירת הבקשה."
+          },
+          {
+            "type": "decision",
+            "text": "האם הסכום חיובי, והסכום או תאריך הערך שונים מהרשום בפיצול?",
+            "branches": [
+              {
+                "label": "כן",
+                "nodes": [
+                  {
+                    "type": "write",
+                    "text": "בפיצול נרשמים הסכום בפועל ותאריך ההעברה בפועל."
+                  }
+                ]
+              },
+              {
+                "label": "לא",
+                "nodes": [
+                  {
+                    "type": "step",
+                    "text": "הפיצול לא מתעדכן."
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "type": "end",
+            "text": "פיצולי ההעברות הפנימיות משקפים את הכסף שנכנס לקופה."
+          }
+        ]
+      },
+      "detailed": {
+        "nodes": [
+          {
+            "type": "step",
+            "text": "נבחרים פיצולי מסלול של בקשות העברה נכנסות במצב 1 מסוג 5 או 6, שקופת היעד שלהם שייכת לחשבון היעד של הבקשה.",
+            "tech": "Get All course partitions ft totals (OLEDBSource, DTSX:83714; SQL DTSX:83719): @BetweenCource_CP ← gen_coursepartition cp ⋈ gen_transferin ti ⋈ Gen_customeraccount ca ⋈ Gen_fundmain fm (fm.Gen_customeraccountname = ca.id AND fm.Gen_fundmainId = cp.gen_fundnumberdest) WHERE ti.Gen_CurrentState = 1 AND ti.gen_transfertype IN (5,6)"
+          },
+          {
+            "type": "step",
+            "text": "לכל פיצול מסוכמות תנועות מסוג 57 בקופת היעד (קבוצת תנועה 01 או 02, רק כש-modeldependage מלא ושונה מ-2; תנועות שבהן הוא ריק לא נספרות), שתאריך הרישום שלהן הוא מיום לפני יצירת הבקשה ועד חמישה ימים אחריה, משתי טבלאות השנה; נלקח גם תאריך הערך המוקדם.",
+            "tech": "gen_ftcurrentyear / gen_ftpreviousyear: gen_transtypeid = '57' AND Gen_modeldependage != 2 AND Gen_transgrouptypeid IN ('01','02') AND ((DATEDIFF(DAY, cp.transferCreated, Gen_EntryDate) BETWEEN 0 AND 5) OR (DATEDIFF(DAY, Gen_EntryDate, cp.transferCreated) BETWEEN 0 AND 1)); sum(gen_transtotalamount), min(gen_valuedate)"
+          },
+          {
+            "type": "decision",
+            "text": "האם הסכום חיובי, תאריך הערך קיים, והסכום שונה מהרשום בפיצול (או שאין בו סכום), או שתאריך הערך שונה ביום אחד לפחות?",
+            "tech": "HAVING sum(gen_transtotalamount) > 0 AND min(gen_valuedate) IS NOT NULL AND (gen_actualtransferamount_CP <> sum(...) OR gen_actualtransferamount_CP IS NULL OR DATEDIFF(day, Gen_actualtransferdate, min(gen_valuedate)) <> 0)",
+            "branches": [
+              {
+                "label": "לא",
+                "nodes": [
+                  {
+                    "type": "step",
+                    "text": "הפיצול לא נבחר."
+                  }
+                ]
+              },
+              {
+                "label": "כן",
+                "nodes": [
+                  {
+                    "type": "step",
+                    "text": "תאריך הערך מומר לשעון מקומי.",
+                    "tech": "Dates To Local (DTSX:83035)"
+                  },
+                  {
+                    "type": "write",
+                    "text": "בפיצול נרשמים הסכום בפועל (סכום התנועות) ותאריך ההעברה בפועל (תאריך הערך המוקדם).",
+                    "tech": "Update Course Partition ×5 (DTSX:84337...; קוד זהה פרט לשם פונקציה) main.cs:39-57: if (gentranstotalamount > 0 && !genvaluedate_IsNull) gen_actualtransferamount = Money, gen_actualtransferdate · gen_coursepartition · Update · SDK"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "type": "end",
+            "text": "הסכום והתאריך בפועל בפיצולי ההעברות הפנימיות הפתוחות מעודכנים, ומשמשים בהמשך לסגירת הבקשות."
+          }
+        ]
+      },
+      "detail_he": [
+        {
+          "h": "מקור ואוכלוסייה",
+          "t": "טבלאות CRM (לא Staging): gen_coursepartition, gen_transferin, Gen_customeraccount, Gen_fundmain, gen_ftcurrentyear, gen_ftpreviousyear. התנועות נטענות כנראה ב-0008_LeumiFile-PY (השערה); הפיצולים נוצרים כנראה ב-0008/0009 (השערה)."
+        },
+        {
+          "h": "התאמה לרשומות קיימות",
+          "t": "תנועה ↔ פיצול לפי gen_fundnumber = cp.gen_fundnumberdest."
+        },
+        {
+          "h": "החלטות",
+          "t": "בקשה במצב 1 מסוג 5/6; תנועה 57 בחלון של יום לפני עד 5 ימים אחרי יצירת הבקשה; סכום > 0; שינוי בסכום או בתאריך."
+        },
+        {
+          "h": "כתיבה ל-CRM",
+          "t": "gen_coursepartition Update (SDK): gen_actualtransferamount, gen_actualtransferdate."
+        },
+        {
+          "h": "תוצאה עסקית",
+          "t": "רישום הכסף שהתקבל בפועל בהעברה פנימית ברמת פיצול המסלול."
+        }
+      ],
+      "sourceFeed": {
+        "component": "Get All course partitions ft totals (DTSX:83714)",
+        "tables": [
+          "gen_coursepartition",
+          "gen_transferin",
+          "gen_customeraccount",
+          "gen_fundmain",
+          "gen_ftcurrentyear",
+          "gen_ftpreviousyear"
+        ],
+        "isStaging": false,
+        "upstream_he": "gen_ftcurrentyear – כנראה 0008_LeumiFile-PY (השערה); gen_ftpreviousyear – לא ידוע; gen_coursepartition – כנראה 0008/0009 (השערה)."
+      },
+      "decisions": [
+        {
+          "where": "SQL DTSX:83719",
+          "condition": "ti.Gen_CurrentState = 1 and ti.gen_transfertype in (5,6)",
+          "meaning_he": "העברה פנימית פתוחה",
+          "outcome_he": "הפיצולים נבחרים"
+        },
+        {
+          "where": "SQL DTSX:83719",
+          "condition": "ftc.gen_transtypeid = '57' AND ftc.Gen_modeldependage != 2 and ftc.Gen_transgrouptypeid in ('01','02') and (( DATEDIFF(DAY,cp.transferCreated, ftc.Gen_EntryDate) Between 0 And 5) or (DATEDIFF(DAY,ftc.Gen_EntryDate,cp.transferCreated) Between 0 And 1))",
+          "meaning_he": "תנועה 57 בחלון הזמן",
+          "outcome_he": "נספרת בסכום"
+        },
+        {
+          "where": "SQL DTSX:83719 HAVING",
+          "condition": "sum(gen_transtotalamount) > 0 and min(gen_valuedate) is not null and (gen_actualtransferamount_CP <> sum(gen_transtotalamount) or gen_actualtransferamount_CP is null or DATEDIFF(day, Gen_actualtransferdate, min(gen_valuedate)) <> 0)",
+          "meaning_he": "יש ערך חדש",
+          "outcome_he": "עדכון הפיצול"
+        }
+      ],
+      "crmEffects": [
+        {
+          "entity": "gen_coursepartition",
+          "verb": "Update",
+          "mechanism": "SDK",
+          "when_he": "סכום חיובי שונה או תאריך שונה"
+        }
+      ],
+      "evidence": [
+        "DTSX:83719 SQL",
+        "DTSX:83035 Dates To Local",
+        "Update Course Partition main.cs (sha 438cad502b01):39-57",
+        "dupes.json + cmp: ×5 זהים (ההבדל: ExecuteBulk/ExcecuteBulk)"
+      ],
+      "openQuestions_he": []
+    },
+    {
+      "refId": "Package\\Update CoursePartition external",
+      "title_he": "סכום ותאריך בפועל לפי תנועות 56 בפיצולים של בקשות מסוג 1 או 7",
+      "techName": "Update CoursePartition external",
+      "short_he": "לכל פיצול מסלול של בקשת העברה פתוחה מסוג 1 או 7 מסכמים את תנועות 56 בקופת היעד שנרשמו ביום יצירת הבקשה או אחריו. אם הסכום חיובי ויש תאריך ערך, ובנוסף הסכום שונה מהקיים בפיצול (או שאין בו סכום) או שתאריך הערך שונה מהתאריך בפיצול, הפיצול מתעדכן.",
+      "flow_he": [
+        "פיצולים של בקשות במצב 1 מסוג 1/7 שקופת היעד שלהם שייכת לחשבון היעד.",
+        "סכום תנועות 56 (01/02, modeldependage מלא ו-≠ 2) עם תאריך רישום ביום יצירת הבקשה או אחריו.",
+        "סכום > 0 ותאריך ערך קיים, וגם (הסכום שונה מהקיים או ריק בפיצול, או תאריך הערך שונה מהתאריך בפיצול) → עדכון gen_coursepartition ב-SDK."
+      ],
+      "short": {
+        "nodes": [
+          {
+            "type": "step",
+            "text": "נבחרים פיצולי מסלול של בקשות העברה פתוחות מסוג 1 או 7."
+          },
+          {
+            "type": "step",
+            "text": "לכל פיצול מסוכמות תנועות הכסף מסוג 56 בקופת היעד שנרשמו מיום יצירת הבקשה והלאה."
+          },
+          {
+            "type": "decision",
+            "text": "האם הסכום חיובי, והסכום או תאריך הערך שונים מהרשום בפיצול?",
+            "branches": [
+              {
+                "label": "כן",
+                "nodes": [
+                  {
+                    "type": "write",
+                    "text": "בפיצול נרשמים הסכום בפועל ותאריך ההעברה בפועל."
+                  }
+                ]
+              },
+              {
+                "label": "לא",
+                "nodes": [
+                  {
+                    "type": "step",
+                    "text": "הפיצול לא מתעדכן."
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "type": "end",
+            "text": "פיצולי הבקשות מסוג 1 או 7 משקפים את הכסף שנכנס לקופה."
+          }
+        ]
+      },
+      "detailed": {
+        "nodes": [
+          {
+            "type": "step",
+            "text": "נבחרים פיצולי מסלול של בקשות העברה נכנסות במצב 1 מסוג 1 או 7, שקופת היעד שלהם שייכת לחשבון היעד של הבקשה.",
+            "tech": "Get All course partitions ft totals (OLEDBSource, DTSX:75512; SQL DTSX:75517): @JoinAndTransfer_CP ← gen_coursepartition cp ⋈ gen_transferin ti ⋈ Gen_customeraccount ca ⋈ Gen_fundmain fm (fm.Gen_customeraccountname = ca.id AND fm.Gen_fundmainId = cp.gen_fundnumberdest) WHERE ti.Gen_CurrentState = 1 AND ti.gen_transfertype IN (1,7)"
+          },
+          {
+            "type": "step",
+            "text": "לכל פיצול מסוכמות תנועות מסוג 56 בקופת היעד (קבוצת תנועה 01 או 02, רק כש-modeldependage מלא ושונה מ-2; תנועות שבהן הוא ריק לא נספרות), שתאריך הרישום שלהן הוא ביום יצירת הבקשה או אחריו, משתי טבלאות השנה; נלקח גם תאריך הערך המוקדם.",
+            "tech": "@PeriodOfTimeToCheck = 0; gen_transtypeid = '56' AND Gen_modeldependage != 2 AND Gen_transgrouptypeid IN ('01','02') AND DATEDIFF(DAY, cp.transferCreated, Gen_EntryDate) >= 0; JOIN Gen_fundtransactiontype, gen_banks"
+          },
+          {
+            "type": "decision",
+            "text": "האם הסכום חיובי, תאריך הערך קיים, והסכום שונה מהרשום בפיצול (או שאין בו סכום), או שתאריך הערך שונה ביום אחד לפחות?",
+            "tech": "HAVING sum(gen_transtotalamount) > 0 AND min(gen_valuedate) IS NOT NULL AND (gen_actualtransferamount_CP <> sum(...) OR gen_actualtransferamount_CP IS NULL OR DATEDIFF(day, Gen_actualtransferdate, min(gen_valuedate)) <> 0)",
+            "branches": [
+              {
+                "label": "לא",
+                "nodes": [
+                  {
+                    "type": "step",
+                    "text": "הפיצול לא נבחר."
+                  }
+                ]
+              },
+              {
+                "label": "כן",
+                "nodes": [
+                  {
+                    "type": "step",
+                    "text": "תאריך הערך מומר לשעון מקומי.",
+                    "tech": "Dates To Local (DTSX:74833)"
+                  },
+                  {
+                    "type": "write",
+                    "text": "בפיצול נרשמים הסכום בפועל ותאריך ההעברה בפועל.",
+                    "tech": "Update Course Partition ×5 (DTSX:76136...; קוד זהה) main.cs:39-59: gen_actualtransferamount (Money), gen_actualtransferdate · gen_coursepartition · Update · SDK"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "type": "end",
+            "text": "הסכום והתאריך בפועל בפיצולי הבקשות הפתוחות מסוג 1 או 7 מעודכנים, ומשמשים בהמשך לסגירת הבקשות."
+          }
+        ]
+      },
+      "detail_he": [
+        {
+          "h": "מקור ואוכלוסייה",
+          "t": "טבלאות CRM (לא Staging): gen_coursepartition, gen_transferin, Gen_customeraccount, Gen_fundmain, gen_ftcurrentyear, gen_ftpreviousyear, Gen_fundtransactiontype, gen_banks. התנועות נטענות כנראה ב-0008_LeumiFile-PY (השערה)."
+        },
+        {
+          "h": "התאמה לרשומות קיימות",
+          "t": "תנועה ↔ פיצול לפי gen_fundnumber = קופת היעד של הפיצול."
+        },
+        {
+          "h": "החלטות",
+          "t": "בקשה במצב 1 מסוג 1/7; תנועה 56 מיום יצירת הבקשה והלאה; סכום > 0; שינוי בסכום או בתאריך."
+        },
+        {
+          "h": "כתיבה ל-CRM",
+          "t": "gen_coursepartition Update (SDK): gen_actualtransferamount, gen_actualtransferdate."
+        },
+        {
+          "h": "תוצאה עסקית",
+          "t": "רישום הכסף שהתקבל בפועל (סכום תנועות 56) בבקשות מסוג 1 או 7 ברמת פיצול המסלול."
+        }
+      ],
+      "sourceFeed": {
+        "component": "Get All course partitions ft totals (DTSX:75512)",
+        "tables": [
+          "gen_coursepartition",
+          "gen_transferin",
+          "gen_customeraccount",
+          "gen_fundmain",
+          "gen_ftcurrentyear",
+          "gen_ftpreviousyear",
+          "gen_fundtransactiontype",
+          "gen_banks"
+        ],
+        "isStaging": false,
+        "upstream_he": "גם פיצולים שנוצרו בשלב Create CP for Fund With FT 56 בחבילה זו (מוכח); gen_ftcurrentyear – כנראה 0008_LeumiFile-PY (השערה)."
+      },
+      "decisions": [
+        {
+          "where": "SQL DTSX:75517",
+          "condition": "(ti.Gen_CurrentState = 1) and ti.gen_transfertype in (1,7)",
+          "meaning_he": "בקשה פתוחה מסוג 1 או 7",
+          "outcome_he": "הפיצולים נבחרים"
+        },
+        {
+          "where": "SQL DTSX:75517",
+          "condition": "ftc.gen_transtypeid = '56' AND ftc.Gen_modeldependage != 2 and ftc.Gen_transgrouptypeid in ('01','02') and DATEDIFF(DAY,cp.transferCreated, ftc.Gen_EntryDate) >= @PeriodOfTimeToCheck /* 0 */",
+          "meaning_he": "תנועה 56 מיום יצירת הבקשה",
+          "outcome_he": "נספרת בסכום"
+        },
+        {
+          "where": "SQL DTSX:75517 HAVING",
+          "condition": "sum(gen_transtotalamount) > 0 and min(gen_valuedate) is not null and (gen_actualtransferamount_CP <> sum(gen_transtotalamount) or gen_actualtransferamount_CP is null or DATEDIFF(day, Gen_actualtransferdate, min(gen_valuedate)) <> 0)",
+          "meaning_he": "יש ערך חדש",
+          "outcome_he": "עדכון הפיצול"
+        }
+      ],
+      "crmEffects": [
+        {
+          "entity": "gen_coursepartition",
+          "verb": "Update",
+          "mechanism": "SDK",
+          "when_he": "סכום חיובי שונה או תאריך שונה"
+        }
+      ],
+      "evidence": [
+        "DTSX:75517 SQL",
+        "DTSX:74833 Dates To Local",
+        "Update Course Partition main.cs (sha eb6e6d528268):39-59",
+        "dupes.json: ×5 זהים"
+      ],
+      "openQuestions_he": []
+    },
+    {
+      "refId": "Package\\Update TI intrnal expectes",
+      "title_he": "סכום צפוי בהעברות פנימיות לפי מסלולי החשבון",
+      "techName": "Update TI intrnal expectes",
+      "short_he": "בבקשות העברה פנימיות פתוחות (סוג 5 או 6) שעוד לא נרשם בהן סכום בפועל, הסכום הצפוי מתעדכן לסכום התנועות במסלולי החשבון שמקושרים לבקשה, כשהסכום חיובי ושונה מהרשום.",
+      "flow_he": [
+        "gen_accountcourses עם סכום ≠ 0, המקושרים לבקשה במצב 1 מסוג 5/6 בלי סכום בפועל.",
+        "סכום לכל בקשה; נבחר רק אם שונה מהסכום הצפוי או שאין סכום צפוי.",
+        "סכום > 0 → עדכון gen_expectedtransferamount ב-SDK."
+      ],
+      "short": {
+        "nodes": [
+          {
+            "type": "step",
+            "text": "נבחרות בקשות העברה פנימיות פתוחות שעוד לא נרשם בהן סכום בפועל."
+          },
+          {
+            "type": "step",
+            "text": "לכל בקשה מסוכמים סכומי התנועות במסלולי החשבון שמקושרים אליה."
+          },
+          {
+            "type": "decision",
+            "text": "האם הסכום חיובי ושונה מהסכום הצפוי שרשום בבקשה?",
+            "branches": [
+              {
+                "label": "כן",
+                "nodes": [
+                  {
+                    "type": "write",
+                    "text": "הסכום הצפוי בבקשה מתעדכן לסכום המחושב."
+                  }
+                ]
+              },
+              {
+                "label": "לא",
+                "nodes": [
+                  {
+                    "type": "step",
+                    "text": "הבקשה לא מתעדכנת."
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "type": "end",
+            "text": "הסכום הצפוי בהעברות הפנימיות תואם את מסלולי החשבון, ומשמש בסגירת הבקשות."
+          }
+        ]
+      },
+      "detailed": {
+        "nodes": [
+          {
+            "type": "step",
+            "text": "נבחרים מסלולי חשבון עם סכום תנועה שונה מאפס, המקושרים לבקשת העברה נכנסת במצב 1 מסוג 5 או 6, שאין בה סכום העברה בפועל (ריק או אפס).",
+            "tech": "Get All Account courses (OLEDBSource, DTSX:99515; SQL DTSX:99520): gen_accountcourses ⋈ Gen_transferin (gen_accountcourses.gen_transferin) WHERE gen_transactionamount != 0 AND (gen_actualtransferamount = 0 OR IS NULL) AND Gen_CurrentState = 1 AND Gen_transferType IN (5,6)"
+          },
+          {
+            "type": "step",
+            "text": "לכל בקשה מסוכמים סכומי התנועות.",
+            "tech": "Sum(gen_transactionamount) AS Transfer_Amount_Total GROUP BY Gen_transferinId, gen_expectedtransferamount; עמודת הפלט Transfer_Amount_Total_Source ← ExternalColumns[Transfer_Amount_Total] (DTSX:99545)"
+          },
+          {
+            "type": "decision",
+            "text": "האם הסכום שונה מהסכום הצפוי הרשום, או שאין סכום צפוי?",
+            "tech": "HAVING gen_expectedtransferamount <> Sum(gen_transactionamount) OR gen_expectedtransferamount IS NULL",
+            "branches": [
+              {
+                "label": "לא",
+                "nodes": [
+                  {
+                    "type": "step",
+                    "text": "הבקשה לא נבחרת."
+                  }
+                ]
+              },
+              {
+                "label": "כן",
+                "nodes": [
+                  {
+                    "type": "decision",
+                    "text": "האם הסכום חיובי?",
+                    "tech": "Update Transferin main.cs:40: !TransferAmountTotalSource_IsNull && TransferAmountTotalSource > 0",
+                    "branches": [
+                      {
+                        "label": "כן",
+                        "nodes": [
+                          {
+                            "type": "write",
+                            "text": "הסכום הצפוי בבקשה מתעדכן לסכום המחושב.",
+                            "tech": "Update Transferin ×5 (DTSX:100102...; קוד זהה) main.cs:38-49: gen_expectedtransferamount = Money · gen_transferin · Update · SDK"
+                          }
+                        ]
+                      },
+                      {
+                        "label": "לא",
+                        "nodes": [
+                          {
+                            "type": "step",
+                            "text": "הבקשה לא מתעדכנת (נספרת כ'אין צורך בעדכון').",
+                            "tech": "NoNeedToUpdateBuffer (main.cs:54)"
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "type": "end",
+            "text": "הסכום הצפוי בהעברות הפנימיות הפתוחות מעודכן לפי מסלולי החשבון."
+          }
+        ]
+      },
+      "detail_he": [
+        {
+          "h": "מקור ואוכלוסייה",
+          "t": "gen_accountcourses ⋈ Gen_transferin (טבלאות CRM, לא Staging). gen_accountcourses נוצרת כנראה בחבילות 0014_AccountCourses / 0008_LeumiFile-PY / 0009_LeumiFile-BY (השערה: בכולן יש יצירת Entity(\"gen_accountcourses\"))."
+        },
+        {
+          "h": "התאמה לרשומות קיימות",
+          "t": "gen_accountcourses.gen_transferin = Gen_transferinId."
+        },
+        {
+          "h": "החלטות",
+          "t": "בקשה במצב 1 מסוג 5/6 בלי סכום בפועל; סכום ≠ צפוי או צפוי ריק; סכום > 0."
+        },
+        {
+          "h": "כתיבה ל-CRM",
+          "t": "gen_transferin.gen_expectedtransferamount – Update ב-SDK."
+        },
+        {
+          "h": "תוצאה עסקית",
+          "t": "הסכום הצפוי בהעברה פנימית נגזר ממסלולי החשבון, והוא הבסיס לבדיקת 15% בסגירת הבקשה."
+        }
+      ],
+      "sourceFeed": {
+        "component": "Get All Account courses (DTSX:99515)",
+        "tables": [
+          "gen_accountcourses",
+          "gen_transferin"
+        ],
+        "isStaging": false,
+        "upstream_he": "gen_accountcourses – כנראה 0014_AccountCourses / 0008 / 0009 (השערה)."
+      },
+      "decisions": [
+        {
+          "where": "SQL DTSX:99520",
+          "condition": "gen_transactionamount != 0 and (gen_transferin.gen_actualtransferamount = 0 or gen_transferin.gen_actualtransferamount is null) and gen_transferin.Gen_CurrentState = 1 and gen_transferin.Gen_transferType in (5,6) ... having gen_expectedtransferamount<>Sum(gen_transactionamount) or gen_expectedtransferamount is null",
+          "meaning_he": "העברה פנימית פתוחה בלי כסף בפועל, וסכום צפוי שונה",
+          "outcome_he": "נבחרת"
+        },
+        {
+          "where": "Update Transferin main.cs:40",
+          "condition": "!Row.TransferAmountTotalSource_IsNull && Row.TransferAmountTotalSource > 0",
+          "meaning_he": "סכום חיובי",
+          "outcome_he": "gen_expectedtransferamount מתעדכן"
+        }
+      ],
+      "crmEffects": [
+        {
+          "entity": "gen_transferin",
+          "verb": "Update",
+          "mechanism": "SDK",
+          "when_he": "סכום חיובי ששונה מהסכום הצפוי"
+        }
+      ],
+      "evidence": [
+        "DTSX:99520 SQL",
+        "DTSX:99545 externalMetadataColumnId",
+        "Update Transferin main.cs (sha c1763f3e8ebc):38-54",
+        "dupes.json: ×5 זהים"
+      ],
+      "openQuestions_he": []
+    },
+    {
+      "refId": "Package\\Close TI internal",
+      "title_he": "סגירת בקשות העברה פנימיות לפי הכסף שהתקבל",
+      "techName": "Close TI internal",
+      "short_he": "בקשות העברה פנימיות פתוחות שיש להן פיצולים עם סכום ותאריך בפועל, ושבין תאריך ההעברה המוקדם בפיצולים לתאריך יצירת הבקשה יש פחות מ-30 מעברי יום: העברה בין קופות (6) נסגרת תמיד; העברה בין מסלולים (5) נסגרת רק אם יש תאריך חתימה וחותמת 'נתקבל' והסכום בפועל בטווח 15% מהצפוי (או שאין צפוי), ואחרת מקבלת סטטוס פעולה 22. בכולן מתעדכנים הסכום והתאריך בפועל וסימון האיחור.",
+      "flow_he": [
+        "בקשות במצב 1 מסוג 5/6 עם פיצולים שיש בהם סכום ותאריך בפועל; בין תאריך ההעברה המוקדם לתאריך יצירת הבקשה פחות מ-30 מעברי יום (ABS(DATEDIFF(day, …)) < 30).",
+        "סוג 6 → סגירה; סוג 5 → חתימה + חותמת + |בפועל − צפוי| ≤ 15% → סגירה, אחרת סטטוס 22.",
+        "המרת תאריכים, חישוב איחור במסירה, ועדכון SDK של השדות שהשתנו."
+      ],
+      "short": {
+        "nodes": [
+          {
+            "type": "step",
+            "text": "נבחרות בקשות העברה פנימיות פתוחות שהפיצולים שלהן כבר קיבלו סכום ותאריך בפועל, כשבין תאריך ההעברה המוקדם בפיצולים לתאריך יצירת הבקשה יש פחות מ-30 מעברי יום."
+          },
+          {
+            "type": "decision",
+            "text": "מה סוג ההעברה הפנימית?",
+            "branches": [
+              {
+                "label": "בין קופות (6)",
+                "nodes": [
+                  {
+                    "type": "write",
+                    "text": "הבקשה נסגרת."
+                  }
+                ]
+              },
+              {
+                "label": "בין מסלולים (5)",
+                "nodes": [
+                  {
+                    "type": "decision",
+                    "text": "האם יש תאריך חתימת לקוח וחותמת 'נתקבל', והסכום בפועל קרוב לצפוי בטווח של 15% (או שאין סכום צפוי)?",
+                    "branches": [
+                      {
+                        "label": "כן",
+                        "nodes": [
+                          {
+                            "type": "write",
+                            "text": "הבקשה נסגרת."
+                          }
+                        ]
+                      },
+                      {
+                        "label": "לא",
+                        "nodes": [
+                          {
+                            "type": "write",
+                            "text": "הבקשה נשארת פתוחה ומקבלת סטטוס פעולה 22."
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "type": "write",
+            "text": "בכל הבקשות מתעדכנים הסכום והתאריך בפועל, תאריך העדכון בבנק וסימון האיחור במסירה."
+          },
+          {
+            "type": "end",
+            "text": "מבין הבקשות שנבחרו, העברות בין קופות נסגרות תמיד, והעברות בין מסלולים נסגרות רק כשיש תאריך חתימה וחותמת 'נתקבל' והסכום בפועל בטווח 15% מהצפוי (או שאין צפוי); שאר העברות בין המסלולים שנבחרו נשארות פתוחות עם סטטוס פעולה 22."
+          }
+        ]
+      },
+      "detailed": {
+        "nodes": [
+          {
+            "type": "step",
+            "text": "נבחרות בקשות העברה נכנסות במצב 1 מסוג 5 או 6 שיש להן פיצולי מסלול עם סכום ותאריך בפועל. לכל בקשה: סכום הפיצולים ותאריך ההעברה המוקדם. נבחרות רק בקשות שבין תאריך ההעברה המוקדם בפיצולים לתאריך יצירת הבקשה יש פחות מ-30 מעברי יום (ABS(DATEDIFF(day, …)) < 30 סופר גבולות יום שנחצו, לא זמן שחלף; בכל כיוון; על הערכים השמורים ב-CRM).",
+            "tech": "Get All transferin course partitions (OLEDBSource, DTSX:24796; SQL DTSX:24801): gen_coursepartition cp ⋈ gen_transferin ti WHERE ti.Gen_CurrentState = 1 AND ti.gen_transfertype IN (5,6) AND cp.gen_actualtransferamount IS NOT NULL AND cp.gen_actualtransferdate IS NOT NULL GROUP BY ... HAVING ABS(DATEDIFF(day, min(cp.gen_actualtransferdate), ti.CreatedOn)) < 30"
+          },
+          {
+            "type": "step",
+            "text": "מחושב טווח הסטייה המותר: 15% מהסכום הצפוי.",
+            "tech": "set sum and percent tranfer fields (DTSX:25990): percent_ExpectedTransferAmount = Gen_ExpectedTransferAmount * 0.15"
+          },
+          {
+            "type": "decision",
+            "text": "מה סוג ההעברה?",
+            "tech": "Is Between Course or Funds (DTSX:25024): BetweenOurCourses = Gen_transferType == 5; BetweenOurFunds = Gen_transferType == 6; Default Output לא מחובר (אין שורות כאלה, כי המקור מסנן 5/6)",
+            "branches": [
+              {
+                "label": "בין קופות (6)",
+                "nodes": [
+                  {
+                    "type": "step",
+                    "text": "הבקשה מועברת ישירות לסגירה."
+                  }
+                ]
+              },
+              {
+                "label": "בין מסלולים (5)",
+                "nodes": [
+                  {
+                    "type": "decision",
+                    "text": "בדיקות לפי הסדר: חסר בבקשה תאריך חתימת לקוח? חסרה בבקשה חותמת 'נתקבל'? אין סכום צפוי, או שהסכום בפועל בטווח 15% מהצפוי? (תאריך החתימה והחותמת הם שדות של בקשת ההעברה: הם מופיעים בשאילתה בלי כינוי טבלה, וקיימים ב-gen_transferin; אילו העמודה הייתה קיימת בשתי הטבלאות השאילתה הייתה נכשלת, ולפי המשתמש החבילה רצה בפרודקשן.)",
+                    "tech": "need to update? (DTSX:25083): Not To Close 2 = ISNULL(gen_customersignaturedate) (order 0); Not To Close3 = ISNULL(gen_receivedstamp) (order 1); Need To Close = ISNULL(Gen_ExpectedTransferAmount) || ABS(gen_actualtransferamount - Gen_ExpectedTransferAmount) <= percent_ExpectedTransferAmount (order 2); Default = Not To Close; בעלות העמודות: gen_customersignaturedate ו-gen_receivedstamp ללא כינוי ב-SELECT וב-GROUP BY (DTSX:24810-24811, 24833-24834) בשאילתה gen_coursepartition cp JOIN gen_transferin ti; ב-gen_transferin הן קיימות (ti.gen_customersignaturedate DTSX:11146, ti.gen_receivedstamp DTSX:11154, ti.Gen_receivedstamp DTSX:14182); כלל העמימות: אילו העמודה הייתה קיימת גם ב-gen_coursepartition השאילתה הייתה נכשלת (ambiguous column), ולפי המשתמש החבילה רצה בפרודקשן – לכן אלה עמודות gen_transferin",
+                    "branches": [
+                      {
+                        "label": "חסר תאריך חתימה או חותמת",
+                        "nodes": [
+                          {
+                            "type": "step",
+                            "text": "הבקשה לא נסגרת."
+                          }
+                        ]
+                      },
+                      {
+                        "label": "בטווח או בלי צפוי",
+                        "nodes": [
+                          {
+                            "type": "step",
+                            "text": "הבקשה מועברת לסגירה."
+                          }
+                        ]
+                      },
+                      {
+                        "label": "מחוץ לטווח",
+                        "nodes": [
+                          {
+                            "type": "step",
+                            "text": "הבקשה לא נסגרת."
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "type": "write",
+            "text": "בבקשות שנסגרות: מצב 3, סטטוס פעולה 1, סיבת דחייה 1, ותאריך העדכון בבנק = תאריך ההעברה בפועל.",
+            "tech": "Union All 2 → Create transferIn Column (DTSX:23882): gen_currentstate = 3, gen_actionstatus = 1, gen_rejectReason = 1, gen_modifiedByBank = gen_actualtransferdate"
+          },
+          {
+            "type": "write",
+            "text": "בבקשות שלא נסגרות: סטטוס פעולה 22, ותאריך העדכון בבנק = תאריך ההעברה בפועל.",
+            "tech": "Union All 1 → Create transferIn Column 1 (DTSX:23930): gen_actionstatus = 22, gen_modifiedByBank = gen_actualtransferdate"
+          },
+          {
+            "type": "step",
+            "text": "תאריכי המסירה, היצירה וההעברה בפועל מומרים לשעון מקומי (תאריך העדכון בבנק החדש אינו מומר, אבל הערך הקיים שלו כן). אם ההעברה בפועל מאוחרת ביום מלא או יותר מתאריך המסירה, סימון האיחור = כן; אחרת (כולל כשתאריך המסירה או תאריך ההעברה בפועל ריק) סימון האיחור = לא, וגם ערך זה נכתב כשהוא שונה מהערך השמור או כשהשמור ריק.",
+            "tech": "Dates To Local (DTSX:23966): Gen_deliverydate, transferincreatedon, gen_actualtransferdate, gen_modifiedbybankDB, gen_actualtransferdateDB; Set delevery delay (DTSX:25196) main.cs:117-124: gen_deliverydelay = (genactualtransferdate - Gendeliverydate).Days > 0"
+          },
+          {
+            "type": "write",
+            "text": "בבקשה נכתבים רק השדות שערכם שונה מהערך הקיים: מצב, סטטוס פעולה, סיבת דחייה, תאריך עדכון בבנק, סכום בפועל, תאריך בפועל וסימון איחור.",
+            "tech": "Update transferin ×5 (DTSX:27187...; קוד זהה) main.cs:40-80: כל שדה רק אם !X_IsNull && (XDB_IsNull || XDB != X) · gen_transferin · Update · SDK"
+          },
+          {
+            "type": "end",
+            "text": "מבין בקשות מסוג 5 או 6 במצב 1 שיש להן פיצולים עם סכום ותאריך בפועל ופחות מ-30 מעברי יום בין תאריך ההעברה המוקדם לתאריך יצירתן: העברה בין קופות (6) נסגרת תמיד; העברה בין מסלולים (5) נסגרת רק כשיש בה תאריך חתימת לקוח וחותמת 'נתקבל', ואין סכום צפוי או שהסכום בפועל בטווח 15% ממנו; שאר בקשות סוג 5 שנבחרו נשארות במצב 1 ומקבלות סטטוס פעולה 22. בכל הבקשות שנבחרו נרשמים הסכום והתאריך בפועל (רק כשהם שונים מהקיים). בקשות שלא נבחרו לא נכתבות בשלב זה."
+          }
+        ]
+      },
+      "detail_he": [
+        {
+          "h": "מקור ואוכלוסייה",
+          "t": "gen_coursepartition ⋈ gen_transferin (טבלאות CRM, לא Staging). הסכומים והתאריכים בפועל בפיצולים נכתבים בשלב Update CoursePartition internal בחבילה זו (מוכח), ואולי גם בחבילות אחרות (לא ידוע)."
+        },
+        {
+          "h": "התאמה לרשומות קיימות",
+          "t": "cp.gen_transferin = ti.Gen_transferinId."
+        },
+        {
+          "h": "החלטות",
+          "t": "סוג 6 → סגירה. סוג 5: חתימה ריקה → לא; חותמת ריקה → לא; צפוי ריק או |בפועל − צפוי| ≤ 15% מהצפוי → סגירה; אחרת סטטוס 22."
+        },
+        {
+          "h": "כתיבה ל-CRM",
+          "t": "gen_transferin Update (SDK): gen_currentstate, gen_actionstatus, gen_rejectreason, gen_modifiedbybank, gen_actualtransferamount, gen_actualtransferdate, gen_deliverydelay – רק שדות שהשתנו."
+        },
+        {
+          "h": "תוצאה עסקית",
+          "t": "מבין הבקשות שנבחרו: העברות בין קופות (6) נסגרות תמיד; העברות בין מסלולים (5) נסגרות רק כשיש תאריך חתימת לקוח וחותמת 'נתקבל', ואין סכום צפוי או שהסכום בפועל בטווח 15% ממנו; שאר העברות סוג 5 שנבחרו מקבלות סטטוס פעולה 22 ונשארות במצב 1."
+        }
+      ],
+      "sourceFeed": {
+        "component": "Get All transferin course partitions (DTSX:24796)",
+        "tables": [
+          "gen_coursepartition",
+          "gen_transferin"
+        ],
+        "isStaging": false,
+        "upstream_he": "סכומים בפועל בפיצולים – שלב Update CoursePartition internal בחבילה זו (מוכח); gen_transferin – כנראה 0008/0009 (השערה)."
+      },
+      "decisions": [
+        {
+          "where": "SQL DTSX:24801",
+          "condition": "(ti.Gen_CurrentState = 1) and (ti.gen_transfertype in (5,6)) and cp.gen_actualtransferamount is not null and cp.gen_actualtransferdate is not null ... having ABS(DATEDIFF(day,min(cp.gen_actualtransferdate),ti.CreatedOn )) < 30",
+          "meaning_he": "העברה פנימית פתוחה עם פיצולים שיש בהם סכום ותאריך בפועל, שבין תאריך ההעברה המוקדם בפיצולים לתאריך יצירתה יש פחות מ-30 מעברי יום (גבולות יום, לא זמן שחלף; בכל כיוון)",
+          "outcome_he": "נבחרת"
+        },
+        {
+          "where": "Is Between Course or Funds (DTSX:25024)",
+          "condition": "Gen_transferType == 5 / Gen_transferType == 6",
+          "meaning_he": "בין מסלולים / בין קופות",
+          "outcome_he": "5 → בדיקות; 6 → סגירה"
+        },
+        {
+          "where": "need to update? (DTSX:25083)",
+          "condition": "ISNULL(gen_customersignaturedate) → Not To Close 2; ISNULL(gen_receivedstamp) → Not To Close3; ISNULL(Gen_ExpectedTransferAmount) || ABS(gen_actualtransferamount - Gen_ExpectedTransferAmount) <= percent_ExpectedTransferAmount → Need To Close; else Not To Close",
+          "meaning_he": "תנאי סגירה להעברה בין מסלולים",
+          "outcome_he": "Need To Close → סגירה; אחרת → סטטוס 22"
+        },
+        {
+          "where": "set sum and percent tranfer fields (DTSX:25990)",
+          "condition": "percent_ExpectedTransferAmount = Gen_ExpectedTransferAmount * 0.15",
+          "meaning_he": "טווח סטייה של 15%",
+          "outcome_he": "משמש בתנאי Need To Close"
+        }
+      ],
+      "crmEffects": [
+        {
+          "entity": "gen_transferin",
+          "verb": "Update",
+          "mechanism": "SDK",
+          "when_he": "סגירה (מצב 3, סטטוס 1, סיבת דחייה 1) או סטטוס 22, ובכל מקרה סכום ותאריך בפועל, תאריך עדכון בבנק ואיחור – רק שדות שהשתנו"
+        }
+      ],
+      "evidence": [
+        "DTSX:24801 SQL",
+        "DTSX:25024 Is Between Course or Funds; DTSX:25083 need to update?; DTSX:25990",
+        "DTSX:23882, 23930 Create transferIn Column / 1",
+        "DTSX:23966 Dates To Local; DTSX:25196 Set delevery delay",
+        "Update transferin main.cs:40-80; dupes.json ×5"
+      ],
+      "openQuestions_he": [
+        "תוויות מצב 3, סטטוס פעולה 1 וסטטוס פעולה 22 ידועות רק מהערת החבילה על Close TI internal (DTSX:115790), לפי התאמה לענפי הקוד: בענף הסגירה (מצב 3, סטטוס פעולה 1) ההערה אומרת 'הסתיים' ו'עדכון בנק אוטומטי'; בענף שאינו נסגר (סטטוס פעולה 22, בלי שינוי מצב) היא אומרת שהמצב נשאר 'בתהליך' והסטטוס 'עדכון עצמי לאחר העברה'. אלה אינן תוויות option-set מתוך הקבצים; האם הן תואמות להגדרות ב-CRM – לא ידוע. סיבת דחייה 1 מסומנת בקוד של חבילה זו \"תקין\" (create transferin (joining only) main.cs:80).",
+        "gen_modifiedByBank החדש לא מומר לשעון מקומי, אבל הערך הקיים (gen_modifiedbybankDB) כן מומר, ולכן ההשוואה ביניהם אינה עקבית. ב-Close TI External שניהם מומרים."
+      ]
+    },
+    {
+      "refId": "Package\\Close TI External",
+      "title_he": "סגירת בקשות העברה מסוג 1 או 7 לפי הכסף שהתקבל",
+      "techName": "Close TI External",
+      "short_he": "בקשות העברה פתוחות מסוג 1 או 7 שיש להן פיצולים עם סכום ותאריך בפועל: אם יש חותמת 'נתקבל' ותאריך ההעברה בפועל מאוחר ממנה, הבקשה נסגרת. בכל הבקשות מתעדכנים הסכום והתאריך בפועל, תאריך העדכון בבנק וסימון האיחור.",
+      "flow_he": [
+        "בקשות במצב 1 מסוג 1/7 עם פיצולים שיש בהם סכום ותאריך בפועל (סכום ותאריך מוקדם לכל בקשה).",
+        "חותמת 'נתקבל' קיימת ותאריך בפועל > החותמת → סגירה (מצב 3, סטטוס 1).",
+        "המרת תאריכים, חישוב איחור, עדכון SDK של השדות שהשתנו."
+      ],
+      "short": {
+        "nodes": [
+          {
+            "type": "step",
+            "text": "נבחרות בקשות העברה פתוחות מסוג 1 או 7 שהפיצולים שלהן כבר קיבלו כסף, עם הסכום הכולל ותאריך ההעברה המוקדם."
+          },
+          {
+            "type": "decision",
+            "text": "האם יש חותמת 'נתקבל' והכסף הגיע אחריה?",
+            "branches": [
+              {
+                "label": "כן",
+                "nodes": [
+                  {
+                    "type": "write",
+                    "text": "הבקשה נסגרת."
+                  }
+                ]
+              },
+              {
+                "label": "לא",
+                "nodes": [
+                  {
+                    "type": "step",
+                    "text": "הבקשה נשארת פתוחה."
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "type": "write",
+            "text": "בכל הבקשות מתעדכנים הסכום והתאריך בפועל, תאריך העדכון בבנק וסימון האיחור במסירה."
+          },
+          {
+            "type": "end",
+            "text": "העברות מסוג 1 או 7 שהכסף שלהן התקבל אחרי חותמת 'נתקבל' נסגרות."
+          }
+        ]
+      },
+      "detailed": {
+        "nodes": [
+          {
+            "type": "step",
+            "text": "נבחרות בקשות העברה נכנסות במצב 1 מסוג 1 או 7 שיש להן פיצולי מסלול עם סכום ותאריך בפועל. לכל בקשה: סכום הפיצולים ותאריך ההעברה המוקדם. אין מגבלת זמן מיצירת הבקשה.",
+            "tech": "Get All transferin course partitions (OLEDBSource, DTSX:14170; SQL DTSX:14175): gen_coursepartition cp ⋈ gen_transferin ti WHERE ti.Gen_CurrentState = 1 AND ti.gen_transfertype IN (1,7) AND cp.gen_actualtransferamount IS NOT NULL AND cp.gen_actualtransferdate IS NOT NULL; sum(cp.gen_actualtransferamount), min(cp.gen_actualtransferdate)"
+          },
+          {
+            "type": "decision",
+            "text": "האם יש בבקשה חותמת 'נתקבל', ותאריך ההעברה בפועל מאוחר ממנה?",
+            "tech": "need to update? (DTSX:14395): need to update status = !ISNULL(Gen_receivedstamp) && gen_actualtransferdate > Gen_receivedstamp; Default Output → Create transferIn Column 1",
+            "branches": [
+              {
+                "label": "כן",
+                "nodes": [
+                  {
+                    "type": "write",
+                    "text": "הבקשה נסגרת: מצב 3, סטטוס פעולה 1, ותאריך העדכון בבנק = תאריך ההעברה בפועל.",
+                    "tech": "Create transferIn Column (DTSX:13228): gen_currentstate = 3, gen_modifiedByBank = gen_actualtransferdate, gen_actionstatus = 1"
+                  }
+                ]
+              },
+              {
+                "label": "לא",
+                "nodes": [
+                  {
+                    "type": "step",
+                    "text": "הבקשה לא נסגרת; רק תאריך העדכון בבנק נקבע לתאריך ההעברה בפועל.",
+                    "tech": "Create transferIn Column 1 (DTSX:13270): gen_modifiedByBank = gen_actualtransferdate"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "type": "step",
+            "text": "התאריכים, כולל תאריך העדכון בבנק החדש והקיים, מומרים לשעון מקומי.",
+            "tech": "Dates To Local (DTSX:13300): Gen_deliverydate, transferincreatedon, gen_actualtransferdate, gen_modifiedbybankDB, gen_actualtransferdateDB, gen_modifiedByBank"
+          },
+          {
+            "type": "step",
+            "text": "אם ההעברה בפועל מאוחרת ביום מלא או יותר מתאריך המסירה, סימון האיחור = כן; אחרת (כולל כשתאריך המסירה או תאריך ההעברה בפועל ריק) סימון האיחור = לא. הערך המחושב, כן או לא, נכתב בבקשה כשהוא שונה מהערך השמור או כשהשמור ריק, ולכן בקשה שסומנה בעבר באיחור תקבל סימון 'לא' אם בריצה זו לא חושב איחור.",
+            "tech": "Set delevery delay (DTSX:14489) main.cs:117-124: gen_deliverydelay = false; if (!Gendeliverydate_IsNull && !genactualtransferdate_IsNull && (genactualtransferdate - Gendeliverydate).Days > 0) gen_deliverydelay = true · Update transferin main.cs:57-60: if (!gendeliverydelay_IsNull && (gendeliverydelayDB_IsNull || gendeliverydelayDB != gendeliverydelay)) entity[\"gen_deliverydelay\"] = gendeliverydelay"
+          },
+          {
+            "type": "write",
+            "text": "בבקשה נכתבים רק השדות שערכם שונה מהערך הקיים: מצב, תאריך עדכון בבנק, סכום בפועל, תאריך בפועל, סימון איחור וסטטוס פעולה.",
+            "tech": "Update transferin ×5 (DTSX:15866...; קוד זהה) main.cs:38-79 · gen_transferin · Update · SDK"
+          },
+          {
+            "type": "end",
+            "text": "העברות מסוג 1 או 7 שהכסף שלהן התקבל אחרי חותמת 'נתקבל' נסגרות, ובבקשות הפתוחות מסוג 1 או 7 שיש להן פיצולים עם סכום ותאריך בפועל נרשמים הסכום והתאריך בפועל (רק כשהם שונים מהקיים); בקשות אחרות לא נכתבות בשלב זה."
+          }
+        ]
+      },
+      "detail_he": [
+        {
+          "h": "מקור ואוכלוסייה",
+          "t": "gen_coursepartition ⋈ gen_transferin (טבלאות CRM, לא Staging). הסכומים בפועל בפיצולים נכתבים בשלב Update CoursePartition external בחבילה זו (מוכח)."
+        },
+        {
+          "h": "התאמה לרשומות קיימות",
+          "t": "cp.gen_transferin = ti.Gen_transferinId."
+        },
+        {
+          "h": "החלטות",
+          "t": "!ISNULL(Gen_receivedstamp) && gen_actualtransferdate > Gen_receivedstamp → סגירה. אין בדיקה של הסכום מול הצפוי. (בהעברות פנימיות בדיקה כזו קיימת רק בסוג 5; סוג 6 נסגר בלי בדיקת סכום.)"
+        },
+        {
+          "h": "כתיבה ל-CRM",
+          "t": "gen_transferin Update (SDK): gen_currentstate, gen_modifiedbybank, gen_actualtransferamount, gen_actualtransferdate, gen_deliverydelay, gen_actionstatus – רק שדות שהשתנו."
+        },
+        {
+          "h": "תוצאה עסקית",
+          "t": "סגירה אוטומטית (מצב 3) של העברות מסוג 1 או 7 שיש להן פיצולים עם סכום ותאריך בפועל, רק כשיש בבקשה חותמת 'נתקבל' ותאריך ההעברה המוקדם בפיצולים מאוחר ממנה (DTSX:14395). בשאר הבקשות שנבחרו הבקשה לא נסגרת; נרשמים בה רק תאריך העדכון בבנק, הסכום והתאריך בפועל וסימון האיחור – כמו בכל הבקשות שנבחרו, רק כשהערך שונה מהקיים."
+        }
+      ],
+      "sourceFeed": {
+        "component": "Get All transferin course partitions (DTSX:14170)",
+        "tables": [
+          "gen_coursepartition",
+          "gen_transferin"
+        ],
+        "isStaging": false,
+        "upstream_he": "סכומים בפועל בפיצולים – Update CoursePartition external בחבילה זו (מוכח)."
+      },
+      "decisions": [
+        {
+          "where": "SQL DTSX:14175",
+          "condition": "(ti.Gen_CurrentState = 1) and ti.gen_transfertype in (1,7) and cp.gen_actualtransferamount is not null and cp.gen_actualtransferdate is not null",
+          "meaning_he": "בקשה פתוחה מסוג 1 או 7 שהכסף שלה התקבל",
+          "outcome_he": "נבחרת"
+        },
+        {
+          "where": "need to update? (DTSX:14395)",
+          "condition": "!ISNULL(Gen_receivedstamp) && gen_actualtransferdate > Gen_receivedstamp",
+          "meaning_he": "הכסף הגיע אחרי חותמת 'נתקבל'",
+          "outcome_he": "סגירה (מצב 3, סטטוס 1)"
+        },
+        {
+          "where": "Set delevery delay main.cs:117-124",
+          "condition": "(Row.genactualtransferdate - Row.Gendeliverydate).Days > 0",
+          "meaning_he": "ההעברה בפועל מאוחרת מתאריך המסירה",
+          "outcome_he": "gen_deliverydelay = true"
+        }
+      ],
+      "crmEffects": [
+        {
+          "entity": "gen_transferin",
+          "verb": "Update",
+          "mechanism": "SDK",
+          "when_he": "לכל בקשה שנבחרה, שדות שהשתנו בלבד; סגירה רק בתנאי החותמת"
+        }
+      ],
+      "evidence": [
+        "DTSX:14175 SQL",
+        "DTSX:14395 need to update?",
+        "DTSX:13228, 13270 Create transferIn Column / 1",
+        "DTSX:13300 Dates To Local; DTSX:14489 Set delevery delay",
+        "Update transferin main.cs (sha 9abf8490a8e4):38-79; dupes.json ×5"
+      ],
+      "openQuestions_he": [
+        "האם סגירת העברה מסוג 1 או 7 בלי השוואת הסכום בפועל לצפוי מכוונת?"
+      ]
+    },
+    {
+      "refId": "Package\\Create TI - Joining Only",
+      "title_he": "יצירת בקשות העברה מסוג 'הצטרפות בלבד' מהצטרפות ממוכנת",
+      "techName": "Create TI - Joining Only",
+      "short_he": "לכל הצטרפות ממוכנת בסטטוס 8 מסוג 1, שנוצרה אחרי 1.1.2020, שחשבון הלקוח המקושר שלה נוצר מתחילת החודש הקלנדרי של ההצטרפות ועד 12 מעברי חודש אחריו, ושאין לה עדיין בקשת העברה, נוצרת בקשת העברה נכנסת מסוג 2 ('הצטרפות בלבד' לפי הערה בקוד) עם פרטי הלקוח, החתימה וההפקדות.",
+      "flow_he": [
+        "gen_automatedjoining: gen_joiningstatus = 8, gen_joiningtype = 1, CreatedOn > 2020-01-01; חשבון לקוח לפי aj.gen_customeraccountid; dateDiff(month, aj.CreatedOn, ca.CreatedOn) between 0 and 12 (מתחילת החודש הקלנדרי של ההצטרפות ועד 12 מעברי חודש אחריו); אין gen_transferin להצטרפות.",
+        "ערכים קבועים: סוג העברה 2, מצב 1, סיבת דחייה 1, סטטוס פעולה 6, חתימה אלקטרונית = לא.",
+        "יצירת gen_transferin ב-SDK."
+      ],
+      "short": {
+        "nodes": [
+          {
+            "type": "step",
+            "text": "נבחרות הצטרפויות ממוכנות בסטטוס 8 מסוג 1 שנוצרו אחרי 1.1.2020, שחשבון הלקוח המקושר שלהן נוצר מתחילת החודש הקלנדרי של ההצטרפות ועד 12 מעברי חודש אחריו."
+          },
+          {
+            "type": "decision",
+            "text": "האם כבר קיימת בקשת העברה להצטרפות הזו?",
+            "branches": [
+              {
+                "label": "לא",
+                "nodes": [
+                  {
+                    "type": "write",
+                    "text": "נוצרת בקשת העברה נכנסת מסוג 'הצטרפות בלבד', בתהליך, עם פרטי הלקוח, תאריך החתימה, תאריך הקבלה בקופה, תיקון 190 והפקדות שוטפות."
+                  }
+                ]
+              },
+              {
+                "label": "כן",
+                "nodes": [
+                  {
+                    "type": "step",
+                    "text": "לא נוצרת בקשה נוספת."
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "type": "end",
+            "text": "לכל הצטרפות ממוכנת מתאימה יש בקשת העברה מסוג 'הצטרפות בלבד'."
+          }
+        ]
+      },
+      "detailed": {
+        "nodes": [
+          {
+            "type": "step",
+            "text": "נבחרות הצטרפויות ממוכנות בסטטוס הצטרפות 8 ובסוג הצטרפות 1, שנוצרו אחרי 1.1.2020, יחד עם חשבון הלקוח שמקושר להן.",
+            "tech": "Get transferin by type & status (OLEDBSource, DTSX:68546; SQL DTSX:68551): SELECT DISTINCT ... FROM gen_automatedjoining aj JOIN Gen_customeraccount ca ON ca.Gen_customeraccountId = aj.gen_customeraccountid WHERE aj.gen_joiningstatus = 8 AND aj.gen_joiningtype = 1 AND aj.CreatedOn > '2020-01-01' (הערה ב-SQL: set by altshuler)"
+          },
+          {
+            "type": "decision",
+            "text": "האם חשבון הלקוח נוצר מתחילת החודש הקלנדרי של ההצטרפות ועד 12 מעברי חודש אחריו (כולל חשבון שנוצר מוקדם יותר באותו חודש, ועד כמעט 13 חודשים אחרי)?",
+            "tech": "dateDiff(month, aj.CreatedOn, ca.CreatedOn) BETWEEN 0 AND 12",
+            "branches": [
+              {
+                "label": "לא",
+                "nodes": [
+                  {
+                    "type": "step",
+                    "text": "ההצטרפות לא מטופלת."
+                  }
+                ]
+              },
+              {
+                "label": "כן",
+                "nodes": [
+                  {
+                    "type": "decision",
+                    "text": "האם כבר קיימת בקשת העברה שמקושרת להצטרפות הזו?",
+                    "tech": "LEFT JOIN gen_transferin ti ON ti.gen_automatedjoining = aj.gen_automatedjoiningId WHERE ti.gen_transferinid IS NULL",
+                    "branches": [
+                      {
+                        "label": "כן",
+                        "nodes": [
+                          {
+                            "type": "step",
+                            "text": "לא נוצרת בקשה נוספת."
+                          }
+                        ]
+                      },
+                      {
+                        "label": "לא",
+                        "nodes": [
+                          {
+                            "type": "step",
+                            "text": "ההצטרפות נבחרת ליצירת בקשה."
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "type": "step",
+            "text": "נקבעים ערכים קבועים: סוג העברה 2 ('הצטרפות בלבד'), מצב 1 ('בתהליך'), סיבת דחייה 1 ('תקין'), סטטוס פעולה 6 ('עדכון עצמי'), חתימה אלקטרונית = לא.",
+            "tech": "Fixed Fields (DerivedColumn, DTSX:68495); התוויות לקוחות מהערות בקוד (main.cs:74-84)"
+          },
+          {
+            "type": "step",
+            "text": "תאריך חתימת העמית ותאריך הקבלה בקופה מומרים לשעון מקומי.",
+            "tech": "Dates To Local (DTSX:67776)"
+          },
+          {
+            "type": "write",
+            "text": "נוצרת בקשת העברה נכנסת: לקוח פרטי או עסקי, חשבון היעד, ההצטרפות הממוכנת, תעודת הזהות (ללקוח פרטי) או מספר הזהות/ח.פ. (ללקוח עסקי), תאריך חתימת העמית, חותמת 'נתקבל' = תאריך הקבלה בקופה, והערכים הקבועים.",
+            "tech": "create transferin (joining only) ×5 (DTSX:61266...; קוד זהה) main.cs:42-121 · gen_transferin · Create · SDK"
+          },
+          {
+            "type": "step",
+            "text": "תיקון 190 = לא כשבהצטרפות gen_fix8 = 2, ואחרת כן; הפקדות שוטפות = כן כש-gen_continuousdepositing = 1, ואחרת לא. כשהשדה בהצטרפות ריק, השדה בבקשה לא נכתב.",
+            "tech": "main.cs:93-106"
+          },
+          {
+            "type": "end",
+            "text": "לכל הצטרפות ממוכנת מתאימה יש בקשת העברה מסוג 'הצטרפות בלבד', שבשלב הבא (Create CP - Joining Only) יכולה לקבל פיצולי מסלול: רק אם להצטרפות הממוכנת יש פיצולים שהמוצר שלהם שווה לסוג קופה של קופה בחשבון היעד, ורק אם לבקשה אין עדיין פיצול, או שיש לה פיצול באותה קופה עם מוצר אחר."
+          }
+        ]
+      },
+      "detail_he": [
+        {
+          "h": "מקור ואוכלוסייה",
+          "t": "gen_automatedjoining ⋈ Gen_customeraccount, LEFT JOIN gen_transferin (טבלאות CRM, לא Staging). רשומות gen_automatedjoining נוצרות מחוץ לקבצים שסופקו (external_unknown). מוכח: בחבילה 0027_AutomatedJoining השלב Close Joining processes מעדכן בהצטרפויות שהיו בסטטוס 7 את gen_joiningstatus ל-8 ואת gen_customeraccountid (חשבון שנמצא לפי מספר חשבון בנק), ואלה השדות שהשלב הזה מסנן ומצרף לפיהם (0027 DTSX:984, 1027, 1368-1376); חשבונות הלקוח – כנראה 0005_Customer Account (השערה)."
+        },
+        {
+          "h": "התאמה לרשומות קיימות",
+          "t": "חשבון: ca.Gen_customeraccountId = aj.gen_customeraccountid. בקשה קיימת: ti.gen_automatedjoining = aj.gen_automatedjoiningId."
+        },
+        {
+          "h": "החלטות",
+          "t": "gen_joiningstatus = 8, gen_joiningtype = 1, CreatedOn > 2020-01-01, dateDiff(month, aj.CreatedOn, ca.CreatedOn) between 0 and 12 (החשבון נוצר מתחילת החודש הקלנדרי של ההצטרפות ועד 12 מעברי חודש אחריו), אין בקשה קיימת. לקוח פרטי מול עסקי לפי gen_contactname / gen_accountname."
+        },
+        {
+          "h": "כתיבה ל-CRM",
+          "t": "gen_transferin Create (SDK)."
+        },
+        {
+          "h": "תוצאה עסקית",
+          "t": "פתיחת בקשת העברה פנימה מסוג 2 ('הצטרפות בלבד' לפי הערה בקוד, main.cs:74) לכל הצטרפות ממוכנת שעומדת בתנאים: סטטוס 8, סוג 1, נוצרה אחרי 2020-01-01, חשבון לקוח מקושר שנוצר בחלון החודשים שלמעלה, ואין לה עדיין בקשה."
+        }
+      ],
+      "sourceFeed": {
+        "component": "Get transferin by type & status (DTSX:68546)",
+        "tables": [
+          "gen_automatedjoining",
+          "gen_customeraccount",
+          "gen_transferin"
+        ],
+        "isStaging": false,
+        "upstream_he": "gen_automatedjoining – נוצרת מחוץ לקבצים שסופקו (external_unknown); gen_joiningstatus = 8 ו-gen_customeraccountid נכתבים ב-0027_AutomatedJoining, Close Joining processes (מוכח, 0027 DTSX:984, 1368-1376); gen_customeraccount – כנראה 0005_Customer Account (השערה)."
+      },
+      "decisions": [
+        {
+          "where": "SQL DTSX:68551",
+          "condition": "aj.gen_joiningstatus=8 and aj.gen_joiningtype=1 and dateDiff(month,aj.CreatedOn,ca.CreatedOn) between 0 and 12 and aj.CreatedOn > '2020-01-01' and ti.gen_transferinid is null",
+          "meaning_he": "הצטרפות ממוכנת מתאימה בלי בקשה",
+          "outcome_he": "נוצרת בקשה"
+        },
+        {
+          "where": "create transferin (joining only) main.cs:62-67",
+          "condition": "!Row.gencontactname_IsNull → gen_identitynumber; else if !Row.genaccountname_IsNull → gen_accountnumber",
+          "meaning_he": "לקוח פרטי או עסקי",
+          "outcome_he": "השדה שאליו נכתבת תעודת הזהות"
+        },
+        {
+          "where": "create transferin (joining only) main.cs:93-106",
+          "condition": "Row.genfix8 == 2 → gen_190correction = false, else true; Row.gencontinuousdepositing == 1 → gen_currentdeposits = true, else false",
+          "meaning_he": "מיפוי תיקון 190 והפקדות שוטפות",
+          "outcome_he": "ערכי בוליאני בבקשה"
+        }
+      ],
+      "crmEffects": [
+        {
+          "entity": "gen_transferin",
+          "verb": "Create",
+          "mechanism": "SDK",
+          "when_he": "לכל הצטרפות ממוכנת מתאימה בלי בקשה"
+        }
+      ],
+      "evidence": [
+        "DTSX:68551 SQL",
+        "DTSX:68495 Fixed Fields",
+        "DTSX:67776 Dates To Local",
+        "create transferin (joining only) main.cs (sha 0a6f15c4d554):42-121",
+        "dupes.json ×5"
+      ],
+      "openQuestions_he": [
+        "gen_contactname, gen_accountname ו-gen_automatedjoining נשלחים כ-EntityReference מסוג \"gen_customeraccount\" (main.cs:46-56), אף שהמזהים הם של איש קשר, חשבון והצטרפות ממוכנת. ההשפעה בזמן ריצה לא ידועה.",
+        "מה משמעות סטטוס הצטרפות 8 וסוג הצטרפות 1? מהקבצים: בחבילה 0027 סטטוס 8 הוא הערך ש-Close Joining processes כותב להצטרפויות שהיו בסטטוס 7 אחרי שנמצא להן חשבון לקוח (בחבילה 0005 סטטוס 7 ב-gen_automatedjoining מסומן בהערה \"status send to the bank\"). בחבילה 0028 ההערה \"בוטל או הסתיים\" על הקבוצה (5,6,7,8,13) נוגעת ל-gen_pensionjoining.gen_joiningstatus – ישות אחרת (0028 DTSX:911, 915); אם אותם ערכים חלים על gen_automatedjoining – לא ידוע. משמעות סוג הצטרפות 1 – לא ידוע."
+      ]
+    },
+    {
+      "refId": "Package\\Create CP - Joining Only",
+      "title_he": "יצירת פיצולי מסלול לבקשות 'הצטרפות בלבד'",
+      "techName": "Create CP - Joining Only",
+      "short_he": "לכל בקשת העברה מסוג 'הצטרפות בלבד' נוצר פיצול מסלול לכל קופה בחשבון היעד שהמוצר שלה תואם לפיצול המסלול של ההצטרפות הממוכנת – כשלבקשה עוד אין פיצולים, או שיש לה בקופה הזו פיצול עם מוצר אחר.",
+      "flow_he": [
+        "בקשות מסוג 2 ⋈ קופות חשבון היעד ⋈ ההצטרפות הממוכנת ⋈ פיצולי ההצטרפות, כשסוג הקופה = מוצר הפיצול.",
+        "לבקשה אין פיצולים, או שיש לה בקופה פיצול עם מוצר אחר.",
+        "העברה מלאה = 1; יצירת gen_coursepartition ב-SDK."
+      ],
+      "short": {
+        "nodes": [
+          {
+            "type": "step",
+            "text": "לכל בקשת 'הצטרפות בלבד' נבחרות הקופות של חשבון היעד שהמוצר שלהן תואם לפיצול מסלול בהצטרפות הממוכנת."
+          },
+          {
+            "type": "decision",
+            "text": "האם לבקשה עדיין אין פיצולי מסלול, או שיש לה בקופה הזו פיצול עם מוצר אחר?",
+            "branches": [
+              {
+                "label": "כן",
+                "nodes": [
+                  {
+                    "type": "write",
+                    "text": "נוצר פיצול מסלול לבקשה ולקופה, עם המוצר, אחוז ההפקדה, פרטי הסוכן והמפקח, וסימון העברה מלאה."
+                  }
+                ]
+              },
+              {
+                "label": "לא",
+                "nodes": [
+                  {
+                    "type": "step",
+                    "text": "לא נוצר פיצול."
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "type": "end",
+            "text": "בקשות 'הצטרפות בלבד' מקבלות פיצולי מסלול לפי ההצטרפות הממוכנת."
+          }
+        ]
+      },
+      "detailed": {
+        "nodes": [
+          {
+            "type": "step",
+            "text": "נבחרות בקשות העברה מסוג 'הצטרפות בלבד', יחד עם הקופות של חשבון היעד, ההצטרפות הממוכנת של הבקשה ופיצולי המסלול של ההצטרפות. נשמרות רק התאמות שבהן סוג הקופה שווה למוצר בפיצול ההצטרפות.",
+            "tech": "Get FIelds To CoursePartition (OLEDBSource, DTSX:42618; SQL DTSX:42623): Gen_transferin TI ⋈ Gen_fundmain FM (FM.Gen_customeraccountname = TI.gen_customeraccountdest) ⋈ gen_automatedjoining aj (aj.id = ti.gen_automatedjoining) ⋈ gen_coursepartition CP (CP.gen_automatedjoining = aj.id) LEFT JOIN gen_coursepartition CP2 (TI.Gen_transferinId = CP2.gen_transferin) LEFT JOIN Gen_agentcontract AC (FM.gen_brokernumber) WHERE FM.gen_fundtypename = CP.gen_product AND TI.Gen_transferType = 2 (--הצטרפות בלבד)"
+          },
+          {
+            "type": "decision",
+            "text": "האם לבקשה אין עדיין פיצולי מסלול כלל, או שיש לה בקופה הזו לפחות פיצול אחד עם מוצר שונה ממוצר פיצול ההצטרפות? הבדיקה נעשית שורה-שורה מול כל פיצול קיים של הבקשה, ולא כבדיקה ש'אין פיצול מתאים': פיצול קיים באותה קופה עם אותו מוצר אינו מונע יצירה אם יש בקופה גם פיצול עם מוצר אחר, ולבקשה שיש לה פיצולים רק בקופות אחרות לא נוצר פיצול לקופה הזו.",
+            "tech": "((CP2.gen_fundnumberdest = fm.gen_fundmainid AND CP.gen_product <> CP2.gen_product AND fm.gen_fundtypename <> CP2.gen_product) OR CP2.gen_coursepartitionId IS NULL) · CP2 = LEFT JOIN לכל הפיצולים של הבקשה (TI.Gen_transferinId = CP2.gen_transferin), התנאי ברמת שורה; CP2.gen_fundnumberdest או CP2.gen_product ריקים בפיצול קיים → השורה נפסלת; כל שורה שעוברת נשלחת ליצירה (אין הסרת כפילויות; Create CoursePartition main.cs:107)",
+            "branches": [
+              {
+                "label": "לא",
+                "nodes": [
+                  {
+                    "type": "step",
+                    "text": "לא נוצר פיצול."
+                  }
+                ]
+              },
+              {
+                "label": "כן",
+                "nodes": [
+                  {
+                    "type": "step",
+                    "text": "נקבע 'העברה מלאה' = 1, ותאריכי היצירה ופתיחת הקופה מומרים לשעון מקומי.",
+                    "tech": "Fixed Fields (DTSX:42591): gen_isfulltransfer = 1; Dates To Local (DTSX:41872)"
+                  },
+                  {
+                    "type": "write",
+                    "text": "נוצר פיצול מסלול: הבקשה, הלקוח, קופת היעד, המוצר, הסוכן (ואם אין – הסוכנות), המפקח, הבנק המייעץ, אחוז ההפקדה המבוקש, השדה gen_fundfinanceid של פיצול ההצטרפות (משמעותו לא מוכחת: הערת ה-SQL ב-DTSX:42637 אומרת 'מסםר אישור מ\"ה', ואילו הערת הקוד ב-DTSX:35665 / main.cs:78 אומרת 'אחוזים מבוקשים מהפקדה'), מספר הסוכן, תעודת הזהות, העברה מלאה ותאריך פתיחת הקופה.",
+                    "tech": "Create CoursePartition ×5 (DTSX:35454...; קוד זהה) main.cs:41-107 · gen_coursepartition · Create · SDK"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "type": "step",
+            "text": "הסוכן נכתב כשהוא קיים; הסוכנות נכתבת רק כשאין סוכן.",
+            "tech": "main.cs:57-60: if (!genagentname_IsNull) gen_agent ... else if (!genagencyname_IsNull) gen_agency"
+          },
+          {
+            "type": "end",
+            "text": "לבקשות 'הצטרפות בלבד' נוצרים פיצולי מסלול לפי המוצרים ואחוזי ההפקדה של פיצולי המסלול המקושרים להצטרפות הממוכנת של הבקשה (CP.gen_automatedjoining), לקופות של חשבון היעד שסוגן תואם למוצר."
+          }
+        ]
+      },
+      "detail_he": [
+        {
+          "h": "מקור ואוכלוסייה",
+          "t": "Gen_transferin, Gen_fundmain, gen_automatedjoining, gen_coursepartition, Gen_agentcontract (טבלאות CRM, לא Staging). הבקשות מסוג 2 נוצרות בשלב הקודם בחבילה זו (מוכח). פיצולי המסלול של ההצטרפות הממוכנת (CP.gen_automatedjoining): אף חבילה מהקבצים שסופקו לא יוצרת gen_coursepartition עם gen_automatedjoining (0027 לא מתייחסת ל-gen_coursepartition; יוצרי הפיצולים 0008, 0009 ו-0015 לא כותבים את השדה), ולכן מקורם external_unknown."
+        },
+        {
+          "h": "התאמה לרשומות קיימות",
+          "t": "קופה ↔ פיצול הצטרפות: FM.gen_fundtypename = CP.gen_product. פיצול קיים של הבקשה: CP2.gen_transferin = TI.Gen_transferinId."
+        },
+        {
+          "h": "החלטות",
+          "t": "סוג העברה 2; סוג הקופה = מוצר פיצול ההצטרפות; ולבקשה אין פיצולים כלל, או שיש לה בקופה הזו פיצול עם מוצר אחר. הבדיקה ברמת שורה (LEFT JOIN לכל פיצולי הבקשה), לא NOT EXISTS: פיצול באותה קופה עם אותו מוצר אינו מונע יצירה אם יש בה גם פיצול עם מוצר אחר; לבקשה עם פיצולים רק בקופות אחרות לא נוצר פיצול."
+        },
+        {
+          "h": "כתיבה ל-CRM",
+          "t": "gen_coursepartition Create (SDK)."
+        },
+        {
+          "h": "תוצאה עסקית",
+          "t": "העתקת המוצר ואחוז ההפקדה של פיצולי המסלול המקושרים להצטרפות הממוכנת של הבקשה (CP.gen_automatedjoining) כפיצולי מסלול של בקשת ההעברה, לקופות של חשבון היעד שסוגן תואם למוצר."
+        }
+      ],
+      "sourceFeed": {
+        "component": "Get FIelds To CoursePartition (DTSX:42618)",
+        "tables": [
+          "gen_transferin",
+          "gen_fundmain",
+          "gen_automatedjoining",
+          "gen_coursepartition",
+          "gen_agentcontract"
+        ],
+        "isStaging": false,
+        "upstream_he": "gen_transferin מסוג 2 – Create TI - Joining Only בחבילה זו (מוכח); פיצולי ההצטרפות (CP.gen_automatedjoining) – external_unknown (אין בקבצים שסופקו כותב של השדה)."
+      },
+      "decisions": [
+        {
+          "where": "SQL DTSX:42623",
+          "condition": "FM.gen_fundtypename = CP.gen_product and TI.Gen_transferType = 2 and ((CP2.gen_fundnumberdest=fm.gen_fundmainid and CP.gen_product <> CP2.gen_product and fm.gen_fundtypename <> CP2.gen_product) or CP2.gen_coursepartitionId is null)",
+          "meaning_he": "הקופה תואמת למוצר בפיצול ההצטרפות, ו(לבקשה אין פיצולים כלל, או שקיים לה בקופה הזו פיצול עם מוצר אחר). הבדיקה ברמת שורה מול כל פיצול קיים של הבקשה (LEFT JOIN), לא 'אין פיצול מתאים': (א) אם לבקשה יש פיצולים רק בקופות אחרות – אף שורה לא עוברת ולא נוצר פיצול לקופה הזו; (ב) אם בקופה הזו יש לבקשה גם פיצול עם אותו מוצר וגם פיצול עם מוצר אחר – השורה של הפיצול האחר עוברת ונוצר פיצול; (ג) פיצול קיים שקופת היעד או המוצר שלו ריקים פוסל את השורה שלו.",
+          "outcome_he": "נוצר פיצול לכל שורה שעוברת (אין הסרת כפילויות, ולכן כמה פיצולים קיימים שעוברים את התנאי יוצרים כמה פיצולים)"
+        },
+        {
+          "where": "Create CoursePartition main.cs:57-60",
+          "condition": "!Row.genagentname_IsNull → gen_agent; else if !Row.genagencyname_IsNull → gen_agency",
+          "meaning_he": "סוכן קודם לסוכנות",
+          "outcome_he": "נכתב רק אחד מהשניים"
+        }
+      ],
+      "crmEffects": [
+        {
+          "entity": "gen_coursepartition",
+          "verb": "Create",
+          "mechanism": "SDK",
+          "when_he": "לכל שורת בקשה-קופה-פיצול הצטרפות שעומדת בתנאי"
+        }
+      ],
+      "evidence": [
+        "DTSX:42623 SQL",
+        "DTSX:42591 Fixed Fields",
+        "DTSX:41872 Dates To Local",
+        "Create CoursePartition main.cs (sha 148ee1cff8e4):41-107",
+        "dupes.json ×5"
+      ],
+      "openQuestions_he": [
+        "חלק מה-EntityReference בקוד מסומנים בסוג שאינו תואם למזהה: gen_customername ← \"gen_transferin\" (מזהה איש קשר), gen_product ← \"gen_coursepartition\" (מזהה מוצר), gen_agent / gen_agency / gen_consultingbankname ← \"gen_fundmain\" (main.cs:49-66). ההשפעה בזמן ריצה לא ידועה.",
+        "gen_supervisor נשלח כאן כ-\"gen_agentcontract\" וב-Create CP for Fund With FT 56 כ-\"systemuser\", אף ששניהם מאותו מקור (Gen_agentcontract.gen_supervisor). איזה מהם נכון?"
+      ]
+    },
+    {
+      "refId": "Package\\Update TI - first transaction (53)",
+      "title_he": "מועד קובע ותאריך שיוך כספים לפי תנועת 53 המוקדמת בקופות היעד",
+      "techName": "Update TI - first transaction (53)",
+      "short_he": "בבקשות העברה מסוג 1 בסטטוס פעולה 11 שעוד לא נשלח בהן נספח ד', כשבקופת היעד של אחד הפיצולים שלהן יש תנועה מסוג 53 בטבלאות השנה הנוכחית או הקודמת (בלי סינון לפי תאריך או לפי הבקשה), נרשמים בבקשה מועד קובע (תאריך הערך המוקדם של תנועות אלה) ותאריך שיוך כספים (תאריך הרישום שלה), והסטטוס עובר ל-12.",
+      "flow_he": [
+        "בקשות עם Gen_ActionStatus = 11, סוג 1, gen_appendixdsent ריק, ופיצול שקופת היעד שלו קיבלה תנועה 53.",
+        "התנועה עם תאריך הערך המוקדם לכל בקשה (ערך ריק ממוין ראשון).",
+        "עדכון SDK: gen_fixtransferdate, gen_moneyassociatingdate, gen_actionstatus = 12."
+      ],
+      "short": {
+        "nodes": [
+          {
+            "type": "step",
+            "text": "נבחרות בקשות העברה מסוג 1 בסטטוס פעולה 11 שעוד לא נשלח בהן נספח ד', ושבקופת היעד של אחד הפיצולים שלהן יש תנועת כסף מסוג 53 בטבלאות השנה הנוכחית או הקודמת. השאילתה לא מקשרת את התנועה לבקשה (אין סינון לפי תאריך או לפי הבקשה)."
+          },
+          {
+            "type": "step",
+            "text": "לכל בקשה נבחרת התנועה הראשונה לפי תאריך הערך."
+          },
+          {
+            "type": "write",
+            "text": "בבקשה נרשמים מועד קובע = תאריך הערך ותאריך שיוך כספים = תאריך הרישום (כשהם קיימים), והסטטוס עובר ל-12."
+          },
+          {
+            "type": "end",
+            "text": "בקשות שבקופות היעד של הפיצולים שלהן נמצאה תנועת 53 עוברות לסטטוס 12. שהתנועה היא הכסף של הבקשה הזו – השערה, כי השאילתה לא מקשרת ביניהן."
+          }
+        ]
+      },
+      "detailed": {
+        "nodes": [
+          {
+            "type": "step",
+            "text": "נבחרות בקשות העברה נכנסות בסטטוס פעולה 11, מסוג 1, שלא נרשם בהן תאריך שליחת נספח ד'.",
+            "tech": "Get Fields For TransferIn (OLEDBSource, DTSX:92024; SQL DTSX:92029): WHERE ti.Gen_ActionStatus = 11 AND ti.gen_transfertype = 1 AND ti.gen_appendixdsent IS NULL"
+          },
+          {
+            "type": "step",
+            "text": "לכל בקשה נאספות תנועות מסוג 53 בקופות היעד של הפיצולים שלה, משתי טבלאות השנה, עם תאריך הרישום ותאריך הערך.",
+            "tech": "gen_ftcurrentyear (⋈ gen_fundmain) / gen_ftpreviousyear ⋈ Gen_fundtransactiontype ⋈ gen_banks ⋈ gen_coursepartition cp (cp.gen_fundnumberdest = gen_fundnumber) ⋈ Gen_transferin (cp.gen_transferin) WHERE gen_transtypeid = '53'; GROUP BY gen_fundnumber, gen_entrydate, Gen_transferinId: min(gen_valuedate)"
+          },
+          {
+            "type": "decision",
+            "text": "האם יש לבקשה תנועה כזו?",
+            "tech": "INNER JOIN – בקשה בלי תנועה 53 לא נבחרת",
+            "branches": [
+              {
+                "label": "לא",
+                "nodes": [
+                  {
+                    "type": "step",
+                    "text": "הבקשה לא מתעדכנת ונשארת בסטטוס 11."
+                  }
+                ]
+              },
+              {
+                "label": "כן",
+                "nodes": [
+                  {
+                    "type": "step",
+                    "text": "נבחרת קבוצת התנועות עם תאריך הערך המוקדם. במיון עולה ב-SQL Server ערך ריק בא ראשון, ולכן אם יש קבוצה שתאריך הערך שלה ריק – היא זו שנבחרת. אם לכמה קבוצות (קופה, תאריך רישום) של אותה בקשה יש אותו תאריך ערך מוקדם, אין מיון משני, ולכן הקבוצה שנבחרת – ותאריך הרישום שנרשם כתאריך שיוך כספים – נקבעת באופן שרירותי.",
+                    "tech": "ROW_NUMBER() OVER (PARTITION BY Gen_transferinId ORDER BY gen_valuedate ASC) = 1; NULL ממוין ראשון; אין סינון min(gen_valuedate) is not null; אין ORDER BY משני – שוויון ב-gen_valuedate מוכרע שרירותית"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "type": "step",
+            "text": "תאריך הרישום ותאריך הערך מומרים לשעון מקומי.",
+            "tech": "Dates To Local (DTSX:91305)"
+          },
+          {
+            "type": "write",
+            "text": "בבקשה נרשמים מועד קובע = תאריך הערך (אם קיים), תאריך שיוך כספים = תאריך הרישום (אם קיים), וסטטוס פעולה 12. הסטטוס נכתב בכל שורה שנבחרה, גם כשתאריך הערך ריק; אז המועד הקובע לא נכתב, וערך שכבר שמור בבקשה (למשל ערך שנכתב בחבילה 0009) נשאר כמו שהוא. כך גם לגבי תאריך שיוך כספים כשתאריך הרישום ריק. אחרי עדכון מוצלח הסטטוס כבר אינו 11, ולכן הבקשה לא נבחרת שוב.",
+            "tech": "Update TransferIn By Transaction ×5 (DTSX:92597...; קוד זהה) main.cs:41-62: gen_fixtransferdate = genvaluedate, gen_moneyassociatingdate = genentrydate, gen_actionstatus = OptionSetValue(12) · gen_transferin · Update · SDK"
+          },
+          {
+            "type": "end",
+            "text": "בקשות שבקופות היעד של הפיצולים שלהן נמצאה תנועת 53 עוברות לסטטוס 12, ומקבלות מועד קובע ותאריך שיוך כספים כשהתאריכים האלה קיימים. שהתנועה היא הכסף של הבקשה הזו – השערה (אין בשאילתה קישור לפי תאריך או לפי הבקשה)."
+          }
+        ]
+      },
+      "detail_he": [
+        {
+          "h": "מקור ואוכלוסייה",
+          "t": "gen_fundmain, gen_ftcurrentyear, gen_ftpreviousyear, Gen_fundtransactiontype, gen_banks, gen_coursepartition, Gen_transferin (טבלאות CRM, לא Staging). התנועות נטענות כנראה ב-0008_LeumiFile-PY (השערה); gen_ftpreviousyear – לא ידוע."
+        },
+        {
+          "h": "התאמה לרשומות קיימות",
+          "t": "תנועה ↔ פיצול לפי cp.gen_fundnumberdest; פיצול ↔ בקשה לפי cp.gen_transferin."
+        },
+        {
+          "h": "החלטות",
+          "t": "סטטוס פעולה 11, סוג 1 (ולא 7), אין נספח ד', קיימת תנועה 53; התנועה עם תאריך הערך המוקדם (ערך ריק ממוין ראשון; שוויון בתאריך הערך המוקדם מוכרע שרירותית)."
+        },
+        {
+          "h": "כתיבה ל-CRM",
+          "t": "gen_transferin Update (SDK): gen_fixtransferdate, gen_moneyassociatingdate, gen_actionstatus = 12 (ערך קבוע)."
+        },
+        {
+          "h": "תוצאה עסקית",
+          "t": "קביעת המועד הקובע (התווית מהערת הקוד 'תאריך ערך העברה למועד קובע', DTSX:92773) לפי תנועת 53 עם תאריך הערך המוקדם (ערך ריק ממוין ראשון) בקופות היעד של פיצולי הבקשה, בטבלאות השנה הנוכחית והקודמת בלבד. תנועות מסוגים אחרים לא נבדקות, ואין קישור לפי תאריך או לפי הבקשה."
+        }
+      ],
+      "sourceFeed": {
+        "component": "Get Fields For TransferIn (DTSX:92024)",
+        "tables": [
+          "gen_fundmain",
+          "gen_ftcurrentyear",
+          "gen_ftpreviousyear",
+          "gen_fundtransactiontype",
+          "gen_banks",
+          "gen_coursepartition",
+          "gen_transferin"
+        ],
+        "isStaging": false,
+        "upstream_he": "gen_ftcurrentyear – כנראה 0008_LeumiFile-PY (השערה); gen_ftpreviousyear – לא ידוע."
+      },
+      "decisions": [
+        {
+          "where": "SQL DTSX:92029",
+          "condition": "ti.Gen_ActionStatus = 11 and (ti.gen_transfertype = 1) and ti.gen_appendixdsent is null and gen_transtypeid = '53'",
+          "meaning_he": "בקשה מסוג 1 בסטטוס פעולה 11, בלי נספח ד', שבקופת היעד של אחד הפיצולים שלה יש תנועה 53",
+          "outcome_he": "נבחרת"
+        },
+        {
+          "where": "SQL DTSX:92029",
+          "condition": "ROW_NUMBER() OVER(PARTITION BY Gen_transferinId ORDER BY gen_valuedate ASC) = 1",
+          "meaning_he": "התנועה עם תאריך הערך המוקדם (ערך ריק ראשון)",
+          "outcome_he": "מקור התאריכים"
+        }
+      ],
+      "crmEffects": [
+        {
+          "entity": "gen_transferin",
+          "verb": "Update",
+          "mechanism": "SDK",
+          "when_he": "לכל בקשה שנבחרה"
+        }
+      ],
+      "evidence": [
+        "DTSX:92029 SQL",
+        "DTSX:91305 Dates To Local",
+        "Update TransferIn By Transaction main.cs (sha e97e8b256047):41-62",
+        "dupes.json ×5"
+      ],
+      "openQuestions_he": [
+        "מדוע רק סוג 1 ולא גם 7?",
+        "תשובה מהקבצים: בחבילה 0009 (Create transferin from outside source\\Compare Fields Before Update) מוגדרים בקוד הקבועים ACTION_STATUS_WATING_FOR_DEPOSIT = 11 ו-ACTION_STATUS_DEPOSIT_RECIVED = 12, וגם TRANSFER_TYPE_JOINING_AND_TRANSFER = 1 (0009 DTSX:82780-82783)."
+      ]
+    }
+  ],
+  "findings_he": [
+    {
+      "severity": "medium",
+      "text": "סוגי EntityReference אינם עקביים עם המזהים שנשלחים: ב-Create CP - Joining Only הלקוח נשלח כ-\"gen_transferin\", המוצר כ-\"gen_coursepartition\", והסוכן, הסוכנות והבנק המייעץ כ-\"gen_fundmain\". ב-Create TI - Joining Only איש הקשר, החשבון וההצטרפות הממוכנת נשלחים כ-\"gen_customeraccount\". המפקח מאותו מקור נשלח פעם כ-\"gen_agentcontract\" ופעם כ-\"systemuser\". ההשפעה בזמן ריצה (דחייה או התעלמות מהסוג) לא ידועה.",
+      "evidence": "Create CoursePartition main.cs:46-66; create transferin (joining only) main.cs:46-56; SDK Create gen_coursepartition main.cs:79-80"
+    },
+    {
+      "severity": "medium",
+      "text": "ב-Create CP for Fund With FT 56 עלולים להיווצר פיצולים כפולים: השאילתה מאחדת (UNION ALL) תנועות מהשנה הנוכחית ומהשנה הקודמת בלי איחוד לפי קופה, ובדיקת 'אין פיצול לקופה' נעשית פעם אחת לפני היצירה. קופה עם תנועות 56 בשתי השנים, או שתי בקשות פתוחות לאותו חשבון, יכולות להוביל לשני פיצולים לאותה קופה (השערה לפי מבנה השאילתה).",
+      "evidence": "SQL DTSX:46144; SDK Create gen_coursepartition"
+    },
+    {
+      "severity": "medium",
+      "text": "בשכפול הבקשה (Clone TransferIn) כמה שדות נקראים בלי בדיקת ערך ריק: תיאור, לקוח, תעודת זהות, gen_investhousename, מספר קופה מקורית, סוג קופה מקורית, gen_fundfinanceid ומספר מסלקה. אם אחד מהם ריק, נזרקת חריגה, השורה עוברת לפלט השגיאה, והבקשה לא משוכפלת באותה ריצה. החשבון נבחר שוב רק בריצה שמתקיים בה DATEDIFF(HOUR, ca.CreatedOn, GETUTCDATE()) <= 24. אם תהיה ריצה כזו – תלוי בלוח הזמנים, שאינו בקבצים.",
+      "evidence": "Clone TransferIn main.cs:47, 50-51, 73-76, 95, 111-117; SQL DTSX:11136 (isnull(ca.Gen_customeridnumber, ti.gen_identitynumber); N'חשבון מקור – '+ ti.gen_customeraccountdestName); SQL DTSX:11136 (DATEDIFF(HOUR, ca.CreatedOn, GETUTCDATE()) <= 24)"
+    },
+    {
+      "severity": "medium",
+      "text": "Create CP for Fund With FT 56 מעדכן את הבקשה (תאריך בפועל, ריבית פיגורים, ימי פיגור) לכל שורות המקור דרך פלט ה-Result הסינכרוני, גם כשיצירת הפיצול נכשלה. gen_actualtransferdate בבקשה מקבל כאן את תאריך הביצוע המוקדם של תנועות 56, בלי המרה לשעון מקומי (Dates To Local בשלב זה ממיר רק את CreatedOn ו-gen_fundcreationdate). בהמשך אותה ריצה Close TI External עשוי לכתוב באותו שדה ערך אחר: אם הבקשה עדיין במצב 1, מסוג 1 או 7, ויש לה פיצולים עם סכום ותאריך בפועל, נכתב התאריך המוקדם מהפיצולים (min(cp.gen_actualtransferdate), אחרי המרה לשעון מקומי), ורק אם הוא שונה מהערך השמור. כך לאותו שדה יש שני מקורות אפשריים.",
+      "evidence": "Create CP for Fund With FT 56: SDK Create .Result → Union All → Group by TransferIn → Update Transfer In main.cs:54-57; Close TI External SQL DTSX:14175 + Update transferin main.cs:53-56; Dates To Local DTSX:45390 (FT56: CreatedOn, gen_fundcreationdate) מול DTSX:13300 (External: כולל gen_actualtransferdate)"
+    },
+    {
+      "severity": "low",
+      "text": "ב-Create CP for Fund With FT 56 תאריך היצירה בפיצול מקבל את תאריך יצירת רשומת הקופה (CreatedOn), אף שהתנאי בודק את תאריך פתיחת הקופה. ב-Create CP - Joining Only נכתב תאריך פתיחת הקופה. קופות בלי חוזה סוכן (INNER JOIN ל-Gen_agentcontract) או בלי מוצר תואם (INNER JOIN ל-Product) נשמטות.",
+      "evidence": "SDK Create gen_coursepartition main.cs:41-42; Create CoursePartition main.cs:102-103; SQL DTSX:46144"
+    },
+    {
+      "severity": "low",
+      "text": "ב-Close TI internal תאריך העדכון בבנק החדש (gen_modifiedByBank) אינו מומר לשעון מקומי, אבל הערך הקיים (gen_modifiedbybankDB) מומר. לכן ההשוואה ביניהם אינה עקבית, וייתכן שהשדה נכתב שוב בכל ריצה. ב-Close TI External שניהם מומרים.",
+      "evidence": "Dates To Local inputs: DTSX:23966 (internal) מול DTSX:13300 (external)"
+    },
+    {
+      "severity": "info",
+      "text": "תנאי הסגירה שונים בין העברות פנימיות (סוג 5 ו-6) לבין העברות מסוג 1 ו-7. בפנימיות ה-SQL בוחר רק בקשות במצב 1 שיש להן פיצולים עם סכום ותאריך בפועל, ושהתאריך המוקדם בפיצולים רחוק פחות מ-30 מעברי יום מיצירת הבקשה (ABS(DATEDIFF(day, …)) < 30). בתוך האוכלוסייה הזו, סוג 6 נסגר בלי בדיקה נוספת, וסוג 5 נסגר רק אם יש תאריך חתימה וחותמת 'נתקבל', ואין סכום צפוי או שהסטייה ממנו היא עד 15%. בסוג 1 ו-7 יש אותו סינון של מצב 1 ופיצולים עם סכום ותאריך בפועל, בלי מגבלת 30 יום, ונבדק רק שהכסף הגיע אחרי חותמת 'נתקבל'.",
+      "evidence": "DTSX:24801, 25024, 25083 מול DTSX:14175, 14395"
+    },
+    {
+      "severity": "info",
+      "text": "כל הכתיבה העסקית ל-CRM בחבילה נעשית ב-SDK (Supported). ה-SQL הישיר היחיד הוא הוספת אזהרות ETL (מסגרת). רכיבי הריבוי (×5) זהים בכל קבוצה.",
+      "evidence": "sqlStatements ב-evidence/0015_TransferIn.json; analysis/0015_TransferIn/dupes.json"
+    }
+  ]
+}

@@ -1,0 +1,60 @@
+{
+  "verifier": "ssis-verifier",
+  "package": "0020_Preservation",
+  "scope": "logic-claims re-check after fixes",
+  "checkedAt": "2026-11-07T12:00:00Z",
+  "checked": 3,
+  "results": [
+    {
+      "id": "L|Package\\Handle Expired Preservations\\Close preservations|title",
+      "hash": "dec95067ae72",
+      "verdict": "WRONG",
+      "detail": "The state-1 fix is correct (only p.gen_currentstate = 1 is tested, DTSX:4817, now labelled השערה). Units 3-7 verified: source SQL and isnull priority withdrawal -> customercare -> pensiontransferout (DTSX:4806-4817), WHERE 'gen_transferoutamountinactual is not null or( date is not null and date < dateadd(\"dd\",-1,getdate()) and p.gen_currentstate = 1)', Set columns literals gen_currentstate=2, gen_preservationresault=57, gen_generalresult=2 (DTSX:4861-4873), KingswaySoft destination gen_preservation, input columns 3 + gen_preservationid (DTSX:3181, 3205-3208), errorRowDisposition RedirectRow -> ETL Warning (DTSX:3203). Remaining problem in unit 2: 'תיקי שימור שיש בהם סכום העברה בפועל' states as fact that the amount is a field of the preservation record. gen_transferoutamountinactual is unqualified in a 4-table join (DTSX:4814); it is not in the gen_preservation destination metadata (132 columns, DTSX:3209-4790; that list is incomplete, it also lacks gen_pensiontransferout) and appears in no other supplied DTSX. The package's own finding#2, open question #2 and detailed node 5 say the source table is unknown, so unit 2 contradicts them.",
+      "evidence": "DTSX:3181-3208, 4806-4817, 4861-4873; grep -i transferoutamountinactual source/DailyProcess/*.dtsx -> only 0020:4814",
+      "wrongUnits": [
+        {
+          "unit": 2,
+          "problem": "Attributes gen_transferoutamountinactual to the preservation record ('שיש בהם') although the column's table is unknown.",
+          "correct": "e.g. 'נבחרים תיקי שימור שבהם gen_transferoutamountinactual אינו ריק (העמודה לא מסויגת; לא ידוע אם היא של תיק השימור או של רשומה מקושרת: משיכה, שירות לקוחות או העברת פנסיה), או ...'",
+          "evidence": "DTSX:4814; package finding#2 / open#2"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Handle Expired Preservations\\Close preservations|short",
+      "hash": "2e5b3ec4f64d",
+      "verdict": "WRONG",
+      "detail": "Units 1, 2, 4-9 verified against DTSX:4806-4817 (OR precedence: the amount condition stands alone; date branch needs non-null date < getdate()-1 day and state 1) and DTSX:4861-4873 / 3179-3208. The state-1 label is now השערה. Unit 3 ('יש בתיק סכום העברה בפועל') and unit 10 ('או שבוצעה בהם העברה בפועל') attribute the unqualified gen_transferoutamountinactual to the preservation record, and unit 10 further infers that a transfer was actually performed from the column name; neither is proven (column unqualified, table unknown per the package's own finding#2/open#2). Unit 10 also says 'תיקי שימור שפג תוקפם' are closed without the state-1 condition of that branch.",
+      "evidence": "DTSX:4806-4817, 4861-4873",
+      "wrongUnits": [
+        {
+          "unit": 3,
+          "problem": "Branch label places the amount in the preservation file as fact.",
+          "correct": "'gen_transferoutamountinactual אינו ריק (טבלת המקור לא ידועה)'",
+          "evidence": "DTSX:4814"
+        },
+        {
+          "unit": 10,
+          "problem": "'שבוצעה בהם העברה בפועל' is a name-based meaning and location stated as fact; expiry branch omits the state = 1 condition.",
+          "correct": "Records with gen_transferoutamountinactual not null (table unknown; meaning השערה), or with state 1 and last preservation date older than one day, get 2/57/2.",
+          "evidence": "DTSX:4814-4817"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Handle Expired Preservations\\Close preservations|detailed",
+      "hash": "91ab16bf0e14",
+      "verdict": "WRONG",
+      "detail": "Units 1-16 verified: joins (DTSX:4809-4812), isnull priority (4807), WHERE and OR precedence (4813-4817), node 5 correctly says the amount column's table is unknown, node 6 label fixed to 'מצב 1 (השערה: פתוח)', literals 2/57/2 (4861-4873), destination gen_preservation, ActionType=3 with label marked השערה, RecordMatchingCriteria=1, BatchSize=100, 20 threads, only 4 input columns (3181-3208), RedirectRow to ETL warning (3203). Unit 17 (end) contradicts node 5: 'או שבוצעה בהם העברה בפועל' places the amount in the preservation record and infers that a transfer was performed, both unproven; it also says files 'שעברו את תאריך השימור האחרון' get the values without the required state = 1 condition.",
+      "evidence": "DTSX:3181-3208, 4806-4817, 4861-4873",
+      "wrongUnits": [
+        {
+          "unit": 17,
+          "problem": "Unproven location/meaning of gen_transferoutamountinactual stated as fact (contradicts node 5); date branch summary omits state = 1.",
+          "correct": "Records with gen_transferoutamountinactual not null (source table unknown), or in state 1 whose last preservation date is older than one day, receive state 2, preservation result 57 and general result 2; labels unknown.",
+          "evidence": "DTSX:4814-4817"
+        }
+      ]
+    }
+  ]
+}

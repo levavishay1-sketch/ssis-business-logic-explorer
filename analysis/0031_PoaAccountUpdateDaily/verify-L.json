@@ -1,0 +1,593 @@
+{
+  "verifier": "ssis-verifier",
+  "package": "0031_PoaAccountUpdateDaily",
+  "scope": "logic-claims all",
+  "checkedAt": "2026-11-07T11:33:54.030Z",
+  "checked": 62,
+  "results": [
+    {
+      "id": "L|summary",
+      "hash": "2510175722fe",
+      "verdict": "WRONG",
+      "detail": "Most of the summary matches the DTSX (activation of state-3 POAs, cancellation of expired active POAs with statustransfertobank=2, POA Main sync, creation for accounts/pension programs created in the last 2 days). Unit 1 is wrong in claiming the mailing CSV is built from the JSON: Send Poa Emails never reads emailDetailsJson; it reads PowerOfAttorneyId, LetterVersion, StatusAfterUpdate, ContactIdentityNumber, AcountProgramNumber of every isProcessed=0 row and enriches them by CRM lookups. Unit 1 also states without the condition that the receiving date is written on the other agent's active POA; it is written only when that old POA's appendix is 2/3/5, otherwise the field is set to NULL (CASE without ELSE), and the value is the new POA receiving date +3h. Unit 2 (scope note) checked: [CRM] DTSX:4, [SQL.GENERIX_STAGING] DTSX:53, Kingsway only declared (DTSX:23, no other reference), log provider DTSX:65, 4 email components commented out (DTSX:13989,15683,23130,24705), no package configurations.",
+      "evidence": "Send Poa Emails source SQL DTSX:31813 (no emailDetailsJson); Update NeedToSendMailBit DTSX:31302; Handle Wait OLE DB Source DTSX:27226 (dateadd(HH,3,poa.gen_receivingdate))",
+      "wrongUnits": [
+        {
+          "unit": 1,
+          "problem": "'נבנים נתונים (JSON ב-staging), ומהם קובץ דיוור CSV' - the CSV is not built from the JSON.",
+          "correct": "The JSON is only written to PowerOfAttorneySendEmails.emailDetailsJson; nothing in 0031 reads it. The CSV/error CSV are built from all isProcessed=0 staging rows (columns PowerOfAttorneyId, LetterVersion, StatusAfterUpdate, ContactIdentityNumber, AcountProgramNumber) enriched by CRM lookups (Get Agent/Agencie/Power Of Attorney/Contact/Pension/Provident Fund).",
+          "evidence": "DTSX:31813 SqlCommand of Get Not Proceessed PowerOfAttorneySendEmails Data; Proccess Data main.cs:27-68 @DTSX:32186"
+        },
+        {
+          "unit": 1,
+          "problem": "Receiving date is said to be written on the other agent's active POA unconditionally.",
+          "correct": "gen_receivingdateofcancelpoa = new POA gen_receivingdate+3h only when the old active POA's Gen_appendixtype is 2, 3 or 5; otherwise it is overwritten with NULL.",
+          "evidence": "DTSX:31302-31306; DTSX:27226 (Gen_receivingdatePoa = dateadd(HH,3,poa.gen_receivingdate)); Param_0=Gen_receivingdatePoa, Param_1=PowerOfAttorneyIdPa"
+        }
+      ]
+    },
+    {
+      "id": "L|exec",
+      "hash": "24c2e8098b49",
+      "verdict": "CONFIRMED",
+      "detail": "All 18 package-level precedence constraints are Success (no DTS:Value, no expressions, LogicalAnd=True) and form a single linear chain in exactly the stated order; each cited constraint line matches its From/To pair. No executable is disabled.",
+      "evidence": "DTSX:44824-44841",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|ignored",
+      "hash": "ab93d4c1ac0f",
+      "verdict": "WRONG",
+      "detail": "Checked every listed item. Count/RowCount, Etl Warning, error-description Derived Columns, Union of errors, Set Task Name Variable (pass-through, PostExecute sets ComponentTaskName only), Get Base Fields Values (UserId/OrganizationId not consumed by business components), Set Queue Id Variable (AgentDescQueueId used only by the commented-out email code), log provider and the unused Kingsway connection are plumbing. Unit 4 is not pure plumbing: Set Destinations Paths builds StatusYpuieKoahFileName (+'_yyyy-MM-dd_HH_mm.csv') and the paths ({Year}/{Month}) of the business mailing CSV and creates the directories, and that file name becomes the subject of the CRM email created in Send Poa Emails. (Get Organization Variables likewise supplies the queue ids used as email from/to, but Organization Variables are declared plumbing by CLAUDE.md, so it is not counted.)",
+      "evidence": "Set Destinations Paths ScriptMain DTSX:36665 (+247-263 within task); Send Email main.cs:48-49 @DTSX:33987; POA File ConnectionString expression DTSX:29-52",
+      "wrongUnits": [
+        {
+          "unit": 4,
+          "problem": "Set Destinations Paths is classed as ETL plumbing although its output reaches CRM.",
+          "correct": "It computes the name/path of the business mailing file (StatusYpuieKoahFileName + '_' + yyyy-MM-dd_HH_mm + '.csv', path with {Year}/{Month}) and creates the folders; the file name without extension is written to CRM as email.subject by Send Poa Emails\\Send Email.",
+          "evidence": "DTSX:36665 script lines 247-263; Send Email main.cs:48-49"
+        }
+      ]
+    },
+    {
+      "id": "L|finding#1",
+      "hash": "b10f9f75024f",
+      "verdict": "CONFIRMED",
+      "detail": "Update NeedToSendMailBit (OLE DB Command on [CRM]) updates Gen_powerofattorneyBase.gen_receivingdateofcancelpoa; Update sentToPrintOn (OLE DB Command on [CRM]) updates Gen_powerofattorney.gen_SentToPrintOn = GETUTCDATE(). Both are direct SQL on the CRM database (catalog altshuler_mscrm, CRM tables), bypassing the SDK.",
+      "evidence": "DTSX:31299/31302; DTSX:36592/36595; DTSX:4",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|finding#2",
+      "hash": "30fa556191bc",
+      "verdict": "CONFIRMED",
+      "detail": "SQL is 'set gen_receivingdateofcancelpoa = case when ((Gen_appendixtype = 2) or (=3) or (=5)) then ? end where Gen_powerofattorneyId = ?' with no ELSE; the CASE reads the appendix of the row being updated (the old active POA, Param_1 = PowerOfAttorneyIdPa), so for other appendix values the field becomes NULL.",
+      "evidence": "DTSX:31302-31306; parameter mapping Gen_receivingdatePoa->Param_0, PowerOfAttorneyIdPa->Param_1",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|finding#3",
+      "hash": "59dec6f7d0a3",
+      "verdict": "CONFIRMED",
+      "detail": "All four agent-email script components (Email - Start Date Poa, ... With Commission Appointment, Email - Cancel Poa To Perform Actions, ... With Commission Appointment) have their Input0_ProcessInput body inside a commented region 'In Comment due to 13366'; their sync Output 0 still passes rows on. The JSON in staging is written by Set Data For ... Poa Emails; 'replacement mechanism' is correctly labelled as hypothesis.",
+      "evidence": "DTSX:13989, 15683, 23130, 24705; Email - Start Date Poa main.cs:44-74",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|finding#4",
+      "hash": "cad8e415d58d",
+      "verdict": "CONFIRMED",
+      "detail": "Send Email calls CreateAndSendEmail() in PostExecute; Input0_ProcessInputRow is empty, so the email is created and SendEmail executed on every run that reaches the component, even with zero rows.",
+      "evidence": "Send Email main.cs:25-33 @DTSX:33987",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|finding#5",
+      "hash": "5c4f10e66da9",
+      "verdict": "CONFIRMED",
+      "detail": "Check If Exists Agent_cy Email Address 'Not Exists' -> Multicast 2 -> output 3 -> Union All -> Update IsProcessed True -> Update sentToPrintOn; output 4 -> Add Columns -> Create Error POA File. So rows without email are both written to the error file, flagged isProcessed=1 and get gen_SentToPrintOn = GETUTCDATE().",
+      "evidence": "Send Poa Emails paths (Multicast 2 outputs 3/4); DTSX:36554/36557; DTSX:36592/36595",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|finding#6",
+      "hash": "6644bbe5cbba",
+      "verdict": "CONFIRMED",
+      "detail": "Create POA Account - Agent (both flows) sets gen_agentname = EntityReference(\"gen_agents\", POA Main Gen_agentname), gen_agencyname = EntityReference(\"gen_agencie\", ...), and in pension gen_customerprogram = EntityReference(\"gen_policies\", Gen_programmainid). 0029 creates POA Main with gen_agentname = contact and gen_agencyname = account. Consequence correctly stated conditionally and labelled hypothesis.",
+      "evidence": "Create POA Account - Agent main.cs:165-174 (account) / 165-174 (pension); 0029_POA.dtsx:22820,22823",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|finding#7",
+      "hash": "df4b23086833",
+      "verdict": "CONFIRMED",
+      "detail": "Pension Remove Duplicates has a single sort key Gen_powerofattorneymainId with EliminateDuplicates=true; the existence lookup runs before it, so already-created programs are dropped in later runs and remaining programs can be picked up while still within the 2-day CreatedOn window.",
+      "evidence": "DTSX:9066-9089 (sort key at 9086); path order Get Policies -> Check If POA Account Agent -> Move Annotation To Policies -> Remove Duplicates -> Create",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|finding#8",
+      "hash": "c2d7f522b2a4",
+      "verdict": "CONFIRMED",
+      "detail": "If All Statuses Are Same False (CountTypes > 1) -> If Exists Active (gen_currentstate = 1) NoMatch -> Set Related Current State To Canceled (= 3) -> update; a pending (3) child does not prevent this. Meaning of 3 correctly labelled as hypothesis.",
+      "evidence": "DTSX:39106, 39180-39196, 39334",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|finding#9",
+      "hash": "68d4e1cb09b7",
+      "verdict": "CONFIRMED",
+      "detail": "Move Annotation scripts update annotation.objectid for every row with AnnotationId (no check if already moved) and run before Remove Duplicates; source queries have no ORDER BY; Annotation left join is inside the ROW_NUMBER subquery filtered rowNumber = 1, so one annotation per account/program.",
+      "evidence": "Move Annotation To Customer Account main.cs:122-141; Move Annotation To Policies main.cs:123-142; Get Customer Accounts DTSX:3295; Get Policies DTSX:7589",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|finding#10",
+      "hash": "8da9d1a01e49",
+      "verdict": "CONFIRMED",
+      "detail": "Is Renewal (agentcyIdNumberPa == agentcyIdNumber) and AppendixType (gen_appendixtype != 2 && != 3 && != 5) outputs have errorRowDisposition=FailComponent; a NULL condition result is an evaluation error in a Conditional Split. Both sit upstream of the blocking Sort By PoaId, so a failure stops all activations of the run. NULL occurrence is correctly labelled hypothesis.",
+      "evidence": "DTSX:27056, 22859, 28819",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|finding#11",
+      "hash": "1a8abb12edb1",
+      "verdict": "CONFIRMED",
+      "detail": "0031 only UPDATEs PowerOfAttorneySendEmails (Update Json x2, Update IsProcessed True) and reads it; no destination/INSERT. 0030_PoaAccountUpdateDailyTest has OLE DB Destination 'Write To PowerOfAttorneySendEmails Table' to [dbo].[PowerOfAttorneySendEmails] on SQL.GENERIX_STAGING; whether 0030 is what loads it in production is not provable, so the hypothesis label is correct.",
+      "evidence": "0031 DTSX:22766, 31253, 36554, 31811; 0030_PoaAccountUpdateDailyTest.dtsx:5219-5237",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Handle Wait Status|title",
+      "hash": "2e24080e3f35",
+      "verdict": "INCOMPLETE",
+      "detail": "Population, renewal/no-active branches, JSON for appendix 2/3/5 and SDK activation are correct. short_he states that the new POA's receiving date is recorded on the other agent's active POA, omitting that this only happens when the old POA's appendix is 2/3/5 and that otherwise the field is cleared to NULL (and that the value is shifted +3h).",
+      "evidence": "DTSX:31302-31306; DTSX:27226",
+      "wrongUnits": [
+        {
+          "unit": 0,
+          "problem": "Missing condition on the SQL write to the old active POA.",
+          "correct": "gen_receivingdateofcancelpoa on the old active POA = new POA gen_receivingdate + 3h only if the OLD POA's Gen_appendixtype in (2,3,5); otherwise it is set to NULL.",
+          "evidence": "DTSX:31302-31306"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Handle Wait Status|short",
+      "hash": "1c2f58b80d1f",
+      "verdict": "INCOMPLETE",
+      "detail": "Step order and branches are correct, but unit 8 states the receiving date is recorded on the old active POA without the condition that drives it; for other appendix values the write clears the field.",
+      "evidence": "DTSX:31302-31306",
+      "wrongUnits": [
+        {
+          "unit": 0,
+          "problem": "Unit 8 omits the CASE condition of the SQL update.",
+          "correct": "The date (new receiving date +3h) is written only when the old active POA's appendix is 2/3/5; otherwise gen_receivingdateofcancelpoa is overwritten with NULL.",
+          "evidence": "DTSX:31302-31306"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Handle Wait Status|detailed",
+      "hash": "9fe3265d1913",
+      "verdict": "WRONG",
+      "detail": "Units 1-24 and 26 match the DTSX (source WHERE, full-cache lookup, Is Renewal, Update NeedToSendMailBit, AppendixType, Check Format, Set Data JSON per POA Main, Update Json filter, Sort/Contains Data 1 filter, Update ACTIVE condition). Unit 25 is wrong: the Error output of 'Update gen_powerofattorney ACTIVE' is not connected to anything, so SDK update failures are silently discarded; UnionErrors -> Etl Warning only receives the Error outputs of the two commented-out email components. Unit 10 also omits the +3h shift of the written date.",
+      "evidence": "Handle Wait Status paths DTSX:31349-31380 (no path from Update gen_powerofattorney ACTIVE.Outputs[Error]); UnionErrors inputs from EmailFormat1/2 - Error only; Update ACTIVE main.cs:46-50",
+      "wrongUnits": [
+        {
+          "unit": 25,
+          "problem": "Claims update failures are logged as ETL warnings via Error -> UnionErrors -> Etl Warning.",
+          "correct": "Update gen_powerofattorney ACTIVE adds failures to its Error output, which has no path; they are dropped without any ETL warning or count. Update NeedToSendMailBit / Update Json have errorRowDisposition=FailComponent (a SQL error fails the data flow).",
+          "evidence": "path list of Handle Wait Status (UnionErrors.Inputs[1] <- EmailFormat1 - Error, [3] <- EmailFormat2 - Error only); DTSX:31267, 31315"
+        },
+        {
+          "unit": 10,
+          "problem": "Value written is described as the new POA receiving date.",
+          "correct": "Param_0 = Gen_receivingdatePoa = dateadd(HH,3,poa.gen_receivingdate) of the new POA, i.e. +3 hours, written via direct SQL.",
+          "evidence": "DTSX:27226; Param mapping Gen_receivingdatePoa -> Param_0"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Handle Wait Status|detail",
+      "hash": "7c712d2afba4",
+      "verdict": "WRONG",
+      "detail": "Units 1-4 and 6 match. Unit 5 says the old POA 'is marked for cancellation'; the package only writes gen_receivingdateofcancelpoa (or NULL) on it, and nothing in 0031 cancels it on that basis (Handle Active Status cancels only by Gen_enddate <= GETDATE()); the component's own open question 1 says the canceller is unknown. Stated as a fact it is an unproven business meaning.",
+      "evidence": "DTSX:31302; Handle Active Status source WHERE DTSX:18171",
+      "wrongUnits": [
+        {
+          "unit": 5,
+          "problem": "'הישן מסומן לביטול' stated as fact.",
+          "correct": "The old active POA receives gen_receivingdateofcancelpoa = new receiving date +3h (appendix 2/3/5) or NULL; this field is used in 0031 only to decide a cancellation-letter JSON when that POA later expires. Whether it triggers cancellation is unknown (השערה).",
+          "evidence": "DTSX:31302-31306; DTSX:18070"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Handle Wait Status|decisions",
+      "hash": "117395f61bf3",
+      "verdict": "CONFIRMED",
+      "detail": "All 8 conditions re-derived and exact (WHERE, lookup query/key, Is Renewal, CASE, AppendixType, Check Format, Update Json WHERE, main.cs:34).",
+      "evidence": "DTSX:27226, 27081-27105, 27045, 31302, 22849, 22882, 31256, Update ACTIVE main.cs:34",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Handle Wait Status|crm",
+      "hash": "5fa0ea72934f",
+      "verdict": "CONFIRMED",
+      "detail": "SDK proxy.Update gen_currentstate=1; SQL update of Gen_powerofattorneyBase.gen_receivingdateofcancelpoa on the old POA (Not Renewal path); staging Update Json on appendix 2/3/5 rows of the other-agent path. No other CRM writes in this data flow (email components commented out).",
+      "evidence": "Update ACTIVE main.cs:36-42; DTSX:31299; DTSX:31253",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Handle Wait Status|open",
+      "hash": "6dc7c2c5b03b",
+      "verdict": "WRONG",
+      "detail": "Unit 1 is correctly labelled unknown (no active component in the supplied files cancels the old POA; 0029 'Cancel Active POA' that did so is disabled). Unit 2 is correct (full-cache lookup returns the first match). Unit 3 is wrong in saying the meanings of states 1/3 and appendix 2 are not defined in the files.",
+      "evidence": "0031 Update ACTIVE const ACTIVE = 1 (DTSX:30447); Create POA main.cs:150 '//ACTIVE' (DTSX:1936, 6376); '--active' DTSX:3327/7622; '--appendix b1' DTSX:3326/7621; 0029_POA.dtsx:3878 '-- active', 3889 '-- waiting'",
+      "wrongUnits": [
+        {
+          "unit": 3,
+          "problem": "Claims the meaning of states 1/3 and appendices 2/3/5 is not defined in the files.",
+          "correct": "gen_currentstate 1 = active (const ACTIVE = 1, '//ACTIVE', '--active' comments); 3 = waiting (0029 SQL comment 'Gen_currentstate = 3 -- waiting', and the flow name Handle Wait Status); appendix 2 = appendix B1 ('--appendix b1'). Only appendices 3 and 5 remain undefined.",
+          "evidence": "DTSX:30447, 1936, 3326-3327; 0029_POA.dtsx:3878, 3889"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Handle Active Status|title",
+      "hash": "a16c5a9b4a03",
+      "verdict": "CONFIRMED",
+      "detail": "Source WHERE Gen_enddate <= GETDATE() and Gen_currentstate = 1; NoMail = ISNULL(gen_receivingdateofcancelpoa); formats 3/8 (emails commented out); JSON update in staging; SDK update gen_currentstate=2 and gen_statustransfertobank=2 (consts CANCELED, WAITING_SENDING_TO_BANK).",
+      "evidence": "DTSX:18171, 18070, 13739, 22769, Update CANCELED main.cs:27-28,65-82",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Handle Active Status|short",
+      "hash": "f8e9eac97354",
+      "verdict": "CONFIRMED",
+      "detail": "Branching on gen_receivingdateofcancelpoa, JSON in staging without sending, and cancellation + waiting-to-bank status match the flow.",
+      "evidence": "DTSX:18070; DTSX:22766; Update CANCELED main.cs:65-82",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Handle Active Status|detailed",
+      "hash": "718fe64e9e2f",
+      "verdict": "WRONG",
+      "detail": "Units 1-6 and 8-14 match the DTSX. Unit 15 is wrong: the Error output of 'Update gen_powerofattorney CANCELED And Status Transfer To Bank' has no path, so SDK failures are dropped; Union Error -> Etl Warning only receives errors from the two commented-out email components. Unit 7 calls the JSON date 'תאריך הביטול', but RecievingDate in the JSON is gen_receivingdateofcancelpoa (receiving date of the cancelling POA), not the cancellation date.",
+      "evidence": "Handle Active Status path list (Union Error inputs 1/4 from Email Format8/3 - Error only); Update CANCELED main.cs:86-90; Set Data For Cancel Poa Emails main.cs:99",
+      "wrongUnits": [
+        {
+          "unit": 15,
+          "problem": "Claims failures are logged as ETL warnings (Error -> Etl Warning).",
+          "correct": "The cancel-update script's Error output is unconnected; failures are silently discarded (no ETL warning, no count).",
+          "evidence": "Handle Active Status paths; Update CANCELED main.cs:86-90"
+        },
+        {
+          "unit": 7,
+          "problem": "JSON date described as the cancellation date.",
+          "correct": "EmailDetails.RecievingDate = Row.genreceivingdateofcancelpoa (the date written in Handle Wait Status from the new POA's receiving date +3h).",
+          "evidence": "Set Data For Cancel Poa Emails main.cs:99 @DTSX:18330"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Handle Active Status|detail",
+      "hash": "73edd7512c22",
+      "verdict": "CONFIRMED",
+      "detail": "Population, match keys, decisions, SDK writes and staging write are correct; sourceTables correct (gen_receivingdateofcancelpoa set in Handle Wait Status; staging table not inserted in 0031, 0030 hypothesis correctly labelled).",
+      "evidence": "DTSX:18171, 22769, Update CANCELED main.cs:65-82",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Handle Active Status|decisions",
+      "hash": "bcb781d232ac",
+      "verdict": "CONFIRMED",
+      "detail": "Conditions exact: source WHERE, ISNULL(gen_receivingdateofcancelpoa), !ISNULL(gen_appointmentofagent) && == TRUE -> EmailFormatTrue (With Commission Appointment, error label 'נוסח 3'), else 8; main.cs:69 and 75.",
+      "evidence": "DTSX:18171, 18070, 13739, 17130/17157; Update CANCELED main.cs:69,75",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Handle Active Status|crm",
+      "hash": "05cf02c9f94b",
+      "verdict": "CONFIRMED",
+      "detail": "SDK update of gen_powerofattorney (currentstate 2, statustransfertobank 2 when not already 2) and staging JSON update when gen_receivingdateofcancelpoa is set. No other writes.",
+      "evidence": "Update CANCELED main.cs:65-82; DTSX:22766",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Handle Active Status|open",
+      "hash": "3d1473bd3a44",
+      "verdict": "CONFIRMED",
+      "detail": "main.cs:107 'Gencontactname = Row.Genagentname_IsNull ? Guid.Empty : Row.Gencontactname' (null check on the wrong column; bug labelled hypothesis). Update Json SQL has no isProcessed filter (DTSX:22769) unlike Handle Wait (DTSX:31256); overwrite risk stated conditionally.",
+      "evidence": "Set Data For Cancel Poa Emails main.cs:107; DTSX:22769; DTSX:31256",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Send Poa Emails|title",
+      "hash": "75f844f8020c",
+      "verdict": "CONFIRMED",
+      "detail": "isProcessed = 0 source; agent then agency lookup; POA/contact lookups; pension then provident; StatusAfterUpdate == 2 -> Get Reciving Date; email exists -> POA file, else error file; isProcessed = 1, gen_SentToPrintOn via SQL, summary email via SDK.",
+      "evidence": "DTSX:31813, 31636, 31557, 31861, 31715, 32089, 33900, 31450, 31964, 31417, 36557, 36595, Send Email main.cs:25-99",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Send Poa Emails|short",
+      "hash": "c793773250f6",
+      "verdict": "CONFIRMED",
+      "detail": "Matches the flow; error reason literal 'לא עודכנה כתובת מייל'; email from LibaSystemQueueId to MailingReportsCustomerTeamQueueId.",
+      "evidence": "Add Columns DTSX:31390; Send Email main.cs:53-70",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Send Poa Emails|detailed",
+      "hash": "54a16287d298",
+      "verdict": "CONFIRMED",
+      "detail": "Re-derived every unit: source columns and 9-digit padding; no-cache lookups whose NoMatch outputs are unconnected (row stops); StringMap 1037 texts; 'לא קיים' defaults for phones; Canceled split; Get Reciving Date NoMatchBehavior=0 with Match output IgnoreFailure and fallback in getRecivingDate(); Proccess Data field mapping (agency overrides agent, provident account name overrides ID); 15-column POA File; error file; both paths -> Update IsProcessed True -> Update sentToPrintOn (GETUTCDATE) -> Send Email in PostExecute.",
+      "evidence": "DTSX:31813, 31636-31662, 31964-31986, 32186 main.cs:27-69, 31483-31556, 36557, 36595, 33987",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Send Poa Emails|detail",
+      "hash": "3559922d4c20",
+      "verdict": "CONFIRMED",
+      "detail": "Population, match keys, decisions, writes and outcome match; staging-loader statement correctly labelled hypothesis.",
+      "evidence": "DTSX:31813, 31966-31986, 36557, 36595",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Send Poa Emails|decisions",
+      "hash": "1191b4f893dc",
+      "verdict": "CONFIRMED",
+      "detail": "All five conditions exact; NoMatch on Get Agencie and Provident Fund have no path, so the row never reaches Update IsProcessed True and stays isProcessed = 0.",
+      "evidence": "DTSX:31813, 31578, 33929, 31450, 31417",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Send Poa Emails|crm",
+      "hash": "c6991c85ce1e",
+      "verdict": "CONFIRMED",
+      "detail": "Update sentToPrintOn is direct SQL on [CRM] for every row reaching Union All (both files); email Create + SendEmail via CrmProxy in PostExecute.",
+      "evidence": "DTSX:36592-36595; Send Email main.cs:25-99",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Send Poa Emails|open",
+      "hash": "b58bdc91f2cc",
+      "verdict": "CONFIRMED",
+      "detail": "No INSERT into PowerOfAttorneySendEmails in 0031; only 0030 (Test) has a destination to it - not provable that it is the production loader. The file consumer is not described anywhere in the supplied files.",
+      "evidence": "grep of source/DailyProcess (only 0030/0031 mention the table); 0030 DTSX:5219",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Update Power Of Attorney Main|title",
+      "hash": "db60fcbd2f7d",
+      "verdict": "CONFIRMED",
+      "detail": "36-hour ModifiedOn window, count(distinct gen_currentstate), uniform 4 -> 4, uniform 2 -> 2+1 = 3, other uniform -> no path, mixed with no active -> 3, mixed with active -> no path; SDK update only when different. Meanings correctly labelled hypothesis.",
+      "evidence": "DTSX:38954, 38992, 39106, 39147, 39232, 39334, 39361, Update Current State Poa Main main.cs:64-85",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Update Power Of Attorney Main|short",
+      "hash": "b3bde48de939",
+      "verdict": "CONFIRMED",
+      "detail": "Branches match the conditional splits and lookup; hypotheses labelled.",
+      "evidence": "DTSX:39106, 39147, 39232, 39180",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Update Power Of Attorney Main|detailed",
+      "hash": "c98d5137d954",
+      "verdict": "CONFIRMED",
+      "detail": "All units re-derived, including Default output of If All Statuses Are Same unconnected, derived 'gen_currentstate_related + 1' (DTSX:39361), '= 3' (DTSX:39334), error output connected to Set Error Columns -> ETL Warning.",
+      "evidence": "DTSX:38949-39361; main.cs:66-85",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Update Power Of Attorney Main|detail",
+      "hash": "c558cbe1bdfc",
+      "verdict": "WRONG",
+      "detail": "Units 1-4 and 6 correct. Unit 5 over-generalises: a POA Main whose children have no active POA gets 3 only when the children have MIXED statuses; if all children share one status other than 2/4 (e.g. all 3) nothing changes, and if all are 4 it gets 4.",
+      "evidence": "DTSX:39106 (CountTypes == 1 / > 1), 39147, 39180",
+      "wrongUnits": [
+        {
+          "unit": 5,
+          "problem": "'ייפוי כוח ראשי ... שאין לו אף פעיל, מקבל סטטוס 3' is not what the flow does.",
+          "correct": "POA Main -> 3 when all children are 2, or when children have more than one distinct status and none is 1; -> 4 when all are 4; otherwise unchanged (including all children 3).",
+          "evidence": "DTSX:39106, 39147, 39232, 39180, 39334, 39361"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Update Power Of Attorney Main|decisions",
+      "hash": "7331bb7a7883",
+      "verdict": "CONFIRMED",
+      "detail": "Conditions exact, including the !ISNULL guards and main.cs:68.",
+      "evidence": "DTSX:39106, 39147, 39232, 39180; main.cs:66-68",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Update Power Of Attorney Main|crm",
+      "hash": "66049e41f099",
+      "verdict": "CONFIRMED",
+      "detail": "Single SDK write gen_powerofattorneymain.gen_currentstate (3 or 4) when different from current.",
+      "evidence": "main.cs:68-77",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Update Power Of Attorney Main|open",
+      "hash": "049fa857d91e",
+      "verdict": "CONFIRMED",
+      "detail": "0029 'Canncel POA main' sets POA Main gen_currentstate = 3 (derived column '3'); the equivalence of values is not defined by OptionSet text in the files. Unit 2 technical fact correct, judgement labelled hypothesis.",
+      "evidence": "0029_POA.dtsx:7356+1353 (FriendlyExpression 3), 9032-9035; DTSX:39334",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Create Power Of Attorney|title",
+      "hash": "e92042e83319",
+      "verdict": "CONFIRMED",
+      "detail": "Accounts created in last 2 days joined to POA Main by contact, appendix 2 ('appendix b1'), active, product/exclusion filter; existence lookup; annotation move; dedup by account + POA Main; SDK create with currentstate 1.",
+      "evidence": "DTSX:3295-3335, 858-870, 3431, 4799-4840, 1781",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Create Power Of Attorney|short",
+      "hash": "9e8a3db9e1c5",
+      "verdict": "CONFIRMED",
+      "detail": "Order and branches match the paths.",
+      "evidence": "Create Power Of Attorney path list",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Create Power Of Attorney|detailed",
+      "hash": "e26d91583ce1",
+      "verdict": "CONFIRMED",
+      "detail": "SQL filter and product meanings (SQL comments --training, --gemel, gemel to invest, Compensation, --appendix b1, --active), ROW_NUMBER by signature date desc, partial-cache existence lookup with Match unconnected, annotation move semantics, dedup keys, Create fields (+3h dates, enddate fallback +10y, startdate = DateTime.Now), OptionSet validation, '//gemel to invest' exclusion of consultation data, error outputs to ETL warning all confirmed.",
+      "evidence": "DTSX:3295-3335; 858-870; Move Annotation main.cs:122-141; 4813/4837; Create POA Account - Agent main.cs:131-228; DTSX:816, 843",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Create Power Of Attorney|detail",
+      "hash": "7daf424eb04b",
+      "verdict": "WRONG",
+      "detail": "Units 1-5 correct. Unit 6 (sourceTables) labels as hypothesis that 0005_Customer Account creates Gen_customeraccount, but the files prove it.",
+      "evidence": "0005_Customer Account.dtsx:18169 component 'Create or Update Customer Accounts\\Create Customer Account', 18341 new Entity(\"gen_customeraccount\"), 18556 ExecuteMultipleExtension(myEntities, RequestType.Create, ...)",
+      "wrongUnits": [
+        {
+          "unit": 6,
+          "problem": "'Gen_customeraccount נכתבת ב-0005_Customer Account (השערה לגבי יצירה)' - left unproven although answerable.",
+          "correct": "0005_Customer Account creates gen_customeraccount records via SDK ExecuteMultiple (RequestType.Create) in the active component 'Create or Update Customer Accounts\\Create Customer Account' (no disabled executables in 0005).",
+          "evidence": "0005_Customer Account.dtsx:18169, 18341, 18556"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Create Power Of Attorney|decisions",
+      "hash": "dfd3836ba881",
+      "verdict": "CONFIRMED",
+      "detail": "All six conditions exact.",
+      "evidence": "DTSX:3295; 858-870; main.cs:126; main.cs:138-154, 188-192, 197",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Create Power Of Attorney|crm",
+      "hash": "152959696953",
+      "verdict": "CONFIRMED",
+      "detail": "annotation Update (objectid -> gen_customeraccount) and gen_powerofattorney Create, both via IOrganizationService.",
+      "evidence": "Move Annotation main.cs:129-134; Create POA Account - Agent main.cs:222",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Create Power Of Attorney|open",
+      "hash": "7fd2f2cf222f",
+      "verdict": "CONFIRMED",
+      "detail": "EntityReference types and 0029 contact/account references verified; consequence labelled hypothesis. CreatedOn > DATEADD(dd,-2,GETDATE()) window verified.",
+      "evidence": "main.cs:169-174; 0029_POA.dtsx:22820-22823; DTSX:3295 (SqlCommand)",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Create Power Of Attorney - Pension|title",
+      "hash": "04050fddaac2",
+      "verdict": "CONFIRMED",
+      "detail": "Programs created in last 2 days, POA Main by Gen_customername = contact, appendix 2, active, ProductTypeCode 200003 (--mekifa) with including comprehensive = 1 or 200004 (--clalit) with including general = 1; dedup by POA Main only; SDK create.",
+      "evidence": "DTSX:7589-7630, 9086, 6102",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Create Power Of Attorney - Pension|short",
+      "hash": "cb210ba7715e",
+      "verdict": "CONFIRMED",
+      "detail": "Order and branches match the paths.",
+      "evidence": "Pension path list",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Create Power Of Attorney - Pension|detailed",
+      "hash": "4ac39b5e24e9",
+      "verdict": "CONFIRMED",
+      "detail": "All units re-derived; consultation data copied unconditionally (main.cs:198-217). Only cosmetic difference: the ETL warning texts carry the suffix ' (Pension)' (DTSX:5140, 5167), which is error-column decoration and not counted.",
+      "evidence": "DTSX:7589-7630; 5182-5194; Move Annotation To Policies main.cs:123-143; 9086; Create POA Account - Agent main.cs:131-229",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Create Power Of Attorney - Pension|detail",
+      "hash": "05e64ef51e1a",
+      "verdict": "CONFIRMED",
+      "detail": "Population, matching, decisions, writes correct. No creator of Gen_programmain/gen_policies exists in the supplied DTSX (only 0029/0031/0037 reference it, none create it), so the hypothesis label is correct.",
+      "evidence": "grep of source/DailyProcess for gen_programmain creates; DTSX:7589",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Create Power Of Attorney - Pension|decisions",
+      "hash": "df46c71cfbce",
+      "verdict": "CONFIRMED",
+      "detail": "All five conditions exact.",
+      "evidence": "DTSX:7589; 5182-5194; main.cs:127; main.cs:138-154, 188-192",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Create Power Of Attorney - Pension|crm",
+      "hash": "61651925e0b7",
+      "verdict": "CONFIRMED",
+      "detail": "annotation Update objectid -> EntityReference(\"gen_policies\") and gen_powerofattorney Create via SDK.",
+      "evidence": "Move Annotation To Policies main.cs:130-135; Create main.cs:220",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Create Power Of Attorney - Pension|open",
+      "hash": "31d4380a5899",
+      "verdict": "CONFIRMED",
+      "detail": "Facts verified; consequence labelled hypothesis; 2-day window verified.",
+      "evidence": "Create main.cs:165-174; DTSX:7589 (SqlCommand)",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Get Valid Optionsets Values|title",
+      "hash": "9af179c19406",
+      "verdict": "CONFIRMED",
+      "detail": "StringMap query for Gen_powerofattorney, langid 1033, five attributes; dictionary saved to User::ValidOptionsetsValues in PostExecute; used by both Create scripts.",
+      "evidence": "DTSX:13693; Build Valid Values Dictionary main.cs:100-129; Create main.cs:104,138-154",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Get Valid Optionsets Values|short",
+      "hash": "91914ad2300d",
+      "verdict": "CONFIRMED",
+      "detail": "Matches.",
+      "evidence": "DTSX:13693",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Get Valid Optionsets Values|detailed",
+      "hash": "cb740096c92c",
+      "verdict": "CONFIRMED",
+      "detail": "Query, dictionary build, variable, use and unset-if-invalid behaviour verified; no CRM write.",
+      "evidence": "DTSX:13693; main.cs:116-129, 100-104; Create main.cs:138-154",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Get Valid Optionsets Values|detail",
+      "hash": "aaee4646a2ac",
+      "verdict": "CONFIRMED",
+      "detail": "Matches.",
+      "evidence": "DTSX:13693",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Get Valid Optionsets Values|decisions",
+      "hash": "1fb5011e6a5e",
+      "verdict": "CONFIRMED",
+      "detail": "Condition exact (plus !IsNull of the source value).",
+      "evidence": "Create POA Account - Agent main.cs:138",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Get Valid Optionsets Values|crm",
+      "hash": "3daaac66b95e",
+      "verdict": "CONFIRMED",
+      "detail": "Read-only SELECT on StringMap/Entity via [CRM].",
+      "evidence": "DTSX:13688-13699",
+      "wrongUnits": []
+    }
+  ]
+}

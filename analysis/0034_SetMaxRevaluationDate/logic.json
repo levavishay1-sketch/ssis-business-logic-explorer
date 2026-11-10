@@ -1,0 +1,220 @@
+{
+ "package": "0034_SetMaxRevaluationDate",
+ "analyst": "ssis-business-logic",
+ "source": {
+  "file": "source/DailyProcess/0034_SetMaxRevaluationDate.dtsx",
+  "sha256": "C43194323EA136DC52C0467058A8C11A0AC4498DB47E6A82585A7043A82C15C3",
+  "lines": 39
+ },
+ "scopeNote_he": "החבילה כוללת משימת SQL אחת בלבד (Execute SQL Task), בלי זרימות נתונים, בלי משתנים, בלי קובץ תצורה (configurations ריק ב-evidence), בלי Event Handlers ובלי לוג. מנהל החיבור היחיד [PCRM] מצביע על Data Source=PSQL; Initial Catalog=ALTSHULER_MSCRM (DTSX:4-6), הקטלוג שבו חבילות אחרות קוראות ישויות CRM. Gen_fundmain (בלי Base) הוא אובייקט במסד שלא סופק (השערה: ה-View הסטנדרטי של הישות) – external_unknown. לא ידוע אם ה-Job דורס את מחרוזת החיבור.",
+ "summary_he": "החבילה בוחרת רשומות Gen_fundmain שמסומנות gen_existinfile = 1 ושתאריך השערוך שלהן (gen_revaluationdate) קטן מהמחרוזת 'שנה/חודש/1' של היום. אם ה-Session רץ בהגדרת DATEFORMAT mdy או ymd, זה ה-1 בחודש הנוכחי; בהגדרת dmy המחרוזת מתפרשת כשנה-יום-חודש (למשל '2026/11/1' = 11 בינואר 2026). ההגדרה בפועל לא מופיעה בקבצים שסופקו. היא מוסיפה 3 שעות לתאריך השערוך, לוקחת את הערך המאוחר ביותר, ושומרת אותו כטקסט בפורמט dd/mm/yyyy בפרמטר המערכת MaxRevaluationDate (ישות gen_SystemConfiguration). הסינון משווה את התאריך בלי 3 השעות; התוספת יכולה להזיז את התאריך שנשמר ביום קדימה (כשהשעה בערך המקסימלי היא 21:00 או מאוחר יותר). הכתיבה היא UPDATE ישיר ב-SQL על טבלת Base במסד CRM – Unsupported. מי צורך את הפרמטר – לא ידוע (אף חבילה אחרת שסופקה לא מפנה אליו).",
+ "executionOrder": [
+  {
+   "step": 1,
+   "refId": "Package\\Execute SQL Task",
+   "title_he": "עדכון פרמטר המערכת MaxRevaluationDate",
+   "trigger": "start (אין Precedence Constraints בחבילה; משימה יחידה, DTSX:12)"
+  }
+ ],
+ "ignoredAsFramework": [],
+ "components": [
+  {
+   "refId": "Package\\Execute SQL Task",
+   "title_he": "קביעת תאריך השערוך המקסימלי",
+   "techName": "Execute SQL Task",
+   "short_he": "מחשב את תאריך השערוך המאוחר ביותר, בתוספת 3 שעות, מבין רשומות הקופה המסומנות gen_existinfile = 1 שתאריך השערוך שלהן לפני גבול החודש (ה-1 בחודש הנוכחי רק אם DATEFORMAT של ה-Session הוא mdy/ymd; ההגדרה לא בקבצים), ושומר אותו בפרמטר המערכת MaxRevaluationDate ב-CRM.",
+   "flow_he": [
+    "סינון Gen_fundmain: gen_existinfile = 1 ותאריך שערוך קטן מהמחרוזת 'שנה/חודש/1' (ה-1 בחודש הנוכחי רק ב-DATEFORMAT mdy/ymd)",
+    "חישוב MAX של תאריך השערוך + 3 שעות, בפורמט dd/mm/yyyy",
+    "UPDATE לפרמטר MaxRevaluationDate ב-gen_SystemConfigurationBase"
+   ],
+   "short": {
+    "nodes": [
+     {
+      "type": "step",
+      "text": "החבילה בוחנת רשומות Gen_fundmain שהדגל gen_existinfile שלהן שווה 1 (משמעות הדגל לא מוכחת) ושתאריך השערוך שלהן קודם לגבול החודש (גבול ה'חודש' הוא המחרוזת 'שנה/חודש/1' של היום; בהגדרת DATEFORMAT mdy או ymd היא מתפרשת כ-1 בחודש הנוכחי, ובהגדרת dmy כשנה-יום-חודש, למשל '2026/11/1' = 11 בינואר 2026; ההגדרה בפועל לא מופיעה בקבצים שסופקו)."
+     },
+     {
+      "type": "step",
+      "text": "לכל תאריך שערוך מתווספות 3 שעות; מתוכם נבחר הערך המאוחר ביותר ומומר לטקסט בפורמט יום/חודש/שנה."
+     },
+     {
+      "type": "write",
+      "text": "התאריך נשמר בפרמטר המערכת MaxRevaluationDate ב-CRM, בכתיבה ישירה למסד הנתונים."
+     },
+     {
+      "type": "end",
+      "text": "פרמטר המערכת מחזיק את תאריך השערוך המאוחר ביותר שלפני גבול החודש, אחרי תוספת 3 שעות. הגבול הוא ה-1 בחודש הנוכחי רק אם DATEFORMAT של ה-Session הוא mdy או ymd, וזה לא מופיע בקבצים. מי משתמש בפרמטר – לא ידוע מהחבילות שסופקו."
+     }
+    ]
+   },
+   "detailed": {
+    "nodes": [
+     {
+      "type": "step",
+      "text": "המשימה מתחברת למסד הנתונים של CRM דרך מנהל החיבור PCRM.",
+      "tech": "Connection [PCRM]: Data Source=PSQL; Initial Catalog=ALTSHULER_MSCRM",
+      "evidence": "DTSX:4-6, SQLTask:Connection DTSX:15"
+     },
+     {
+      "type": "step",
+      "text": "האוכלוסייה היא רשומות הקופה שהדגל gen_existinfile שלהן שווה 1. בחבילות שסופקו הדגל מקבל 1, בין היתר ב-0004 (גם בעדכון קופה קיימת וגם ביצירת קופה חדשה), ב-0008 וב-0009. אף חבילה שסופקה לא מאפסת אותו ל-0 ב-gen_fundmain. האם הדגל משקף רק את הקובץ האחרון – לא ידוע.",
+      "tech": "from Gen_fundmain where gen_existinfile = 1 · כותבים, בין היתר: 0004 UPDATE gen_fundmain (DTSX:92874) ו-INSERT INTO Gen_fundmainbase (Create gen_FundMain, DTSX:61789; Param_74 = IsExistsFile = \"1\" מ-Add System Columns, DTSX:58963/61981), 0008 SDK scripts (DTSX:23784 ×5), 0009 SDK scripts (DTSX:27026 ×5)",
+      "evidence": "DTSX:15"
+     },
+     {
+      "type": "decision",
+      "text": "האם תאריך השערוך של הרשומה קטן מהמחרוזת 'שנה/חודש/1' של היום? בהגדרת DATEFORMAT mdy או ymd זה ה-1 בחודש הנוכחי; בהגדרת dmy זה יום M (מספר החודש הנוכחי) בינואר של השנה הנוכחית. ההגדרה לא מופיעה בקבצים שסופקו.",
+      "tech": "gen_revaluationdate < cast(YEAR(GETDATE()) as nvarchar) +'/'+ CAST(MONTH(GETDATE()) as nvarchar) +'/'+ '1'",
+      "branches": [
+       {
+        "label": "כן",
+        "nodes": [
+         {
+          "type": "step",
+          "text": "הרשומה משתתפת בחישוב התאריך המקסימלי."
+         }
+        ]
+       },
+       {
+        "label": "לא",
+        "nodes": [
+         {
+          "type": "step",
+          "text": "הרשומה אינה משתתפת בחישוב (תאריך שערוך שאינו קטן מהגבול, או תאריך ריק)."
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "type": "step",
+      "text": "מחושב תאריך השערוך המאוחר ביותר, אחרי הוספת 3 שעות, ומומר לטקסט בפורמט dd/mm/yyyy (השערה: 3 השעות מתרגמות זמן UTC לשעון ישראל).",
+      "tech": "@PrmMaxRevaluationDate = CONVERT(varchar(10), Max(dateadd(hh,3,gen_revaluationdate)),103)",
+      "evidence": "DTSX:15"
+     },
+     {
+      "type": "decision",
+      "text": "האם נמצאה לפחות רשומה אחת מתאימה?",
+      "tech": "MAX על קבוצה ריקה מחזיר NULL (סמנטיקת SQL)",
+      "branches": [
+       {
+        "label": "כן",
+        "nodes": [
+         {
+          "type": "write",
+          "text": "ערך פרמטר המערכת MaxRevaluationDate מתעדכן לתאריך שחושב.",
+          "tech": "gen_systemconfiguration · Update [gen_SystemConfigurationBase] set [gen_Value] = @PrmMaxRevaluationDate where gen_name = 'MaxRevaluationDate' · SQL (Unsupported)"
+         }
+        ]
+       },
+       {
+        "label": "לא",
+        "nodes": [
+         {
+          "type": "write",
+          "text": "ערך פרמטר המערכת MaxRevaluationDate מתרוקן (NULL), כי אין תאריך לחשב.",
+          "tech": "אותו UPDATE עם @PrmMaxRevaluationDate = NULL"
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "type": "step",
+      "text": "אם אין בטבלה רשומת פרמטר בשם MaxRevaluationDate, שום דבר לא מתעדכן ואין שגיאה; החבילה לא יוצרת את הרשומה.",
+      "tech": "UPDATE ... where gen_name = 'MaxRevaluationDate' (אין INSERT)",
+      "evidence": "DTSX:15"
+     },
+     {
+      "type": "end",
+      "text": "פרמטר המערכת MaxRevaluationDate ב-CRM מחזיק את תאריך השערוך המאוחר ביותר שלפני גבול החודש (ה-1 בחודש הנוכחי רק בהגדרת DATEFORMAT mdy/ymd, שלא מופיעה בקבצים), אחרי תוספת 3 שעות, כטקסט dd/mm/yyyy. העדכון עוקף את שירותי CRM."
+     }
+    ]
+   },
+   "detail_he": [
+    {
+     "h": "מקור ואוכלוסייה",
+     "t": "Gen_fundmain במסד ALTSHULER_MSCRM, רשומות עם gen_existinfile = 1 ו-gen_revaluationdate קטן מהמחרוזת 'YYYY/M/1' שנבנית מ-GETDATE() (DTSX:15). המחרוזת מומרת במרומז ל-datetime: בהגדרת DATEFORMAT mdy/ymd זה ה-1 בחודש הנוכחי, ובהגדרת dmy שנה-יום-חודש (למשל '2026/11/1' = 11 בינואר 2026). החיבור (DTSX:6) לא קובע שפה, וההגדרה בפועל לא מופיעה בקבצים. רשומות עם gen_revaluationdate ריק (NULL) לא נכללות. gen_existinfile מקבל 1/true ב-gen_fundmain, בין היתר: ב-0004 גם ב-UPDATE ב-SQL (DTSX:92874) וגם ב-INSERT ל-Gen_fundmainbase ביצירת קופה חדשה (Create gen_FundMain, DTSX:61789; Param_74 = IsExistsFile = \"1\", DTSX:58963/61981), וב-0008 וב-0009 בסקריפטי SDK (DTSX:23784 / 27026). אף חבילה שסופקה לא מאפסת אותו ל-0 ב-gen_fundmain, ולכן האם הוא משקף רק את הקובץ האחרון – לא ידוע (איפוס אפשרי רק מחוץ לחבילות שסופקו)."
+    },
+    {
+     "h": "התאמה לרשומות קיימות",
+     "t": "הרשומה המעודכנת מזוהה לפי gen_name = 'MaxRevaluationDate' בטבלה gen_SystemConfigurationBase. אין יצירה אם היא חסרה."
+    },
+    {
+     "h": "החלטות",
+     "t": "סינון: gen_existinfile = 1 and gen_revaluationdate < cast(YEAR(GETDATE()) as nvarchar) +'/'+ CAST(MONTH(GETDATE()) as nvarchar) +'/'+ '1'. חישוב: CONVERT(varchar(10), Max(dateadd(hh,3,gen_revaluationdate)),103). אם אין רשומות – הערך הוא NULL."
+    },
+    {
+     "h": "כתיבה ל-CRM",
+     "t": "UPDATE ישיר ב-SQL על [gen_SystemConfigurationBase] (טבלת Base של ישות CRM), השדה [gen_Value], דרך החיבור [PCRM] → PSQL/ALTSHULER_MSCRM. סיווג: Unsupported."
+    },
+    {
+     "h": "תוצאה עסקית",
+     "t": "פרמטר מערכת עם תאריך השערוך המאוחר ביותר שלפני גבול החודש, אחרי תוספת 3 שעות (dd/mm/yyyy). הגבול הוא ה-1 בחודש הנוכחי רק בהגדרת DATEFORMAT mdy/ymd (לא מופיעה בקבצים). הצרכן של הפרמטר לא ידוע: אף חבילה אחרת שסופקה לא מכילה את המחרוזת MaxRevaluationDate."
+    }
+   ],
+   "decisions": [
+    {
+     "where": "Execute SQL Task (DTSX:15) – SELECT",
+     "condition": "gen_existinfile = 1 and gen_revaluationdate < cast(YEAR(GETDATE()) as nvarchar) +'/'+ CAST(MONTH(GETDATE()) as nvarchar) +'/'+ '1'",
+     "meaning_he": "רשומות קופה שהדגל gen_existinfile שלהן 1 ושתאריך השערוך שלהן קטן מהמחרוזת 'שנה/חודש/1' של היום (תאריך ריק לא נכלל). המחרוזת היא ה-1 בחודש הנוכחי רק בהגדרת DATEFORMAT mdy/ymd; בהגדרת dmy היא מתפרשת כשנה-יום-חודש. ההגדרה לא מופיעה בקבצים.",
+     "outcome_he": "משתתפים בחישוב MAX של תאריך השערוך."
+    },
+    {
+     "where": "Execute SQL Task (DTSX:15) – UPDATE",
+     "condition": "where gen_name =  'MaxRevaluationDate'",
+     "meaning_he": "רשומת פרמטר המערכת שמעודכנת.",
+     "outcome_he": "gen_Value מקבל את התאריך שחושב (או NULL אם אין רשומות מתאימות)."
+    }
+   ],
+   "crmEffects": [
+    {
+     "entity": "gen_systemconfiguration (טבלה gen_SystemConfigurationBase)",
+     "verb": "UPDATE gen_Value",
+     "mechanism": "SQL",
+     "when_he": "בכל ריצה, לרשומה gen_name = 'MaxRevaluationDate'. Unsupported – SQL ישיר על מסד CRM."
+    }
+   ],
+   "evidence": [
+    "DTSX:4-8 ConnectionManager [PCRM] DTSID {BED24F94-9937-47AB-B7A7-59C068103945}: Data Source=PSQL;Initial Catalog=ALTSHULER_MSCRM",
+    "DTSX:12 Executable Package\\Execute SQL Task (Microsoft.ExecuteSQLTask)",
+    "DTSX:15 SQLTask:Connection={BED24F94-...} SqlStatementSource (DECLARE / SELECT MAX / UPDATE)",
+    "grep על source/DailyProcess: המחרוזת MaxRevaluationDate מופיעה רק ב-0034"
+   ],
+   "openQuestions_he": [
+    "מי צורך את פרמטר המערכת MaxRevaluationDate (דוחות, Plugins, ממשק)? לא נמצא בחבילות שסופקו.",
+    "gen_existinfile מקבל 1/true ב-gen_fundmain בחבילות 0004 (SQL), 0008 ו-0009 (SDK) כשקופות נטענות מקבצי לאומי, ואף חבילה שסופקה לא מאפסת אותו ל-0 ב-gen_fundmain. פתוח רק: האם תהליך חיצוני מאפס אותו.",
+    "האם 3 השעות נועדו להמרת UTC לשעון ישראל? אם כן, בחורף ההפרש הוא שעתיים.",
+    "מה שפת/DATEFORMAT של חשבון ההרצה? השוואת התאריך מבוססת על מחרוזת 'yyyy/m/1' שעוברת המרה מרומזת."
+   ]
+  }
+ ],
+ "findings_he": [
+  {
+   "severity": "high",
+   "text": "כתיבה ישירה ב-SQL לטבלת Base של CRM (gen_SystemConfigurationBase) – Unsupported. העדכון עוקף את שירותי CRM (אין ModifiedOn/Audit/Plugins – התנהגות פלטפורמה כללית).",
+   "evidence": "DTSX:6, DTSX:15"
+  },
+  {
+   "severity": "medium",
+   "text": "אם אין אף רשומה מתאימה (gen_existinfile = 1 עם תאריך שערוך קטן ממחרוזת גבול החודש), MAX מחזיר NULL והפרמטר MaxRevaluationDate נדרס בערך ריק. אין בדיקה שמונעת זאת.",
+   "evidence": "DTSX:15 (SELECT MAX ואחריו UPDATE ללא תנאי על הערך)"
+  },
+  {
+   "severity": "low",
+   "text": "גבול החודש נבנה כמחרוזת 'yyyy/m/1' ומושווה ל-gen_revaluationdate בהמרה מרומזת. פירוש המחרוזת תלוי בהגדרות השפה/DATEFORMAT של ה-Session (ב-datetime עם DATEFORMAT dmy ייתכן פירוש כשנה-יום-חודש). ההגדרה בפועל לא ידועה.",
+   "evidence": "DTSX:15"
+  },
+  {
+   "severity": "low",
+   "text": "התוספת של 3 שעות קבועה, אבל הסינון עצמו משווה את הערך הגולמי (בלי התוספת) לגבול החודש. אם 3 השעות מתרגמות UTC לשעון ישראל (השערה), יש אי-עקביות בין הסינון לחישוב, ובחורף ההפרש בפועל הוא שעתיים.",
+   "evidence": "DTSX:15"
+  },
+  {
+   "severity": "info",
+   "text": "הערך נשמר כטקסט בפורמט 103 (dd/mm/yyyy), לא כתאריך. צרכן הפרמטר חייב לפרש את הפורמט הזה.",
+   "evidence": "DTSX:15 CONVERT(varchar(10), ..., 103)"
+  }
+ ]
+}

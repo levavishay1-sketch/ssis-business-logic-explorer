@@ -1,0 +1,239 @@
+{
+  "verifier": "ssis-verifier",
+  "package": "0023_Employers",
+  "scope": "logic-claims re-check after fixes",
+  "checkedAt": "2026-11-07T12:07:11Z",
+  "checked": 19,
+  "standardApplied": "SSIS expression NULL semantics and the documented meaning of DTSX-declared properties (errorRowDisposition on Conditional Split outputs, JoinType, precedence constraints, OverwriteDestination default) are treated as reading the files. Data-dependent outcomes must be conditional.",
+  "results": [
+    {
+      "id": "L|summary",
+      "hash": "f6362a1d9085",
+      "verdict": "INCOMPLETE",
+      "detail": "Part (1) is correct and the MF hypothesis is labelled. In part (2) the trigger condition is correct (Constraint 5 / Constraint 6 OR, DTSX:8058-8059), and so are the SQL direct update on AccountBase and Unsupported. The scopeNote is correct: DTSX:33 config, DTSX:4 [CRM], SDK update of gen_employers. Missing: part (2) says the values 'ונכתבים' with no condition. Update Account receives only rows routed by Check if to update (stored fee NULL, stored value NULL, or computed != stored; DTSX:7731). Also, when the computed fee is NULL and both stored values exist, the condition returns NULL and the whole data flow fails (FailComponent). Part (1) also omits that only gen_employers records joined to a product (inner join) are candidates (DTSX:5689-5695).",
+      "evidence": "DTSX:7731-7771 (Check if to update, FailComponent x4), 7796 (get employers SQL), 7988-7991; DTSX:5689-5695",
+      "wrongUnits": [
+        {
+          "unit": 1,
+          "problem": "'ונכתבים בעדכון SQL ישיר' with no write condition, and the NULL-fee failure path is not mentioned.",
+          "correct": "'...ונכתבים בעדכון SQL ישיר לטבלת AccountBase (Unsupported) כשאחד הערכים השמורים ריק או שונה מהמחושב; אם דמי הניהול המחושבים NULL ושני הערכים השמורים קיימים, זרימת הנתונים נכשלת.'",
+          "evidence": "DTSX:7731-7771"
+        }
+      ]
+    },
+    {
+      "id": "L|exec",
+      "hash": "2e2323be8ac4",
+      "verdict": "CONFIRMED",
+      "detail": "Order and triggers match DTSX:8053-8059. Constraint=8053, 1=8054, 2=8055 (Set MF -> Move), 3=8056 (Update -> End), 4=8057 (Check -> Set MF, EvalOp=3 @[User::isFileExist]), 5=8058 (Check -> Update, EvalOp=3 !@[User::isFileExist]), 6=8059 (Move -> Update). Constraints 4-6 have no LogicalAnd (OR). The MF hypothesis is labelled. Check File Existence always sets TaskResult=Success (ScriptMain.cs:55).",
+      "evidence": "DTSX:8053-8059; Check File Existence ScriptMain.cs:33-56 @DTSX:273",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|finding#4",
+      "hash": "6d4cc41d9d40",
+      "verdict": "CONFIRMED",
+      "detail": "Check Fund type: Pension Fund = ProductTypeCode == 200001 || ProductTypeCode == 1 (order 0), Study Fund = ProductTypeCode == 200000 || ProductTypeCode == 2 (order 1). Both outputs have errorRowDisposition=FailComponent. The DE Output has no path. Rows with Gen_employersid NULL (no match) are split off earlier by Check if employer exist. A NULL ProductTypeCode on a matched row is possible only if product.ProductTypeCode is NULL (inner join, DTSX:5695), which the text states conditionally. Set MF failure blocks Move (Success, DTSX:8055), and Update is then not reached (8059 not satisfied, 8058 false).",
+      "evidence": "DTSX:3702-3724; DTSX:5689-5695; DTSX:8055, 8058, 8059",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|finding#7",
+      "hash": "bc1af043a055",
+      "verdict": "WRONG",
+      "detail": "SQL: case when SUM(ISNULL(bal,0)) = 0 then 0 else SUM(ISNULL(bal,0) * pct) / SUM(ISNULL(bal,0)) end. A fund with NULL pct is in the denominator only. If all pcts are NULL and the sum is non-zero, the result is NULL. With both stored values present, Update3 (NULL != x) fails with FailComponent. Accounts without employers/funds get 0 and are updated whenever the stored value is NULL or != 0. All of this is correct. Wrong: 'הממוצע נמוך מהממוצע על הקופות עם שיעור בלבד' is unconditional, but it depends on the data. If the NULL-rate funds have a total balance of 0, the result is equal, and with negative balances or rates the direction is not fixed. The outcome must be conditional.",
+      "evidence": "get employers SQL DTSX:7796-7801; Check if to update DTSX:7731-7771",
+      "wrongUnits": [
+        {
+          "unit": 1,
+          "problem": "'הממוצע נמוך מהממוצע על הקופות עם שיעור בלבד' is stated unconditionally.",
+          "correct": "'...הממוצע שונה (בדרך כלל נמוך, כשליתרות של קופות אלה יש סכום חיובי והשיעורים חיוביים) מהממוצע על הקופות עם שיעור בלבד; אם היתרה שלהן 0 אין השפעה.'",
+          "evidence": "DTSX:7796-7801"
+        }
+      ]
+    },
+    {
+      "id": "L|finding#8",
+      "hash": "8114fba7b479",
+      "verdict": "CONFIRMED",
+      "detail": "DTSX:8058 and 8059 (the two constraints into Update employer amount) have no DTS:LogicalAnd. DTSX:8053-8056 carry LogicalAnd=\"True\" explicitly, which shows that the omitted value is False (OR). Under AND the step could never run: 8059 needs Move to have run, which needs isFileExist=true, while 8058 needs !isFileExist. The text makes no claim about 8057.",
+      "evidence": "DTSX:8053-8059",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package (control flow)|title",
+      "hash": "e6106305c7e1",
+      "verdict": "WRONG",
+      "detail": "flow_he[1]-[5] match DTSX:8053-8059 and Check File Existence ScriptMain.cs:36-53: the path is built from MFBenefitFilePath (adding '\\' if missing) + MFBenefitFile, and Archive\\yyyy.MM.dd\\ is created only when the file exists. Wrong in short_he: 'מחושבים מחדש לכל חשבון מעסיק'. The calculation runs over every account in CRM (FROM account LEFT JOIN gen_employers ...), including accounts with no employer records. Those get 0 written whenever the stored value is NULL or != 0.",
+      "evidence": "get employers SQL DTSX:7796-7808; Check File Existence ScriptMain.cs:36-55 @DTSX:273",
+      "wrongUnits": [
+        {
+          "unit": 2,
+          "problem": "'לכל חשבון מעסיק' narrows the population; the query covers all accounts.",
+          "correct": "'...מחושבים מחדש לכל חשבון (account) ב-CRM, כולל חשבונות בלי רשומות מעסיק (שמקבלים 0), שווי קופות העובדים ודמי הניהול המשוקללים.'",
+          "evidence": "DTSX:7796-7808"
+        }
+      ]
+    },
+    {
+      "id": "L|Package (control flow)|short",
+      "hash": "4a92fd03d4a2",
+      "verdict": "WRONG",
+      "detail": "Branches are correct: file exists -> Set MF -> Move -> Update; no file -> Update. Failure of ingestion or archive blocks the calculation (DTSX:8055, 8058, 8059). Unit 7 says 'מחושבים מחדש לכל חשבון מעסיק', but the query processes every account, including non-employer accounts, which receive 0 (same issue as the title).",
+      "evidence": "DTSX:7796-7808; DTSX:8053-8059",
+      "wrongUnits": [
+        {
+          "unit": 7,
+          "problem": "Population stated as employer accounts only.",
+          "correct": "'...מחושבים מחדש לכל חשבון ב-CRM (גם חשבונות בלי מעסיקים, שמקבלים 0) שווי קופות העובדים ודמי הניהול המשוקללים...'",
+          "evidence": "DTSX:7796-7808"
+        }
+      ]
+    },
+    {
+      "id": "L|Package (control flow)|detailed",
+      "hash": "01b5129966e5",
+      "verdict": "CONFIRMED",
+      "detail": "[1] gen_etlvariable (DTSX:2813) and the config caveat (DTSX:33). [2]-[5] Check File Existence ScriptMain.cs:36-53, isFileExist default 0 (DTSX:56). [8]-[17] Success constraints 8055/8059; MoveFile User::MFBenefitFile -> User::MFBenefitFileArchive with no OverwriteDestination (DTSX:3693). The same-name failure is given as an example ('למשל'). Failure of Set MF blocks both Move and Update. [18] OR on 8058/8059. [19] DTSX:8056. [20] is correctly conditional.",
+      "evidence": "DTSX:2813, 33, 56, 3689-3693, 8053-8059; Check File Existence ScriptMain.cs:33-56 @DTSX:273",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package (control flow)|detail",
+      "hash": "b68972023b61",
+      "verdict": "CONFIRMED",
+      "detail": "[1] MF Source ConnectionString is the fixed literal 'C:\\Banks Source Files\\Leumi Source Files\\הטבות מעסיקים.csv' with no PropertyExpression (DTSX:9-11). The variables come from gen_etlvariable or the config, and their values are unknown. The text refers to the findings (finding#2 carries the config caveat). [2]-[4] are consistent with the precedence constraints and the hypothesis is labelled.",
+      "evidence": "DTSX:9-11, 33, 8053-8059",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Set MF on employers|title",
+      "hash": "a5ba65d011cb",
+      "verdict": "WRONG",
+      "detail": "flow_he[1]-[6] match: TRIM + convert (ISNULL || == \"\" -> NULL, else cast); Merge Join JoinType=1 (left outer); Check if employer exist -> warning; Check Fund type mapping, DE Output dropped, NULL -> FailComponent; Check If Date Valid; Create = ExecuteMultiple Update with non-NULL fields only. The MF hypothesis is labelled. Wrong: short_he 'מאותרות רשומות המעסיק שלו ב-CRM, אחת לכל סוג מוצר' asserts one record per product type, which the files do not prove. The query simply returns every gen_employers row with its product's ProductTypeCode (DTSX:5689-5695), and nothing enforces uniqueness. Also, because the query inner-joins product, employer records without a matching product are never fetched.",
+      "evidence": "Get Employer Nunmer SQL DTSX:5689-5695; Merge Join DTSX:5730-5734",
+      "wrongUnits": [
+        {
+          "unit": 2,
+          "problem": "'אחת לכל סוג מוצר' is an unproven data-cardinality claim.",
+          "correct": "'...מאותרות כל רשומות המעסיק שלו ב-CRM שמקושרות למוצר (join ל-product), וכל אחת עם סוג המוצר שלה...'",
+          "evidence": "DTSX:5689-5695"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Set MF on employers|short",
+      "hash": "56c5d29138ce",
+      "verdict": "INCOMPLETE",
+      "detail": "Branches [6]-[11] are correct, including the Pension/Study column choice, skip, NULL failure, validity rule and write. Missing: decision [2] 'האם המעסיק קיים ב-CRM?' is really 'is there a gen_employers record with this corporate number that inner-joins to product'. Get Employer Nunmer uses 'join product on productid = gen_fundtypename', so an employer whose records have no (matching) product gets the warning 'מעסיק לא נמצא במאגר הנתונים' although it exists, and is never updated.",
+      "evidence": "DTSX:5689-5695; Check if employer exist DTSX:3787; Set Warning columns 1 1 (\"מעסיק לא נמצא במאגר הנתונים\")",
+      "wrongUnits": [
+        {
+          "unit": 2,
+          "problem": "The decision omits the inner join with product.",
+          "correct": "'האם קיימת ב-CRM רשומת מעסיק עם מספר התאגיד שמקושרת למוצר? (רשומות בלי מוצר אינן נשלפות, והמעסיק יקבל אזהרת \"לא נמצא\")'",
+          "evidence": "DTSX:5689-5695"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Set MF on employers|detailed",
+      "hash": "d9adb9b14851",
+      "verdict": "INCOMPLETE",
+      "detail": "Verified: file columns (DTSX:13-20); TRIM only trims, and the convert expressions turn NULL/\"\" into NULL and cast to DT_DBTIMESTAMP/DT_R8 with FailComponent x6 (DTSX:3820). Because Sort is blocking and sits after convert, a conversion failure means no row reaches Create. Also verified: Merge Join left outer with 1 key, TreatNullsAsEqual; warning texts; Check Fund type/Date Valid conditions, orders and FailComponent; Pension/Study column mapping; Create sends only non-NULL fields as Update in batches of 1000; Error output -> 'נכשל בקליטת הנתונים'. Missing in unit [3]: the employer query inner-joins product (join product on productid = gen_fundtypename). Employer records with no matching product are not fetched; if all records of a corporate number lack a product, the row goes to the 'מעסיק לא נמצא במאגר הנתונים' warning (unit [7]) although the employer exists.",
+      "evidence": "DTSX:5689-5695, 3787, 3820, 3702-3724, 3743, 5730-5734, 6033-6175; Create main.cs:121-182 @DTSX:3885",
+      "wrongUnits": [
+        {
+          "unit": 3,
+          "problem": "The text omits that only gen_employers records joined to a product are fetched (inner join).",
+          "correct": "Add: 'נשלפות רק רשומות מעסיק שמקושרות למוצר (join פנימי ל-product); רשומה בלי מוצר אינה נשלפת, ואם אין למספר התאגיד רשומה אחרת, נרשמת אזהרת \"מעסיק לא נמצא\".'",
+          "evidence": "DTSX:5689-5695"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Set MF on employers|detail",
+      "hash": "679dfe84c1b5",
+      "verdict": "WRONG",
+      "detail": "Units [1] (Delimited, header, CodePage 1255), [3], [4] and [5] are correct and the hypothesis is labelled. Unit [2] 'לכל מספר תאגיד יכולות להיות כמה רשומות gen_employers, אחת לכל מוצר' asserts one record per product, which is not proven, and omits that records without a product are excluded by the inner join.",
+      "evidence": "DTSX:9-11, 5689-5695, 5730-5734",
+      "wrongUnits": [
+        {
+          "unit": 2,
+          "problem": "'אחת לכל מוצר' is an unproven cardinality claim; the inner-join exclusion is missing.",
+          "correct": "'...לכל מספר תאגיד יכולות להיות כמה רשומות gen_employers; כל אחת עם המוצר שלה (gen_fundtypename → product.ProductTypeCode). רשומות בלי מוצר תואם אינן נשלפות (join פנימי).'",
+          "evidence": "DTSX:5689-5695"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Set MF on employers|decisions",
+      "hash": "5860715f8257",
+      "verdict": "INCOMPLETE",
+      "detail": "Conditions [1] and [3]-[9] match the DTSX exactly, including orders and FailComponent. Decision [2]: the condition ISNULL(Gen_employersid) is correct, but the meaning 'מעסיק לא קיים' omits that the right side of the join contains only gen_employers rows that inner-join to product. An existing employer without a matching product also lands here.",
+      "evidence": "DTSX:3787, 5689-5695",
+      "wrongUnits": [
+        {
+          "unit": 2,
+          "problem": "Meaning omits the product inner join.",
+          "correct": "meaning_he: 'אין רשומת מעסיק עם מספר התאגיד שמקושרת למוצר (כולל מעסיק קיים בלי מוצר)'.",
+          "evidence": "DTSX:5689-5695"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Update employer amount|short",
+      "hash": "6bfeab99debe",
+      "verdict": "CONFIRMED",
+      "detail": "[1] all accounts, sum of balances and weighted fee (DTSX:7796). [2] stored NULL or different (DTSX:7731 orders 0-3). [4] direct DB update bypassing CRM (UPDATE dbo.AccountBase, DTSX:7991). [7] 'אלא אם החישוב נכשל' covers the FailComponent case.",
+      "evidence": "DTSX:7731-7771, 7796-7808, 7988-7991",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Update employer amount|detailed",
+      "hash": "8373b7235c1c",
+      "verdict": "INCOMPLETE",
+      "detail": "Verified: SQL joins and GROUP BY; SUM(ISNULL(bal,0)); the CASE expression; NULL when all rates are NULL; conditional split orders 0-3 with FailComponent; Update Account parameters Param_0=Gen_EmployeesFundsValue, Param_1=Gen_employeesweightedmanagementfee, Param_2=accountid (positional, matches SET ?, ?, where ?); the default output has no path; the zero-account case; Success constraint 8056. Imprecise or missing in unit [11]: 'אם דמי הניהול המחושבים ריקים (NULL) והערך השמור ריק, נכתב ערך ריק' does not cover the case computed fee NULL + stored fee present + stored funds value NULL. Order 1 (ISNULL(Gen_EmployeesFundsValueDB)) routes the row to Update, which overwrites the existing stored fee with NULL. Branch [14] covers only 'both stored values exist'.",
+      "evidence": "DTSX:7731-7771, 7796-7808, 7988-7991 (Param map: accountid->Param_2, Gen_EmployeesFundsValue->Param_0, Gen_employeesweightedmanagementfee->Param_1)",
+      "wrongUnits": [
+        {
+          "unit": 11,
+          "problem": "Does not state that when the computed fee is NULL and only the stored funds value is NULL, the existing stored fee is overwritten with NULL.",
+          "correct": "'אם דמי הניהול המחושבים NULL ואחד הערכים השמורים ריק, נכתב NULL לדמי הניהול – גם כשבחשבון היה ערך דמי ניהול (כשרק השווי השמור ריק).'",
+          "evidence": "DTSX:7731-7771 (order 1 ISNULL(Gen_EmployeesFundsValueDB))"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Update employer amount|detail",
+      "hash": "a568784ab879",
+      "verdict": "CONFIRMED",
+      "detail": "[1] all account rows via LEFT JOINs, independent of the file, gen_corporatename = accountid, gen_employernumber = Gen_employersId. [2] JOINs in the query, update by accountid. [3] first-true-output semantics; NULL + both stored -> FailComponent. [4] AccountBase direct SQL, Unsupported, two columns. [5] business result.",
+      "evidence": "DTSX:7731-7771, 7796-7808, 7991",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Update employer amount|decisions",
+      "hash": "ae3ac8ca9573",
+      "verdict": "CONFIRMED",
+      "detail": "[1] CASE expression copied exactly (DTSX:7796); outcome order 0 / weighted / NULL is correct. [2]-[5] conditions and EvaluationOrder 0-3 match DTSX:7731-7771, and the order-2 NULL -> FailComponent note is correct.",
+      "evidence": "DTSX:7731-7771, 7796",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Update employer amount|open",
+      "hash": "59222e303799",
+      "verdict": "WRONG",
+      "detail": "[2] is a genuine open question. [1] contains 'אם כן, הממוצע המשוקלל נמוך מהממוצע על הקופות עם שיעור בלבד', which is the same unconditional data-dependent claim as in finding#7. It holds only when the NULL-rate funds carry a positive total balance (and the rates are positive). If their balance is 0, the result is equal.",
+      "evidence": "DTSX:7796-7801",
+      "wrongUnits": [
+        {
+          "unit": 1,
+          "problem": "'נמוך' is stated unconditionally.",
+          "correct": "'אם כן, וליתרות של קופות אלה סכום חיובי, הממוצע המשוקלל נמוך (בשיעורים חיוביים) מהממוצע על הקופות עם שיעור בלבד; ...'",
+          "evidence": "DTSX:7796-7801"
+        }
+      ]
+    }
+  ]
+}

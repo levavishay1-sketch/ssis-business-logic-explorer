@@ -1,0 +1,38 @@
+{
+  "verifier": "ssis-verifier",
+  "package": "0024_AgentFundInformation",
+  "scope": "logic-claims re-check round 5",
+  "checkedAt": "2026-11-07",
+  "checked": 2,
+  "results": [
+    {
+      "id": "L|Package\\Create Fund View Table|detailed",
+      "hash": "13834a52d823",
+      "verdict": "CONFIRMED",
+      "detail": "I re-derived every unit from the raw DTSX. [1] The WHERE is ((Gen_existinfile is not null and Gen_existinfile = 1) or (gen_revaluationdate is not null and year(gen_revaluationdate) >= year(getdate())-3)) AND poa.gen_currentstate = 1 in both active branches. That is a lower bound only, getdate() runs on the DB server, and the existinfile meaning is labelled השערה. [2] Inner joins fund -> gen_customeraccount -> gen_powerofattorney on the customer account. The 0030 reference is exact: 'Get Active Poa' (0030 DTSX:4187) and 'poa.Gen_currentstate = 1)as ActivePoas' (0030 DTSX:4222). [3] UNION ALL (DTSX:2054). The two other branches are commented out (DTSX:1984-2032). Branch-1 conditions are a subset of branch-2 conditions, so a branch-2 fund also gets branch-1 rows. [5] The fix is correct. AGENT_NAME = gen_agents.gen_agentsid via LEFT JOIN gen_agents.gen_contactname = poa.gen_agentname, and AGENCY_NAME = gen_agencie.gen_agencieid via LEFT JOIN gen_agencie.gen_agencyname = poa.gen_agencyname (DTSX:2038-2039, 2046-2047). With no match the value is NULL; with several matches there are several rows. 'איש הקשר שלה' and 'החשבון שלה' are not cited, but the supplied files prove them: 0029 DTSX:26979 'Account.AccountId = Gen_agencie.gen_agencyname', 0029 DTSX:26981 'Contact.ContactId = Gen_agents.gen_contactname', and 0029 DTSX:13906-13907 (gen_powerofattorney gen_agencyname = EntityReference account, gen_agentname = EntityReference contact). [7] Joins and conditions: ac1 on fund.gen_brokernumber, ac2 on ac1.gen_agencycontractnumber, left joins on the PKs from ac2, POA agent = fund agent OR POA agency = fund agency, ac1.Gen_isContractDataSharing = 1 (DTSX:2055-2082). 'חוזה האב' matches the SQL comment '--Agent with parent contracr and POA and data sharing' (DTSX:2055). [8] ROW_NUMBER partitions by FUND_NUMBER (gen_fundnumber), CONTACT, ACCOUNT, AGENT and AGENCY, ordered by POW_START_DATE desc with no tie-breaker. isnull(...,0) is applied to the commission flag. [9] Lookup: CacheType 0, NoMatchBehavior 1, 'select * from [dbo].[Gen_allowedinformationforfundBase]', and the JoinToReferenceColumn are Gen_agentname, Gen_agencyname, Gen_contactname, Gen_accountname and Gen_fundname (no POW_MAIN). The Match output has no path (DTSX:2205-2216). [13]-[16] filtering customers dead: Full cache, NoMatchBehavior 1, CONTACT_NAME -> ContactId from 'select ContactId from Contact where gen_customeragename =N'נפטר''. Only No Match is connected. A NULL contact cannot match a ContactId, so it passes. [17] main.vb lines 18-36 match: OwningBusinessUnit (18), OwningUser/ModifiedBy/CreatedBy (19-21), CreatedOn (25), StatusCode 1 (27), DeletionStateCode 0 (29), StateCode 0 (30), ModifiedOn (33), AllowedfundinfoID = Guid.NewGuid (36). 'Step 3' is 'Get systemuser organisationname and curency' in the precedence chain Get Organization Variables -> Create ETL Process record -> Get systemuser -> Create Fund View Table. [18] OLE DB Destination, AccessMode 0, OpenRowset [dbo].[Gen_allowedinformationforfundBase], connection [CRM]. The 16 mapped input columns include every value named. Notes, not counted: (a) 'פעיל (statecode 0)' rests on the CRM convention; 0029 SQL comments ('stateCode = 0 -- active', 0029 DTSX:26989) support it but are not cited. (b) In [19], 'שנגזר מייפוי כוח נוכחי' is loose for branch-2 rows. Their agent and agency come from ac2, but a current POA is still required, and [7] states this exactly. (c) A row skipped in [11] because of a 5-key match can be deleted later by Delete Rows if POW_MAIN changed (6-key validity). That is another component; [11] is correct for this step.",
+      "evidence": "source/DailyProcess/0024_AgentFundInformation.dtsx:1970-2088 (SqlCommand), 2130-2152 (Lookup), 1900-1925 (filtering customers dead), 2205-2216 (paths), 600-650 (destination), 817-860 (main.vb); evidence precedenceConstraints; 0030 DTSX:4187,4222; 0029 DTSX:13906-13907, 26979-26981",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Create Fund View Table|detail",
+      "hash": "c3bc4755f45b",
+      "verdict": "WRONG",
+      "detail": "Verified units: [1] the population, the Gen_existinfile ownership argument (ambiguity rule plus 0034 DTSX:15 'from Gen_fundmain where gen_existinfile = 1'), the year lower bound, the state-1 POA, branch-2 conditions, the left joins and the latest-POW_START_DATE dedupe with no tie-breaker. [2] the 5-key full-cache Lookup and the N'נפטר' filter. [3] the decisions. [5] the result, with the meaning labelled השערה / external_unknown. [4] the column list matches the 16 destination mappings (DTSX:628-643). The line refs are main.vb:36 (NewGuid), 25 and 33 (UtcNow), 29 (DeletionStateCode, unmapped) and 27/30 (statuscode 1 / statecode 0). The OwningBusinessUnit fix is correct: main.vb:18 = Variables.BusinessUnitId, which 'Set system variables' sets from the SystemUser lookup (DTSX:5390, 6503-6512). DomainName is matched to User::UserName through the 'System User Domain Name' derived column (DTSX:7314). Two units are wrong. (a) [4] names the runtime target '(Psql/ALTSHULER_MSCRM)' as fact. The package loads the unsupplied C:\\Generix\\SSISConfigFile.dtsConfig (EnableConfig, DTSX:17), so the standard requires the text to say this is the design-time connection string and that the config file may override it. (b) [1] '(1) מייפוי הכוח עצמו' presents the branch-1 agent and agency as taken from the POA itself. They are actually the IDs of gen_agents and gen_agencie records found by LEFT JOIN on poa.gen_agentname and poa.gen_agencyname, and NULL when no record matches. This is the same fact counted WRONG in round 4 for the detailed 'ישירות', and the fixed detailed [5] now states it correctly. Note, not counted: 'לכל צירוף' in [1] does not name the dedupe key. The key is the fund number (gen_fundnumber), not the fund GUID; detailed [8] states this.",
+      "evidence": "source/DailyProcess/0024_AgentFundInformation.dtsx:6 (design-time [CRM] string), 17 (Configuration C:\\Generix\\SSISConfigFile.dtsConfig), 2038-2039, 2046-2047 (left joins), 608-643 (destination), main.vb:18-36",
+      "wrongUnits": [
+        {
+          "unit": "[4] 'INSERT ישיר בטבלה dbo.Gen_allowedinformationforfundBase דרך חיבור [CRM] (Psql/ALTSHULER_MSCRM)'",
+          "problem": "This names the runtime target without a caveat. The package loads the unsupplied config file, which may override the [CRM] connection string.",
+          "correct": "INSERT ישיר בטבלה dbo.Gen_allowedinformationforfundBase דרך חיבור [CRM] (מחרוזת החיבור בזמן תכנון: Psql/ALTSHULER_MSCRM; קובץ התצורה C:\\Generix\\SSISConfigFile.dtsConfig שלא סופק (DTSX:17) עשוי לדרוס אותה)",
+          "evidence": "DTSX:6, DTSX:17"
+        },
+        {
+          "unit": "[1] 'הסוכן והסוכנות נקבעים בשני ענפים: (1) מייפוי הכוח עצמו'",
+          "problem": "This presents the written agent and agency as the POA's own values. They are the gen_agents and gen_agencie record IDs matched to the POA's values by LEFT JOIN, and NULL when there is no match.",
+          "correct": "(1) לפי ייפוי הכוח: מזהה רשומת הסוכן (gen_agents) שאיש הקשר שלה הוא הסוכן שבייפוי הכוח ומזהה רשומת הסוכנות (gen_agencie) שהחשבון שלה הוא הסוכנות שבייפוי הכוח; אם אין רשומה תואמת נכתב NULL",
+          "evidence": "DTSX:2038-2039, 2046-2047"
+        }
+      ]
+    }
+  ]
+}

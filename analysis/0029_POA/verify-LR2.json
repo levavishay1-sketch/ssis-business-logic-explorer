@@ -1,0 +1,209 @@
+{
+  "verifier": "ssis-verifier",
+  "package": "0029_POA",
+  "scope": "logic-claims re-check round 2",
+  "checkedAt": "2026-11-07",
+  "checked": 20,
+  "results": [
+    {
+      "id": "L|summary",
+      "hash": "11b9b1199f76",
+      "verdict": "WRONG",
+      "detail": "Verified: 14 pipelines, 10 disabled (DTSX DTS:Disabled on Active POA, Cancel Active POA, Cancel Duplicate waiting POA, Canncel POA main, 4 future-funds flows, Create POA MAIN For Transfer Request, Out of Date); only active business flows AJ and PJ; direct SQL update of gen_pensionjoiningbase (DTSX 36944) on [CRM]; POAMainMonthsToAdd loaded from gen_etlvariable (DTSX 42346) by Set Organization Variables, throw when missing (main.cs:103-110); disabled flows maintain states (Out of Date sets 5 where getdate()>gen_enddate, DTSX 44475; Active POA sets 1; Cancel* set states). Problems: (a) 'הצטרפויות ממוכנות שהסתיימו' states the meaning of gen_joiningstatus = 8 as fact; the only support is the component name 'Get Finished Automated Joining' (no SQL comment at DTSX 26984, unlike pension status 13 which has '--הסתיים' at 36384). (b) scopeNote names the runtime target '[CRM] = Psql/ALTSHULER_MSCRM (DTSX:4)' but does not say the unsupplied C:\\Generix\\SSISConfigFile.dtsConfig (DTSX:11) may override it. (c) 'ייפוי כוח קיים בחשבון לאותו סוכן' - the lookup matches the agency account number OR the agent ID number (DTSX 22178). (d) The sentence 'כשלת\"ז כבר יש ייפוי כוח ראשי פעיל, מטופלת בריצה לכל היותר הצטרפות אחת שלה' is not qualified as pension-only; in the automated-joining flow there is no such per-ID rule.",
+      "evidence": "DTSX 4, 11, 26984, 36384, 22178; 0029 main.cs (Check If Poa Attached) 45-86",
+      "wrongUnits": [
+        { "unit": 1, "problem": "'הצטרפויות ממוכנות שהסתיימו' - meaning of status 8 from component name only, not labelled.", "correct": "'הצטרפויות ממוכנות בסטטוס 8 (\"הסתיימו\" לפי שם הרכיב בלבד - השערה)'.", "evidence": "DTSX 26924 component name; 26984 'and gen_joiningstatus = 8' without comment" },
+        { "unit": 2, "problem": "Runtime target of [CRM] stated without the config-override caveat.", "correct": "Add: the package loads C:\\Generix\\SSISConfigFile.dtsConfig (DTSX:11, not supplied), which may override the [CRM] connection string; Psql/ALTSHULER_MSCRM is the design-time value.", "evidence": "DTSX 4-8, 11" },
+        { "unit": 1, "problem": "'לאותו סוכן' for the account-level POA stop; the condition is same agency account number OR same agent ID number.", "correct": "'ייפוי כוח קיים בחשבון לאותו סוכן או לאותה סוכנות'.", "evidence": "DTSX 22178" },
+        { "unit": 1, "problem": "Per-ID 'at most one joining per run' rule stated without scope; it exists only in the pension flow.", "correct": "Prefix with 'בפנסיה,'.", "evidence": "Check If Poa Attached To Pension Joining DTSX 31387 main.cs:47-84" }
+      ]
+    },
+    {
+      "id": "L|finding#2",
+      "hash": "e66ba28f1def",
+      "verdict": "CONFIRMED",
+      "detail": "Create POA Main (DTSX 22327) Success output is synchronous with exclusionGroup 0 (DTSX 24449), so every input row - including rows returned early and rows whose creation later fails - is passed to Union All Automated Joining Id For Update (Input 1) and Update Automated Joining (gen_testedtocreatepoa = true, main.cs:63-79). Creation runs only at EndOfRowset (main.cs:452-455); rows of earlier buffers are passed on before creation is even attempted. Stated conditionally ('יכולה', 'תלוי בהתנהגות הכשל'), not as a bug. Correct.",
+      "evidence": "DTSX 24449, 22327 main.cs:159-279, 452-455; path Create POA Main.Success -> Union All Input 1",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|finding#4",
+      "hash": "b20eb66e22d4",
+      "verdict": "CONFIRMED",
+      "detail": "If POA period merge main.cs:117-136: agent-licence-null branch compares genagencylicensenumber (Gen_agencie.Gen_licenseNumber) with genagencyidentity; agent branch compares genagentlicensenumber (Gen_agents.Gen_LicenseNumber) with genagencyidentity; genagencyidentity = account.AccountNumber from Check If Exists POA Main (DTSX 21938). Pension: agentcyIdentityNumber = ISNULL(agent licence, agency licence) (DTSX 36352) is matched to isnull(contact.gen_identitynumber, account.AccountNumber) in Check If Exist POA (DTSX 31196/31223). Consequence labelled השערה and conditional. Note: for the AJ period-merge case the consequence is 'creation instead of stop' rather than 'no link', but the sentence is a labelled hypothesis covering both flows.",
+      "evidence": "DTSX 27154 main.cs:117-136; 21938; 36352; 31223",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|finding#6",
+      "hash": "8b313cd834be",
+      "verdict": "WRONG",
+      "detail": "From the files, PJ Update POA Main (DTSX 36979) Output 0 is synchronous with exclusionGroup 0 (DTSX 37747) and its catch only adds an Error row (main.cs:37-41); so by the files alone every input row, including a failed link, flows to Union All 2 -> Update Pension Joining and would be marked 3. A failed link stays unmarked only because the catch writes 'Pension Joining Id: ' + guid + ... (> 50 chars) into ErrorDescription wstr(50) (DTSX 37750-37752), which by documented SSIS runtime behaviour (DoesNotFitBufferException, not shown in the files) throws and fails the component before the row is passed on. The claim states 'קישור שנכשל אינו מסומן' as a plain fact without marking it as runtime behaviour not shown in the files.",
+      "evidence": "DTSX 37747, 37750-37752; Update POA Main main.cs:28-42",
+      "wrongUnits": [
+        { "unit": 1, "problem": "Runtime-dependent outcome stated as fact.", "correct": "'לפי הקבצים הפלט Output 0 סינכרוני ומעביר כל שורה; קישור שנכשל אינו מסומן רק משום שכתיבת הודעת השגיאה (מעל 50 תווים) לעמודה wstr(50) נכשלת - לפי התנהגות SSIS המתועדת, לא מוצג בקבצים.'", "evidence": "DTSX 37747, 37752" }
+      ]
+    },
+    {
+      "id": "L|Package\\Create POA Main For Automated Joining|short",
+      "hash": "cf3b65019f4b",
+      "verdict": "WRONG",
+      "detail": "Flow structure matches the paths. Wrong units: [1] 'שהסתיימו' (status 8, component-name only) unlabelled, and 'ויש בהן ייפוי כוח לסוכן או לסוכנות' is not a selection condition - the SQL filters gen_typeofpowerofattorney not null and != 3 ('-- !=No poa'), with left joins to agent/agency (DTSX 26929-26990); this also contradicts [19], which says rows without agent and agency reach marking. [9] omits that a link is possible only when the member's latest active B1 POA Main (rownumber = 1 by createdon desc) has the same agent and agency (Check If Exists POA Main, full cache, DTSX 21938); otherwise a new one is created even if an older matching B1 within ±7 days exists. [13] 'אלא אם קיים כבר ייפוי כוח מאוחר יותר לאותו סוכן' misstates the period-merge stop: it is 'same or later' (TotalDays >= 0) AND the joining licence (agent, else agency) equals the existing POA Main's agency account number (main.cs:117-134). [19] 'החתימה אינה האחרונה של העמית': rowNumber is computed inside the subquery after the WHERE, i.e. among this run's fetched joinings (untested, status 8, active, joined to an active customer account), partitioned by applicant ID and ordered by the raw gen_signaturedateofpowerofattorney - not over all of the member's joinings. [19] 'לאותו סוכן' twice: the account-POA stop is agency OR agent (DTSX 22178), and the in-run duplicate rule is same agency OR same agent (main.cs:326-329).",
+      "evidence": "DTSX 26929-26990, 21938, 22178, 27154 main.cs:117-136, 22327 main.cs:326-330",
+      "wrongUnits": [
+        { "unit": 1, "problem": "Unlabelled meaning of status 8; 'has a POA to agent or agency' is not a filter.", "correct": "'נשלפות הצטרפויות ממוכנות בסטטוס 8 (\"הסתיימו\" לפי שם הרכיב - השערה), עם סוג ייפוי כוח מוגדר שאינו 3 (\"ללא ייפוי כוח\" לפי הערת SQL), שעדיין לא נבדקו'.", "evidence": "DTSX 26983-26990" },
+        { "unit": 9, "problem": "Omits the 'latest active B1 of the member has the same agent and agency' precondition.", "correct": "'האם ייפוי הכוח הראשי ב'1 הפעיל האחרון של העמית הוא לאותו סוכן ולאותה סוכנות, וקיים ב'1 פעיל בפרמטרים זהים בטווח שבוע?'", "evidence": "DTSX 21938 (rownumber = 1), 22026" },
+        { "unit": 13, "problem": "Period-merge condition misstated.", "correct": "'... אלא אם ייפוי הכוח הראשי הקיים חתום באותו מועד או מאוחר יותר ומספר הרישיון בהצטרפות שווה למזהה הסוכנות (מספר החשבון) שבו (\"מיזוג תקופה\")'.", "evidence": "DTSX 27154 main.cs:117-134" },
+        { "unit": 19, "problem": "'latest signature of the member' and 'same agent' are inexact.", "correct": "'... כשהחתימה אינה האחרונה מבין ההצטרפויות של העמית שנשלפו בריצה ...'; 'ייפוי כוח קיים בחשבון לאותו סוכן או לאותה סוכנות'; 'הצטרפות ב'1 קודמת או זהה לאותו עמית ולאותו סוכן או לאותה סוכנות'.", "evidence": "DTSX 26929-26931, 22178; main.cs:326-329" }
+      ]
+    },
+    {
+      "id": "L|Package\\Create POA Main For Automated Joining|detailed",
+      "hash": "9c7706c944cb",
+      "verdict": "WRONG",
+      "detail": "Verified: source SQL and joins [1]; computed columns [2]; Check If POA Of Customer Account Exists (partial cache, OR condition, Match unconnected) [3]-[5]; Check Type of POA [8]; Check If Exists POA Main full cache keys [14]; Bet 1 lookup SQL and parameter order (DTSX 21620) [18]; Update POA Main [20]; period merge tech [22] (correct, incl. agent branch requiring an agent on the existing POA Main); Is Exists POA Main By Automated Joining [28]; Bet 2 lookup and parameter order (DTSX 21816, raw gen_excludeprovidentfunds) [32]; Create POA Main early returns and dictionary [39]; attributes [44]-[50] (main.cs:167-264); Update Automated Joining [52]. Wrong units: [10] 'האם זו החתימה האחרונה של העמית?' - rowNumber is computed among this run's fetched joinings only (ROW_NUMBER inside the filtered subquery, DTSX 26931/26983-26990); a member whose newer joining was already marked tested gets rowNumber 1 on an older one. [39] and [53] say 'לאותו עמית ולאותו סוכן' while the code matches same agency OR same agent (main.cs:328); [53] also repeats 'לאותו סוכן' for the account-POA stop (agency OR agent, DTSX 22178) and 'החתימה האחרונה של העמית'. [51] '<מספר החשבון>': the note appends Row.genname = gen_customeraccount.gen_name (main.cs:416, SQL DTSX 26929); calling it the account number rests only on the C# parameter name customerAccountNumnber. Minor (not counted): [32] Hebrew 'סוכן' - the key is agent ID, else agency account number.",
+      "evidence": "DTSX 26929-26990, 22178; 22327 main.cs:286-305, 326-330, 416",
+      "wrongUnits": [
+        { "unit": 10, "problem": "'latest signature of the member' overstates the scope of rowNumber.", "correct": "'האם זו החתימה האחרונה מבין ההצטרפויות של העמית שנשלפו בריצה (לא נבדקו, סטטוס 8, פעילות)?'", "evidence": "DTSX 26931, 26983-26990" },
+        { "unit": 39, "problem": "In-run duplicate rule: same agency OR same agent, not only same agent.", "correct": "'... לאותו עמית ולאותו סוכן או לאותה סוכנות'.", "evidence": "main.cs:326-329" },
+        { "unit": 51, "problem": "Placeholder named 'מספר החשבון' without proof.", "correct": "'יפוי כח נסרק לחשבון <gen_name של חשבון הלקוח>'.", "evidence": "main.cs:291, 416; DTSX 26929 (gen_customeraccount.gen_name)" },
+        { "unit": 53, "problem": "Same inexact 'latest of the member' and 'same agent' wording.", "correct": "As for [10] and [39]; account-POA stop = 'לאותו סוכן או לאותה סוכנות'.", "evidence": "DTSX 22178; main.cs:326-329" }
+      ]
+    },
+    {
+      "id": "L|Package\\Create POA Main For Automated Joining|detail",
+      "hash": "fd1df8256260",
+      "verdict": "WRONG",
+      "detail": "[1] (no meaning claimed for status 8), [2], [4], [5] verified. [6] sourceTables verified: 0027 updates gen_automatedjoining (0027 DTSX 1371, 5936, entity.Id set); no creator found in supplied packages (labelled השערה); gen_customeraccount writers 0005, 0006 (DTSX 9752 LogicalName gen_customeraccount), 0012 (Update Customer Account DTSX 100190, update gen_customeraccountbase), 0033 (DTSX 15); 0031 Update Current State Poa Main (DTSX 40252, SDK update gen_currentstate 40447-40453); Gen_powerofattorneyBase SQL updates 0031:31302, 0030:6661. Wrong: [3] 'חתימה אחרונה לעמית (rowNumber = 1)' - rowNumber is the latest among this run's fetched joinings only.",
+      "evidence": "DTSX 26931, 26983-26990",
+      "wrongUnits": [
+        { "unit": 3, "problem": "'חתימה אחרונה לעמית' overstates rowNumber scope.", "correct": "'חתימה אחרונה מבין ההצטרפויות של העמית שנשלפו בריצה (rowNumber = 1)'.", "evidence": "DTSX 26931" }
+      ]
+    },
+    {
+      "id": "L|Package\\Create POA Main For Automated Joining|decisions",
+      "hash": "7b0e7043cc96",
+      "verdict": "WRONG",
+      "detail": "Conditions [1]-[10] match the DTSX (SQL, lookup parameter maps DTSX 22205/22026/21620/21816/27982, split expressions DTSX 22253/22286, main.cs:117-136, 256-264); [7] meaning correctly labelled השערה. Wrong: [4] meaning_he 'החתימה האחרונה של העמית' - rowNumber == 1 means the latest among the joinings fetched in this run (the ROW_NUMBER is computed after the WHERE filter), not the member's latest overall.",
+      "evidence": "DTSX 22253, 26931, 26983-26990",
+      "wrongUnits": [
+        { "unit": 4, "problem": "Meaning overstates rowNumber scope.", "correct": "'החתימה האחרונה מבין ההצטרפויות של העמית שנשלפו בריצה'.", "evidence": "DTSX 26931" }
+      ]
+    },
+    {
+      "id": "L|Package\\Create POA Main For Automated Joining|crm",
+      "hash": "6d573846a2f1",
+      "verdict": "CONFIRMED",
+      "detail": "Writes verified: Create POA Main new Entity(\"gen_powerofattorneymain\") + service.Create (main.cs:167, 266); annotation create with objectid = POA Main (main.cs:290-294); Update POA Main sets gen_automatedjoining via proxy.Update (main.cs:32-35); Update Automated Joining sets gen_testedtocreatepoa = true (main.cs:67-72). Marking 'when' list matches the paths (Input 1 Success sync, Input 2 not B1/B2, Input 3 Update POA Main Output 0, Input 4 other signature, Input 6 B2 already linked). Note: the create 'when' is a summary; the other create preconditions (agent/agency present, no in-run duplicate, no account POA, latest signature) are stated in the sibling claims. No other CRM write in the active AJ flow except ETL warnings (plumbing).",
+      "evidence": "DTSX 22327, 30374, 29486; paths of Union All Automated Joining Id For Update",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Create POA Main For Automated Joining|open",
+      "hash": "69ebe520c61d",
+      "verdict": "CONFIRMED",
+      "detail": "[1] correct (status 8 only from component name; types 1/2 from output names/code, 3 from SQL comment '!=No poa'). [2] correct (main.cs:117-134). [3] correct: Bet 2 parameter 3 is raw gen_excludeprovidentfunds from Get Finished Automated Joining (DTSX 21816) while B2 creation always writes 2 (main.cs:204); labelled השערה. [4] correctly marked unverified runtime behaviour.",
+      "evidence": "DTSX 21816, 26984-26986; main.cs:204",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Create POA Main For Pension Joining|title",
+      "hash": "6b5189cecbb8",
+      "verdict": "CONFIRMED",
+      "detail": "Status 13 'הסתיים', createpoamain 1 'required', 3 'Created' are attributed by SQL/code comments (DTSX 36384-36388; main.cs:73). flow_he[1]-[5] match: Get Finished Pension Joinings (DTSX 36352), Get POA Main partial lookup statecode = 0 (DTSX 36497-36504), Check If Poa Attached main.cs:47-84 (one candidate per ID on the Match path, attached joining evicts an earlier candidate; NoMatch rows go straight to Union All Input 3 without per-ID reduction), Derived Column (DTSX 35357), Check If Exist POA ±7 (DTSX 31223) -> Update POA Main / Create POA Main, Update Pension Joining SQL (DTSX 36944). short_he only claims marking after successful creation/link, which is correct.",
+      "evidence": "DTSX 36352-36391, 36495-36518, 31387 main.cs:45-122, 35357, 31194-31273, 33566, 36941-36944",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Create POA Main For Pension Joining|short",
+      "hash": "2682a3a91a24",
+      "verdict": "WRONG",
+      "detail": "Steps [1]-[12] match the paths. [13] states 'קישור שנכשל אינו מסומן' as fact. By the files, Update POA Main Output 0 is synchronous, exclusionGroup 0 (DTSX 37747), and passes every row - including failed links - to Union All 2 -> Update Pension Joining; the failed link is unmarked only through SSIS runtime behaviour not shown in the files (overflow of 'Pension Joining Id: '+guid+... into ErrorDescription wstr(50), DTSX 37750-37752, throws and fails the component). Must be labelled. Rest of [13] (no agent/agency and failed creation stay 'נדרש'; one joining per ID with eviction case) verified against main.cs:47-84 (Check If Poa Attached) and Create POA Main main.cs:269-283, 324-328.",
+      "evidence": "DTSX 37747, 37750-37752; 31387 main.cs:47-84; 33566 main.cs:269-283, 327",
+      "wrongUnits": [
+        { "unit": 13, "problem": "Runtime-dependent statement about failed links stated as fact.", "correct": "'קישור שנכשל אינו מסומן - לפי התנהגות SSIS המתועדת (הודעת השגיאה ארוכה מ-wstr(50) ולכן הרכיב נכשל), לא מוצג בקבצים; לפי מבנה הקבצים בלבד הפלט Output 0 מעביר גם שורה שנכשלה.'", "evidence": "DTSX 37747, 37752" }
+      ]
+    },
+    {
+      "id": "L|Package\\Create POA Main For Pension Joining|detailed",
+      "hash": "909275d02632",
+      "verdict": "WRONG",
+      "detail": "Verified: [1] SQL; [2] agentcyIdentityNumber = ISNULL(agent licence, agency licence); [3]-[11] Get POA Main and Check If Poa Attached logic incl. SDK mark (main.cs:69-75) and eviction (main.cs:81-84); [13] Derived Column expressions; [16] Update POA Main; [19]-[21] main.cs:324-328; [24] create attributes (main.cs:146-265: includepension only when IncludePensionProducts != 0, isenddatelessthan10years only when true, startdate = Now, enddate = expiration when present). Wrong units: [12] 'החרגה ריקה נקבעת \"כן\" בנספח ב'2' - the code tests gen_agenttypeofattachment == 2 (const B2 = 2, main.cs:17, 49-50), while [13] defines ב'2 as every type other than 1 (Derived Column ? 2 : 3); for type values other than 1 and 2 an empty exclusion becomes 'לא' although the appendix is ב'2 - the claim contradicts itself for those values. [14] Hebrew 'אותו רישיון סוכן או סוכנות' - the POA Main side is the agent's ID number or the agency's account number, not a licence (tech part correct). [25] 'הכשל בה לא מונע את סימון ההצטרפות' - the code comment (main.cs:271) and SuccessBuffer.AddRow before CreateAnnotation support it, but the annotation catch writes ex.Message to ErrorMessage wstr(150) (DTSX 35348-35353); if the message is longer, documented SSIS runtime behaviour throws and the component fails, so the statement must be conditional. [26]/[27] 'קישור שנכשל אינו מסומן' stated as fact; depends on runtime overflow of wstr(50) (DTSX 37752) - by the files Output 0 (sync, excl 0, DTSX 37747) would pass a failed link to marking.",
+      "evidence": "31387 main.cs:17, 49-50; DTSX 35357; 31223-31273; 33566 main.cs:269-310; DTSX 35348, 37747, 37752",
+      "wrongUnits": [
+        { "unit": 12, "problem": "Condition stated as appendix ב'2; code condition is type == 2 exactly; contradicts [13].", "correct": "'... החרגה ריקה נקבעת \"כן\" כשסוג הנספח בהצטרפות = 2 (B2 = 2 בקוד), ו\"לא\" לכל ערך אחר (גם לערכים שמקבלים נספח ב'2 [3] אך אינם 2)'.", "evidence": "main.cs:17, 49-50; DTSX 35357" },
+        { "unit": 14, "problem": "'אותו רישיון סוכן או סוכנות' - POA Main side is not a licence.", "correct": "'ת\"ז הסוכן (או מספר החשבון של הסוכנות) ב-POA Main שווה לרישיון הסוכן (או הסוכנות) בהצטרפות'.", "evidence": "DTSX 31223 (isnull(contact.gen_identitynumber, account.AccountNumber)), 36352" },
+        { "unit": 25, "problem": "Failure-handling statement made unconditionally.", "correct": "'לפי הקוד (הערה main.cs:271) הסימון מתבצע גם אם ההערה נכשלה, בתנאי שהודעת השגיאה נכנסת ל-wstr(150); אחרת הרכיב נכשל (התנהגות SSIS המתועדת, לא מוצג בקבצים)'.", "evidence": "main.cs:271-275, 301-305; DTSX 35348" },
+        { "unit": 26, "problem": "Runtime-dependent 'failed link not marked' stated as fact.", "correct": "Label as SSIS runtime behaviour not shown in the files (wstr(50) overflow), as in finding#6.", "evidence": "DTSX 37747, 37752" },
+        { "unit": 27, "problem": "Same as [26].", "correct": "Same label.", "evidence": "DTSX 37747, 37752" }
+      ]
+    },
+    {
+      "id": "L|Package\\Create POA Main For Pension Joining|detail",
+      "hash": "562629f9faee",
+      "verdict": "WRONG",
+      "detail": "[1], [2], [4], [6] verified (0028 'Upate Pension Joining' update gen_pensionjoiningBase set gen_fundenrolmentid DTSX 0028:8053-8058; no creator of gen_pensionjoining in supplied packages, labelled השערה). Wrong: [3] 'החרגות ריקות → כן בנספח ב'2' while the same unit defines ב'2 as every type other than 1; code tests type == 2 (main.cs:49-50). [5] 'הצטרפויות שלא הגיעו לשם (יצירה/קישור מוצלחים) נשארות \"נדרש\"' covers failed links, which by the files would be passed by the synchronous Output 0 (DTSX 37747) to marking; they stay unmarked only through runtime wstr(50) overflow (DTSX 37752) - not labelled.",
+      "evidence": "main.cs:17, 49-50; DTSX 35357, 37747, 37752",
+      "wrongUnits": [
+        { "unit": 3, "problem": "'ב'2' used for type == 2 here but defined as type != 1 in the same unit.", "correct": "'החרגות ריקות → כן כשסוג הנספח בהצטרפות = 2, ולא לכל ערך אחר'.", "evidence": "main.cs:49-50; DTSX 35357" },
+        { "unit": 5, "problem": "Failed-link outcome depends on unlabelled runtime behaviour.", "correct": "Add 'קישור שנכשל נשאר \"נדרש\" לפי התנהגות SSIS המתועדת (wstr(50)), לא מוצג בקבצים'.", "evidence": "DTSX 37747, 37752" }
+      ]
+    },
+    {
+      "id": "L|Package\\Create POA Main For Pension Joining|decisions",
+      "hash": "fb49401cd03f",
+      "verdict": "CONFIRMED",
+      "detail": "[1] SQL WHERE (DTSX 36380-36388) with SQL comments supporting the meaning; [2] Get POA Main (DTSX 36497-36518); [3] main.cs:47 / 67-84 conditions and outcomes incl. eviction of an earlier candidate; [4] Derived Column (DTSX 35357); [5] Check If Exist POA (DTSX 31223-31273) Match -> Update POA Main, NoMatch -> Create POA Main; [6] main.cs:327. All match.",
+      "evidence": "DTSX 36352-36392, 36495-36518, 31387, 35357, 31194-31273, 33566",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Create POA Main For Pension Joining|crm",
+      "hash": "fb3a53cbd402",
+      "verdict": "CONFIRMED",
+      "detail": "[1] Check If Poa Attached main.cs:71-74 service.Update gen_pensionjoining gen_createpoamain = 3 (CRM.Proxy); [2] Create POA Main main.cs:146, 267; [3] annotation main.cs:295-298; [4] Update POA Main gen_pensionjoining main.cs:32-35; [5] Update Pension Joining 'update gen_pensionjoiningbase set gen_createpoamain = 3' on [CRM] (DTSX 36944) after Union All 2 (Create Success + Update POA Main Output 0). The 'when' texts state only success cases, which are correct. No other active CRM write in the flow except ETL warnings (plumbing).",
+      "evidence": "DTSX 31387, 33566, 36979, 36906, 36941-36944",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Create POA for future funds providant - allow action|detail",
+      "hash": "b1f2c3af959a",
+      "verdict": "WRONG",
+      "detail": "Disabled (DTSX 10195). SQL (DTSX 12827-12861): gen_currentstate = 1, isfuturefundvalid = 1, IsAllowAction = 1, appendix <> 4, isnull(excludeprovidentfunds,2) = 2, gen_customeraccounttype.gen_type = 1, Gen_startdate < getdate(), not exists gen_powerofattorney for the account; ROW_NUMBER by contact, createdon desc; split POAMainOrder == 1 (Default unconnected); Set columns gen_currentstate = 1; Create POA 1 entity gen_powerofattorney via ExecuteMultipleExtension Create. sourceTables cross-package references verified (0031:40252/40447-40453, 31302; 0030:6661; 0006:9752; 0012:100190; 0033:15). Wrong: [1] 'חשבונות הגמל (סוג חשבון 1)' states that account type 1 is provident ('גמל') as fact; the only support is the data-flow name 'providant' (and the parallel excludeprovidentfunds filter) - no comment or constant maps gen_type = 1.",
+      "evidence": "DTSX 12827-12861, 10719",
+      "wrongUnits": [
+        { "unit": 1, "problem": "Meaning of gen_type = 1 taken from the data-flow name.", "correct": "'... לכל חשבונות הלקוח עם gen_customeraccounttype.gen_type = 1 (\"גמל\" לפי שם הזרימה - השערה) ...'", "evidence": "DTSX 12858" }
+      ]
+    },
+    {
+      "id": "L|Package\\Create POA for future funds studing - allow action|detail",
+      "hash": "5351ee4fcb55",
+      "verdict": "WRONG",
+      "detail": "Disabled (DTSX 15775). SQL (DTSX 18415-18448): as stated - no startdate filter, isnull(exclludetrainingfunds,2) = 2, gen_type = 2; POAMainOrder == 1 split; Set columns = 1; Create POA gen_powerofattorney. sourceTables verified. Wrong: [1] 'חשבונות הקרן השתלמות (סוג חשבון 2)' - meaning of gen_type = 2 only from the data-flow name 'studing'.",
+      "evidence": "DTSX 18415-18448",
+      "wrongUnits": [
+        { "unit": 1, "problem": "Meaning of gen_type = 2 taken from the data-flow name.", "correct": "'... gen_type = 2 (\"קרן השתלמות\" לפי שם הזרימה - השערה) ...'", "evidence": "DTSX 18415-18448" }
+      ]
+    },
+    {
+      "id": "L|Package\\Create POA for future funds providant - allow info|detail",
+      "hash": "f9762504f569",
+      "verdict": "WRONG",
+      "detail": "Disabled (DTSX 13047). SQL (DTSX 15553-15587): IsAllowAction isnull 0 = 0, otherwise as provident-action; no split (every matching account row goes to Create POA); Set columns gen_currentstate = gen_startdate > GETDATE() ? 3 : 1; Create POA gen_powerofattorney. sourceTables verified. Wrong: [1] 'חשבונות הגמל (סוג חשבון 1)' from the data-flow name only; '(מידע)' for IsAllowAction = 0 also comes from the flow name 'allow info' (the SQL does not test gen_isallowinformation).",
+      "evidence": "DTSX 15553-15587",
+      "wrongUnits": [
+        { "unit": 1, "problem": "Name-derived meanings for gen_type = 1 and for 'info'.", "correct": "'... בלי הרשאת פעולה (IsAllowAction = 0; \"מידע\" לפי שם הזרימה - השערה) ... gen_type = 1 (\"גמל\" לפי שם הזרימה - השערה)'.", "evidence": "DTSX 15553-15587" }
+      ]
+    },
+    {
+      "id": "L|Package\\Create POA for future funds studing - allow info|detail",
+      "hash": "187706cd4920",
+      "verdict": "WRONG",
+      "detail": "Disabled (DTSX 18634). SQL (DTSX 21140-21173): IsAllowAction = 0, exclludetrainingfunds isnull 2 = 2, gen_type = 2, no startdate filter, no split; Set columns ? 3 : 1; Create POA gen_powerofattorney. sourceTables verified. Wrong: [1] 'חשבונות הקרן השתלמות (סוג חשבון 2)' and '(מידע)' are taken from the data-flow name only.",
+      "evidence": "DTSX 21140-21173",
+      "wrongUnits": [
+        { "unit": 1, "problem": "Name-derived meanings for gen_type = 2 and for 'info'.", "correct": "Label both as השערה from the data-flow name.", "evidence": "DTSX 21140-21173" }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,1494 @@
+{
+ "package": "0032_POAOperator",
+ "analyst": "ssis-business-logic",
+ "source": {
+  "file": "source/DailyProcess/0032_POAOperator.dtsx",
+  "sha256": "537C3F53A332ABFA9713E05BB7559DFAB2ED165C37AA40418DAC611E181DF47F",
+  "lines": 20577
+ },
+ "scopeNote_he": "ניתוח קוד המקור (C#) של רכיבי הסקריפט בלבד; ה-DLL לא פוענח. CRM.Proxy / ExecuteMultipleExtension הם אסמבלי חיצוני (external_unknown). אין קובץ תצורה בחבילה. ServerName ו-OrganizationName נטענים מ-gen_etlvariable. [psql] = psql/ALTSHULER_MSCRM (DTSX:4) משמש לקריאה בלבד. כל הכתיבה ל-CRM ב-SDK (Supported), ואין SQL DML ישיר. משמעות ערכי gen_poastatus של הקישורים (gen_poaaccountoperator) נלקחה מהערות SQL בחבילה: 2 = valid, 4 = expired, 5 = invalid, 6 = cancelled (DTSX:10055, 11969, 13889, 15807, 17699; וגם VALID = 2 בקוד, DTSX:742, 3803). לערכי gen_poastatus של ייפוי הכוח המתפעל (gen_poaoperator) אין תווית בקבצים; אותן משמעויות עבורו הן השערה באנלוגיה בלבד. ספירת הקישורים: בשאילתה של שתי הטבלאות (gen_poaoperator join gen_poaaccountoperator) העמודה gen_poaaccountoperatorid ב-count והעמודה gen_poaoperatorid ב-group by אינן מתויגות בשם טבלה. gen_poaaccountoperatorid היא מזהה רשומת הקישור: היא נשלפת מ-gen_poaaccountoperator לבדה (DTSX:10053) ומשמשת Id של עדכון הקישור (Update POA account operator, main.cs:122-123 @DTSX:10084). gen_poaoperatorid מתויגת כ-gen_poaoperator.gen_poaoperatorid בתנאי ה-join, ומשמשת Id של עדכון gen_poaoperator (main.cs:124-126 בסקריפטי העדכון של ארבע הזרימות). אילו אחת מהן הייתה קיימת בשתי הטבלאות, השאילתה הייתה נכשלת כעמודה דו-משמעית; לפי המשתמש החבילה רצה בפרודקשן. לכן count(gen_poaaccountoperatorid) סופר את הקישורים של ייפוי הכוח המתפעל.",
+ "summary_he": "תחזוקה של ייפויי כוח מתפעל של מעסיקים (gen_poaoperator) ושל הקישורים שלהם לחשבונות ולפוליסות (gen_poaaccountoperator). קישורים בסטטוס 2 (\"valid\" לפי הערת SQL) שתאריך הסיום שלהם ועוד 3 שעות קטן מזמן הריצה (dateadd(HH,3, gen_enddate) < GETDATE(), DTSX:10054) מקבלים סטטוס 4 (\"expired\" לפי הערות SQL). ייפוי כוח מתפעל בסטטוס 2 (כנראה \"תקף\" – השערה) שיש לו לפחות קישור אחד מקבל סטטוס לפי כל קישוריו: כולם 6 → 6, כולם 5 → 5, כולם 4 → 4, ואחר כך כל ייפוי כוח שעדיין בסטטוס 2 ושלכל קישוריו סטטוס מוגדר שאינו 2 → 6. משמעות הסטטוסים 6, 5 ו-4 של ייפוי הכוח המתפעל (\"בוטל\", \"לא תקין\", \"פג תוקף\") היא השערה באנלוגיה להערות ה-SQL על סטטוס הקישורים. קישור עם סטטוס ריק מונע כל אחד מהעדכונים האלה. לחשבונות לקוח ולפוליסות (gen_policies) שנוצרו ביומיים האחרונים אצל מעסיק עם ייפוי כוח מתפעל בסטטוס 2 (כנראה \"תקף\" – השערה) (המעסיק הוא Account: עמודות ה-join AccountId ו-Accountid אינן מתויגות בשם טבלה, DTSX:3106, 6149-6150, אבל Account.AccountId מתויגת ב-DTSX:3107 באותו חיבור [psql]. אילו העמודה הייתה קיימת גם בטבלה אחרת שזמינה באותו תנאי join, השאילתה הייתה נכשלת כעמודה דו-משמעית; לפי המשתמש החבילה רצה בפרודקשן. עבור Accountid ההתאמה מניחה שמות עמודות שאינם תלויי רישיות; ה-collation אינו מוצג בקבצים) נוצרים קישורים חדשים, עם ההרשאות של ייפוי הכוח. זה קורה כש-gen_applypoa של ייפוי הכוח המתפעל שווה 1 ואינו ריק (המשמעות \"ייפוי הכוח חל על כל העובדים\" היא השערה לפי שם הרכיב IS All Employees בלבד), או לעובד שמופיע עם המתפעל ברשומה פעילה (gen_active = 1) ברשימת העובדים, ובתנאי שאין לחשבון או לפוליסה קישור קודם.",
+ "executionOrder": [
+  {
+   "step": 1,
+   "refId": "Package\\Get Organization Variables",
+   "title_he": "טעינת משתני ארגון (מסגרת)",
+   "trigger": "start (no incoming constraint)"
+  },
+  {
+   "step": 2,
+   "refId": "Package\\Create ETL Process record",
+   "title_he": "רשומת תהליך ETL (מסגרת)",
+   "trigger": "after Get Organization Variables · Success (DTSX:18794)"
+  },
+  {
+   "step": 3,
+   "refId": "Package\\Update POA Account Operator Out Of Date",
+   "title_he": "קישורים שפג תוקפם → 4",
+   "trigger": "after Create ETL Process record · Success (DTSX:18795)"
+  },
+  {
+   "step": 4,
+   "refId": "Package\\Update Poa Operator Cancelled by Poa Account",
+   "title_he": "מתפעל שכל קישוריו בוטלו → 6 (ספירת הקישורים: בשאילתה של שתי הטבלאות (gen_poaoperator join gen_poaaccountoperator) העמודה gen_poaaccountoperatorid ב-count והעמודה gen_poaoperatorid ב-group by אינן מתויגות בשם טבלה. gen_poaaccountoperatorid היא מזהה רשומת הקישור: היא נשלפת מ-gen_poaaccountoperator לבדה (DTSX:10053) ומשמשת Id של עדכון הקישור (Update POA account operator, main.cs:122-123 @DTSX:10084). gen_poaoperatorid מתויגת כ-gen_poaoperator.gen_poaoperatorid בתנאי ה-join, ומשמשת Id של עדכון gen_poaoperator (main.cs:124-126 בסקריפטי העדכון של ארבע הזרימות). אילו אחת מהן הייתה קיימת בשתי הטבלאות, השאילתה הייתה נכשלת כעמודה דו-משמעית; לפי המשתמש החבילה רצה בפרודקשן. לכן count(gen_poaaccountoperatorid) סופר את הקישורים של ייפוי הכוח המתפעל.)",
+   "trigger": "after Update POA Account Operator Out Of Date · Success (DTSX:18796)"
+  },
+  {
+   "step": 5,
+   "refId": "Package\\Update Poa Operator Invalid by Poa Account",
+   "title_he": "מתפעל שכל קישוריו לא תקינים → 5 (ספירת הקישורים לפי count(gen_poaaccountoperatorid) – ראה הנימוק בשלב 4)",
+   "trigger": "after Update Poa Operator Cancelled by Poa Account · Success (DTSX:18797)"
+  },
+  {
+   "step": 6,
+   "refId": "Package\\Update Poa Operator Expired By Poa Account",
+   "title_he": "מתפעל שכל קישוריו פגו → 4 (ספירת הקישורים לפי count(gen_poaaccountoperatorid) – ראה הנימוק בשלב 4)",
+   "trigger": "after Update Poa Operator Invalid by Poa Account · Success (DTSX:18798)"
+  },
+  {
+   "step": 7,
+   "refId": "Package\\Update Poa Operator Cancelled",
+   "title_he": "מתפעל שלכל קישוריו סטטוס מוגדר שאינו 2 → 6 (ספירת הקישורים לפי count(gen_poaaccountoperatorid) – ראה הנימוק בשלב 4)",
+   "trigger": "after Update Poa Operator Expired By Poa Account · Success (DTSX:18799)"
+  },
+  {
+   "step": 8,
+   "refId": "Package\\Create POA Account Operator",
+   "title_he": "קישור לחשבונות לקוח חדשים",
+   "trigger": "after Update Poa Operator Cancelled · Success (DTSX:18801)"
+  },
+  {
+   "step": 9,
+   "refId": "Package\\Create POA Account Operator - Pension",
+   "title_he": "קישור לפוליסות חדשות (gen_policies)",
+   "trigger": "after Create POA Account Operator · Success (DTSX:18802)"
+  },
+  {
+   "step": 10,
+   "refId": "Package\\End ETL Process record",
+   "title_he": "סיום רשומת תהליך ETL (מסגרת)",
+   "trigger": "after Create POA Account Operator - Pension · Success (DTSX:18800)"
+  }
+ ],
+ "ignoredAsFramework": [
+  "Package\\Get Organization Variables",
+  "Package\\Create ETL Process record",
+  "Package\\End ETL Process record",
+  "Package\\Create POA Account Operator\\ETL Warning",
+  "Package\\Create POA Account Operator\\Derived Column",
+  "Package\\Create POA Account Operator\\Union All 1",
+  "Package\\Create POA Account Operator - Pension\\ETL Warning",
+  "Package\\Create POA Account Operator - Pension\\Derived Column",
+  "Package\\Create POA Account Operator - Pension\\Union All 1",
+  "Package\\Update POA Account Operator Out Of Date\\ETL Warning 1 1",
+  "Package\\Update POA Account Operator Out Of Date\\Failed To Update Poa account operator",
+  "Package\\Update Poa Operator Cancelled\\ETL Warning 1 1",
+  "Package\\Update Poa Operator Cancelled\\Failed To Update Poa account operator",
+  "Package\\Update Poa Operator Cancelled by Poa Account\\ETL Warning 1 1",
+  "Package\\Update Poa Operator Cancelled by Poa Account\\Failed To Update Poa account operator",
+  "Package\\Update Poa Operator Expired By Poa Account\\ETL Warning 1 1",
+  "Package\\Update Poa Operator Expired By Poa Account\\Failed To Update Poa account operator",
+  "Package\\Update Poa Operator Invalid by Poa Account\\ETL Warning 1 1",
+  "Package\\Update Poa Operator Invalid by Poa Account\\Failed To Update Poa account operator"
+ ],
+ "components": [
+  {
+   "refId": "Package\\Update POA Account Operator Out Of Date",
+   "title_he": "סימון קישורי ייפוי כוח מתפעל (לחשבון או לפוליסה) שפג תוקפם",
+   "techName": "Update POA Account Operator Out Of Date",
+   "short_he": "קישורי ייפוי כוח מתפעל לחשבון או לפוליסה (gen_poaaccountoperator) בסטטוס \"תקף\", שתאריך הסיום שלהם עבר, מסומנים \"פג תוקף\".",
+   "flow_he": [
+    "שליפת gen_poaaccountoperator עם gen_poastatus = 2 ותאריך סיום (+3 שעות) שעבר.",
+    "עדכון gen_poastatus = 4 ב-SDK, באצוות של 500."
+   ],
+   "sourceTables": [
+    {
+     "table": "gen_poaaccountoperator",
+     "db": "ALTSHULER_MSCRM",
+     "connection": "[psql] DTSX:4",
+     "kind": "CRM",
+     "loadedBy_he": "טבלת CRM. נוצרת בחבילה זו (Create POA Account Operator / - Pension).",
+     "proven": false
+    }
+   ],
+   "short": {
+    "nodes": [
+     {
+      "type": "step",
+      "text": "נבדקים קישורי ייפוי כוח מתפעל לחשבונות ולפוליסות שבסטטוס \"תקף\"."
+     },
+     {
+      "type": "decision",
+      "text": "האם תאריך הסיום עבר?",
+      "branches": [
+       {
+        "label": "כן",
+        "nodes": [
+         {
+          "type": "write",
+          "text": "הקישור מסומן \"פג תוקף\"."
+         }
+        ]
+       },
+       {
+        "label": "לא",
+        "nodes": [
+         {
+          "type": "end",
+          "text": "ללא שינוי."
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "type": "end",
+      "text": "קישורים שפג תוקפם אינם מוצגים עוד כתקפים."
+     }
+    ]
+   },
+   "detailed": {
+    "nodes": [
+     {
+      "type": "step",
+      "text": "נשלפים קישורי ייפוי כוח מתפעל לחשבון או לפוליסה בסטטוס 2 (\"valid\" לפי הערת הקוד).",
+      "tech": "Get Poa Account Operator (DTSX:10048/10053): where gen_poaaccountoperator.gen_poastatus = 2"
+     },
+     {
+      "type": "decision",
+      "text": "האם תאריך הסיום, אחרי הוספת 3 שעות, מוקדם מעכשיו?",
+      "tech": "dateadd(HH,3, gen_enddate) < GETDATE()",
+      "branches": [
+       {
+        "label": "כן",
+        "nodes": [
+         {
+          "type": "step",
+          "text": "הקישור נשלף לעדכון."
+         }
+        ]
+       },
+       {
+        "label": "לא",
+        "nodes": [
+         {
+          "type": "end",
+          "text": "לא נשלף."
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "type": "step",
+      "text": "ערך היעד נקבע ל-4 (\"expired\" לפי הערות הקוד בזרימות הבאות).",
+      "tech": "Expired Status (DerivedColumn, DTSX:9973): expiredStatus = 4"
+     },
+     {
+      "type": "write",
+      "text": "הקישור מתעדכן ל\"פג תוקף\" (4).",
+      "tech": "Update POA account operator main.cs:118-178 @DTSX:10084: gen_poaaccountoperator.gen_poastatus = 4 · Update · SDK ExecuteMultiple ×500"
+     },
+     {
+      "type": "step",
+      "text": "תקלות ברמת הרשומה שמוחזרות בתשובת ה-ExecuteMultiple אינן נרשמות (הקוד בהערה). אם שליחת אצווה מלאה של 500 זורקת חריגה, הקוד כותב שורת שגיאה אחת עם הודעת החריגה ומזהה השורה ה-500 בלבד לעמודה Message באורך 100 תווים (wstr(100)), ושורה זו מגיעה לאזהרת ETL. במקרה כזה הרשימה אינה מתרוקנת, ולכן השורות הבאות נשלחות רק באצווה הסופית. שליחת האצווה הסופית (בסוף הקלט) נמצאת מחוץ ל-try. לפי התנהגות SSIS המתועדת, לא מוצג בקבצים: הודעה ארוכה מ-100 תווים מכשילה את הרכיב, וחריגה בשליחת האצווה הסופית מכשילה את זרימת הנתונים, ואז הזרימות הבאות בשרשרת Success לא רצות.",
+      "tech": "main.cs:120-137 (ExecuteBulk בתוך try; catch → ErrorBuffer.Message wstr(100)); main.cs:163 entitiesList.Clear() רק אחרי הצלחה; main.cs:176-179 שליחה אחרונה מחוץ ל-try; Error → Failed To Update Poa account operator → ETL Warning 1 1"
+     },
+     {
+      "type": "end",
+      "text": "קישורי ייפוי כוח מתפעל שפג תוקפם מסומנים \"פג תוקף\"."
+     }
+    ]
+   },
+   "detail_he": [
+    {
+     "h": "מקור ואוכלוסייה",
+     "t": "gen_poaaccountoperator עם gen_poastatus = 2 ו-dateadd(HH,3,gen_enddate) < GETDATE()."
+    },
+    {
+     "h": "התאמה לרשומות קיימות",
+     "t": "לפי gen_poaaccountoperatorid."
+    },
+    {
+     "h": "החלטות",
+     "t": "dateadd(HH,3,gen_enddate) < GETDATE() (תאריך הסיום בתוספת 3 שעות מוקדם מזמן הריצה) → 4."
+    },
+    {
+     "h": "כתיבה ל-CRM",
+     "t": "gen_poaaccountoperator · Update gen_poastatus=4 · SDK (ExecuteMultiple)."
+    },
+    {
+     "h": "תוצאה עסקית",
+     "t": "בכל ריצה של החבילה, קישור בסטטוס 2 (\"valid\" לפי הערת SQL, DTSX:10055) שתאריך הסיום שלו בתוספת 3 שעות מוקדם מזמן הריצה (dateadd(HH,3,gen_enddate) < GETDATE()) מקבל gen_poastatus = 4 (\"expired\" לפי הערת SQL על סטטוס הקישורים, DTSX:15807). מתי החבילה רצה אינו מוצג בקבצים שסופקו, ולכן המועד בפועל של שינוי הסטטוס אינו ידוע."
+    }
+   ],
+   "decisions": [
+    {
+     "where": "Get Poa Account Operator (DTSX:10053)",
+     "condition": "dateadd(HH,3, gen_enddate) < GETDATE() and gen_poaaccountoperator.gen_poastatus = 2",
+     "meaning_he": "קישור תקף שפג תוקפו",
+     "outcome_he": "gen_poastatus = 4"
+    }
+   ],
+   "crmEffects": [
+    {
+     "entity": "gen_poaaccountoperator",
+     "verb": "update gen_poastatus = 4",
+     "mechanism": "SDK (ExecuteMultiple)",
+     "when_he": "תקף שתאריך הסיום שלו עבר"
+    }
+   ],
+   "evidence": [
+    "DTSX:10048-10059 Get Poa Account Operator",
+    "DTSX:9973 Expired Status",
+    "DTSX:10084 Update POA account operator main.cs:118-178 (sha eadedb7ac478)"
+   ],
+   "openQuestions_he": [
+    "משמעות ערכי gen_poastatus (2/4/5/6) של הקישורים (gen_poaaccountoperator) נלקחה מהערות SQL בחבילה (valid / expired / invalid / cancelled). לערכי gen_poastatus של gen_poaoperator אין תווית בקבצים, ואותן משמעויות עבורו הן השערה. ה-StringMap לא סופק.",
+    "הוספת 3 שעות לתאריך הסיום (התאמת אזור זמן) — השערה."
+   ]
+  },
+  {
+   "refId": "Package\\Update Poa Operator Cancelled by Poa Account",
+   "title_he": "סימון ייפוי כוח מתפעל בסטטוס 6 (כנראה \"בוטל\" – השערה) כשכל קישוריו בסטטוס 6",
+   "techName": "Update Poa Operator Cancelled by Poa Account",
+   "short_he": "ייפוי כוח מתפעל (gen_poaoperator) בסטטוס 2 (כנראה \"תקף\" – השערה) שיש לו לפחות קישור אחד, וכל הקישורים שלו (gen_poaaccountoperator, לחשבונות ולפוליסות) בסטטוס 6 (\"cancelled\" לפי הערת SQL על סטטוס הקישורים, DTSX:13889), מקבל סטטוס 6 (כנראה \"בוטל\" – השערה). הערך 6 מתויג בקבצים (\"-- cancelled\") רק על סטטוס הקישורים, ומלבד זה רק בשמות הרכיבים; עבור gen_poaoperator אין לו תווית. קישור עם סטטוס ריק אינו נספר, ולכן מונע את העדכון. ספירת הקישורים: בשאילתה של שתי הטבלאות (gen_poaoperator join gen_poaaccountoperator) העמודה gen_poaaccountoperatorid ב-count והעמודה gen_poaoperatorid ב-group by אינן מתויגות בשם טבלה. gen_poaaccountoperatorid היא מזהה רשומת הקישור: היא נשלפת מ-gen_poaaccountoperator לבדה (DTSX:10053) ומשמשת Id של עדכון הקישור (Update POA account operator, main.cs:122-123 @DTSX:10084). gen_poaoperatorid מתויגת כ-gen_poaoperator.gen_poaoperatorid בתנאי ה-join, ומשמשת Id של עדכון gen_poaoperator (main.cs:124-126 בסקריפטי העדכון של ארבע הזרימות). אילו אחת מהן הייתה קיימת בשתי הטבלאות, השאילתה הייתה נכשלת כעמודה דו-משמעית; לפי המשתמש החבילה רצה בפרודקשן. לכן count(gen_poaaccountoperatorid) סופר את הקישורים של ייפוי הכוח המתפעל.",
+   "flow_he": [
+    "שליפת gen_poaoperator בסטטוס 2 עם לפחות gen_poaaccountoperator אחד (לחשבון או לפוליסה), שכל ה-gen_poaaccountoperator שלו בסטטוס 6 (\"cancelled\" לפי הערת SQL).",
+    "עדכון gen_poastatus = 6 ב-SDK, באצוות של 500."
+   ],
+   "sourceTables": [
+    {
+     "table": "gen_poaoperator join gen_poaaccountoperator",
+     "db": "ALTSHULER_MSCRM",
+     "connection": "[psql] DTSX:4",
+     "kind": "CRM",
+     "loadedBy_he": "טבלאות CRM. gen_poaaccountoperator נוצרת ומתעדכנת בחבילה זו. היוצר של gen_poaoperator לא נמצא בחבילות שסופקו (השערה: הזנה ידנית ב-CRM).",
+     "proven": false
+    }
+   ],
+   "short": {
+    "nodes": [
+     {
+      "type": "step",
+      "text": "נבדקים ייפויי כוח מתפעל בסטטוס 2 (כנראה \"תקף\" – השערה) שיש להם לפחות קישור אחד, יחד עם כל הקישורים שלהם לחשבונות ולפוליסות."
+     },
+     {
+      "type": "decision",
+      "text": "האם כל הקישורים בסטטוס 6 (\"cancelled\" לפי הערת SQL על סטטוס הקישורים, DTSX:13889)?",
+      "branches": [
+       {
+        "label": "כן",
+        "nodes": [
+         {
+          "type": "write",
+          "text": "ייפוי הכוח המתפעל מקבל סטטוס 6 (כנראה \"בוטל\" – השערה)."
+         }
+        ]
+       },
+       {
+        "label": "לא",
+        "nodes": [
+         {
+          "type": "end",
+          "text": "ללא שינוי."
+         }
+        ]
+       }
+      ],
+      "tech": "having count(gen_poaaccountoperatorid) = count(case when gen_poaaccountoperator.gen_poastatus = 6 then 1 else null end) (DTSX:13889). ספירת הקישורים: בשאילתה של שתי הטבלאות (gen_poaoperator join gen_poaaccountoperator) העמודה gen_poaaccountoperatorid ב-count והעמודה gen_poaoperatorid ב-group by אינן מתויגות בשם טבלה. gen_poaaccountoperatorid היא מזהה רשומת הקישור: היא נשלפת מ-gen_poaaccountoperator לבדה (DTSX:10053) ומשמשת Id של עדכון הקישור (Update POA account operator, main.cs:122-123 @DTSX:10084). gen_poaoperatorid מתויגת כ-gen_poaoperator.gen_poaoperatorid בתנאי ה-join, ומשמשת Id של עדכון gen_poaoperator (main.cs:124-126 בסקריפטי העדכון של ארבע הזרימות). אילו אחת מהן הייתה קיימת בשתי הטבלאות, השאילתה הייתה נכשלת כעמודה דו-משמעית; לפי המשתמש החבילה רצה בפרודקשן. לכן count(gen_poaaccountoperatorid) סופר את הקישורים של ייפוי הכוח המתפעל."
+     },
+     {
+      "type": "end",
+      "text": "ייפוי כוח מתפעל שכל קישוריו בסטטוס 6 מקבל סטטוס 6 (כנראה \"בוטל\" – השערה)."
+     }
+    ]
+   },
+   "detailed": {
+    "nodes": [
+     {
+      "type": "step",
+      "text": "הזרימה רצה אחרי סימון פג התוקף של הקישורים (לחשבונות ולפוליסות). הסדר קובע איזה סטטוס יקבל ייפוי כוח מתפעל, כי כל זרימה בוחרת רק ייפויי כוח שעדיין בסטטוס 2.",
+      "tech": "Precedence DTSX:18795-18801"
+     },
+     {
+      "type": "step",
+      "text": "נשלפים ייפויי כוח מתפעל בסטטוס 2 (כנראה \"תקף\" – השערה) שיש להם לפחות קישור אחד (gen_poaaccountoperator, לחשבון או לפוליסה).",
+      "tech": "Get Poa Operator (DTSX:13879): from gen_poaoperator join gen_poaaccountoperator on gen_powerofattorenyoperator = gen_poaoperatorid where gen_poaoperator.gen_poastatus = 2 group by gen_poaoperatorid"
+     },
+     {
+      "type": "decision",
+      "text": "האם מספר כל הקישורים שווה למספר הקישורים בסטטוס 6 (\"cancelled\" לפי הערת SQL על סטטוס הקישורים, DTSX:13889)? קישור עם סטטוס ריק אינו נספר, ולכן מונע את השליפה.",
+      "tech": "having count(gen_poaaccountoperatorid) = count(case when gen_poaaccountoperator.gen_poastatus = 6 then 1 else null end) (DTSX:13889). ספירת הקישורים: בשאילתה של שתי הטבלאות (gen_poaoperator join gen_poaaccountoperator) העמודה gen_poaaccountoperatorid ב-count והעמודה gen_poaoperatorid ב-group by אינן מתויגות בשם טבלה. gen_poaaccountoperatorid היא מזהה רשומת הקישור: היא נשלפת מ-gen_poaaccountoperator לבדה (DTSX:10053) ומשמשת Id של עדכון הקישור (Update POA account operator, main.cs:122-123 @DTSX:10084). gen_poaoperatorid מתויגת כ-gen_poaoperator.gen_poaoperatorid בתנאי ה-join, ומשמשת Id של עדכון gen_poaoperator (main.cs:124-126 בסקריפטי העדכון של ארבע הזרימות). אילו אחת מהן הייתה קיימת בשתי הטבלאות, השאילתה הייתה נכשלת כעמודה דו-משמעית; לפי המשתמש החבילה רצה בפרודקשן. לכן count(gen_poaaccountoperatorid) סופר את הקישורים של ייפוי הכוח המתפעל.",
+      "branches": [
+       {
+        "label": "כן",
+        "nodes": [
+         {
+          "type": "step",
+          "text": "ייפוי הכוח המתפעל נשלף לעדכון."
+         }
+        ]
+       },
+       {
+        "label": "לא",
+        "nodes": [
+         {
+          "type": "end",
+          "text": "לא נשלף."
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "type": "step",
+      "text": "ערך היעד נקבע ל-6.",
+      "tech": "Cancelled Status (DerivedColumn, DTSX:13041) = 6"
+     },
+     {
+      "type": "write",
+      "text": "ייפוי הכוח המתפעל מתעדכן ל-6 (כנראה \"בוטל\" – השערה, באנלוגיה להערת ה-SQL על סטטוס הקישורים).",
+      "tech": "Update Poa Operator Cancelled @DTSX:13918: gen_poaoperator.gen_poastatus = 6 · Update · SDK ExecuteMultiple ×500 (sha —)"
+     },
+     {
+      "type": "step",
+      "text": "תקלות ברמת הרשומה בתוך ה-ExecuteMultiple אינן נרשמות (הקוד בהערה).",
+      "tech": "ExecuteBulk: ErrorBuffer בהערה"
+     },
+     {
+      "type": "end",
+      "text": "ייפוי כוח מתפעל שכל קישוריו (לחשבונות ולפוליסות) בסטטוס 6 מקבל סטטוס 6 (כנראה \"בוטל\" – השערה)."
+     }
+    ]
+   },
+   "detail_he": [
+    {
+     "h": "מקור ואוכלוסייה",
+     "t": "gen_poaoperator עם gen_poastatus = 2 ולפחות gen_poaaccountoperator אחד (לחשבון או לפוליסה)."
+    },
+    {
+     "h": "התאמה לרשומות קיימות",
+     "t": "gen_poaaccountoperator.gen_powerofattorenyoperator = gen_poaoperatorid."
+    },
+    {
+     "h": "החלטות",
+     "t": "כל הקישורים: gen_poastatus = 6 → 6. ספירת הקישורים: בשאילתה של שתי הטבלאות (gen_poaoperator join gen_poaaccountoperator) העמודה gen_poaaccountoperatorid ב-count והעמודה gen_poaoperatorid ב-group by אינן מתויגות בשם טבלה. gen_poaaccountoperatorid היא מזהה רשומת הקישור: היא נשלפת מ-gen_poaaccountoperator לבדה (DTSX:10053) ומשמשת Id של עדכון הקישור (Update POA account operator, main.cs:122-123 @DTSX:10084). gen_poaoperatorid מתויגת כ-gen_poaoperator.gen_poaoperatorid בתנאי ה-join, ומשמשת Id של עדכון gen_poaoperator (main.cs:124-126 בסקריפטי העדכון של ארבע הזרימות). אילו אחת מהן הייתה קיימת בשתי הטבלאות, השאילתה הייתה נכשלת כעמודה דו-משמעית; לפי המשתמש החבילה רצה בפרודקשן. לכן count(gen_poaaccountoperatorid) סופר את הקישורים של ייפוי הכוח המתפעל."
+    },
+    {
+     "h": "כתיבה ל-CRM",
+     "t": "gen_poaoperator · Update gen_poastatus=6 · SDK (ExecuteMultiple)."
+    },
+    {
+     "h": "תוצאה עסקית",
+     "t": "ייפוי הכוח המתפעל משקף את מצב ההרשאות שלו בקישורים לחשבונות ולפוליסות."
+    }
+   ],
+   "decisions": [
+    {
+     "where": "Get Poa Operator (DTSX:13879)",
+     "condition": "gen_poaoperator.gen_poastatus = 2 … having count(gen_poaaccountoperatorid) = count(case when gen_poaaccountoperator.gen_poastatus = 6 then 1 else null end)",
+     "meaning_he": "כל הקישורים (לחשבונות ולפוליסות; לפחות אחד) בסטטוס 6 (\"cancelled\" לפי הערת SQL על סטטוס הקישורים). ספירת הקישורים: בשאילתה של שתי הטבלאות (gen_poaoperator join gen_poaaccountoperator) העמודה gen_poaaccountoperatorid ב-count והעמודה gen_poaoperatorid ב-group by אינן מתויגות בשם טבלה. gen_poaaccountoperatorid היא מזהה רשומת הקישור: היא נשלפת מ-gen_poaaccountoperator לבדה (DTSX:10053) ומשמשת Id של עדכון הקישור (Update POA account operator, main.cs:122-123 @DTSX:10084). gen_poaoperatorid מתויגת כ-gen_poaoperator.gen_poaoperatorid בתנאי ה-join, ומשמשת Id של עדכון gen_poaoperator (main.cs:124-126 בסקריפטי העדכון של ארבע הזרימות). אילו אחת מהן הייתה קיימת בשתי הטבלאות, השאילתה הייתה נכשלת כעמודה דו-משמעית; לפי המשתמש החבילה רצה בפרודקשן. לכן count(gen_poaaccountoperatorid) סופר את הקישורים של ייפוי הכוח המתפעל.",
+     "outcome_he": "gen_poaoperator.gen_poastatus = 6 (כנראה \"בוטל\" – השערה)"
+    }
+   ],
+   "crmEffects": [
+    {
+     "entity": "gen_poaoperator",
+     "verb": "update gen_poastatus = 6",
+     "mechanism": "SDK (ExecuteMultiple)",
+     "when_he": "כל הקישורים (לחשבונות ולפוליסות; לפחות אחד) בסטטוס 6; משמעות הערך 6 ב-gen_poaoperator (\"בוטל\") היא השערה. ספירת הקישורים: בשאילתה של שתי הטבלאות (gen_poaoperator join gen_poaaccountoperator) העמודה gen_poaaccountoperatorid ב-count והעמודה gen_poaoperatorid ב-group by אינן מתויגות בשם טבלה. gen_poaaccountoperatorid היא מזהה רשומת הקישור: היא נשלפת מ-gen_poaaccountoperator לבדה (DTSX:10053) ומשמשת Id של עדכון הקישור (Update POA account operator, main.cs:122-123 @DTSX:10084). gen_poaoperatorid מתויגת כ-gen_poaoperator.gen_poaoperatorid בתנאי ה-join, ומשמשת Id של עדכון gen_poaoperator (main.cs:124-126 בסקריפטי העדכון של ארבע הזרימות). אילו אחת מהן הייתה קיימת בשתי הטבלאות, השאילתה הייתה נכשלת כעמודה דו-משמעית; לפי המשתמש החבילה רצה בפרודקשן. לכן count(gen_poaaccountoperatorid) סופר את הקישורים של ייפוי הכוח המתפעל."
+    }
+   ],
+   "evidence": [
+    "DTSX:13036 executable",
+    "DTSX:13879 Get Poa Operator",
+    "DTSX:13041 Cancelled Status",
+    "DTSX:13918 Update Poa Operator Cancelled"
+   ],
+   "openQuestions_he": []
+  },
+  {
+   "refId": "Package\\Update Poa Operator Invalid by Poa Account",
+   "title_he": "סימון ייפוי כוח מתפעל בסטטוס 5 (כנראה \"לא תקין\" – השערה) כשכל קישוריו בסטטוס 5",
+   "techName": "Update Poa Operator Invalid by Poa Account",
+   "short_he": "ייפוי כוח מתפעל (gen_poaoperator) בסטטוס 2 (כנראה \"תקף\" – השערה) שיש לו לפחות קישור אחד, וכל הקישורים שלו (gen_poaaccountoperator, לחשבונות ולפוליסות) בסטטוס 5 (\"invalid\" לפי הערת SQL על סטטוס הקישורים, DTSX:17699), מקבל סטטוס 5 (כנראה \"לא תקין\" – השערה). הערך 5 מתויג בקבצים (\"-- invalid\") רק על סטטוס הקישורים, ומלבד זה רק בשמות הרכיבים; עבור gen_poaoperator אין לו תווית. קישור עם סטטוס ריק אינו נספר, ולכן מונע את העדכון. ספירת הקישורים: בשאילתה של שתי הטבלאות (gen_poaoperator join gen_poaaccountoperator) העמודה gen_poaaccountoperatorid ב-count והעמודה gen_poaoperatorid ב-group by אינן מתויגות בשם טבלה. gen_poaaccountoperatorid היא מזהה רשומת הקישור: היא נשלפת מ-gen_poaaccountoperator לבדה (DTSX:10053) ומשמשת Id של עדכון הקישור (Update POA account operator, main.cs:122-123 @DTSX:10084). gen_poaoperatorid מתויגת כ-gen_poaoperator.gen_poaoperatorid בתנאי ה-join, ומשמשת Id של עדכון gen_poaoperator (main.cs:124-126 בסקריפטי העדכון של ארבע הזרימות). אילו אחת מהן הייתה קיימת בשתי הטבלאות, השאילתה הייתה נכשלת כעמודה דו-משמעית; לפי המשתמש החבילה רצה בפרודקשן. לכן count(gen_poaaccountoperatorid) סופר את הקישורים של ייפוי הכוח המתפעל.",
+   "flow_he": [
+    "שליפת gen_poaoperator בסטטוס 2 עם לפחות gen_poaaccountoperator אחד (לחשבון או לפוליסה), שכל ה-gen_poaaccountoperator שלו בסטטוס 5 (\"invalid\" לפי הערת SQL).",
+    "עדכון gen_poastatus = 5 ב-SDK, באצוות של 500."
+   ],
+   "sourceTables": [
+    {
+     "table": "gen_poaoperator join gen_poaaccountoperator",
+     "db": "ALTSHULER_MSCRM",
+     "connection": "[psql] DTSX:4",
+     "kind": "CRM",
+     "loadedBy_he": "טבלאות CRM. gen_poaaccountoperator נוצרת ומתעדכנת בחבילה זו. היוצר של gen_poaoperator לא נמצא בחבילות שסופקו (השערה: הזנה ידנית ב-CRM).",
+     "proven": false
+    }
+   ],
+   "short": {
+    "nodes": [
+     {
+      "type": "step",
+      "text": "נבדקים ייפויי כוח מתפעל בסטטוס 2 (כנראה \"תקף\" – השערה) שיש להם לפחות קישור אחד, יחד עם כל הקישורים שלהם לחשבונות ולפוליסות."
+     },
+     {
+      "type": "decision",
+      "text": "האם כל הקישורים בסטטוס 5 (\"invalid\" לפי הערת SQL על סטטוס הקישורים, DTSX:17699)?",
+      "branches": [
+       {
+        "label": "כן",
+        "nodes": [
+         {
+          "type": "write",
+          "text": "ייפוי הכוח המתפעל מקבל סטטוס 5 (כנראה \"לא תקין\" – השערה)."
+         }
+        ]
+       },
+       {
+        "label": "לא",
+        "nodes": [
+         {
+          "type": "end",
+          "text": "ללא שינוי."
+         }
+        ]
+       }
+      ],
+      "tech": "having count(gen_poaaccountoperatorid) = count(case when gen_poaaccountoperator.gen_poastatus = 5 then 1 else null end) (DTSX:17699). ספירת הקישורים: בשאילתה של שתי הטבלאות (gen_poaoperator join gen_poaaccountoperator) העמודה gen_poaaccountoperatorid ב-count והעמודה gen_poaoperatorid ב-group by אינן מתויגות בשם טבלה. gen_poaaccountoperatorid היא מזהה רשומת הקישור: היא נשלפת מ-gen_poaaccountoperator לבדה (DTSX:10053) ומשמשת Id של עדכון הקישור (Update POA account operator, main.cs:122-123 @DTSX:10084). gen_poaoperatorid מתויגת כ-gen_poaoperator.gen_poaoperatorid בתנאי ה-join, ומשמשת Id של עדכון gen_poaoperator (main.cs:124-126 בסקריפטי העדכון של ארבע הזרימות). אילו אחת מהן הייתה קיימת בשתי הטבלאות, השאילתה הייתה נכשלת כעמודה דו-משמעית; לפי המשתמש החבילה רצה בפרודקשן. לכן count(gen_poaaccountoperatorid) סופר את הקישורים של ייפוי הכוח המתפעל."
+     },
+     {
+      "type": "end",
+      "text": "ייפוי כוח מתפעל שכל קישוריו בסטטוס 5 מקבל סטטוס 5 (כנראה \"לא תקין\" – השערה)."
+     }
+    ]
+   },
+   "detailed": {
+    "nodes": [
+     {
+      "type": "step",
+      "text": "הזרימה רצה אחרי Update Poa Operator Cancelled by Poa Account. הסדר קובע איזה סטטוס יקבל ייפוי כוח מתפעל, כי כל זרימה בוחרת רק ייפויי כוח שעדיין בסטטוס 2.",
+      "tech": "Precedence DTSX:18795-18801"
+     },
+     {
+      "type": "step",
+      "text": "נשלפים ייפויי כוח מתפעל בסטטוס 2 (כנראה \"תקף\" – השערה) שיש להם לפחות קישור אחד (gen_poaaccountoperator, לחשבון או לפוליסה).",
+      "tech": "Get Poa Operator (DTSX:17689): from gen_poaoperator join gen_poaaccountoperator on gen_powerofattorenyoperator = gen_poaoperatorid where gen_poaoperator.gen_poastatus = 2 group by gen_poaoperatorid"
+     },
+     {
+      "type": "decision",
+      "text": "האם מספר כל הקישורים שווה למספר הקישורים בסטטוס 5 (\"invalid\" לפי הערת SQL על סטטוס הקישורים, DTSX:17699)? קישור עם סטטוס ריק אינו נספר, ולכן מונע את השליפה.",
+      "tech": "having count(gen_poaaccountoperatorid) = count(case when gen_poaaccountoperator.gen_poastatus = 5 then 1 else null end) (DTSX:17699). ספירת הקישורים: בשאילתה של שתי הטבלאות (gen_poaoperator join gen_poaaccountoperator) העמודה gen_poaaccountoperatorid ב-count והעמודה gen_poaoperatorid ב-group by אינן מתויגות בשם טבלה. gen_poaaccountoperatorid היא מזהה רשומת הקישור: היא נשלפת מ-gen_poaaccountoperator לבדה (DTSX:10053) ומשמשת Id של עדכון הקישור (Update POA account operator, main.cs:122-123 @DTSX:10084). gen_poaoperatorid מתויגת כ-gen_poaoperator.gen_poaoperatorid בתנאי ה-join, ומשמשת Id של עדכון gen_poaoperator (main.cs:124-126 בסקריפטי העדכון של ארבע הזרימות). אילו אחת מהן הייתה קיימת בשתי הטבלאות, השאילתה הייתה נכשלת כעמודה דו-משמעית; לפי המשתמש החבילה רצה בפרודקשן. לכן count(gen_poaaccountoperatorid) סופר את הקישורים של ייפוי הכוח המתפעל.",
+      "branches": [
+       {
+        "label": "כן",
+        "nodes": [
+         {
+          "type": "step",
+          "text": "ייפוי הכוח המתפעל נשלף לעדכון."
+         }
+        ]
+       },
+       {
+        "label": "לא",
+        "nodes": [
+         {
+          "type": "end",
+          "text": "לא נשלף."
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "type": "step",
+      "text": "ערך היעד נקבע ל-5.",
+      "tech": "Invalid Status (DerivedColumn, DTSX:17728) = 5"
+     },
+     {
+      "type": "write",
+      "text": "ייפוי הכוח המתפעל מתעדכן ל-5 (כנראה \"לא תקין\" – השערה, באנלוגיה להערת ה-SQL על סטטוס הקישורים).",
+      "tech": "Update Invalid Poa Operator @DTSX:17755: gen_poaoperator.gen_poastatus = 5 · Update · SDK ExecuteMultiple ×500 (sha —)"
+     },
+     {
+      "type": "step",
+      "text": "תקלות ברמת הרשומה בתוך ה-ExecuteMultiple אינן נרשמות (הקוד בהערה).",
+      "tech": "ExecuteBulk: ErrorBuffer בהערה"
+     },
+     {
+      "type": "end",
+      "text": "ייפוי כוח מתפעל שכל קישוריו (לחשבונות ולפוליסות) בסטטוס 5 מקבל סטטוס 5 (כנראה \"לא תקין\" – השערה)."
+     }
+    ]
+   },
+   "detail_he": [
+    {
+     "h": "מקור ואוכלוסייה",
+     "t": "gen_poaoperator עם gen_poastatus = 2 ולפחות gen_poaaccountoperator אחד (לחשבון או לפוליסה)."
+    },
+    {
+     "h": "התאמה לרשומות קיימות",
+     "t": "gen_poaaccountoperator.gen_powerofattorenyoperator = gen_poaoperatorid."
+    },
+    {
+     "h": "החלטות",
+     "t": "כל הקישורים: gen_poastatus = 5 → 5. ספירת הקישורים: בשאילתה של שתי הטבלאות (gen_poaoperator join gen_poaaccountoperator) העמודה gen_poaaccountoperatorid ב-count והעמודה gen_poaoperatorid ב-group by אינן מתויגות בשם טבלה. gen_poaaccountoperatorid היא מזהה רשומת הקישור: היא נשלפת מ-gen_poaaccountoperator לבדה (DTSX:10053) ומשמשת Id של עדכון הקישור (Update POA account operator, main.cs:122-123 @DTSX:10084). gen_poaoperatorid מתויגת כ-gen_poaoperator.gen_poaoperatorid בתנאי ה-join, ומשמשת Id של עדכון gen_poaoperator (main.cs:124-126 בסקריפטי העדכון של ארבע הזרימות). אילו אחת מהן הייתה קיימת בשתי הטבלאות, השאילתה הייתה נכשלת כעמודה דו-משמעית; לפי המשתמש החבילה רצה בפרודקשן. לכן count(gen_poaaccountoperatorid) סופר את הקישורים של ייפוי הכוח המתפעל."
+    },
+    {
+     "h": "כתיבה ל-CRM",
+     "t": "gen_poaoperator · Update gen_poastatus=5 · SDK (ExecuteMultiple)."
+    },
+    {
+     "h": "תוצאה עסקית",
+     "t": "ייפוי הכוח המתפעל משקף את מצב ההרשאות שלו בקישורים לחשבונות ולפוליסות."
+    }
+   ],
+   "decisions": [
+    {
+     "where": "Get Poa Operator (DTSX:17689)",
+     "condition": "gen_poaoperator.gen_poastatus = 2 … having count(gen_poaaccountoperatorid) = count(case when gen_poaaccountoperator.gen_poastatus = 5 then 1 else null end)",
+     "meaning_he": "כל הקישורים (לחשבונות ולפוליסות; לפחות אחד) בסטטוס 5 (\"invalid\" לפי הערת SQL על סטטוס הקישורים). ספירת הקישורים: בשאילתה של שתי הטבלאות (gen_poaoperator join gen_poaaccountoperator) העמודה gen_poaaccountoperatorid ב-count והעמודה gen_poaoperatorid ב-group by אינן מתויגות בשם טבלה. gen_poaaccountoperatorid היא מזהה רשומת הקישור: היא נשלפת מ-gen_poaaccountoperator לבדה (DTSX:10053) ומשמשת Id של עדכון הקישור (Update POA account operator, main.cs:122-123 @DTSX:10084). gen_poaoperatorid מתויגת כ-gen_poaoperator.gen_poaoperatorid בתנאי ה-join, ומשמשת Id של עדכון gen_poaoperator (main.cs:124-126 בסקריפטי העדכון של ארבע הזרימות). אילו אחת מהן הייתה קיימת בשתי הטבלאות, השאילתה הייתה נכשלת כעמודה דו-משמעית; לפי המשתמש החבילה רצה בפרודקשן. לכן count(gen_poaaccountoperatorid) סופר את הקישורים של ייפוי הכוח המתפעל.",
+     "outcome_he": "gen_poaoperator.gen_poastatus = 5 (כנראה \"לא תקין\" – השערה)"
+    }
+   ],
+   "crmEffects": [
+    {
+     "entity": "gen_poaoperator",
+     "verb": "update gen_poastatus = 5",
+     "mechanism": "SDK (ExecuteMultiple)",
+     "when_he": "כל הקישורים (לחשבונות ולפוליסות; לפחות אחד) בסטטוס 5; משמעות הערך 5 ב-gen_poaoperator (\"לא תקין\") היא השערה. ספירת הקישורים: בשאילתה של שתי הטבלאות (gen_poaoperator join gen_poaaccountoperator) העמודה gen_poaaccountoperatorid ב-count והעמודה gen_poaoperatorid ב-group by אינן מתויגות בשם טבלה. gen_poaaccountoperatorid היא מזהה רשומת הקישור: היא נשלפת מ-gen_poaaccountoperator לבדה (DTSX:10053) ומשמשת Id של עדכון הקישור (Update POA account operator, main.cs:122-123 @DTSX:10084). gen_poaoperatorid מתויגת כ-gen_poaoperator.gen_poaoperatorid בתנאי ה-join, ומשמשת Id של עדכון gen_poaoperator (main.cs:124-126 בסקריפטי העדכון של ארבע הזרימות). אילו אחת מהן הייתה קיימת בשתי הטבלאות, השאילתה הייתה נכשלת כעמודה דו-משמעית; לפי המשתמש החבילה רצה בפרודקשן. לכן count(gen_poaaccountoperatorid) סופר את הקישורים של ייפוי הכוח המתפעל."
+    }
+   ],
+   "evidence": [
+    "DTSX:16873 executable",
+    "DTSX:17689 Get Poa Operator",
+    "DTSX:17728 Invalid Status",
+    "DTSX:17755 Update Invalid Poa Operator"
+   ],
+   "openQuestions_he": []
+  },
+  {
+   "refId": "Package\\Update Poa Operator Expired By Poa Account",
+   "title_he": "סימון ייפוי כוח מתפעל בסטטוס 4 (כנראה \"פג תוקף\" – השערה) כשכל קישוריו בסטטוס 4",
+   "techName": "Update Poa Operator Expired By Poa Account",
+   "short_he": "ייפוי כוח מתפעל (gen_poaoperator) בסטטוס 2 (כנראה \"תקף\" – השערה) שיש לו לפחות קישור אחד, וכל הקישורים שלו (gen_poaaccountoperator, לחשבונות ולפוליסות) בסטטוס 4 (\"expired\" לפי הערת SQL על סטטוס הקישורים, DTSX:15807), מקבל סטטוס 4 (כנראה \"פג תוקף\" – השערה). הערך 4 מתויג בקבצים (\"-- expired\") רק על סטטוס הקישורים, ומלבד זה רק בשמות הרכיבים; עבור gen_poaoperator אין לו תווית. קישור עם סטטוס ריק אינו נספר, ולכן מונע את העדכון. ספירת הקישורים: בשאילתה של שתי הטבלאות (gen_poaoperator join gen_poaaccountoperator) העמודה gen_poaaccountoperatorid ב-count והעמודה gen_poaoperatorid ב-group by אינן מתויגות בשם טבלה. gen_poaaccountoperatorid היא מזהה רשומת הקישור: היא נשלפת מ-gen_poaaccountoperator לבדה (DTSX:10053) ומשמשת Id של עדכון הקישור (Update POA account operator, main.cs:122-123 @DTSX:10084). gen_poaoperatorid מתויגת כ-gen_poaoperator.gen_poaoperatorid בתנאי ה-join, ומשמשת Id של עדכון gen_poaoperator (main.cs:124-126 בסקריפטי העדכון של ארבע הזרימות). אילו אחת מהן הייתה קיימת בשתי הטבלאות, השאילתה הייתה נכשלת כעמודה דו-משמעית; לפי המשתמש החבילה רצה בפרודקשן. לכן count(gen_poaaccountoperatorid) סופר את הקישורים של ייפוי הכוח המתפעל.",
+   "flow_he": [
+    "שליפת gen_poaoperator בסטטוס 2 עם לפחות gen_poaaccountoperator אחד (לחשבון או לפוליסה), שכל ה-gen_poaaccountoperator שלו בסטטוס 4 (\"expired\" לפי הערת SQL).",
+    "עדכון gen_poastatus = 4 ב-SDK, באצוות של 500."
+   ],
+   "sourceTables": [
+    {
+     "table": "gen_poaoperator join gen_poaaccountoperator",
+     "db": "ALTSHULER_MSCRM",
+     "connection": "[psql] DTSX:4",
+     "kind": "CRM",
+     "loadedBy_he": "טבלאות CRM. gen_poaaccountoperator נוצרת ומתעדכנת בחבילה זו. היוצר של gen_poaoperator לא נמצא בחבילות שסופקו (השערה: הזנה ידנית ב-CRM).",
+     "proven": false
+    }
+   ],
+   "short": {
+    "nodes": [
+     {
+      "type": "step",
+      "text": "נבדקים ייפויי כוח מתפעל בסטטוס 2 (כנראה \"תקף\" – השערה) שיש להם לפחות קישור אחד, יחד עם כל הקישורים שלהם לחשבונות ולפוליסות."
+     },
+     {
+      "type": "decision",
+      "text": "האם כל הקישורים בסטטוס 4 (\"expired\" לפי הערת SQL על סטטוס הקישורים, DTSX:15807)?",
+      "branches": [
+       {
+        "label": "כן",
+        "nodes": [
+         {
+          "type": "write",
+          "text": "ייפוי הכוח המתפעל מקבל סטטוס 4 (כנראה \"פג תוקף\" – השערה)."
+         }
+        ]
+       },
+       {
+        "label": "לא",
+        "nodes": [
+         {
+          "type": "end",
+          "text": "ללא שינוי."
+         }
+        ]
+       }
+      ],
+      "tech": "having count(gen_poaaccountoperatorid) = count(case when gen_poaaccountoperator.gen_poastatus = 4 then 1 else null end) (DTSX:15807). ספירת הקישורים: בשאילתה של שתי הטבלאות (gen_poaoperator join gen_poaaccountoperator) העמודה gen_poaaccountoperatorid ב-count והעמודה gen_poaoperatorid ב-group by אינן מתויגות בשם טבלה. gen_poaaccountoperatorid היא מזהה רשומת הקישור: היא נשלפת מ-gen_poaaccountoperator לבדה (DTSX:10053) ומשמשת Id של עדכון הקישור (Update POA account operator, main.cs:122-123 @DTSX:10084). gen_poaoperatorid מתויגת כ-gen_poaoperator.gen_poaoperatorid בתנאי ה-join, ומשמשת Id של עדכון gen_poaoperator (main.cs:124-126 בסקריפטי העדכון של ארבע הזרימות). אילו אחת מהן הייתה קיימת בשתי הטבלאות, השאילתה הייתה נכשלת כעמודה דו-משמעית; לפי המשתמש החבילה רצה בפרודקשן. לכן count(gen_poaaccountoperatorid) סופר את הקישורים של ייפוי הכוח המתפעל."
+     },
+     {
+      "type": "end",
+      "text": "ייפוי כוח מתפעל שכל קישוריו בסטטוס 4 מקבל סטטוס 4 (כנראה \"פג תוקף\" – השערה)."
+     }
+    ]
+   },
+   "detailed": {
+    "nodes": [
+     {
+      "type": "step",
+      "text": "הזרימה רצה אחרי Update Poa Operator Invalid by Poa Account. הסדר קובע איזה סטטוס יקבל ייפוי כוח מתפעל, כי כל זרימה בוחרת רק ייפויי כוח שעדיין בסטטוס 2.",
+      "tech": "Precedence DTSX:18795-18801"
+     },
+     {
+      "type": "step",
+      "text": "נשלפים ייפויי כוח מתפעל בסטטוס 2 (כנראה \"תקף\" – השערה) שיש להם לפחות קישור אחד (gen_poaaccountoperator, לחשבון או לפוליסה).",
+      "tech": "Get Poa Operator (DTSX:15797): from gen_poaoperator join gen_poaaccountoperator on gen_powerofattorenyoperator = gen_poaoperatorid where gen_poaoperator.gen_poastatus = 2 group by gen_poaoperatorid"
+     },
+     {
+      "type": "decision",
+      "text": "האם מספר כל הקישורים שווה למספר הקישורים בסטטוס 4 (\"expired\" לפי הערת SQL על סטטוס הקישורים, DTSX:15807)? קישור עם סטטוס ריק אינו נספר, ולכן מונע את השליפה.",
+      "tech": "having count(gen_poaaccountoperatorid) = count(case when gen_poaaccountoperator.gen_poastatus = 4 then 1 else null end) (DTSX:15807). ספירת הקישורים: בשאילתה של שתי הטבלאות (gen_poaoperator join gen_poaaccountoperator) העמודה gen_poaaccountoperatorid ב-count והעמודה gen_poaoperatorid ב-group by אינן מתויגות בשם טבלה. gen_poaaccountoperatorid היא מזהה רשומת הקישור: היא נשלפת מ-gen_poaaccountoperator לבדה (DTSX:10053) ומשמשת Id של עדכון הקישור (Update POA account operator, main.cs:122-123 @DTSX:10084). gen_poaoperatorid מתויגת כ-gen_poaoperator.gen_poaoperatorid בתנאי ה-join, ומשמשת Id של עדכון gen_poaoperator (main.cs:124-126 בסקריפטי העדכון של ארבע הזרימות). אילו אחת מהן הייתה קיימת בשתי הטבלאות, השאילתה הייתה נכשלת כעמודה דו-משמעית; לפי המשתמש החבילה רצה בפרודקשן. לכן count(gen_poaaccountoperatorid) סופר את הקישורים של ייפוי הכוח המתפעל.",
+      "branches": [
+       {
+        "label": "כן",
+        "nodes": [
+         {
+          "type": "step",
+          "text": "ייפוי הכוח המתפעל נשלף לעדכון."
+         }
+        ]
+       },
+       {
+        "label": "לא",
+        "nodes": [
+         {
+          "type": "end",
+          "text": "לא נשלף."
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "type": "step",
+      "text": "ערך היעד נקבע ל-4.",
+      "tech": "Expired Status (DerivedColumn, DTSX:15722) = 4"
+     },
+     {
+      "type": "write",
+      "text": "ייפוי הכוח המתפעל מתעדכן ל-4 (כנראה \"פג תוקף\" – השערה, באנלוגיה להערת ה-SQL על סטטוס הקישורים).",
+      "tech": "Update Poa Operator Cancelled @DTSX:15836: gen_poaoperator.gen_poastatus = 4 · Update · SDK ExecuteMultiple ×500 (sha —)"
+     },
+     {
+      "type": "step",
+      "text": "תקלות ברמת הרשומה בתוך ה-ExecuteMultiple אינן נרשמות (הקוד בהערה).",
+      "tech": "ExecuteBulk: ErrorBuffer בהערה"
+     },
+     {
+      "type": "end",
+      "text": "ייפוי כוח מתפעל שכל קישוריו (לחשבונות ולפוליסות) בסטטוס 4 מקבל סטטוס 4 (כנראה \"פג תוקף\" – השערה)."
+     }
+    ]
+   },
+   "detail_he": [
+    {
+     "h": "מקור ואוכלוסייה",
+     "t": "gen_poaoperator עם gen_poastatus = 2 ולפחות gen_poaaccountoperator אחד (לחשבון או לפוליסה)."
+    },
+    {
+     "h": "התאמה לרשומות קיימות",
+     "t": "gen_poaaccountoperator.gen_powerofattorenyoperator = gen_poaoperatorid."
+    },
+    {
+     "h": "החלטות",
+     "t": "כל הקישורים: gen_poastatus = 4 → 4. ספירת הקישורים: בשאילתה של שתי הטבלאות (gen_poaoperator join gen_poaaccountoperator) העמודה gen_poaaccountoperatorid ב-count והעמודה gen_poaoperatorid ב-group by אינן מתויגות בשם טבלה. gen_poaaccountoperatorid היא מזהה רשומת הקישור: היא נשלפת מ-gen_poaaccountoperator לבדה (DTSX:10053) ומשמשת Id של עדכון הקישור (Update POA account operator, main.cs:122-123 @DTSX:10084). gen_poaoperatorid מתויגת כ-gen_poaoperator.gen_poaoperatorid בתנאי ה-join, ומשמשת Id של עדכון gen_poaoperator (main.cs:124-126 בסקריפטי העדכון של ארבע הזרימות). אילו אחת מהן הייתה קיימת בשתי הטבלאות, השאילתה הייתה נכשלת כעמודה דו-משמעית; לפי המשתמש החבילה רצה בפרודקשן. לכן count(gen_poaaccountoperatorid) סופר את הקישורים של ייפוי הכוח המתפעל."
+    },
+    {
+     "h": "כתיבה ל-CRM",
+     "t": "gen_poaoperator · Update gen_poastatus=4 · SDK (ExecuteMultiple)."
+    },
+    {
+     "h": "תוצאה עסקית",
+     "t": "ייפוי הכוח המתפעל משקף את מצב ההרשאות שלו בקישורים לחשבונות ולפוליסות."
+    }
+   ],
+   "decisions": [
+    {
+     "where": "Get Poa Operator (DTSX:15797)",
+     "condition": "gen_poaoperator.gen_poastatus = 2 … having count(gen_poaaccountoperatorid) = count(case when gen_poaaccountoperator.gen_poastatus = 4 then 1 else null end)",
+     "meaning_he": "כל הקישורים (לחשבונות ולפוליסות; לפחות אחד) בסטטוס 4 (\"expired\" לפי הערת SQL על סטטוס הקישורים). ספירת הקישורים: בשאילתה של שתי הטבלאות (gen_poaoperator join gen_poaaccountoperator) העמודה gen_poaaccountoperatorid ב-count והעמודה gen_poaoperatorid ב-group by אינן מתויגות בשם טבלה. gen_poaaccountoperatorid היא מזהה רשומת הקישור: היא נשלפת מ-gen_poaaccountoperator לבדה (DTSX:10053) ומשמשת Id של עדכון הקישור (Update POA account operator, main.cs:122-123 @DTSX:10084). gen_poaoperatorid מתויגת כ-gen_poaoperator.gen_poaoperatorid בתנאי ה-join, ומשמשת Id של עדכון gen_poaoperator (main.cs:124-126 בסקריפטי העדכון של ארבע הזרימות). אילו אחת מהן הייתה קיימת בשתי הטבלאות, השאילתה הייתה נכשלת כעמודה דו-משמעית; לפי המשתמש החבילה רצה בפרודקשן. לכן count(gen_poaaccountoperatorid) סופר את הקישורים של ייפוי הכוח המתפעל.",
+     "outcome_he": "gen_poaoperator.gen_poastatus = 4 (כנראה \"פג תוקף\" – השערה)"
+    }
+   ],
+   "crmEffects": [
+    {
+     "entity": "gen_poaoperator",
+     "verb": "update gen_poastatus = 4",
+     "mechanism": "SDK (ExecuteMultiple)",
+     "when_he": "כל הקישורים (לחשבונות ולפוליסות; לפחות אחד) בסטטוס 4; משמעות הערך 4 ב-gen_poaoperator (\"פג תוקף\") היא השערה. ספירת הקישורים: בשאילתה של שתי הטבלאות (gen_poaoperator join gen_poaaccountoperator) העמודה gen_poaaccountoperatorid ב-count והעמודה gen_poaoperatorid ב-group by אינן מתויגות בשם טבלה. gen_poaaccountoperatorid היא מזהה רשומת הקישור: היא נשלפת מ-gen_poaaccountoperator לבדה (DTSX:10053) ומשמשת Id של עדכון הקישור (Update POA account operator, main.cs:122-123 @DTSX:10084). gen_poaoperatorid מתויגת כ-gen_poaoperator.gen_poaoperatorid בתנאי ה-join, ומשמשת Id של עדכון gen_poaoperator (main.cs:124-126 בסקריפטי העדכון של ארבע הזרימות). אילו אחת מהן הייתה קיימת בשתי הטבלאות, השאילתה הייתה נכשלת כעמודה דו-משמעית; לפי המשתמש החבילה רצה בפרודקשן. לכן count(gen_poaaccountoperatorid) סופר את הקישורים של ייפוי הכוח המתפעל."
+    }
+   ],
+   "evidence": [
+    "DTSX:14954 executable",
+    "DTSX:15797 Get Poa Operator",
+    "DTSX:15722 Expired Status",
+    "DTSX:15836 Update Poa Operator Cancelled"
+   ],
+   "openQuestions_he": []
+  },
+  {
+   "refId": "Package\\Update Poa Operator Cancelled",
+   "title_he": "סימון ייפוי כוח מתפעל בסטטוס 6 (כנראה \"בוטל\" – השערה) כשלכל קישוריו סטטוס מוגדר שאינו 2",
+   "techName": "Update Poa Operator Cancelled",
+   "short_he": "ייפוי כוח מתפעל (gen_poaoperator) בסטטוס 2 (כנראה \"תקף\" – השערה) שיש לו לפחות קישור אחד, ולכל הקישורים שלו (gen_poaaccountoperator, לחשבונות ולפוליסות) יש סטטוס מוגדר שאינו 2 (\"-- not valid\" לפי הערת SQL, DTSX:11969), מקבל סטטוס 6 (כנראה \"בוטל\" – השערה). בזרימה זו אין לערך 6 תווית בקבצים מלבד שמות הרכיב והעמודה (Update Poa Operator Cancelled, CancelledStatus). קישור עם סטטוס ריק אינו נספר כ\"שונה מ-2\" (NULL != 2 אינו אמת ב-SQL), ולכן מונע את העדכון. ספירת הקישורים: בשאילתה של שתי הטבלאות (gen_poaoperator join gen_poaaccountoperator) העמודה gen_poaaccountoperatorid ב-count והעמודה gen_poaoperatorid ב-group by אינן מתויגות בשם טבלה. gen_poaaccountoperatorid היא מזהה רשומת הקישור: היא נשלפת מ-gen_poaaccountoperator לבדה (DTSX:10053) ומשמשת Id של עדכון הקישור (Update POA account operator, main.cs:122-123 @DTSX:10084). gen_poaoperatorid מתויגת כ-gen_poaoperator.gen_poaoperatorid בתנאי ה-join, ומשמשת Id של עדכון gen_poaoperator (main.cs:124-126 בסקריפטי העדכון של ארבע הזרימות). אילו אחת מהן הייתה קיימת בשתי הטבלאות, השאילתה הייתה נכשלת כעמודה דו-משמעית; לפי המשתמש החבילה רצה בפרודקשן. לכן count(gen_poaaccountoperatorid) סופר את הקישורים של ייפוי הכוח המתפעל.",
+   "flow_he": [
+    "שליפת gen_poaoperator בסטטוס 2 עם לפחות gen_poaaccountoperator אחד (לחשבון או לפוליסה), שלכל ה-gen_poaaccountoperator שלו סטטוס מוגדר שונה מ-2 (קישור עם סטטוס ריק מונע את השליפה).",
+    "עדכון gen_poastatus = 6 ב-SDK, באצוות של 500."
+   ],
+   "sourceTables": [
+    {
+     "table": "gen_poaoperator join gen_poaaccountoperator",
+     "db": "ALTSHULER_MSCRM",
+     "connection": "[psql] DTSX:4",
+     "kind": "CRM",
+     "loadedBy_he": "טבלאות CRM. gen_poaaccountoperator נוצרת ומתעדכנת בחבילה זו. היוצר של gen_poaoperator לא נמצא בחבילות שסופקו (השערה: הזנה ידנית ב-CRM).",
+     "proven": false
+    }
+   ],
+   "short": {
+    "nodes": [
+     {
+      "type": "step",
+      "text": "נבדקים ייפויי כוח מתפעל בסטטוס 2 (כנראה \"תקף\" – השערה) שיש להם לפחות קישור אחד, יחד עם כל הקישורים שלהם לחשבונות ולפוליסות."
+     },
+     {
+      "type": "decision",
+      "text": "האם לכל הקישורים יש סטטוס מוגדר שונה מ-2? קישור עם סטטוס ריק נחשב כאן \"לא\" ומונע את העדכון.",
+      "branches": [
+       {
+        "label": "כן",
+        "nodes": [
+         {
+          "type": "write",
+          "text": "ייפוי הכוח המתפעל מקבל סטטוס 6 (כנראה \"בוטל\" – השערה)."
+         }
+        ]
+       },
+       {
+        "label": "לא",
+        "nodes": [
+         {
+          "type": "end",
+          "text": "ללא שינוי."
+         }
+        ]
+       }
+      ],
+      "tech": "having count(gen_poaaccountoperatorid) = count(case when gen_poaaccountoperator.gen_poastatus != 2 then 1 else null end) (DTSX:11969). ספירת הקישורים: בשאילתה של שתי הטבלאות (gen_poaoperator join gen_poaaccountoperator) העמודה gen_poaaccountoperatorid ב-count והעמודה gen_poaoperatorid ב-group by אינן מתויגות בשם טבלה. gen_poaaccountoperatorid היא מזהה רשומת הקישור: היא נשלפת מ-gen_poaaccountoperator לבדה (DTSX:10053) ומשמשת Id של עדכון הקישור (Update POA account operator, main.cs:122-123 @DTSX:10084). gen_poaoperatorid מתויגת כ-gen_poaoperator.gen_poaoperatorid בתנאי ה-join, ומשמשת Id של עדכון gen_poaoperator (main.cs:124-126 בסקריפטי העדכון של ארבע הזרימות). אילו אחת מהן הייתה קיימת בשתי הטבלאות, השאילתה הייתה נכשלת כעמודה דו-משמעית; לפי המשתמש החבילה רצה בפרודקשן. לכן count(gen_poaaccountoperatorid) סופר את הקישורים של ייפוי הכוח המתפעל."
+     },
+     {
+      "type": "end",
+      "text": "ייפוי כוח מתפעל שלכל קישוריו סטטוס מוגדר שאינו 2 מקבל סטטוס 6 (כנראה \"בוטל\" – השערה)."
+     }
+    ]
+   },
+   "detailed": {
+    "nodes": [
+     {
+      "type": "step",
+      "text": "הזרימה רצה אחרי שלוש הזרימות שבודקות קישורים אחידים (כולם 6 / כולם 5 / כולם 4). הסדר קובע איזה סטטוס יקבל ייפוי כוח מתפעל, כי כל זרימה בוחרת רק ייפויי כוח שעדיין בסטטוס 2.",
+      "tech": "Precedence DTSX:18795-18801"
+     },
+     {
+      "type": "step",
+      "text": "נשלפים ייפויי כוח מתפעל בסטטוס 2 (כנראה \"תקף\" – השערה) שיש להם לפחות קישור אחד (gen_poaaccountoperator, לחשבון או לפוליסה).",
+      "tech": "Get Poa Operator (DTSX:11959): from gen_poaoperator join gen_poaaccountoperator on gen_powerofattorenyoperator = gen_poaoperatorid where gen_poaoperator.gen_poastatus = 2 group by gen_poaoperatorid"
+     },
+     {
+      "type": "decision",
+      "text": "האם מספר כל הקישורים שווה למספר הקישורים שהסטטוס שלהם שונה מ-2? קישור עם סטטוס ריק אינו נספר (NULL != 2 אינו אמת ב-SQL), ולכן מונע את השליפה.",
+      "tech": "having count(gen_poaaccountoperatorid) = count(case when gen_poaaccountoperator.gen_poastatus != 2 then 1 else null end) (DTSX:11969). ספירת הקישורים: בשאילתה של שתי הטבלאות (gen_poaoperator join gen_poaaccountoperator) העמודה gen_poaaccountoperatorid ב-count והעמודה gen_poaoperatorid ב-group by אינן מתויגות בשם טבלה. gen_poaaccountoperatorid היא מזהה רשומת הקישור: היא נשלפת מ-gen_poaaccountoperator לבדה (DTSX:10053) ומשמשת Id של עדכון הקישור (Update POA account operator, main.cs:122-123 @DTSX:10084). gen_poaoperatorid מתויגת כ-gen_poaoperator.gen_poaoperatorid בתנאי ה-join, ומשמשת Id של עדכון gen_poaoperator (main.cs:124-126 בסקריפטי העדכון של ארבע הזרימות). אילו אחת מהן הייתה קיימת בשתי הטבלאות, השאילתה הייתה נכשלת כעמודה דו-משמעית; לפי המשתמש החבילה רצה בפרודקשן. לכן count(gen_poaaccountoperatorid) סופר את הקישורים של ייפוי הכוח המתפעל.",
+      "branches": [
+       {
+        "label": "כן",
+        "nodes": [
+         {
+          "type": "step",
+          "text": "ייפוי הכוח המתפעל נשלף לעדכון."
+         }
+        ]
+       },
+       {
+        "label": "לא",
+        "nodes": [
+         {
+          "type": "end",
+          "text": "לא נשלף."
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "type": "step",
+      "text": "ערך היעד נקבע ל-6.",
+      "tech": "Cancelled Status (DerivedColumn, DTSX:11121) = 6"
+     },
+     {
+      "type": "write",
+      "text": "ייפוי הכוח המתפעל מתעדכן ל-6 (כנראה \"בוטל\" – השערה, לפי שמות הרכיב והעמודה בלבד).",
+      "tech": "Update Poa Operator Cancelled @DTSX:11998: gen_poaoperator.gen_poastatus = 6 · Update · SDK ExecuteMultiple ×500 (sha 9fcf7224bf31)"
+     },
+     {
+      "type": "step",
+      "text": "תקלות ברמת הרשומה בתוך ה-ExecuteMultiple אינן נרשמות (הקוד בהערה).",
+      "tech": "ExecuteBulk: ErrorBuffer בהערה"
+     },
+     {
+      "type": "end",
+      "text": "ייפוי כוח מתפעל שלכל קישוריו (לחשבונות ולפוליסות) סטטוס מוגדר שאינו 2 מקבל סטטוס 6 (כנראה \"בוטל\" – השערה)."
+     }
+    ]
+   },
+   "detail_he": [
+    {
+     "h": "מקור ואוכלוסייה",
+     "t": "gen_poaoperator עם gen_poastatus = 2 ולפחות gen_poaaccountoperator אחד (לחשבון או לפוליסה)."
+    },
+    {
+     "h": "התאמה לרשומות קיימות",
+     "t": "gen_poaaccountoperator.gen_powerofattorenyoperator = gen_poaoperatorid."
+    },
+    {
+     "h": "החלטות",
+     "t": "כל הקישורים: gen_poastatus מוגדר ושונה מ-2 → 6 (קישור עם gen_poastatus ריק אינו נספר ב-count(case …), ולכן מונע את העדכון). הזרימה רצה אחרי הזרימות לקישורים אחידים (כולם 6 / 5 / 4), ולכן היא תופסת שילובים מעורבים (למשל חלק 4 וחלק 6), וגם כל ייפוי כוח שעדיין בסטטוס 2 ושכל קישוריו בערך מוגדר אחר שאינו 2. ספירת הקישורים: בשאילתה של שתי הטבלאות (gen_poaoperator join gen_poaaccountoperator) העמודה gen_poaaccountoperatorid ב-count והעמודה gen_poaoperatorid ב-group by אינן מתויגות בשם טבלה. gen_poaaccountoperatorid היא מזהה רשומת הקישור: היא נשלפת מ-gen_poaaccountoperator לבדה (DTSX:10053) ומשמשת Id של עדכון הקישור (Update POA account operator, main.cs:122-123 @DTSX:10084). gen_poaoperatorid מתויגת כ-gen_poaoperator.gen_poaoperatorid בתנאי ה-join, ומשמשת Id של עדכון gen_poaoperator (main.cs:124-126 בסקריפטי העדכון של ארבע הזרימות). אילו אחת מהן הייתה קיימת בשתי הטבלאות, השאילתה הייתה נכשלת כעמודה דו-משמעית; לפי המשתמש החבילה רצה בפרודקשן. לכן count(gen_poaaccountoperatorid) סופר את הקישורים של ייפוי הכוח המתפעל."
+    },
+    {
+     "h": "כתיבה ל-CRM",
+     "t": "gen_poaoperator · Update gen_poastatus=6 · SDK (ExecuteMultiple)."
+    },
+    {
+     "h": "תוצאה עסקית",
+     "t": "ייפוי הכוח המתפעל משקף את מצב ההרשאות שלו בקישורים לחשבונות ולפוליסות."
+    }
+   ],
+   "decisions": [
+    {
+     "where": "Get Poa Operator (DTSX:11959)",
+     "condition": "gen_poaoperator.gen_poastatus = 2 … having count(gen_poaaccountoperatorid) = count(case when gen_poaaccountoperator.gen_poastatus != 2 then 1 else null end)",
+     "meaning_he": "לכל הקישורים (לחשבונות ולפוליסות; לפחות אחד) סטטוס מוגדר שונה מ-2; קישור עם סטטוס ריק מונע את השליפה. ספירת הקישורים: בשאילתה של שתי הטבלאות (gen_poaoperator join gen_poaaccountoperator) העמודה gen_poaaccountoperatorid ב-count והעמודה gen_poaoperatorid ב-group by אינן מתויגות בשם טבלה. gen_poaaccountoperatorid היא מזהה רשומת הקישור: היא נשלפת מ-gen_poaaccountoperator לבדה (DTSX:10053) ומשמשת Id של עדכון הקישור (Update POA account operator, main.cs:122-123 @DTSX:10084). gen_poaoperatorid מתויגת כ-gen_poaoperator.gen_poaoperatorid בתנאי ה-join, ומשמשת Id של עדכון gen_poaoperator (main.cs:124-126 בסקריפטי העדכון של ארבע הזרימות). אילו אחת מהן הייתה קיימת בשתי הטבלאות, השאילתה הייתה נכשלת כעמודה דו-משמעית; לפי המשתמש החבילה רצה בפרודקשן. לכן count(gen_poaaccountoperatorid) סופר את הקישורים של ייפוי הכוח המתפעל.",
+     "outcome_he": "gen_poaoperator.gen_poastatus = 6 (כנראה \"בוטל\" – השערה)"
+    }
+   ],
+   "crmEffects": [
+    {
+     "entity": "gen_poaoperator",
+     "verb": "update gen_poastatus = 6",
+     "mechanism": "SDK (ExecuteMultiple)",
+     "when_he": "לכל הקישורים (לחשבונות ולפוליסות; לפחות אחד) סטטוס מוגדר שונה מ-2; משמעות הערך 6 ב-gen_poaoperator (\"בוטל\") היא השערה. ספירת הקישורים: בשאילתה של שתי הטבלאות (gen_poaoperator join gen_poaaccountoperator) העמודה gen_poaaccountoperatorid ב-count והעמודה gen_poaoperatorid ב-group by אינן מתויגות בשם טבלה. gen_poaaccountoperatorid היא מזהה רשומת הקישור: היא נשלפת מ-gen_poaaccountoperator לבדה (DTSX:10053) ומשמשת Id של עדכון הקישור (Update POA account operator, main.cs:122-123 @DTSX:10084). gen_poaoperatorid מתויגת כ-gen_poaoperator.gen_poaoperatorid בתנאי ה-join, ומשמשת Id של עדכון gen_poaoperator (main.cs:124-126 בסקריפטי העדכון של ארבע הזרימות). אילו אחת מהן הייתה קיימת בשתי הטבלאות, השאילתה הייתה נכשלת כעמודה דו-משמעית; לפי המשתמש החבילה רצה בפרודקשן. לכן count(gen_poaaccountoperatorid) סופר את הקישורים של ייפוי הכוח המתפעל."
+    }
+   ],
+   "evidence": [
+    "DTSX:11116 executable",
+    "DTSX:11959 Get Poa Operator",
+    "DTSX:11121 Cancelled Status",
+    "DTSX:11998 Update Poa Operator Cancelled"
+   ],
+   "openQuestions_he": []
+  },
+  {
+   "refId": "Package\\Create POA Account Operator",
+   "title_he": "קישור ייפוי כוח מתפעל של המעסיק לחשבונות לקוח חדשים",
+   "techName": "Create POA Account Operator",
+   "short_he": "לחשבון לקוח שנוצר ב-CRM ביומיים האחרונים (לפי CreatedOn, DTSX:3108; שזה מועד פתיחת החשבון לא מוכח), אצל מעסיק שיש לו ייפוי כוח מתפעל בסטטוס 2 (כנראה \"תקף\" – השערה) (המעסיק הוא Account: עמודת ה-join AccountId אינה מתויגת בשם טבלה, DTSX:3106, אבל Account.AccountId מתויגת ב-DTSX:3107. אילו העמודה הייתה קיימת גם בטבלה אחרת שזמינה באותו תנאי join, השאילתה הייתה נכשלת כעמודה דו-משמעית; לפי המשתמש החבילה רצה בפרודקשן), נוצר קישור ייפוי כוח מתפעל (gen_poaaccountoperator) עם ההרשאות של ייפוי הכוח. זה קורה אם gen_applypoa של ייפוי הכוח המתפעל שווה 1 ואינו ריק (המשמעות \"ייפוי הכוח חל על כל העובדים\" היא השערה לפי שם הרכיב IS All Employees בלבד), או שהעובד מופיע עם המתפעל ברשומה פעילה (gen_active = 1) ברשימת העובדים שלו, ובתנאי שאין לחשבון קישור קודם.",
+   "flow_he": [
+    "Gen_customeraccount שנוצרו ביומיים האחרונים × gen_poaoperator בסטטוס 2 (כנראה \"תקף\" – השערה) של המעסיק.",
+    "יש כבר gen_poaaccountoperator לחשבון → דילוג.",
+    "gen_applypoa = 1 ואינו ריק (המשמעות \"כל העובדים\" – השערה לפי שם הרכיב בלבד) → יצירה; אחרת → רק אם העובד ברשימה הפעילה.",
+    "יצירת gen_poaaccountoperator תקף עם ההרשאות."
+   ],
+   "sourceTables": [
+    {
+     "table": "Gen_customeraccount join Account join gen_poaoperator",
+     "db": "ALTSHULER_MSCRM",
+     "connection": "[psql] DTSX:4",
+     "kind": "CRM",
+     "loadedBy_he": "טבלאות CRM. Gen_customeraccount נכתבת ב-0005_Customer Account. gen_poaoperator כנראה מוזנת ב-CRM (השערה).",
+     "proven": false
+    },
+    {
+     "table": "gen_poaemployeeemployeroperator (Lookup)",
+     "db": "ALTSHULER_MSCRM",
+     "connection": "[psql] DTSX:4",
+     "kind": "CRM",
+     "loadedBy_he": "רשימת עובדים לייפוי כוח מתפעל. היוצר לא נמצא בחבילות שסופקו (השערה).",
+     "proven": false
+    }
+   ],
+   "short": {
+    "nodes": [
+     {
+      "type": "step",
+      "text": "נאספים חשבונות לקוח שנוצרו ב-CRM ביומיים האחרונים (לפי CreatedOn; שזה מועד פתיחת החשבון לא מוכח) אצל מעסיק שיש לו ייפוי כוח מתפעל בסטטוס 2 (כנראה \"תקף\" – השערה).",
+      "tech": "Get Customer Accounts. הקישור למעסיק: עמודת ה-join AccountId ב-Get Customer Accounts אינה מתויגת בשם טבלה (DTSX:3106). הטבלה Account מכילה את העמודה: Account.AccountId מתויגת בתנאי ה-join השני של אותה שאילתה (DTSX:3107). אילו העמודה הייתה קיימת גם בטבלה אחרת שזמינה באותו תנאי join, השאילתה הייתה נכשלת כעמודה דו-משמעית; לפי המשתמש החבילה רצה בפרודקשן. לכן תנאי ה-join הראשון הוא Gen_customeraccount.Gen_employername = Account.AccountId, וייפוי הכוח המתפעל מוצמד לאותו Account (Account.AccountId = gen_poaoperator.gen_employername)."
+     },
+     {
+      "type": "decision",
+      "text": "האם לחשבון כבר יש קישור ייפוי כוח מתפעל?",
+      "branches": [
+       {
+        "label": "כן",
+        "nodes": [
+         {
+          "type": "end",
+          "text": "דילוג."
+         }
+        ]
+       },
+       {
+        "label": "לא",
+        "nodes": [
+         {
+          "type": "step",
+          "text": "ממשיכים."
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "type": "decision",
+      "text": "האם בשדה gen_applypoa של ייפוי הכוח המתפעל יש ערך 1 (המשמעות \"ייפוי הכוח חל על כל העובדים\" היא השערה לפי שם הרכיב IS All Employees בלבד), או שהעובד ברשימת העובדים הפעילה שלו?",
+      "branches": [
+       {
+        "label": "כן",
+        "nodes": [
+         {
+          "type": "write",
+          "text": "נוצר קישור ייפוי כוח מתפעל תקף לחשבון, עם תאריכי ייפוי הכוח וההרשאות שלו."
+         }
+        ]
+       },
+       {
+        "label": "לא",
+        "nodes": [
+         {
+          "type": "end",
+          "text": "אין קישור."
+         }
+        ]
+       }
+      ],
+      "tech": "IS All Employees (DTSX:3217): !ISNULL(gen_applypoa) && gen_applypoa == 1; אחרת Check If Employee Exist (gen_active = 1)"
+     },
+     {
+      "type": "end",
+      "text": "החשבון החדש של העובד מכוסה בייפוי הכוח המתפעל של המעסיק."
+     }
+    ]
+   },
+   "detailed": {
+    "nodes": [
+     {
+      "type": "step",
+      "text": "נשלפים חשבונות לקוח שנוצרו ביומיים האחרונים. כל אחד מוצמד לכל ייפוי כוח מתפעל בסטטוס 2 (כנראה \"תקף\" – השערה) של המעסיק (Account).",
+      "tech": "Get Customer Accounts (DTSX:3076/3081): from Gen_customeraccount join Account on Gen_customeraccount.Gen_employername = AccountId join gen_poaoperator on Account.AccountId = gen_poaoperator.gen_employername where Gen_customeraccount.CreatedOn > DATEADD(dd,-2,GETDATE()) and gen_poaoperator.gen_poastatus = 2 הקישור למעסיק: עמודת ה-join AccountId ב-Get Customer Accounts אינה מתויגת בשם טבלה (DTSX:3106). הטבלה Account מכילה את העמודה: Account.AccountId מתויגת בתנאי ה-join השני של אותה שאילתה (DTSX:3107). אילו העמודה הייתה קיימת גם בטבלה אחרת שזמינה באותו תנאי join, השאילתה הייתה נכשלת כעמודה דו-משמעית; לפי המשתמש החבילה רצה בפרודקשן. לכן תנאי ה-join הראשון הוא Gen_customeraccount.Gen_employername = Account.AccountId, וייפוי הכוח המתפעל מוצמד לאותו Account (Account.AccountId = gen_poaoperator.gen_employername)."
+     },
+     {
+      "type": "decision",
+      "text": "האם כבר קיים קישור ייפוי כוח מתפעל כלשהו לחשבון, מכל ייפוי כוח מתפעל?",
+      "tech": "Check If POA Account Operator Exist (Lookup partial, DTSX:541): gen_poaaccountoperator.gen_customeraccount = gen_customeraccountid; Match לא מחובר",
+      "branches": [
+       {
+        "label": "כן",
+        "nodes": [
+         {
+          "type": "end",
+          "text": "דילוג."
+         }
+        ]
+       },
+       {
+        "label": "לא",
+        "nodes": [
+         {
+          "type": "step",
+          "text": "ממשיכים."
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "type": "decision",
+      "text": "האם בשדה gen_applypoa של ייפוי הכוח המתפעל יש ערך 1 (ולא ריק)? המשמעות \"ייפוי הכוח חל על כל העובדים\" היא השערה לפי שם הרכיב IS All Employees בלבד.",
+      "tech": "IS All Employees (DTSX:3204): !ISNULL(gen_applypoa) && gen_applypoa == 1",
+      "branches": [
+       {
+        "label": "כן",
+        "nodes": [
+         {
+          "type": "step",
+          "text": "ממשיכים ליצירה."
+         }
+        ]
+       },
+       {
+        "label": "לא",
+        "nodes": [
+         {
+          "type": "decision",
+          "text": "האם העובד (לפי ת\"ז) מופיע ברשימת העובדים הפעילה של ייפוי הכוח המתפעל?",
+          "tech": "Check If Employee Exist (Lookup partial, DTSX:483): gen_poaemployeeemployeroperator where gen_active = 1 and gen_identitynumber = Gen_customeridnumber and gen_powerofattorenyoperator = gen_poaoperatorId; NoMatch לא מחובר",
+          "branches": [
+           {
+            "label": "כן",
+            "nodes": [
+             {
+              "type": "step",
+              "text": "ממשיכים ליצירה."
+             }
+            ]
+           },
+           {
+            "label": "לא",
+            "nodes": [
+             {
+              "type": "end",
+              "text": "אין קישור."
+             }
+            ]
+           }
+          ]
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "type": "write",
+      "text": "נוצר קישור ייפוי כוח מתפעל בסטטוס \"תקף\" (2), ומקושר ללקוח, לחשבון ולייפוי הכוח המתפעל. נכללים בו תאריכי חתימת המעסיק, התחלה, קבלה וסיום.",
+      "tech": "Create POA Account Operator main.cs:123-220 @DTSX:589: gen_poaaccountoperator · Create · SDK; gen_poastatus=2; gen_customername(contact); gen_customeraccount; gen_powerofattorenyoperator; gen_signaturedate = gen_employersignatorydate; gen_startdate; gen_receivingdate; gen_enddate"
+     },
+     {
+      "type": "decision",
+      "text": "האם לייפוי הכוח המתפעל יש \"כל ההרשאות\"?",
+      "tech": "main.cs: !genallpermissions_IsNull && genallpermissions",
+      "branches": [
+       {
+        "label": "כן",
+        "nodes": [
+         {
+          "type": "step",
+          "text": "בקישור מסומן \"כל ההרשאות\".",
+          "tech": "gen_allpermissions = true"
+         }
+        ]
+       },
+       {
+        "label": "לא",
+        "nodes": [
+         {
+          "type": "step",
+          "text": "בקישור מסומן \"לא כל ההרשאות\", ומועתקות רק ההרשאות הפרטניות שמסומנות \"כן\": צירוף לקרן ברירת מחדל (סעיף 20ב), צירוף לביטוח, מידע להפקדה, הפקדה ומידע, משוב לבקרות, משוב והנחה בדמי ניהול, הודעה למעסיק על ציות, יתרת פיצויים, מידע על הפקדות, סטטוס קליטה, הנחה בדמי ניהול, ומידע על יתרת פיצויים.",
+          "tech": "gen_allpermissions = false; gen_addemployeetodefaultfundundersection20b, gen_joininganemployeetoaninsuranceplan, gen_informationforpurposeofdepositingfunds, gen_depositingfundsforemployeeandinformation, gen_feedbacktoperformcontrols, gen_feedbackforthediscountofmanagementfees, gen_notificationtotheemployerregardingcomplia, gen_informationofemployeecompensationbalance, gen_informationondepositsmadebytheemployer, gen_informationregardingtherecievingstatus, gen_informationofadiscountinmanagementfees, gen_informationregardingemployeecompensatioba = true"
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "type": "step",
+      "text": "כשל ביצירה נרשם כאזהרת ETL.",
+      "tech": "Error → Derived Column → Union All 1 → ETL Warning (מסגרת)"
+     },
+     {
+      "type": "end",
+      "text": "החשבונות החדשים של עובדי המעסיק מכוסים בייפוי הכוח המתפעל של המעסיק שבסטטוס 2."
+     }
+    ]
+   },
+   "detail_he": [
+    {
+     "h": "מקור ואוכלוסייה",
+     "t": "Gen_customeraccount שנוצרו ביומיים האחרונים, ושיש למעסיק שלהם (Account) gen_poaoperator בסטטוס 2. הקישור למעסיק: עמודת ה-join AccountId ב-Get Customer Accounts אינה מתויגת בשם טבלה (DTSX:3106). הטבלה Account מכילה את העמודה: Account.AccountId מתויגת בתנאי ה-join השני של אותה שאילתה (DTSX:3107). אילו העמודה הייתה קיימת גם בטבלה אחרת שזמינה באותו תנאי join, השאילתה הייתה נכשלת כעמודה דו-משמעית; לפי המשתמש החבילה רצה בפרודקשן. לכן תנאי ה-join הראשון הוא Gen_customeraccount.Gen_employername = Account.AccountId, וייפוי הכוח המתפעל מוצמד לאותו Account (Account.AccountId = gen_poaoperator.gen_employername)."
+    },
+    {
+     "h": "התאמה לרשומות קיימות",
+     "t": "דילוג אם קיים gen_poaaccountoperator עם אותו gen_customeraccount, מכל מתפעל. עובד ברשימה: gen_poaemployeeemployeroperator פעיל לפי ת\"ז ומתפעל."
+    },
+    {
+     "h": "החלטות",
+     "t": "gen_applypoa = 1 ואינו ריק → יצירה בלי בדיקת רשימת העובדים (המשמעות \"ייפוי הכוח חל על כל העובדים\" היא השערה לפי שם הרכיב IS All Employees בלבד); אחרת רק עובד ברשימה. כל ההרשאות → דגל אחד; אחרת → הרשאות פרטניות."
+    },
+    {
+     "h": "כתיבה ל-CRM",
+     "t": "gen_poaaccountoperator · Create · SDK."
+    },
+    {
+     "h": "תוצאה עסקית",
+     "t": "ייפוי הכוח המתפעל של המעסיק מוחל אוטומטית על חשבונות או פוליסות חדשים של עובדיו."
+    }
+   ],
+   "decisions": [
+    {
+     "where": "Get Customer Accounts WHERE (DTSX:3081)",
+     "condition": "Gen_customeraccount.CreatedOn > DATEADD(dd,-2,GETDATE()) and gen_poaoperator.gen_poastatus = 2",
+     "meaning_he": "חדש אצל מעסיק עם ייפוי כוח מתפעל בסטטוס 2 (כנראה \"תקף\" – השערה) (המעסיק הוא Account: עמודת ה-join AccountId אינה מתויגת בשם טבלה, DTSX:3106, אבל Account.AccountId מתויגת ב-DTSX:3107. אילו העמודה הייתה קיימת גם בטבלה אחרת שזמינה באותו תנאי join, השאילתה הייתה נכשלת כעמודה דו-משמעית; לפי המשתמש החבילה רצה בפרודקשן)",
+     "outcome_he": "נשלף"
+    },
+    {
+     "where": "Check If POA Account Operator Exist (DTSX:541)",
+     "condition": "gen_poaaccountoperator.gen_customeraccount = gen_customeraccountid",
+     "meaning_he": "כבר מקושר",
+     "outcome_he": "Match → אין נתיב (דילוג)"
+    },
+    {
+     "where": "IS All Employees (DTSX:3204)",
+     "condition": "!ISNULL(gen_applypoa) && gen_applypoa == 1",
+     "meaning_he": "gen_applypoa = 1 ואינו ריק; המשמעות \"ייפוי הכוח חל על כל העובדים\" היא השערה לפי שם הרכיב IS All Employees בלבד",
+     "outcome_he": "יצירה; אחרת → Check If Employee Exist"
+    },
+    {
+     "where": "Check If Employee Exist (DTSX:483)",
+     "condition": "gen_poaemployeeemployeroperator.gen_active = 1 and gen_identitynumber = ? and gen_powerofattorenyoperator = ?",
+     "meaning_he": "העובד ברשימה",
+     "outcome_he": "Match → יצירה; NoMatch → אין נתיב"
+    },
+    {
+     "where": "Create POA Account Operator",
+     "condition": "!genallpermissions_IsNull && genallpermissions",
+     "meaning_he": "כל ההרשאות",
+     "outcome_he": "gen_allpermissions = true; אחרת הרשאות פרטניות"
+    }
+   ],
+   "crmEffects": [
+    {
+     "entity": "gen_poaaccountoperator",
+     "verb": "create (gen_poastatus=2 + הרשאות)",
+     "mechanism": "SDK",
+     "when_he": "חשבון חדש בלי קישור, ועובד מכוסה"
+    }
+   ],
+   "evidence": [
+    "DTSX:3076-3113 Get Customer Accounts",
+    "DTSX:541 Check If POA Account Operator Exist",
+    "DTSX:3204 IS All Employees; DTSX:483 Check If Employee Exist",
+    "DTSX:589 Create POA Account Operator main.cs:123-220 (sha cf5d6685a04b)"
+   ],
+   "openQuestions_he": [
+    "החבילה בוחנת רק חשבונות לקוח שנוצרו ביומיים שלפני הריצה (Gen_customeraccount.CreatedOn > DATEADD(dd,-2,GETDATE())), ומקשרת חשבון רק אם ריצה בתוך החלון הזה מוצאת למעסיק שלו ייפוי כוח מתפעל בסטטוס 2 (המעסיק הוא Account: עמודת ה-join AccountId אינה מתויגת בשם טבלה, DTSX:3106, אבל Account.AccountId מתויגת ב-DTSX:3107. אילו העמודה הייתה קיימת גם בטבלה אחרת שזמינה באותו תנאי join, השאילתה הייתה נכשלת כעמודה דו-משמעית; לפי המשתמש החבילה רצה בפרודקשן) (gen_poaoperator.gen_poastatus = 2; המשמעות \"תקף\" היא השערה, באנלוגיה ל-gen_poaaccountoperator, שבו הקבצים מגדירים את 2 כ-VALID (\"-- valid\")). בנוסף נדרשים תנאי הכיסוי: gen_applypoa = 1 ואינו ריק (המשמעות \"ייפוי הכוח חל על כל העובדים\" היא השערה לפי שם הרכיב IS All Employees בלבד), או שמספר הזהות של הלקוח (Gen_customeridnumber) מופיע עם המתפעל הזה ברשומה פעילה (gen_active = 1) של gen_poaemployeeemployeroperator; וגם אין לחשבון קישור קודם. אין השוואה בין מועד יצירת החשבון למועד יצירת ייפוי הכוח. חשבון שהחלון שלו חלף לפני שריצה מצאה למעסיק ייפוי כוח מתפעל בסטטוס 2, או בלי שהחבילה רצה בו, לא יקושר בחבילה זו. אף חבילה אחרת שסופקה אינה יוצרת gen_poaaccountoperator. מי מקשר חשבונות כאלה? לא ידוע.",
+    "בדיקת \"קישור קיים\" היא לפי החשבון בלבד, לא לפי המתפעל. מתפעל שני לאותו מעסיק לא יקושר לחשבון שכבר קושר בריצה קודמת."
+   ]
+  },
+  {
+   "refId": "Package\\Create POA Account Operator - Pension",
+   "title_he": "קישור ייפוי כוח מתפעל של המעסיק לפוליסות חדשות (gen_policies)",
+   "techName": "Create POA Account Operator - Pension",
+   "short_he": "לפוליסה (gen_policies) שנוצרה ביומיים האחרונים (שם הזרימה, Create POA Account Operator - Pension, מציין פנסיה, אבל השאילתה אינה מסננת לפי סוג מוצר או פוליסה, DTSX:6125-6154; שמדובר בפוליסות פנסיה – השערה לפי שם הזרימה בלבד), אצל מעסיק שיש לו ייפוי כוח מתפעל בסטטוס 2 (כנראה \"תקף\" – השערה) (המעסיק הוא Account: עמודת ה-join Accountid אינה מתויגת בשם טבלה בשני תנאי ה-join, DTSX:6149-6150, אבל Account.AccountId מתויגת ב-DTSX:3107 באותו חיבור [psql]. אילו העמודה הייתה קיימת גם בטבלה אחרת שזמינה באותו תנאי join, השאילתה הייתה נכשלת כעמודה דו-משמעית; לפי המשתמש החבילה רצה בפרודקשן. ההתאמה בין Accountid ל-AccountId מניחה שמות עמודות שאינם תלויי רישיות; ה-collation אינו מוצג בקבצים), נוצר קישור ייפוי כוח מתפעל (gen_poaaccountoperator) עם ההרשאות של ייפוי הכוח. זה קורה אם gen_applypoa של ייפוי הכוח המתפעל שווה 1 ואינו ריק (המשמעות \"ייפוי הכוח חל על כל העובדים\" היא השערה לפי שם הרכיב IS All Employees בלבד), או שהעובד מופיע עם המתפעל ברשומה פעילה (gen_active = 1) ברשימת העובדים שלו, ובתנאי שאין לפוליסה קישור קודם.",
+   "flow_he": [
+    "gen_policies שנוצרו ביומיים האחרונים × gen_poaoperator בסטטוס 2 (כנראה \"תקף\" – השערה) של המעסיק.",
+    "יש כבר gen_poaaccountoperator לפוליסה → דילוג.",
+    "gen_applypoa = 1 ואינו ריק (המשמעות \"כל העובדים\" – השערה לפי שם הרכיב בלבד) → יצירה; אחרת → רק אם העובד ברשימה הפעילה.",
+    "יצירת gen_poaaccountoperator תקף עם ההרשאות."
+   ],
+   "sourceTables": [
+    {
+     "table": "gen_policies join Account join gen_poaoperator",
+     "db": "ALTSHULER_MSCRM",
+     "connection": "[psql] DTSX:4",
+     "kind": "CRM",
+     "loadedBy_he": "טבלאות CRM. היוצר של gen_policies לא נמצא בחבילות שסופקו. gen_poaoperator כנראה מוזנת ב-CRM (השערה).",
+     "proven": false
+    },
+    {
+     "table": "gen_poaemployeeemployeroperator (Lookup)",
+     "db": "ALTSHULER_MSCRM",
+     "connection": "[psql] DTSX:4",
+     "kind": "CRM",
+     "loadedBy_he": "רשימת עובדים לייפוי כוח מתפעל. היוצר לא נמצא בחבילות שסופקו (השערה).",
+     "proven": false
+    }
+   ],
+   "short": {
+    "nodes": [
+     {
+      "type": "step",
+      "text": "נאספות פוליסות (gen_policies) שנוצרו ביומיים האחרונים אצל מעסיק שיש לו ייפוי כוח מתפעל בסטטוס 2 (כנראה \"תקף\" – השערה) (שם הזרימה, Create POA Account Operator - Pension, מציין פנסיה, אבל השאילתה אינה מסננת לפי סוג מוצר או פוליסה, DTSX:6125-6154; שמדובר בפוליסות פנסיה – השערה לפי שם הזרימה בלבד).",
+      "tech": "Get Policies. הקישור למעסיק: עמודת ה-join Accountid ב-Get Policies אינה מתויגת בשם טבלה באף אחד משני תנאי ה-join (DTSX:6149-6150). הטבלה Account מכילה עמודה בשם זה: Account.AccountId מתויגת ב-Get Customer Accounts (DTSX:3107), באותו חיבור [psql] (DTSX:3117, 6160). ההתאמה בין Accountid ל-AccountId מניחה ששמות העמודות אינם תלויי רישיות. ה-collation אינו מוצג בקבצים, אבל באותו חיבור [psql] אותה עמודה מופיעה גם כ-gen_poaoperator.gen_poaoperatorId (DTSX:3086) וגם כ-gen_poaoperator.gen_poaoperatorid (DTSX:11966). אילו העמודה הייתה קיימת גם בטבלה אחרת שזמינה באותו תנאי join, השאילתה הייתה נכשלת כעמודה דו-משמעית; לפי המשתמש החבילה רצה בפרודקשן. לכן שני תנאי ה-join הם gen_policies.Gen_accountname = Account.AccountId ו-Account.AccountId = gen_poaoperator.gen_employername."
+     },
+     {
+      "type": "decision",
+      "text": "האם לפוליסה כבר יש קישור ייפוי כוח מתפעל?",
+      "branches": [
+       {
+        "label": "כן",
+        "nodes": [
+         {
+          "type": "end",
+          "text": "דילוג."
+         }
+        ]
+       },
+       {
+        "label": "לא",
+        "nodes": [
+         {
+          "type": "step",
+          "text": "ממשיכים."
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "type": "decision",
+      "text": "האם בשדה gen_applypoa של ייפוי הכוח המתפעל יש ערך 1 (המשמעות \"ייפוי הכוח חל על כל העובדים\" היא השערה לפי שם הרכיב IS All Employees בלבד), או שהעובד ברשימת העובדים הפעילה שלו?",
+      "branches": [
+       {
+        "label": "כן",
+        "nodes": [
+         {
+          "type": "write",
+          "text": "נוצר קישור ייפוי כוח מתפעל תקף לפוליסה, עם תאריכי ייפוי הכוח וההרשאות שלו."
+         }
+        ]
+       },
+       {
+        "label": "לא",
+        "nodes": [
+         {
+          "type": "end",
+          "text": "אין קישור."
+         }
+        ]
+       }
+      ],
+      "tech": "IS All Employees (DTSX:6257): !ISNULL(gen_applypoa) && gen_applypoa == 1; אחרת Check If Employee Exist (gen_active = 1)"
+     },
+     {
+      "type": "end",
+      "text": "הפוליסה החדשה של העובד מכוסה בייפוי הכוח המתפעל של המעסיק."
+     }
+    ]
+   },
+   "detailed": {
+    "nodes": [
+     {
+      "type": "step",
+      "text": "נשלפות פוליסות (gen_policies) שנוצרו ביומיים האחרונים (שם הזרימה, Create POA Account Operator - Pension, מציין פנסיה, אבל השאילתה אינה מסננת לפי סוג מוצר או פוליסה, DTSX:6125-6154; שמדובר בפוליסות פנסיה – השערה לפי שם הזרימה בלבד). כל אחת מוצמדת לכל ייפוי כוח מתפעל בסטטוס 2 (כנראה \"תקף\" – השערה) של המעסיק (Account).",
+      "tech": "Get Policies (DTSX:6120/6125): from gen_policies join Account on gen_policies.Gen_accountname = Accountid join gen_poaoperator on Accountid = gen_poaoperator.gen_employername where gen_policies.CreatedOn > DATEADD(dd,-2,GETDATE()) and gen_poaoperator.gen_poastatus = 2 הקישור למעסיק: עמודת ה-join Accountid ב-Get Policies אינה מתויגת בשם טבלה באף אחד משני תנאי ה-join (DTSX:6149-6150). הטבלה Account מכילה עמודה בשם זה: Account.AccountId מתויגת ב-Get Customer Accounts (DTSX:3107), באותו חיבור [psql] (DTSX:3117, 6160). ההתאמה בין Accountid ל-AccountId מניחה ששמות העמודות אינם תלויי רישיות. ה-collation אינו מוצג בקבצים, אבל באותו חיבור [psql] אותה עמודה מופיעה גם כ-gen_poaoperator.gen_poaoperatorId (DTSX:3086) וגם כ-gen_poaoperator.gen_poaoperatorid (DTSX:11966). אילו העמודה הייתה קיימת גם בטבלה אחרת שזמינה באותו תנאי join, השאילתה הייתה נכשלת כעמודה דו-משמעית; לפי המשתמש החבילה רצה בפרודקשן. לכן שני תנאי ה-join הם gen_policies.Gen_accountname = Account.AccountId ו-Account.AccountId = gen_poaoperator.gen_employername."
+     },
+     {
+      "type": "decision",
+      "text": "האם כבר קיים קישור ייפוי כוח מתפעל כלשהו לפוליסה, מכל ייפוי כוח מתפעל?",
+      "tech": "Check If POA Account Operator Exist (Lookup partial, DTSX:3629): gen_poaaccountoperator.gen_policy = gen_policiesid; Match לא מחובר",
+      "branches": [
+       {
+        "label": "כן",
+        "nodes": [
+         {
+          "type": "end",
+          "text": "דילוג."
+         }
+        ]
+       },
+       {
+        "label": "לא",
+        "nodes": [
+         {
+          "type": "step",
+          "text": "ממשיכים."
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "type": "decision",
+      "text": "האם בשדה gen_applypoa של ייפוי הכוח המתפעל יש ערך 1 (ולא ריק)? המשמעות \"ייפוי הכוח חל על כל העובדים\" היא השערה לפי שם הרכיב IS All Employees בלבד.",
+      "tech": "IS All Employees (DTSX:6244): !ISNULL(gen_applypoa) && gen_applypoa == 1",
+      "branches": [
+       {
+        "label": "כן",
+        "nodes": [
+         {
+          "type": "step",
+          "text": "ממשיכים ליצירה."
+         }
+        ]
+       },
+       {
+        "label": "לא",
+        "nodes": [
+         {
+          "type": "decision",
+          "text": "האם העובד (לפי ת\"ז) מופיע ברשימת העובדים הפעילה של ייפוי הכוח המתפעל?",
+          "tech": "Check If Employee Exist (Lookup partial, DTSX:3571): gen_poaemployeeemployeroperator where gen_active = 1 and gen_identitynumber = gen_policies.Gen_identitynumber and gen_powerofattorenyoperator = gen_poaoperatorId; NoMatch לא מחובר",
+          "branches": [
+           {
+            "label": "כן",
+            "nodes": [
+             {
+              "type": "step",
+              "text": "ממשיכים ליצירה."
+             }
+            ]
+           },
+           {
+            "label": "לא",
+            "nodes": [
+             {
+              "type": "end",
+              "text": "אין קישור."
+             }
+            ]
+           }
+          ]
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "type": "write",
+      "text": "נוצר קישור ייפוי כוח מתפעל בסטטוס \"תקף\" (2), ומקושר ללקוח, לפוליסה ולייפוי הכוח המתפעל. נכללים בו תאריכי חתימת המעסיק, התחלה, קבלה וסיום.",
+      "tech": "Create POA Account Operator main.cs:124-219 @DTSX:3677: gen_poaaccountoperator · Create · SDK; gen_poastatus=2; gen_customername(contact); gen_policy = EntityReference(\"gen_policies\"); gen_powerofattorenyoperator; gen_signaturedate = gen_employersignatorydate; gen_startdate; gen_receivingdate; gen_enddate"
+     },
+     {
+      "type": "decision",
+      "text": "האם לייפוי הכוח המתפעל יש \"כל ההרשאות\"?",
+      "tech": "main.cs: !genallpermissions_IsNull && genallpermissions",
+      "branches": [
+       {
+        "label": "כן",
+        "nodes": [
+         {
+          "type": "step",
+          "text": "בקישור מסומן \"כל ההרשאות\".",
+          "tech": "gen_allpermissions = true"
+         }
+        ]
+       },
+       {
+        "label": "לא",
+        "nodes": [
+         {
+          "type": "step",
+          "text": "בקישור מסומן \"לא כל ההרשאות\", ומועתקות רק ההרשאות הפרטניות שמסומנות \"כן\": צירוף לקרן ברירת מחדל (סעיף 20ב), צירוף לביטוח, מידע להפקדה, הפקדה ומידע, משוב לבקרות, משוב והנחה בדמי ניהול, הודעה למעסיק על ציות, יתרת פיצויים, מידע על הפקדות, סטטוס קליטה, הנחה בדמי ניהול, ומידע על יתרת פיצויים.",
+          "tech": "gen_allpermissions = false; gen_addemployeetodefaultfundundersection20b, gen_joininganemployeetoaninsuranceplan, gen_informationforpurposeofdepositingfunds, gen_depositingfundsforemployeeandinformation, gen_feedbacktoperformcontrols, gen_feedbackforthediscountofmanagementfees, gen_notificationtotheemployerregardingcomplia, gen_informationofemployeecompensationbalance, gen_informationondepositsmadebytheemployer, gen_informationregardingtherecievingstatus, gen_informationofadiscountinmanagementfees, gen_informationregardingemployeecompensatioba = true"
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "type": "step",
+      "text": "כשל ביצירה נרשם כאזהרת ETL.",
+      "tech": "Error → Derived Column → Union All 1 → ETL Warning (מסגרת)"
+     },
+     {
+      "type": "end",
+      "text": "הפוליסות (gen_policies) החדשות של עובדי המעסיק מכוסות בייפוי הכוח המתפעל של המעסיק שבסטטוס 2."
+     }
+    ]
+   },
+   "detail_he": [
+    {
+     "h": "מקור ואוכלוסייה",
+     "t": "gen_policies שנוצרו ביומיים האחרונים, ושיש למעסיק שלהם (Account) gen_poaoperator בסטטוס 2. הקישור למעסיק: עמודת ה-join Accountid ב-Get Policies אינה מתויגת בשם טבלה באף אחד משני תנאי ה-join (DTSX:6149-6150). הטבלה Account מכילה עמודה בשם זה: Account.AccountId מתויגת ב-Get Customer Accounts (DTSX:3107), באותו חיבור [psql] (DTSX:3117, 6160). ההתאמה בין Accountid ל-AccountId מניחה ששמות העמודות אינם תלויי רישיות. ה-collation אינו מוצג בקבצים, אבל באותו חיבור [psql] אותה עמודה מופיעה גם כ-gen_poaoperator.gen_poaoperatorId (DTSX:3086) וגם כ-gen_poaoperator.gen_poaoperatorid (DTSX:11966). אילו העמודה הייתה קיימת גם בטבלה אחרת שזמינה באותו תנאי join, השאילתה הייתה נכשלת כעמודה דו-משמעית; לפי המשתמש החבילה רצה בפרודקשן. לכן שני תנאי ה-join הם gen_policies.Gen_accountname = Account.AccountId ו-Account.AccountId = gen_poaoperator.gen_employername."
+    },
+    {
+     "h": "התאמה לרשומות קיימות",
+     "t": "דילוג אם קיים gen_poaaccountoperator עם אותו gen_policy, מכל מתפעל. עובד ברשימה: gen_poaemployeeemployeroperator פעיל לפי ת\"ז ומתפעל."
+    },
+    {
+     "h": "החלטות",
+     "t": "gen_applypoa = 1 ואינו ריק → יצירה בלי בדיקת רשימת העובדים (המשמעות \"ייפוי הכוח חל על כל העובדים\" היא השערה לפי שם הרכיב IS All Employees בלבד); אחרת רק עובד ברשימה. כל ההרשאות → דגל אחד; אחרת → הרשאות פרטניות."
+    },
+    {
+     "h": "כתיבה ל-CRM",
+     "t": "gen_poaaccountoperator · Create · SDK."
+    },
+    {
+     "h": "תוצאה עסקית",
+     "t": "ייפוי הכוח המתפעל של המעסיק מוחל אוטומטית על חשבונות או פוליסות חדשים של עובדיו."
+    }
+   ],
+   "decisions": [
+    {
+     "where": "Get Policies WHERE (DTSX:6125)",
+     "condition": "gen_policies.CreatedOn > DATEADD(dd,-2,GETDATE()) and gen_poaoperator.gen_poastatus = 2",
+     "meaning_he": "חדש אצל מעסיק עם ייפוי כוח מתפעל בסטטוס 2 (כנראה \"תקף\" – השערה) (המעסיק הוא Account: עמודת ה-join Accountid אינה מתויגת בשם טבלה בשני תנאי ה-join, DTSX:6149-6150, אבל Account.AccountId מתויגת ב-DTSX:3107 באותו חיבור [psql]. אילו העמודה הייתה קיימת גם בטבלה אחרת שזמינה באותו תנאי join, השאילתה הייתה נכשלת כעמודה דו-משמעית; לפי המשתמש החבילה רצה בפרודקשן. ההתאמה בין Accountid ל-AccountId מניחה שמות עמודות שאינם תלויי רישיות; ה-collation אינו מוצג בקבצים)",
+     "outcome_he": "נשלף"
+    },
+    {
+     "where": "Check If POA Account Operator Exist (DTSX:3629)",
+     "condition": "gen_poaaccountoperator.gen_policy = gen_policiesid",
+     "meaning_he": "כבר מקושר",
+     "outcome_he": "Match → אין נתיב (דילוג)"
+    },
+    {
+     "where": "IS All Employees (DTSX:6244)",
+     "condition": "!ISNULL(gen_applypoa) && gen_applypoa == 1",
+     "meaning_he": "gen_applypoa = 1 ואינו ריק; המשמעות \"ייפוי הכוח חל על כל העובדים\" היא השערה לפי שם הרכיב IS All Employees בלבד",
+     "outcome_he": "יצירה; אחרת → Check If Employee Exist"
+    },
+    {
+     "where": "Check If Employee Exist (DTSX:3571)",
+     "condition": "gen_poaemployeeemployeroperator.gen_active = 1 and gen_identitynumber = ? and gen_powerofattorenyoperator = ?",
+     "meaning_he": "העובד ברשימה",
+     "outcome_he": "Match → יצירה; NoMatch → אין נתיב"
+    },
+    {
+     "where": "Create POA Account Operator",
+     "condition": "!genallpermissions_IsNull && genallpermissions",
+     "meaning_he": "כל ההרשאות",
+     "outcome_he": "gen_allpermissions = true; אחרת הרשאות פרטניות"
+    }
+   ],
+   "crmEffects": [
+    {
+     "entity": "gen_poaaccountoperator",
+     "verb": "create (gen_poastatus=2 + הרשאות)",
+     "mechanism": "SDK",
+     "when_he": "פוליסה חדש בלי קישור, ועובד מכוסה"
+    }
+   ],
+   "evidence": [
+    "DTSX:6120-6156 Get Policies",
+    "DTSX:3629 Check If POA Account Operator Exist",
+    "DTSX:6244 IS All Employees; DTSX:3571 Check If Employee Exist",
+    "DTSX:3677 Create POA Account Operator main.cs:124-219 (sha 46b5615a5841)"
+   ],
+   "openQuestions_he": [
+    "החבילה בוחנת רק פוליסות שנוצרו ביומיים שלפני הריצה (CreatedOn > DATEADD(dd,-2,GETDATE())), ומקשרת פוליסה רק אם ריצה בתוך החלון הזה מוצאת למעסיק שלה ייפוי כוח מתפעל בסטטוס 2 (המעסיק הוא Account: עמודת ה-join Accountid אינה מתויגת בשם טבלה בשני תנאי ה-join, DTSX:6149-6150, אבל Account.AccountId מתויגת ב-DTSX:3107 באותו חיבור [psql]. אילו העמודה הייתה קיימת גם בטבלה אחרת שזמינה באותו תנאי join, השאילתה הייתה נכשלת כעמודה דו-משמעית; לפי המשתמש החבילה רצה בפרודקשן. ההתאמה בין Accountid ל-AccountId מניחה שמות עמודות שאינם תלויי רישיות; ה-collation אינו מוצג בקבצים) (gen_poaoperator.gen_poastatus = 2; המשמעות \"תקף\" היא השערה, באנלוגיה ל-gen_poaaccountoperator, שבו הקבצים מגדירים את 2 כ-VALID (\"-- valid\")). בנוסף נדרשים תנאי הכיסוי: gen_applypoa = 1 ואינו ריק (המשמעות \"ייפוי הכוח חל על כל העובדים\" היא השערה לפי שם הרכיב IS All Employees בלבד), או שמספר הזהות שבפוליסה (gen_policies.Gen_identitynumber) מופיע עם המתפעל הזה ברשומה פעילה (gen_active = 1) של gen_poaemployeeemployeroperator; וגם אין לפוליסה קישור קודם. אין השוואה בין מועד יצירת הפוליסה למועד יצירת ייפוי הכוח. פוליסה שהחלון שלה חלף לפני שריצה מצאה למעסיק ייפוי כוח מתפעל בסטטוס 2, או בלי שהחבילה רצה בו, לא תקושר בחבילה זו. אף חבילה אחרת שסופקה אינה יוצרת gen_poaaccountoperator. מי מקשר פוליסות כאלה? לא ידוע.",
+    "בדיקת \"קישור קיים\" היא לפי הפוליסה בלבד (gen_poaaccountoperator.gen_policy), לא לפי המתפעל. מתפעל שני לאותו מעסיק לא יקושר לפוליסה שכבר קושרה בריצה קודמת."
+   ]
+  }
+ ],
+ "findings_he": [
+  {
+   "severity": "medium",
+   "text": "בכל חמש זרימות העדכון, תקלות ברמת הרשומה בתוך ExecuteMultiple נבלעות: הרישום ל-ErrorBuffer בהערה. עדכון סטטוס שנכשל לא משאיר עדות.",
+   "evidence": "ExecuteBulk ב-DTSX:10084, 11998 ו-3 הזרימות האחרות"
+  },
+  {
+   "severity": "medium",
+   "text": "יצירת קישורים מכסה רק חשבונות לקוח ופוליסות שנוצרו ביומיים שלפני הריצה (CreatedOn > DATEADD(dd,-2,GETDATE())), ורק אם בריצה בתוך החלון הזה יש למעסיק ייפוי כוח מתפעל בסטטוס 2 (המעסיק הוא Account: עמודות ה-join AccountId ו-Accountid אינן מתויגות בשם טבלה, DTSX:3106, 6149-6150, אבל Account.AccountId מתויגת ב-DTSX:3107 באותו חיבור [psql]. אילו העמודה הייתה קיימת גם בטבלה אחרת שזמינה באותו תנאי join, השאילתה הייתה נכשלת כעמודה דו-משמעית; לפי המשתמש החבילה רצה בפרודקשן. עבור Accountid ההתאמה מניחה שמות עמודות שאינם תלויי רישיות; ה-collation אינו מוצג בקבצים) (המשמעות \"תקף\" היא השערה: בקבצים הערך 2 מוגדר כ-VALID רק עבור gen_poaaccountoperator). אין השוואה למועד יצירת ייפוי הכוח. אם החלון של חשבון או פוליסה חלף לפני שריצה מצאה למעסיק ייפוי כוח מתפעל בסטטוס 2, או בלי שהחבילה רצה בו, אז הם לא יקושרו בחבילה זו. אף חבילה אחרת שסופקה אינה יוצרת gen_poaaccountoperator, ולכן לא ידוע מי מקשר אותם.",
+   "evidence": "Get Customer Accounts DTSX:3081, 3108-3109; Get Policies DTSX:6125, 6151-6152; VALID = 2 DTSX:742/3803; \"-- valid\" DTSX:10055"
+  },
+  {
+   "severity": "medium",
+   "text": "בדיקת \"קישור קיים\" היא לפי החשבון (בזרימת החשבונות) או לפי הפוליסה (בזרימת הפוליסות, Create POA Account Operator - Pension) בלבד, לא לפי ייפוי הכוח המתפעל. ה-Lookup הוא partial cache מול ה-DB, בלי מטמון לאי-התאמות. אם שני ייפויי כוח מתפעל בסטטוס 2 של אותו מעסיק (המעסיק הוא Account: עמודות ה-join AccountId ו-Accountid אינן מתויגות בשם טבלה, DTSX:3106, 6149-6150, אבל Account.AccountId מתויגת ב-DTSX:3107 באותו חיבור [psql]. אילו העמודה הייתה קיימת גם בטבלה אחרת שזמינה באותו תנאי join, השאילתה הייתה נכשלת כעמודה דו-משמעית; לפי המשתמש החבילה רצה בפרודקשן. עבור Accountid ההתאמה מניחה שמות עמודות שאינם תלויי רישיות; ה-collation אינו מוצג בקבצים) מכסים את אותו חשבון או פוליסה, ושתי השורות נבדקות לפני שהקישור הראשון נוצר, אז באותה ריצה נוצרים שני קישורים. בריצות הבאות, מתפעל נוסף לא יקושר לחשבון או לפוליסה שכבר קושרו.",
+   "evidence": "Check If POA Account Operator Exist DTSX:541-553 (gen_customeraccount) / 3629-3641 (gen_policy); CacheType=1, NoMatchCachePercentage=0"
+  },
+  {
+   "severity": "low",
+   "text": "סדר זרימות הסטטוס קובע את התוצאה: שלוש הזרימות הראשונות בודקות קישורים אחידים (כולם 6, כולם 5, כולם 4) ונותנות לייפוי הכוח המתפעל את אותו ערך, והזרימה האחרונה, \"Update Poa Operator Cancelled\", נותנת סטטוס 6 לכל ייפוי כוח מתפעל שעדיין בסטטוס 2 ושלכל קישוריו (לחשבונות ולפוליסות) סטטוס מוגדר שאינו 2, כולל שילובים מעורבים. משמעות הערכים 6, 5 ו-4 ב-gen_poaoperator (\"בוטל\", \"לא תקין\", \"פג תוקף\") היא השערה באנלוגיה להערות ה-SQL על סטטוס הקישורים. אם לאחד הקישורים סטטוס ריק, אז ייפוי הכוח אינו מתעדכן באף אחת מארבע הזרימות. ספירת הקישורים: בשאילתה של שתי הטבלאות (gen_poaoperator join gen_poaaccountoperator) העמודה gen_poaaccountoperatorid ב-count והעמודה gen_poaoperatorid ב-group by אינן מתויגות בשם טבלה. gen_poaaccountoperatorid היא מזהה רשומת הקישור: היא נשלפת מ-gen_poaaccountoperator לבדה (DTSX:10053) ומשמשת Id של עדכון הקישור (Update POA account operator, main.cs:122-123 @DTSX:10084). gen_poaoperatorid מתויגת כ-gen_poaoperator.gen_poaoperatorid בתנאי ה-join, ומשמשת Id של עדכון gen_poaoperator (main.cs:124-126 בסקריפטי העדכון של ארבע הזרימות). אילו אחת מהן הייתה קיימת בשתי הטבלאות, השאילתה הייתה נכשלת כעמודה דו-משמעית; לפי המשתמש החבילה רצה בפרודקשן. לכן count(gen_poaaccountoperatorid) סופר את הקישורים של ייפוי הכוח המתפעל.",
+   "evidence": "Precedence DTSX:18796-18799; Get Poa Operator DTSX:11964; DTSX:11964-11969, 13884-13889, 15802-15807, 17694-17699; DTSX:3911"
+  },
+  {
+   "severity": "low",
+   "text": "תאריך הסיום של הקישור מושווה אחרי הוספת 3 שעות (dateadd(HH,3,…)), כנראה התאמת UTC לשעון ישראל (השערה). בשעון חורף ההפרש הוא שעתיים.",
+   "evidence": "Get Poa Account Operator DTSX:10053"
+  },
+  {
+   "severity": "info",
+   "text": "אין עדכוני SQL ישירים על ה-CRM. כל הכתיבה ב-SDK. היוצרים של gen_poaoperator ושל gen_poaemployeeemployeroperator לא נמצאו בחבילות שסופקו.",
+   "evidence": "DTSX:4; survey_0032"
+  }
+ ]
+}

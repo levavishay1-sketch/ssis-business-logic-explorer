@@ -1,0 +1,189 @@
+{
+  "verifier": "ssis-verifier",
+  "package": "0031_PoaAccountUpdateDaily",
+  "scope": "logic-claims re-check after fixes",
+  "checkedAt": "2026-11-07T12:08:22Z",
+  "checked": 14,
+  "results": [
+    {
+      "id": "L|summary",
+      "hash": "1545ab0be0f4",
+      "verdict": "WRONG",
+      "detail": "Unit 2 (scopeNote) is correct. There is no DTS:Configuration. [CRM] DTSX:4-6 and [SQL.GENERIX_STAGING] DTSX:53-55 are correct. The only OLE DB Commands on [CRM] are Update NeedToSendMailBit (Gen_powerofattorneyBase) and Update sentToPrintOn (Gen_powerofattorney). Kingsway is referenced only at DTSX:23. The log provider is at DTSX:65. All four agent-email components have Input0_ProcessInput commented out ('In Comment due to 13366', DTSX:13989, 15683, 23130, 24705). The variables are read from gen_etlvariable (DTSX:11929). Unit 1 is mostly correct. The CASE without ELSE on the old POA's Gen_appendixtype, with the value dateadd(HH,3,new.gen_receivingdate), is right. emailDetailsJson is never read in 0031; it is only written by the two Update Json commands. The email subject is the file name without its extension. The label 'ב'1' is documented in L|Package\\Handle Wait Status|open as the SQL comment '--appendix b1'. However, unit 1 overstates the Send Poa Emails population.",
+      "evidence": "DTSX:31813-31820 (isProcessed = 0); Send Poa Emails paths: Get Agencie / Get Power Of Attorney / Get Contact / Provident Fund 'Lookup No Match Output' have no path; Lookups at DTSX:31557, 31861, 31715, 33900 (NoMatchBehavior=1)",
+      "wrongUnits": [
+        {
+          "unit": 1,
+          "problem": "The text says the CSV mailing file and the exceptions file are built 'from all letter-table rows not yet processed'. That is not true. A row is dropped silently, without being written to either file and without being marked processed, when any of these is not found: an agent, then an agency; the POA (Get Power Of Attorney); the contact (Get Contact); a pension program, then a provident account. Such rows stay isProcessed = 0.",
+          "correct": "Only unprocessed rows (isProcessed = 0) that the CRM lookups can enrich reach the files. Rows without an agent/agency, POA, contact, or pension/provident match stop in the flow and remain unprocessed. Rows that reach the files are split by agent/agency email: rows with an email go to the mailing file, rows without one go to the exceptions file.",
+          "evidence": "DTSX:31557, 31636, 31715, 31861, 32089, 33900; Send Poa Emails path list (no path from those No Match outputs)"
+        }
+      ]
+    },
+    {
+      "id": "L|exec",
+      "hash": "f25a124aff79",
+      "verdict": "CONFIRMED",
+      "detail": "The order, triggers and line numbers match the 18 precedence constraints at DTSX:44824-44841. All are Success (no DTS:Value) and LogicalAnd. All 19 executables appear and none is disabled. The Set Destinations Paths label matches ScriptMain.cs: it builds the base name + '_' + yyyy-MM-dd_HH_mm + '.csv' and the {Year}/{Month} path, and creates the folders (DTSX:36911-36925). Send Email uses the file name without its extension as subject.",
+      "evidence": "DTSX:44824-44841; DTSX:36911-36925; Send Email main.cs:48-49",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|ignored",
+      "hash": "a3be3073b83e",
+      "verdict": "CONFIRMED",
+      "detail": "Each listed item is ETL plumbing or has no business effect. Set Queue Id Variable sets AgentDescQueueId, which is used only inside the commented-out email code (DTSX:14059, 15755, 23205, 24777). Get Base Fields Values sets User::UserId/OrganizationId, which nothing reads (DTSX:11290-11291 only). The three Set Task Name Variable components are synchronous pass-through scripts that only set ComponentTaskName. Counters, ETL warnings and error decoration are plumbing. Kingsway is unused, and SRS.SSIS_Logs is the log provider. No business component is in the list.",
+      "evidence": "DTSX:11290-11291, 37471, 14059, 15755, 23205, 24777; component.mjs Set Task Name Variable x3 (Output 0 sync)",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Handle Wait Status|title",
+      "hash": "a440596633e9",
+      "verdict": "WRONG",
+      "detail": "Units 1 and 3-7 are correct. In unit 2, the final sentence leaves out the branch condition for the JSON.",
+      "evidence": "Handle Wait Status paths: Is Renewal.Outputs[Not Renewal] => Update NeedToSendMailBit => AppendixType; Lookup No Match and Renewal go straight to Union All Data To Update Status; DTSX:31256-31260",
+      "wrongUnits": [
+        {
+          "unit": 2,
+          "problem": "'לייפוי כוח חדש מנספח 2/3/5 נשמרים נתוני מכתב (JSON)' reads as if it applies to every activated POA with appendix 2/3/5. In fact AppendixType is reached only through Is Renewal 'Not Renewal'. That means a Lookup match on an active POA of the same account/program whose agent or agency id differs. With no active POA, or with a renewal, no JSON is built whatever the appendix.",
+          "correct": "Letter data (JSON) is built only when the account/program has an active POA of a different agent or agency AND the new POA's appendix is 2, 3 or 5. It is written only into an existing staging row with isProcessed = 0 and emailDetailsJson NULL.",
+          "evidence": "Paths in Handle Wait Status; DTSX:22862 (AppendixType), 27059 (Is Renewal), 31256-31260"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Handle Wait Status|short",
+      "hash": "690227bcfab2",
+      "verdict": "WRONG",
+      "detail": "Units 1-9 are correct. Unit 8 places the SQL write and the JSON inside the 'other agent' branch with the right conditions. Unit 10, the end node, states outcomes that the flow does not guarantee.",
+      "evidence": "Update gen_powerofattorney ACTIVE main.cs:40-50 (catch -> ErrorBuffer) and Outputs[Error] DTSX:31239 with no path; DTSX:31256-31260; emailDetailsJson read nowhere in 0031",
+      "wrongUnits": [
+        {
+          "unit": 10,
+          "problem": "The text says every due POA is active and 'letters to the agent are ready for sending'. Activation failures go to an unconnected error output, so activation is not guaranteed. JSON letter data is written only in the other-agent + appendix 2/3/5 branch, and only into an existing unprocessed staging row. 0031 never reads the JSON, and the agent e-mail code is commented out, so 'ready for sending' is not shown by the files. This conflicts with the package's own summary ('החבילה הזו לא קוראת אותם') and with finding#3.",
+          "correct": "Due waiting POAs are set to active unless the SDK update fails; failures are not logged. Where an active POA of another agent existed, its gen_receivingdateofcancelpoa was set (new receiving date +3h if its appendix is 2/3/5, otherwise NULL). If the new POA's appendix is 2/3/5 and an unprocessed staging row without JSON exists, letter JSON was stored there. Its use for sending is not shown in the supplied files.",
+          "evidence": "DTSX:31239, 31302-31306, 31256-31260"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Handle Wait Status|detailed",
+      "hash": "0f46e9f0c601",
+      "verdict": "INCOMPLETE",
+      "detail": "The following were verified against the DTSX. Source WHERE (DTSX:27264-27265) and columns. Lookup: full cache, CustomerAccountProgram -> CustomerAccountProgramPa, returns agentcyIdNumberPa and PowerOfAttorneyIdPa, gen_currentstate = 1. Is Renewal (FailComponent; NULL fails). Update NeedToSendMailBit: Param_0 = Gen_receivingdatePoa = dateadd(HH,3,poa.gen_receivingdate), Param_1 = PowerOfAttorneyIdPa, on [CRM], FailComponent. AppendixType (FailComponent). Check Format format 1/2. The email scripts have a synchronous Output 0 and their code is commented out, so rows pass through. Update Json: isProcessed = 0 and emailDetailsJson is null, FailComponent. Sort with EliminateDuplicates=false (DTSX:28819). Is emailDetailsJson Contains Data 1: No Data goes to activation. ACTIVE main.cs:32-54, and its error output has no path. UnionErrors receives only EmailFormat1/2 - Error. One detail is missing in units 16-17.",
+      "evidence": "Set Data For Start Date Poa Emails main.cs:54-66, 88-120 (DTSX:27372); Custom Output -> Is emailDetailsJson Contains Data: only 'Contains Data' has a path (to Update Json DTSX:31253)",
+      "wrongUnits": [
+        {
+          "unit": 17,
+          "problem": "The text says the JSON is saved 'in the POA's row' of the staging letters table. The code emits one Custom Output row per POA, but sets emailDetailsJson only for the IsFirst POA of each POA Main. The other rows have NULL JSON and go to the unconnected 'No Data' output. So for a POA Main with several due POAs, only the first processed POA's staging row gets the JSON; the others get nothing.",
+          "correct": "One JSON per POA Main, which includes all its POAs in listPOADetails, is written only to the staging row of the first POA of that POA Main in this run (IsFirst). The condition is: row exists, isProcessed = 0 and emailDetailsJson is null. Staging rows of the other POAs under the same POA Main are not updated.",
+          "evidence": "main.cs:56-65, 96, 119 (DTSX:27372); path list of Handle Wait Status"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Handle Wait Status|detail",
+      "hash": "eab1717bef76",
+      "verdict": "WRONG",
+      "detail": "Units 1-4 and 6 are correct. In unit 6, the 0029 creators of gen_powerofattorney are only in disabled executables (0029:1779-19488, 44891 are inside Active POA / Cancel* / Create POA for future funds* / Out of Date, all DTS:Disabled=True). The 0030 OLE DB Destinations to [dbo].[PowerOfAttorneySendEmails] on SQL.GENERIX_STAGING exist (0030:5219, 6701) and are labelled as a hypothesis. In unit 5, 'only' is wrong.",
+      "evidence": "DTSX:18070-18083, 18172; Set Data For Cancel Poa Emails main.cs:99 (DTSX:18330)",
+      "wrongUnits": [
+        {
+          "unit": 5,
+          "problem": "The text says that in this package gen_receivingdateofcancelpoa is used 'only to decide whether to build cancellation-letter data'. Handle Active Status also copies its value into the cancellation JSON as RecievingDate (Set Data For Cancel Poa Emails main.cs:99). L|Package\\Handle Active Status|detailed unit 7 states exactly that, so the two claims contradict each other.",
+          "correct": "In this package the field is read only in Handle Active Status. It decides whether cancellation-letter data is built (Is Need To Send Cancellation Mail: ISNULL), and its value is the RecievingDate inside that JSON.",
+          "evidence": "DTSX:18070 (FriendlyExpression 18083), Set Data For Cancel Poa Emails main.cs:99"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Handle Wait Status|decisions",
+      "hash": "4a0a9d9911c2",
+      "verdict": "CONFIRMED",
+      "detail": "All eight conditions are quoted exactly and their outcomes match the paths. For Is Renewal, AppendixType and Check Format, the default outputs are Not Renewal, AppendixTypeNeedToSendMail and EmailFormat 2. The CASE has no ELSE, so the result is NULL otherwise. The Update Json WHERE and the ACTIVE condition (main.cs:34) match.",
+      "evidence": "DTSX:27264-27265, 27081-27088, 27059, 31302-31306, 22862, 22895, 31256-31260; ACTIVE main.cs:34",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Handle Wait Status|crm",
+      "hash": "be9cdbd31b82",
+      "verdict": "CONFIRMED",
+      "detail": "All three writes, their mechanisms and their conditions match. The SDK update gen_currentstate = 1 is reached from all three branches. The SQL update on Gen_powerofattorneyBase targets the old active POA (Param_1 = PowerOfAttorneyIdPa). The staging emailDetailsJson update follows Not Renewal plus appendix 2/3/5.",
+      "evidence": "ACTIVE main.cs:36-42; DTSX:31302-31330; DTSX:31256-31275",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Handle Wait Status|open",
+      "hash": "db8156d85d2a",
+      "verdict": "CONFIRMED",
+      "detail": "Unit 1: Handle Active Status cancels only where Gen_enddate <= GETDATE() and Gen_currentstate = 1 (DTSX:18171). The only supplied flow that cancels an active POA when a waiting POA of another agent exists is 0029 'Package\\Cancel Active POA' (0029:3851-3890), and it is DTS:Disabled=True (0029:2555). 'Unknown' is therefore legitimate for active code. Unit 2: the Lookup is full cache with first match (DTSX:27079, CacheType 0). Unit 3: ACTIVE = 1 (DTSX:30447), //ACTIVE (DTSX:1936), 0029:3889 '-- waiting', and DTSX:3326 '--appendix b1' on Gen_powerofattorneymain.Gen_appendixtype are all exact.",
+      "evidence": "DTSX:18171, 27079, 30447, 1936, 3326; 0029_POA.dtsx:2555, 3851-3890",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Handle Active Status|detailed",
+      "hash": "109aece3fd3c",
+      "verdict": "WRONG",
+      "detail": "Units 1-5 and 7-15 match the DTSX. Source WHERE is DTSX:18171. NoMail is ISNULL(gen_receivingdateofcancelpoa). EmailFormatTrue goes to With Commission Appointment (format 3, error text DTSX:17130), and the default goes to To Perform Actions (format 8). RecievingDate = genreceivingdateofcancelpoa (main.cs:99). The Update Json here has no isProcessed filter (DTSX:22769-22771). CANCELED main.cs:67-90 checks the transfer-to-bank status before setting it to 2. The error output (DTSX:22746) has no path, and Union Error receives only Email Format3/8 - Error. Unit 16 is wrong. Unit 6 also has a bad evidence pointer.",
+      "evidence": "DTSX:18070-18083, 18171, 13739-13752, 22769-22771, 21671; CANCELED main.cs:65-95; Handle Active Status path list",
+      "wrongUnits": [
+        {
+          "unit": 16,
+          "problem": "The end node says cancellation letters are ready 'when the cancellation results from a new POA'. In this flow the cancellation is always caused by Gen_enddate <= GETDATE(). Letter data is built when gen_receivingdateofcancelpoa is not NULL. That a new POA 'causes' the cancellation is not shown. L|Package\\Handle Wait Status|detail unit 5 and its open unit 1 say the old POA is not cancelled when the new one activates, and that who cancels it is unknown. The end node also says all are cancelled, but SDK failures go to an unconnected error output.",
+          "correct": "Active POAs whose end date has passed are set to state 2, and gen_statustransfertobank is set to 2 when it differs, unless the SDK update fails (not logged). Cancellation-letter JSON is written to the staging row (no isProcessed filter) when gen_receivingdateofcancelpoa is not NULL. In 0031 that field is set by Handle Wait Status when a POA of another agent was activated on the same account or program and the old POA's appendix was 2, 3 or 5.",
+          "evidence": "DTSX:18171, 18083, 22746, 31302-31306"
+        },
+        {
+          "unit": 6,
+          "problem": "The tech pointer '(DTSX:1049 / 1398 בקובץ ה-dump)' does not point to the DTSX. Those lines are from an unsupplied dump.",
+          "correct": "Email - Cancel Poa To Perform Actions DTSX:13817 (commented code at 13989); Email - Cancel Poa With Commission Appointment DTSX:15478 (commented code at 15683).",
+          "evidence": "DTSX:13817, 13989, 15478, 15683"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Send Poa Emails|detailed",
+      "hash": "97a4d9082cfb",
+      "verdict": "WRONG",
+      "detail": "Units 1-25, 27-33 and 35 match the DTSX. Source SQL is DTSX:31813-31820. Get Agent, Get Agencie, Get Power Of Attorney, Get Contact, Pension and Provident are no-cache lookups whose No Match outputs have no path. Conditional Split: StatusAfterUpdate == 2. Get Reciving Date: NoMatchBehavior=0 with Match Output IgnoreFailure, and Proccess Data falls back via getRecivingDate. Proccess Data main.cs:30-52. The email check is ISNULL(EmailSohen) || EmailSohen == empty string. The mailing file has 15 columns and the exceptions file has 5. Both branches lead to Update IsProcessed True and then Update sentToPrintOn (GETUTCDATE, [CRM]). Send Email runs in PostExecute (main.cs:25-29), so it runs even with zero rows. The subject is the file name before its last '.'. Unit 34 contains an unproven label, and unit 26 leaves out a file column.",
+      "evidence": "DTSX:31808-31986, 32089-32123, 33900-33934, 31430, 31463, 31510, 31483, 36554-36597; Send Email main.cs:25-99 (DTSX:33987); Proccess Data main.cs:27-69; Set Destinations Paths DTSX:36911-36925; Get Organization Variables ReadWriteVariables incl. LibaSystemQueueId, MailingReportsCustomerTeamQueueId",
+      "wrongUnits": [
+        {
+          "unit": 34,
+          "problem": "The text presents the sender as the queue 'Liba System' and the recipient as the reports-mailing team queue, as if these were facts. The code only uses Guid.Parse(Variables.LibaSystemQueueId) and Guid.Parse(Variables.MailingReportsCustomerTeamQueueId). Both values are loaded at runtime from gen_etlvariable and do not appear in the files. The queue names are inferred from the variable names, and the text does not say so.",
+          "correct": "The email goes from the queue whose id is in User::LibaSystemQueueId to the queue whose id is in User::MailingReportsCustomerTeamQueueId. Both ids are loaded from gen_etlvariable. That these are the 'Liba System' queue and the reports-mailing team queue is a reading of the variable names (השערה).",
+          "evidence": "Send Email main.cs:55, 59 (DTSX:33987); Get Organization Variables ReadWriteVariables"
+        },
+        {
+          "unit": 26,
+          "problem": "The list of mailing-row fields leaves out the 'סטטוס' column. That is the Hebrew StringMap label of the POA's gen_currentstate from Get Power Of Attorney, and it is one of the 15 file columns.",
+          "correct": "The mailing file columns are: ID number, member name, agent/agency name, agent/agency email, received date (yyyy-MM-dd), mobile/work/home phone, product, account/fund number, balance, status (POA current-state label, LangId 1037), agent appointment, agent/agency id, and appendix (LetterVersion).",
+          "evidence": "Create POA File inputs (DTSX:31510); Get Power Of Attorney SqlCommand DTSX:31863"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Update Power Of Attorney Main|detail",
+      "hash": "67e9b3b48cfd",
+      "verdict": "CONFIRMED",
+      "detail": "Source: distinct POA Main joined to POAs with ModifiedOn >= dateadd(HH,-36,GETDATE()) (DTSX:38954-38958). Count of distinct states (full cache). If All Statuses Are Same: CountTypes == 1 is True, CountTypes > 1 is False, and the default output has no path. For True, Get The Related Current State leads to 'Canceled Or Wrong' (state 4 or 2). State 4 (Is Wrong) passes through as 4; state 2 gets +1 = 3 (DTSX:39361); other values go to a counter only. For False, If Exists Active (state = 1, partial cache): No Match sets 3 (DTSX:39334), and Match has no path. Update Current State Poa Main main.cs:66-86 updates gen_powerofattorneymain.gen_currentstate through the SDK only when it differs. The unit 5 outcome matches, and '3 = cancelled' is correctly labelled as a hypothesis. Unit 6: the 0029 POA Main creators are in enabled executables (0029:21361, 31188).",
+      "evidence": "DTSX:38949-38962, 38990-39006, 39049-39063, 39119-39127, 39160, 39180-39196, 39245, 39334-39368, 40252; Update Current State Poa Main main.cs:64-92",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Create Power Of Attorney|detail",
+      "hash": "baa23aa28aca",
+      "verdict": "WRONG",
+      "detail": "Units 1-4 and 6 are correct. Source SQL is DTSX:3295-3332: Gen_customeraccount CreatedOn in the last 2 days, POA Main appendix 2 ('--appendix b1'), gen_currentstate = 1, product exclusion flags, and rowNumber 1 by latest signature date. The existence check is a partial-cache lookup on Gen_powerofattorney.Gen_customeraccount whose Match output has no path. Move Annotation updates annotation.objectid through the SDK, which moves the annotation rather than copying it. Create POA main.cs:131-222: product 2 skips the consultation fields, agent contract and appointment; OptionSets are set only when valid. Unit 6: 0005:18169/18341/18556 and 0029:22327/22758 are exact, 0005 has no disabled executable, and 0029 'Create POA Main For Automated Joining' (21361) is enabled. Unit 5 has the wrong scope.",
+      "evidence": "DTSX:3295-3332, 858-870, 3431 (Move Annotation main.cs:122-143), 4799 (EliminateDuplicates=true), 1781 (Create POA Account - Agent main.cs:131-231); Create Power Of Attorney - Pension Get Policies DTSX:7589 (Gen_programmain)",
+      "wrongUnits": [
+        {
+          "unit": 5,
+          "problem": "The business outcome of this component says 'new accounts and programs'. This data flow reads only Gen_customeraccount and creates POAs with gen_customeraccount. Programs (Gen_programmain) are handled by the separate data flow Create Power Of Attorney - Pension.",
+          "correct": "Customer accounts (Gen_customeraccount) created in the last 2 days get an active gen_powerofattorney automatically. This requires: the customer has an active POA Main with appendix type 2 that does not exclude the account's product type; the latest-signed such POA Main is used; and no gen_powerofattorney exists yet for the account. Programs are created in Create Power Of Attorney - Pension.",
+          "evidence": "DTSX:3295-3332, 1781; DTSX:7589"
+        }
+      ]
+    }
+  ]
+}

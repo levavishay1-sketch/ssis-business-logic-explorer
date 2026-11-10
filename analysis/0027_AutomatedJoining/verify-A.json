@@ -1,0 +1,105 @@
+{
+  "verifier": "ssis-verifier",
+  "package": "0027_AutomatedJoining",
+  "scope": "mapping-A.json",
+  "checked": 15,
+  "results": [
+    {
+      "id": "Update to close joining|gen_automatedjoining|UPDATE|gen_joiningstatus",
+      "verdict": "CONFIRMED",
+      "detail": "main.cs:69-75: entity.LogicalName=\"gen_automatedjoining\", entity.Id=Row.genautomatedjoiningid, entity[\"gen_joiningstatus\"]=new OptionSetValue(Row.genjoiningstatus), crmServiceProxy.GetCrmService().Update(entity). Row.genjoiningstatus = Derived Column 'Set columns' output gen_joiningstatus, Expression literal 8 -> fixed 8. Source WHERE gen_joiningstatus = 7; key gen_automatedjoiningid from the same source. Paths: Source -> Lookup; Lookup Match -> Set columns -> Update; Update Error -> Set Warning columns 1 2 1 -> ETL Warning 1 2 1; Lookup No Match Output has no path -> silent drop. Note: the package loads C:\\Generix\\SSISConfigFile.dtsConfig (DTSX:17), so the runtime target of the read-side [CRM] connection (Psql/ALTSHULER_MSCRM in the file) could be overridden; the SDK target comes from User::ServerName/OrganizationName loaded from gen_etlvariable.",
+      "evidence": "0027_AutomatedJoining.dtsx:975-984 (source SQL), 1016-1028 (Set columns '8'), 1094 main.cs:65-90, paths DTSX:1870-1880, config DTSX:17"
+    },
+    {
+      "id": "Update to close joining|gen_automatedjoining|UPDATE|gen_customeraccountid",
+      "verdict": "CONFIRMED",
+      "detail": "main.cs:73 entity[\"gen_customeraccountid\"]=new EntityReference(\"gen_customeraccount\", Row.GencustomeraccountId). Gen_customeraccountId is CopyFromReferenceColumn of Lookup 'Get customer accounts' (SqlCommand: right('0000000000000' + gen_bankaccountnumber,12), Gen_customeraccountId FROM Gen_customeraccount WHERE Gen_bankaccountnumber is not null), JoinToReferenceColumn gen_bankaccountnumber = source column right('0000000000000' + gen_bankaccountnumbername,12). CacheType=0 (full), NoMatchBehavior=1, TreatDuplicateKeysAsError=false -> one arbitrary match among duplicates. Reference keys can never be NULL (WHERE not null), so a NULL gen_bankaccountnumbername never matches.",
+      "evidence": "DTSX:912-955 (Lookup SqlCommand 914-918, CacheType, NoMatchBehavior, TreatDuplicateKeysAsError, JoinToReferenceColumn), 980-984, main.cs:73"
+    },
+    {
+      "id": "Update Joinings|gen_automatedjoining|UPDATE|gen_joiningstatus",
+      "verdict": "CONFIRMED",
+      "detail": "main.cs:118-122 entity[\"gen_joiningstatus\"]=new OptionSetValue(Row.gensuspicionAsEmitted); Derived Column 'Set Status As SuspicionAsEmitted' Expression literal 12. Source SQL: where gen_joiningstatus = 7 and gen_sendtobankdate is not null and datediff(day, ? ,gen_sendtobankdate) <= 0; ParameterMapping \"Parameter0:Input\",{81CBF82A-...} = User::LastThreeWorkingDays (DTSX:42-43). Precedence Close -> Get NonWorkingDays -> Update LastThreeWorkingDays Variable -> Update SuspicionAsEmitted Joinings (all Success). Script algorithm re-traced: threeWorkingDays=1, start yesterday, increments on each working day, breaks when ==3 is reached on a working day -> returns the 3rd working day counting yesterday as 1st (D-3 if no non-working day). Error output of Update Joinings has no path (only 2 paths in the flow) -> failures silently discarded. The CalendarRule string-matching question is correctly left unresolved.",
+      "evidence": "DTSX:5541-5549, 5584-5585, 5602 main.cs:114-134, paths DTSX:6490-6499, constraints DTSX:6509-6511, ScriptMain.cs:92-134 (DTSX:5131)"
+    },
+    {
+      "id": "LOGIC scopeNote / summary",
+      "verdict": "CONFIRMED",
+      "detail": "EnableConfig=True and DTS:Configuration ConfigurationType=1 (XML file) C:\\Generix\\SSISConfigFile.dtsConfig is loaded -> correctly marked external_unknown. Log provider SQL Server -> [SRS.SSIS_Logs]. All CRM writes are SDK; [CRM] used only by OLE DB Sources, Lookups and the SELECT Execute SQL. ServerName/OrganizationName come from gen_etlvariable (Get SystemConfigurations SQL).",
+      "evidence": "DTSX:1 (EnableConfig), 17, 19-24, 4101-4110"
+    },
+    {
+      "id": "LOGIC executionOrder",
+      "verdict": "CONFIRMED",
+      "detail": "Constraint 2 GetVars->Create ETL; Constraint Create->Close; Constraint 4 Close->Get NonWorkingDays; Constraint 3 NonWorkingDays->LastThree; Constraint 5 LastThree->Suspicion; Constraint 1 Suspicion->End. No DTS:Value = Success.",
+      "evidence": "DTSX:6506-6511"
+    },
+    {
+      "id": "LOGIC Package\\Close Joining processes",
+      "verdict": "CONFIRMED",
+      "detail": "Population, 12-char zero padding on both sides, full cache, no-match unconnected, status 8 + customer account reference, error -> ETL warning all match the DTSX and main.cs.",
+      "evidence": "DTSX:912-1028, 1094 main.cs:65-90, 1870-1880"
+    },
+    {
+      "id": "LOGIC Package\\Update LastThreeWorkingDays Variable",
+      "verdict": "CONFIRMED",
+      "detail": "Re-check: the failure node now says the variable keeps the design-time value 10/2/2017 5:29:05 PM or a value the unsupplied configuration file may set (EnableConfig=True, C:\\Generix\\SSISConfigFile.dtsConfig, DTSX:1, 17, external_unknown), and an open question was added. Raw DTSX confirms EnableConfig=\"True\" on line 1 and the Configuration on line 17. The algorithm was already verified.",
+      "evidence": "DTSX:1, 17, 42-43; ScriptMain.cs:94-104; logic.json lines 328-329, 376",
+      "previousVerdict": "INCOMPLETE",
+      "previousDetail": "Algorithm, 21-day loop, local DateTime.Now, CalendarRule query and the Failure-then-Success overwrite (catch line 100 sets Failure, line 104 unconditionally sets Success) are correct. Incomplete: the node 'the variable keeps the design-time value 10/2/2017 5:29:05 PM' is stated as fact, but this package loads C:\\Generix\\SSISConfigFile.dtsConfig (EnableConfig=True), which can set User::LastThreeWorkingDays at load time; the fallback value is therefore 'design-time value unless the (unsupplied) configuration sets it'. mapping-A notes carry this caveat; logic.json does not.",
+      "recheckedOn": "2026-11-06"
+    },
+    {
+      "id": "LOGIC Package\\Update SuspicionAsEmitted Joinings",
+      "verdict": "CONFIRMED",
+      "detail": "SQL, parameter binding, literal 12, unconnected Error output all verified.",
+      "evidence": "DTSX:5536-5602, 6490-6499"
+    },
+    {
+      "id": "LOGIC finding#1 (no-match joinings dropped silently)",
+      "verdict": "CONFIRMED",
+      "detail": "NoMatchBehavior=1 and no path from 'Lookup No Match Output'; the row stays in status 7 and becomes a candidate for status 12 if gen_sendtobankdate qualifies.",
+      "evidence": "DTSX:927, 1870-1880"
+    },
+    {
+      "id": "LOGIC finding#2 (suspicion-update failures swallowed)",
+      "verdict": "CONFIRMED",
+      "detail": "Update Joinings catch -> DirectRowToError; flow has only 2 paths (source->derived, derived->Update Joinings).",
+      "evidence": "main.cs:124-133 (DTSX:5602); DTSX:6490-6499"
+    },
+    {
+      "id": "LOGIC finding#3 (hidden failure in LastThreeWorkingDays)",
+      "verdict": "CONFIRMED",
+      "detail": "Re-check: the finding now states that the actual value on failure is either the design-time 10/2/2017 or one set by the unsupplied configuration file (EnableConfig=True, DTSX:1, 17), so it is unknown. This matches the raw DTSX.",
+      "evidence": "DTSX:1, 17, 42-43; ScriptMain.cs:94-104; logic.json line 521",
+      "previousVerdict": "INCOMPLETE",
+      "previousDetail": "Failure overwritten by Success at ScriptMain.cs:104 - correct. But 'the marking runs with the design-time value (10/2/2017)' omits that the loaded configuration file C:\\Generix\\SSISConfigFile.dtsConfig (not supplied) may set this variable; correct wording: design-time value 10/2/2017 5:29:05 PM unless overridden by the configuration file or dtexec /SET.",
+      "recheckedOn": "2026-11-06"
+    },
+    {
+      "id": "LOGIC finding#4 (full-cache duplicate bank account numbers)",
+      "verdict": "CONFIRMED",
+      "detail": "CacheType=0, TreatDuplicateKeysAsError=false.",
+      "evidence": "DTSX:926, 934"
+    },
+    {
+      "id": "LOGIC finding#5 (close before suspicion)",
+      "verdict": "CONFIRMED",
+      "detail": "Order proven by Success constraints.",
+      "evidence": "DTSX:6506, 6509-6511"
+    },
+    {
+      "id": "LOGIC finding#6 (config file may override)",
+      "verdict": "CONFIRMED",
+      "detail": "DTS:Configuration C:\\Generix\\SSISConfigFile.dtsConfig present.",
+      "evidence": "DTSX:17"
+    },
+    {
+      "id": "LOGIC ignoredAsFramework",
+      "verdict": "CONFIRMED",
+      "detail": "Excluded writers really are plumbing: ETL Warning 1 2 1 creates gen_etlprocesswarning (DTSX:429-441); Create ETL Process record creates gen_etlprocess (DTSX:2082-2087); ETL Record Finish updates gen_etlprocess (DTSX:2620-2628); OnError\\Error ETL Process record updates gen_etlprocess and creates an annotation whose objectid is the gen_etlprocess record (DTSX:6720-6734); OnPostExecute\\Cancel ETL Process record code is commented out (DTSX:7237-7242); Set Variables only sets variables. No other Create/Update/Execute calls in the package.",
+      "evidence": "DTSX:429-441, 2082-2087, 2620-2628, 6720-6734, 7237-7242"
+    }
+  ],
+  "missingWrites": []
+}

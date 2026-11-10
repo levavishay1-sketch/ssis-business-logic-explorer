@@ -1,0 +1,64 @@
+# 0038_EmployerEnrolment.dtsx · EE81202D1055BC8499F5E40CDA63F17C6D610F25057154E97841E2C0C9C981D3
+
+## Connection managers
+- [PSQL] OLEDB Data Source=PSQL;Initial Catalog=ALTSHULER_MSCRM;Integrated Security=SSPI;  
+
+## Executables (disabled marked !)
+-   Create ETL Process record | Microsoft.ScriptTask  
+-   End ETL Process record | Microsoft.Pipeline  
+-   Get Variables From Etl Varibles | Microsoft.Pipeline  
+-   Send Email | Microsoft.Pipeline  
+
+## Precedence
+- Get Variables From Etl Varibles -> Create ETL Process record | Success Constraint   
+- Create ETL Process record -> Send Email | Success Constraint   
+- Send Email -> End ETL Process record | Success Constraint   
+
+## DataFlow End ETL Process record
+  - ETL Record Finish | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 2 out 0
+  - Get gen_etlprocessid | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 0 out 1
+  - Lookup | Lookup  | conn [PSQL]  | in 1 out 1
+     path Lookup.Outputs[Lookup Match Output] => ETL Record Finish.Inputs[Input 0]
+     path Get gen_etlprocessid.Outputs[Output 0] => Lookup.Inputs[Lookup Input]
+
+## DataFlow Get Variables From Etl Varibles
+  - Get Etl Varibles | OLEDBSource  | conn [PSQL]  | in 0 out 2
+  - Script Component | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 2 out 0
+     path Get Etl Varibles.Outputs[OLE DB Source Output] => Script Component.Inputs[Input 0]
+
+## DataFlow Send Email
+  - Adding Error message 1 | DerivedColumn  | conn   | in 3 out 4
+  - Adding Error message 1 1 | DerivedColumn  | conn   | in 2 out 4
+  - Check If To Send Mail | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 15 out 0
+  - ETL Warning 1 2 1 | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 4 out 0
+  - ETL Warning 1 2 1 1 | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 4 out 0
+  - Get Data From Employer Enrolment & Fundmain | OLEDBSource  | conn [PSQL]  | in 0 out 23
+  - Send Email To Maasikim | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 8 out 1
+     path Adding Error message 1 1.Outputs[Derived Column Output] => ETL Warning 1 2 1 1.Inputs[Input 0]
+     path Adding Error message 1.Outputs[Derived Column Output] => ETL Warning 1 2 1.Inputs[Input 0]
+     path Send Email To Maasikim.Outputs[Error] => Adding Error message 1 1.Inputs[Derived Column Input]
+     path Check If To Send Mail.Outputs[Errors] => Adding Error message 1.Inputs[Derived Column Input]
+     path Get Data From Employer Enrolment & Fundmain.Outputs[OLE DB Source Output] => Check If To Send Mail.Inputs[Input 0]
+     path Check If To Send Mail.Outputs[Output 0] => Send Email To Maasikim.Inputs[Input 0]
+
+## SQL statements
+- End ETL Process record\Lookup | Microsoft.Lookup.SqlCommand | [PSQL] 
+    SELECT p.gen_etlprocessId, CASE WHEN pw.gen_etlprocessid IS NULL THEN 0 ELSE 1 END AS isWarningExist FROM gen_etlprocess AS p LEFT OUTER JOIN (SELECT DISTINCT gen_etlprocessId FROM gen_etlprocesswarning) AS pw ON p.gen_etlprocessId = pw.gen_etlprocessId
+- End ETL Process record\Lookup | Microsoft.Lookup.SqlCommandParam | [PSQL] 
+    select * from (SELECT p.gen_etlprocessId, CASE WHEN pw.gen_etlprocessid IS NULL THEN 0 ELSE 1 END AS isWarningExist FROM gen_etlprocess AS p LEFT OUTER JOIN (SELECT DISTINCT gen_etlprocessId FROM gen_etlprocesswarning) AS pw ON p.gen_etlprocessId = pw.gen_etlprocessId) [refTable] where [refTable].[gen_etlprocessId] = ?
+- Get Variables From Etl Varibles\Get Etl Varibles | Microsoft.OLEDBSource.SqlCommand | [PSQL] 
+    SELECT gen_key ,gen_Value FROM gen_etlvariable where gen_scope ='global' or gen_scope = ?
+- Send Email\Get Data From Employer Enrolment & Fundmain | Microsoft.OLEDBSource.SqlCommand | [PSQL] 
+    select a.AccountNumber AS EmployerNumber, ee.Gen_customername, ee.Gen_employerenrolmentId, p.gen_subproduct, ee.gen_deposittype, ee.gen_employerdepositdate, ee.gen_customeridnumber AS employerenrolment_customeridnumber, ee.gen_currentstate, ee.gen_producttype, ee.gen_employersnumber, ee.gen_selfemployed, fm.gen_fundcreationdate, fm.gen_customeridnumber AS fundmain_customeridnumber, fm.gen_fundtype
+
+## Code write candidates (per owner)
+- Create ETL Process record {"variables-write":2,"sql-command":1,"crm-entity":1,"crm-sdk-create":1}
+- End ETL Process record\ETL Record Finish {"sql-command":2,"crm-entity":3,"output-buffer":1,"crm-sdk-update":1}
+- End ETL Process record\Get gen_etlprocessid {"sql-command":2,"output-buffer":2}
+- Get Variables From Etl Varibles\Script Component {"sql-command":2}
+- Send Email\Check If To Send Mail {"sql-command":2,"output-buffer":3}
+- Send Email\ETL Warning 1 2 1 {"crm-entity":3,"crm-sdk-create":1}
+- Send Email\ETL Warning 1 2 1 1 {"crm-entity":3,"crm-sdk-create":1}
+- Send Email\Send Email To Maasikim {"output-buffer":4,"crm-entity":6,"crm-sdk-create":1,"crm-sdk-execute":1}
+
+## External refs (non-framework) CRM2015.Proxy

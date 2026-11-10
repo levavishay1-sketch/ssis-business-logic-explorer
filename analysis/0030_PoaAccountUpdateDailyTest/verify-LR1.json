@@ -1,0 +1,33 @@
+{
+  "verifier": "ssis-verifier",
+  "package": "0030_PoaAccountUpdateDailyTest",
+  "scope": "logic-claims re-check after fixes",
+  "checkedAt": "2026-11-07T12:07:11Z",
+  "checked": 3,
+  "results": [
+    {
+      "id": "L|finding#3",
+      "hash": "fbe421a78ad3",
+      "verdict": "CONFIRMED",
+      "detail": "Checked against the raw DTSX. Is Renewal.Outputs[Renewal] and AppendixType.Outputs[AppendixTypeNeedToSendMail] both have errorRowDisposition=FailComponent (DTSX:5518, 5317). Paths: Lookup Match -> Is Renewal; Lookup No Match -> Union All -> No Email; Not Renewal -> Update NeedToSendMailBit -> AppendixType; Renewal and AppendixTypeNoMail -> Union All. Is Renewal condition: agentcyIdNumberPa == agentcyIdNumber. agentcyIdNumber of the waiting POA cannot be NULL, because the outer 'WaitingPoas.agentcyIdNumber not in (...)' drops NULLs. agentcyIdNumberPa = isnull(Contact.Gen_Identitynumber, Account.AccountNumber) from LEFT JOINs (DTSX:5543), so it can be NULL. The OLE DB Command runs the UPDATE for the row before AppendixType receives it. A waiting POA with NULL appendix and no match goes to No Email without evaluation. Handle Active Status is reached only on Success (Constraint 16, DTSX:8223). The NULL-condition error is labelled as general SSIS behaviour.",
+      "evidence": "DTSX:5317, 5518, 5378-5419, 5543-5567, 6658-6668, 8223; data-flow paths of Handle Wait Status - For Active",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Handle Wait Status - For Active|detail",
+      "hash": "e54f7aea8788",
+      "verdict": "CONFIRMED",
+      "detail": "[1] Matches the Get Waiting Poa SQL: gen_currentstate=3, Gen_startdate <= GETDATE(), six excluded IDs. 'אלטשולר' is taken from the SQL comment '--Check agency =! altshuler' and presented as such. The NULL drop under NOT IN is correct. [2] Lookup on isnull(Gen_CustomerAccount, gen_customerprogram) against active (state 1) POAs; renewal = equal agentcyIdNumber. [3] Matches the paths and FailComponent lines and is labelled as general SSIS behaviour. [4] The only CRM write is UPDATE Gen_powerofattorneyBase SET gen_iscancellationemailrequired WHERE Gen_powerofattorneyId = ? (Param_0 = PowerOfAttorneyIdPa). Staging rows carry NewStatus=1 -> StatusAfterUpdate in all three Derived Columns (No Email, New Poa With/Without Commission). [5] The business result is consistent with Handle Active Status consuming the flag when Gen_enddate passes.",
+      "evidence": "DTSX:5373-5419, 5541-5567, 5507-5518, 5307-5317, 6658-6677, 5620/5671/5722, 6701-6709",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Handle Wait Status - For Active|open",
+      "hash": "49c64acd5f63",
+      "verdict": "CONFIRMED",
+      "detail": "[1] The consumer of staging is genuinely not in the files. [2] Evidence checked: '--waiting' at DTSX:4338 and 4350, alias WaitingPoas at DTSX:5406, ActivePoas at DTSX:4222; 0031 constants 'const int CANCELED = 2' (0031 DTSX:21822, used at 21869) and 'const int ACTIVE = 1' (0031 DTSX:30447, used at 30470). All are presented as labels from the files, and appendix types 2/3/5 remain open. [3] Lookup CacheType=0 (Full cache, DTSX:5561). The SQL has no ORDER BY, so which match is taken is not determined (documented Lookup behaviour: first match).",
+      "evidence": "DTSX:4222, 4338, 4350, 5406, 5561; 0031_PoaAccountUpdateDaily.dtsx:21822, 21869, 30447, 30470",
+      "wrongUnits": []
+    }
+  ]
+}

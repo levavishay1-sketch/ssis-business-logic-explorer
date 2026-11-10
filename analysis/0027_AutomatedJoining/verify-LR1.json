@@ -1,0 +1,70 @@
+{
+  "verifier": "ssis-verifier",
+  "package": "0027_AutomatedJoining",
+  "scope": "logic-claims re-check after fixes",
+  "checkedAt": "2026-11-07T12:00:00.000Z",
+  "checked": 5,
+  "results": [
+    {
+      "id": "L|finding#1",
+      "hash": "6bb6bca5e5f6",
+      "verdict": "CONFIRMED",
+      "detail": "Get customer accounts: NoMatchBehavior 1 (DTSX:927) and the only paths in Close Joining processes are Source->Lookup, Lookup Match->Set columns, Set columns->Update, Update Error->Set Warning->ETL Warning (DTSX:1876-1880); the No Match output has no path, so unmatched rows are dropped without any record. Get Joinings From DB (DTSX:5546-5549) selects only gen_joiningstatus = 7 and gen_sendtobankdate is not null and datediff(day, ?, gen_sendtobankdate) <= 0, ? = User::LastThreeWorkingDays ({81CBF82A...}, DTSX:42, 5549). So a move to 12 requires a non-null send date on or before the threshold day ('רק אם' is a necessary condition; the update itself can still fail silently, see finding#2); with a NULL send date the request stays in 7 with nothing logged. Correct.",
+      "evidence": "DTSX:927, 1876-1880, 42, 5546-5549",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Close Joining processes|short",
+      "hash": "81c65d0a6de1",
+      "verdict": "WRONG",
+      "detail": "Units 1-6 match the DTSX (source where gen_joiningstatus = 7, DTSX:978-982; Lookup on right('0000000000000'+x,12) both sides, DTSX:914-918; Set columns gen_joiningstatus = 8, DTSX:1016ff; Update sets OptionSetValue(8) + EntityReference gen_customeraccount, main.cs:69-75; No Match unconnected). Unit 7 asserts as fact that the requests are 'closed' ('נסגרות'). Status 8's business meaning is not proven: the package's own open question [1] says that '8 = closed' is only suggested by the component name (השערה), and the corrected detail [5] deliberately says 'עוברות לסטטוס 8'. The end node must state the technical result or label the meaning.",
+      "evidence": "DTSX:978-982, 914-918, 1016, main.cs:65-90 (DTSX:1302-1391); open question L|Package\\Close Joining processes|open [1]",
+      "wrongUnits": [
+        {
+          "unit": 7,
+          "problem": "'נסגרות' states the business meaning of status 8 as fact; per the package's open question it is a hypothesis derived from component names only.",
+          "correct": "בקשות בסטטוס 7 שקיים ב-CRM חשבון לקוח עם אותו מספר חשבון בנק (מנורמל ל-12 תווים) עוברות לסטטוס 8 (לפי שמות הרכיבים: סגירה – השערה) ומקושרות לחשבון. אין בדיקה מתי החשבון נוצר.",
+          "evidence": "DTSX:1016 (Expression 8), main.cs:72 (DTSX:1373)"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Close Joining processes|detail",
+      "hash": "e9886aab0c84",
+      "verdict": "WRONG",
+      "detail": "Units 2-5 match: right-padded/truncated 12-char key on both sides (DTSX:914-918, 978-982), CacheType 0 full (DTSX:926), TreatDuplicateKeysAsError false so one arbitrary match among duplicates, No Match unconnected (DTSX:927, 1876-1880), Update gen_joiningstatus = OptionSetValue(8) and gen_customeraccountid = EntityReference('gen_customeraccount', id) via SDK (main.cs:69-75), and no date/causal check. Unit 1 states as fact that the source is the CRM database Psql/ALTSHULER_MSCRM. That is only the design-time connection string of [CRM] (DTSX:4-6); the package has EnableConfig=True and a file configuration C:\\Generix\\SSISConfigFile.dtsConfig (DTSX:1, 17) that was not supplied and can override the connection at runtime (the package's own summary and finding#6 say so). Rule 4/13: the runtime database is external_unknown.",
+      "evidence": "DTSX:1 (EnableConfig=True), DTSX:4-6, DTSX:16-18",
+      "wrongUnits": [
+        {
+          "unit": 1,
+          "problem": "Runtime source database asserted as Psql/ALTSHULER_MSCRM; only the design-time connection string says so, and an unsupplied active configuration file may override it.",
+          "correct": "מקור ואוכלוסייה: gen_automatedjoining עם gen_joiningstatus = 7, דרך חיבור [CRM] (בזמן התכנון: Psql/ALTSHULER_MSCRM; ייתכן שקובץ ה-Configuration C:\\Generix\\SSISConfigFile.dtsConfig, שלא סופק, דורס אותו בזמן ריצה – external_unknown).",
+          "evidence": "DTSX:1, 4-6, 17"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Update SuspicionAsEmitted Joinings|short",
+      "hash": "e9c1b2bb66a3",
+      "verdict": "CONFIRMED",
+      "detail": "[1] Precedence Close Joining processes -> Get NonWorkingDays -> Update LastThreeWorkingDays Variable -> Update SuspicionAsEmitted Joinings, all Success (DTSX:6510, 6509, 6511); query status 7, send date not null and on/before the threshold day (DTSX:5546-5549); the threshold is the third working day before today, so 'sent three or more working days ago' is a faithful rendering. [2] Set Status As SuspicionAsEmitted = 12 (DTSX:5573ff) -> OptionSetValue(Row.gensuspicionAsEmitted) on gen_joiningstatus, SDK Update (main.cs:118-122). [3] meaning of 12 explicitly labelled unproven. The failure branch (silently swallowed) is not in this simplified view but is stated in detailed and finding#2.",
+      "evidence": "DTSX:5546-5549, 5573, main.cs:114-134 (DTSX:5931-5951), DTSX:6498-6499, 6509-6511",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Update SuspicionAsEmitted Joinings|detail",
+      "hash": "72cd1a4b00bd",
+      "verdict": "WRONG",
+      "detail": "Units 1, 2, 4, 5 match (query DTSX:5546-5549; entity.Id = Row.genautomatedjoiningId, main.cs:120; gen_joiningstatus = OptionSetValue(12) via SDK, main.cs:121-122; meaning labelled hypothesis). Unit 3 says 'אין פיצול בזרימה' (no branch in the flow). The Update Joinings script does branch: on any SoapException/Exception it calls Row.DirectRowToError() (main.cs:124-133), and the Error output has no path (only paths DTSX:6498-6499), so failed rows are discarded, stay in status 7 and nothing is logged. This contradicts the package's own detailed view (decision 'האם העדכון הצליח?', units 5-9) and finding#2.",
+      "evidence": "main.cs:114-134 (DTSX:5931-5951), DTSX:6498-6499",
+      "wrongUnits": [
+        {
+          "unit": 3,
+          "problem": "Claims there is no branch in the flow; the update script routes failed rows to an unconnected Error output.",
+          "correct": "החלטות: הבחירה העסקית נעשית רק בשאילתה. הפיצול היחיד הוא כשל עדכון: השורה מופנית לפלט Error (DirectRowToError) שאינו מחובר, ולכן הבקשה נשארת בסטטוס 7 והכשל לא נרשם.",
+          "evidence": "main.cs:124-133, DTSX:6498-6499"
+        }
+      ]
+    }
+  ]
+}

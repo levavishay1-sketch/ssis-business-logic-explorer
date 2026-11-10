@@ -1,0 +1,81 @@
+{
+  "verifier": "ssis-verifier",
+  "package": "0026_Expectedtransfervalue",
+  "scope": "mapping-A.json",
+  "checked": 12,
+  "results": [
+    {
+      "id": "NO-CRM-WRITES",
+      "verdict": "CONFIRMED",
+      "detail": "Raw DTSX has exactly 3 executables (Copy Template to Dest Folder FileSystemTask, Expected Transfer Value Pipeline, Rename File Name FileSystemTask). Pipeline components: Derived Column, Excel Destination, OLE DB Source, Percent calc (Derived Column) only. No Script Task/Component, no OLE DB Command, no OLE DB Destination, no Execute SQL Task, no event handlers (grep EventHandler = 0). The only SQL is the SELECT in 'Get Data From Query' on [PSQL] (Initial Catalog=ALTSHULER_MSCRM) - no DML. Only destination is Excel Destination on [Excel Connection Manager 1], OpenRowset '1$'. Nothing is written to CRM.",
+      "evidence": "0026_Expectedtransfervalue.dtsx:26-30 ([PSQL]), 41, 47, 52, 79-95 (ExcelDestination, CM 'Excel Connection Manager 1'), 128-244 (OLEDBSource SELECT), 288, 335"
+    },
+    {
+      "id": "LOGIC scopeNote / summary",
+      "verdict": "CONFIRMED",
+      "detail": "No DTS:Configurations element (grep 'configuration' = 0) - package does NOT load C:\\Generix\\SSISConfigFile.dtsConfig; no LogProviders; [Excel Connection Manager] (ExcelFilePath=@[User::ExcelFilePath]) is defined but referenced by no component (Excel Destination uses 'Excel Connection Manager 1'). [PSQL] is read-only.",
+      "evidence": "DTSX:4-15, 26-30, 79-95"
+    },
+    {
+      "id": "LOGIC executionOrder",
+      "verdict": "CONFIRMED",
+      "detail": "Constraint: Copy Template -> Expected Transfer Value; Constraint 1: Expected Transfer Value -> Rename File Name; no DTS:Value attribute = Success.",
+      "evidence": "DTSX:343-344"
+    },
+    {
+      "id": "LOGIC Package\\Copy Template to Dest Folder",
+      "verdict": "CONFIRMED",
+      "detail": "FileSystemData TaskOverwriteDestFile=True, source {19B96E52} = G:\\Expectedtransfervalue\\Template\\expected.xls, dest {03390150} = G:\\Expectedtransfervalue\\expected.xls; no TaskOperationType attribute, correctly flagged as SSIS default (not proven by file).",
+      "evidence": "DTSX:16-25, 44"
+    },
+    {
+      "id": "LOGIC Package\\Expected Transfer Value",
+      "verdict": "CONFIRMED",
+      "detail": "Four sub-queries, CASE amounts (types 1/3 default 50000, 5/6 default 0, no ELSE), -1* signs, date window dateadd(hh,8,..) between GETUTCDATE() and GETUTCDATE()+5, Bank '10', statecode=0 only in the transfer-in-out and withdrawal parts, producttypecode CASE, GROUP BY / ORDER BY, Percent calc and *100 Derived Column, Producttypename mapping and Excel sheet '1$' all match. Minor nuance not stated: 'Gen_transferin.Gen_transferType != 4' also excludes transfer-ins with NULL Gen_transferType from the first sub-query (NULL != 4 is UNKNOWN); the transfer-in-out sub-query has no transfer-type filter at all (type 4 included there).",
+      "evidence": "DTSX:133-244 (SqlCommand), 288-311 (Percent calc expressions), 52-58 (Derived Column)"
+    },
+    {
+      "id": "LOGIC Package\\Rename File Name",
+      "verdict": "CONFIRMED",
+      "detail": "RenameFile User::Destination -> User::ExcelFilePath, overwrite True; ExcelFilePath expression pads hh/mi/ss with Right(\"0\"+..,2) but not month/day.",
+      "evidence": "DTSX:36, 338"
+    },
+    {
+      "id": "LOGIC finding#1 (no CRM write)",
+      "verdict": "CONFIRMED",
+      "detail": "See NO-CRM-WRITES.",
+      "evidence": "DTSX:79, 128"
+    },
+    {
+      "id": "LOGIC finding#2 (UNION instead of UNION ALL)",
+      "verdict": "CONFIRMED",
+      "detail": "All three set operators inside derived table EXPECTED are plain 'union' (no ALL). UNION removes duplicates over all 7 projected columns (expecteddate, valueamount, fundtypename, fundfinanceid, fundtotalassets, producttypecode, bankname) BEFORE SUM(valueamount) - this collapses identical rows both across branches and within the same branch (e.g. two withdrawals of the same amount, same day, same fund), so the reported sum can be too low. Correct as stated.",
+      "evidence": "DTSX:168 (union), 189 (union), 213 (union) within SqlCommand DTSX:133-244"
+    },
+    {
+      "id": "LOGIC finding#3 (CASE without ELSE -> NULL)",
+      "verdict": "CONFIRMED",
+      "detail": "CASE has only WHEN 1/3 and WHEN 5/6; other non-NULL, non-4 types yield NULL valueamount; SUM ignores NULL; all-NULL group -> SUM NULL -> Percent calc ISNULL -> 0.",
+      "evidence": "DTSX:153-155, 304-305"
+    },
+    {
+      "id": "LOGIC finding#4 (non 1/2 code shown as compensation)",
+      "verdict": "CONFIRMED",
+      "detail": "Producttypename = producttypecode == 1 ? \"גמל\" : producttypecode == 2 ? \"השתלמות\" : \"פיצויים\"; SQL maps unknown codes to 0.",
+      "evidence": "DTSX:133-146, 310-311 (Producttypename)"
+    },
+    {
+      "id": "LOGIC finding#5 (unpadded month/day in file name)",
+      "verdict": "CONFIRMED",
+      "detail": "(DT_STR,2,1252) datepart(\"mm\") and datepart(\"dd\") without Right(\"0\"+..); e.g. yyyy+1+11 and yyyy+11+1 give the same string.",
+      "evidence": "DTSX:36"
+    },
+    {
+      "id": "LOGIC finding#6 (unused Excel Connection Manager)",
+      "verdict": "CONFIRMED",
+      "detail": "Only connectionManagerRefId in the pipeline for Excel is 'Excel Connection Manager 1'.",
+      "evidence": "DTSX:4-9, 79-95"
+    }
+  ],
+  "missingWrites": []
+}

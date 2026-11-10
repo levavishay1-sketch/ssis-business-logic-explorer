@@ -1,0 +1,664 @@
+# 0005_Customer Account.dtsx · 181B425338EB4A3D69C613224AE1F97F69DEC6CA614BA2398FC5F559D26F5CCD
+
+## Connection managers
+- [qsql] OLEDB Data Source=psql;Initial Catalog=ALTSHULER_MSCRM;Integrated Security=SSPI;  
+- [srs.SSIS_Logs] OLEDB Data Source=psrs;Initial Catalog=SSIS_Logs;Integrated Security=SSPI;  
+
+## Executables (disabled marked !)
+-   Connect Funds to Customer Accounts | Microsoft.Pipeline  
+-   Create ETL Process record | Microsoft.ScriptTask  
+-   Create or Update Customer Accounts | Microsoft.Pipeline  
+-   End ETL Process record | Microsoft.Pipeline  
+-   Get Sytem User Id | Microsoft.Pipeline  
+-   Get Variables From SystemConfigurarion | Microsoft.Pipeline  
+-   Set Joining email to Agent | Microsoft.Pipeline  
+-   Update Aggrigations on Customer Accounts | Microsoft.ExecuteSQLTask  | SQL:  update Gen_customeraccountBase set gen_accountbalance = sums.gen_accountbalance, Gen_periodofservice = sums.gen_periodofservice, Gen_fundcreationdate = sums.ge
+-   Update Consulting Field  In Customer Account From Transfer Request | Microsoft.Pipeline  
+-   Update Consulting Field  In Fund Main From Transfer Request | Microsoft.Pipeline  
+-   Update Paragraph14 and Employer Confirmation fields | Microsoft.ExecuteSQLTask  | SQL: update Gen_customeraccountBase set gen_paragraph14 = Gen_fundmain.gen_paragraph14, gen_employerconfirmation = Gen_fundmain.gen_employerconfirmation from Gen_fun
+-   Update TransactionCurrencyId And ExchangeRate | Microsoft.ExecuteSQLTask  | SQL: update Gen_customeraccountBase set TransactionCurrencyId = (select top 1 TransactionCurrencyid from TransactionCurrency with (nolock) where CurrencyName = ?), E
+-   Write To ETLProcessCounter | Microsoft.ScriptTask  
+-   Write To ETLProcessCounter 1 | Microsoft.ScriptTask  
+-   Write To ETLProcessCounter 2 | Microsoft.ScriptTask  
+-   Write To ETLProcessCounter 3 | Microsoft.ScriptTask  
+-   Write To ETLProcessCounter 4 | Microsoft.ScriptTask  
+-   Package.EventHandlers[OnError] | EventHandler  
+-   Package.EventHandlers[OnError]\Error ETL Process record | Microsoft.ScriptTask  
+
+## Precedence
+- Get Variables From SystemConfigurarion -> Create ETL Process record | Success Constraint   
+- Create or Update Customer Accounts -> Write To ETLProcessCounter | Success Constraint   
+- Update TransactionCurrencyId And ExchangeRate -> End ETL Process record | Success Constraint   
+- Write To ETLProcessCounter -> Connect Funds to Customer Accounts | Success Constraint   
+- Write To ETLProcessCounter 1 -> Set Joining email to Agent | Success Constraint   
+- Write To ETLProcessCounter 2 -> Update Aggrigations on Customer Accounts | Success Constraint   
+- Write To ETLProcessCounter 3 -> Update Consulting Field  In Fund Main From Transfer Request | Success Constraint   
+- Write To ETLProcessCounter 4 -> Update TransactionCurrencyId And ExchangeRate | Success Constraint   
+- Connect Funds to Customer Accounts -> Write To ETLProcessCounter 1 | Success Constraint   
+- Update Aggrigations on Customer Accounts -> Update Paragraph14 and Employer Confirmation fields | Success Constraint   
+- Create ETL Process record -> Get Sytem User Id | Success Constraint   
+- Get Sytem User Id -> Create or Update Customer Accounts | Success Constraint   
+- Update Paragraph14 and Employer Confirmation fields -> Update Consulting Field  In Customer Account From Transfer Request | Success Constraint   
+- Update Consulting Field  In Customer Account From Transfer Request -> Write To ETLProcessCounter 3 | Success Constraint   
+- Update Consulting Field  In Fund Main From Transfer Request -> Write To ETLProcessCounter 4 | Success Constraint   
+- Set Joining email to Agent -> Write To ETLProcessCounter 2 | Success Constraint   
+
+## DataFlow Connect Funds to Customer Accounts
+  - Add Column for etl process warning | DerivedColumn  | conn   | in 1 out 6
+  - Add Row Number 1 | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 0 out 1
+  - Component Task Name | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 0 out 0
+  - Dates To Local | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 4 out 0
+  - Get Funds Without Linked Customer Accounts | OLEDBSource  | conn [qsql]  | in 0 out 15
+  - insert etl process warning | OLEDBCommand  | conn [qsql]  | in 9 out 0
+  - Multicast | Multicast  | conn   | in 0 out 0
+  - Row Error Count | RowCount  | conn   | in 0 out 0
+  - Row Pipe Count | RowCount  | conn   | in 0 out 0
+  - Row Update Count | RowCount  | conn   | in 0 out 0
+  - Set Error columns | DerivedColumn  | conn   | in 2 out 4
+  - Split Rows For MultiThread 1 | ConditionalSplit  | conn   | in 1 out 0
+  - Union All Error | UnionAll  | conn   | in 10 out 2
+  - Union All Update | UnionAll  | conn   | in 5 out 1
+  - Update Customer Account Guid in Fund | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 16 out 3
+  - Update Customer Account Guid in Fund 1 | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 16 out 3
+  - Update Customer Account Guid in Fund 2 | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 16 out 3
+  - Update Customer Account Guid in Fund 3 | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 16 out 3
+  - Update Customer Account Guid in Fund 4 | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 16 out 3
+     path Split Rows For MultiThread 1.Outputs[Case 1] => Update Customer Account Guid in Fund 1.Inputs[Input 0]
+     path Split Rows For MultiThread 1.Outputs[Case 2] => Update Customer Account Guid in Fund 2.Inputs[Input 0]
+     path Split Rows For MultiThread 1.Outputs[Case 3] => Update Customer Account Guid in Fund 3.Inputs[Input 0]
+     path Split Rows For MultiThread 1.Outputs[Case 4] => Update Customer Account Guid in Fund 4.Inputs[Input 0]
+     path Split Rows For MultiThread 1.Outputs[Case Last] => Update Customer Account Guid in Fund.Inputs[Input 0]
+     path Add Column for etl process warning.Outputs[Derived Column Output] => Row Error Count.Inputs[Row Count Input 1]
+     path Set Error columns.Outputs[Derived Column Output] => Add Column for etl process warning.Inputs[Derived Column Input]
+     path Update Customer Account Guid in Fund 4.Outputs[Error] => Union All Error.Inputs[Union All Input 3]
+     path Update Customer Account Guid in Fund 3.Outputs[Error] => Union All Error.Inputs[Union All Input 2]
+     path Update Customer Account Guid in Fund 2.Outputs[Error] => Union All Error.Inputs[Union All Input 1]
+     path Update Customer Account Guid in Fund.Outputs[Error] => Union All Error.Inputs[Union All Input 4]
+     path Update Customer Account Guid in Fund 1.Outputs[Error] => Union All Error.Inputs[Union All Input 11]
+     path Multicast.Outputs[Multicast Output 2] => Component Task Name.Inputs[Input 0]
+     path Multicast.Outputs[Multicast Output 3] => Row Pipe Count.Inputs[Row Count Input 1]
+     path Get Funds Without Linked Customer Accounts.Outputs[OLE DB Source Output] => Multicast.Inputs[Multicast Input 1]
+     path Component Task Name.Outputs[Output 0] => Dates To Local.Inputs[Input 0]
+     path Dates To Local.Outputs[Output 0] => Add Row Number 1.Inputs[Input 0]
+     path Add Row Number 1.Outputs[Output 0] => Split Rows For MultiThread 1.Inputs[Conditional Split Input]
+     path Row Error Count.Outputs[Row Count Output 1] => insert etl process warning.Inputs[OLE DB Command Input]
+     path Update Customer Account Guid in Fund.Outputs[Success] => Union All Update.Inputs[Union All Input 4]
+     path Update Customer Account Guid in Fund 4.Outputs[Success] => Union All Update.Inputs[Union All Input 6]
+     path Update Customer Account Guid in Fund 3.Outputs[Success] => Union All Update.Inputs[Union All Input 2]
+     path Update Customer Account Guid in Fund 2.Outputs[Success] => Union All Update.Inputs[Union All Input 1]
+     path Update Customer Account Guid in Fund 1.Outputs[Success] => Union All Update.Inputs[Union All Input 5]
+     path Union All Update.Outputs[Union All Output 1] => Row Update Count.Inputs[Row Count Input 1]
+     path Union All Error.Outputs[Union All Output 1] => Set Error columns.Inputs[Derived Column Input]
+
+## DataFlow Create or Update Customer Accounts
+  - Add Column for etl process warning | DerivedColumn  | conn   | in 1 out 6
+  - Add Row Number | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 0 out 1
+  - Add Row Number 1 | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 0 out 1
+  - Add Row Number 2 | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 0 out 1
+  - Compare Filed including Null From DB Before Update | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 77 out 1
+  - Compare Filed including Null From DB Before Update 1 | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 79 out 1
+  - Component Task Name | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 0 out 0
+  - Conditional Split | ConditionalSplit  | conn   | in 2 out 0
+  - Convert Product Type | DerivedColumn  | conn   | in 1 out 1
+  - Count Filters | RowCount  | conn   | in 0 out 0
+  - Create Customer Account | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 54 out 2
+  - Create Customer Account 1 | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 54 out 2
+  - Create Customer Account 2 | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 54 out 2
+  - Create Customer Account 3 | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 54 out 2
+  - Create Customer Account 4 | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 54 out 2
+  - Create System Columns | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 0 out 2
+  - Dates To Local | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 6 out 0
+  - Dates To Local 1 | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 5 out 0
+  - Fund Is Block To Deposit | Lookup  | conn [qsql]  | in 2 out 1
+  - Get Automated Joining | OLEDBSource  | conn [qsql]  | in 0 out 13
+  - Get Customer Account Guid | Lookup  | conn [qsql]  | in 2 out 43
+  - Get Error Description | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 2 out 0
+  - Get Funds Without Linked Customer Accounts | OLEDBSource  | conn [qsql]  | in 0 out 46
+  - insert etl process warning | OLEDBCommand  | conn [qsql]  | in 9 out 0
+  - Is Account Blocked For Deposits FALSE | DerivedColumn  | conn   | in 0 out 1
+  - Is Account Blocked For Deposits TRUE | DerivedColumn  | conn   | in 0 out 1
+  - Is Need To Update All | ConditionalSplit  | conn   | in 1 out 0
+  - Is Need To Update All 1 | ConditionalSplit  | conn   | in 1 out 0
+  - Merge Join | MergeJoin  | conn   | in 62 out 59
+  - Multicast | Multicast  | conn   | in 0 out 0
+  - Multicast 1 | Multicast  | conn   | in 0 out 0
+  - Multicast 2 | Multicast  | conn   | in 0 out 0
+  - Row Count Update | RowCount  | conn   | in 0 out 0
+  - Row Error Create Count | RowCount  | conn   | in 0 out 0
+  - Row Error Update Count | RowCount  | conn   | in 0 out 0
+  - Row Insert Count | RowCount  | conn   | in 0 out 0
+  - Row No Nedd To Update Count | RowCount  | conn   | in 0 out 0
+  - Row Pipe Count | RowCount  | conn   | in 0 out 0
+  - Row Update Count | RowCount  | conn   | in 0 out 0
+  - Set Error columns | DerivedColumn  | conn   | in 1 out 4
+  - Set Error columns 1 | DerivedColumn  | conn   | in 2 out 4
+  - Set Error columns 2 | DerivedColumn  | conn   | in 1 out 3
+  - Set gen_name | DerivedColumn  | conn   | in 2 out 1
+  - Sort | Sort  | conn   | in 11 out 11
+  - Sort 1 | Sort  | conn   | in 51 out 51
+  - Split Rows For MultiThread | ConditionalSplit  | conn   | in 1 out 0
+  - Split Rows For MultiThread 1 | ConditionalSplit  | conn   | in 1 out 0
+  - Split Rows For MultiThread 2 | ConditionalSplit  | conn   | in 1 out 0
+  - Union All | UnionAll  | conn   | in 92 out 46
+  - Union All 1 | UnionAll  | conn   | in 100 out 50
+  - Union All Create | UnionAll  | conn   | in 5 out 1
+  - Union All Eror | UnionAll  | conn   | in 335 out 67
+  - Union All Error | UnionAll  | conn   | in 16 out 8
+  - Union All Error Create Customer Account | UnionAll  | conn   | in 5 out 1
+  - Union All Error Update CustomerAccounts | UnionAll  | conn   | in 10 out 2
+  - Union All No Need To Update | UnionAll  | conn   | in 124 out 62
+  - Union All Update | UnionAll  | conn   | in 325 out 65
+  - Update Customer Account 1 | OLEDBCommand  | conn [qsql]  | in 42 out 0
+  - Update Customer Account 2 | OLEDBCommand  | conn [qsql]  | in 42 out 0
+  - Update Customer Account 3 | OLEDBCommand  | conn [qsql]  | in 42 out 0
+  - Update Customer Account 4 | OLEDBCommand  | conn [qsql]  | in 42 out 0
+  - Update Customer Account 5 | OLEDBCommand  | conn [qsql]  | in 42 out 0
+  - Update CustomerAccounts | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 83 out 3
+  - Update CustomerAccounts 1 | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 83 out 3
+  - Update CustomerAccounts 2 | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 83 out 3
+  - Update CustomerAccounts 3 | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 83 out 3
+  - Update CustomerAccounts 4 | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 83 out 3
+     path Split Rows For MultiThread.Outputs[Case 1] => Create Customer Account 1.Inputs[Input 0]
+     path Split Rows For MultiThread 1.Outputs[Case 1] => Update Customer Account 1.Inputs[OLE DB Command Input]
+     path Split Rows For MultiThread 2.Outputs[Case 1] => Update CustomerAccounts 1.Inputs[Input 0]
+     path Split Rows For MultiThread 2.Outputs[Case 2] => Update CustomerAccounts 2.Inputs[Input 0]
+     path Split Rows For MultiThread 1.Outputs[Case 2] => Update Customer Account 2.Inputs[OLE DB Command Input]
+     path Split Rows For MultiThread.Outputs[Case 2] => Create Customer Account 2.Inputs[Input 0]
+     path Split Rows For MultiThread 2.Outputs[Case 3] => Update CustomerAccounts 4.Inputs[Input 0]
+     path Split Rows For MultiThread 1.Outputs[Case 3] => Update Customer Account 3.Inputs[OLE DB Command Input]
+     path Split Rows For MultiThread.Outputs[Case 3] => Create Customer Account 3.Inputs[Input 0]
+     path Split Rows For MultiThread 2.Outputs[Case 4] => Update CustomerAccounts 3.Inputs[Input 0]
+     path Split Rows For MultiThread 1.Outputs[Case 4] => Update Customer Account 4.Inputs[OLE DB Command Input]
+     path Split Rows For MultiThread.Outputs[Case 4] => Create Customer Account 4.Inputs[Input 0]
+     path Split Rows For MultiThread 1.Outputs[Case Last] => Update Customer Account 5.Inputs[OLE DB Command Input]
+     path Split Rows For MultiThread 2.Outputs[Case Last] => Update CustomerAccounts.Inputs[Input 0]
+     path Split Rows For MultiThread.Outputs[Case Last] => Create Customer Account.Inputs[Input 0]
+     path Convert Product Type.Outputs[Derived Column Output] => Sort 1.Inputs[Sort Input]
+     path Set gen_name.Outputs[Derived Column Output] => Create System Columns.Inputs[Input 0]
+     path Add Column for etl process warning.Outputs[Derived Column Output] => insert etl process warning.Inputs[OLE DB Command Input]
+     path Set Error columns 1.Outputs[Derived Column Output] => Row Error Update Count.Inputs[Row Count Input 1]
+     path Set Error columns 2.Outputs[Derived Column Output] => Union All Error.Inputs[Union All Input 2]
+     path Is Account Blocked For Deposits FALSE.Outputs[Derived Column Output] => Union All 1.Inputs[Union All Input 2]
+     path Set Error columns.Outputs[Derived Column Output] => Row Error Create Count.Inputs[Row Count Input 1]
+     path Is Account Blocked For Deposits TRUE.Outputs[Derived Column Output] => Union All 1.Inputs[Union All Input 1]
+     path Is Need To Update All.Outputs[dont update] => Union All No Need To Update.Inputs[Union All Input 5]
+     path Is Need To Update All 1.Outputs[dont update] => Union All No Need To Update.Inputs[Union All Input 2]
+     path Create Customer Account 2.Outputs[Error] => Union All Error Create Customer Account.Inputs[Union All Input 1]
+     path Create Customer Account.Outputs[Error] => Union All Error Create Customer Account.Inputs[Union All Input 4]
+     path Create Customer Account 3.Outputs[Error] => Union All Error Create Customer Account.Inputs[Union All Input 2]
+     path Update CustomerAccounts 1.Outputs[Error] => Union All Error Update CustomerAccounts.Inputs[Union All Input 11]
+     path Update CustomerAccounts 4.Outputs[Error] => Union All Error Update CustomerAccounts.Inputs[Union All Input 2]
+     path Update CustomerAccounts.Outputs[Error] => Union All Error Update CustomerAccounts.Inputs[Union All Input 4]
+     path Create Customer Account 1.Outputs[Error] => Union All Error Create Customer Account.Inputs[Union All Input 11]
+     path Update CustomerAccounts 3.Outputs[Error] => Union All Error Update CustomerAccounts.Inputs[Union All Input 3]
+     path Create Customer Account 4.Outputs[Error] => Union All Error Create Customer Account.Inputs[Union All Input 3]
+     path Update CustomerAccounts 2.Outputs[Error] => Union All Error Update CustomerAccounts.Inputs[Union All Input 1]
+     path Fund Is Block To Deposit.Outputs[Lookup Match Output] => Is Account Blocked For Deposits TRUE.Inputs[Derived Column Input]
+     path Get Customer Account Guid.Outputs[Lookup Match Output] => Multicast 1.Inputs[Multicast Input 1]
+     path Get Customer Account Guid.Outputs[Lookup No Match Output] => Multicast 2.Inputs[Multicast Input 1]
+     path Fund Is Block To Deposit.Outputs[Lookup No Match Output] => Is Account Blocked For Deposits FALSE.Inputs[Derived Column Input]
+     path Merge Join.Outputs[Merge Join Output] => Dates To Local 1.Inputs[Input 0]
+     path Multicast 1.Outputs[Multicast Output 1] => Conditional Split.Inputs[Conditional Split Input]
+     path Multicast 2.Outputs[Multicast Output 1] => Convert Product Type.Inputs[Derived Column Input]
+     path Multicast 1.Outputs[Multicast Output 2] => Union All.Inputs[Union All Input 2]
+     path Multicast.Outputs[Multicast Output 2] => Row Pipe Count.Inputs[Row Count Input 1]
+     path Multicast 2.Outputs[Multicast Output 2] => Union All.Inputs[Union All Input 1]
+     path Multicast.Outputs[Multicast Output 3] => Component Task Name.Inputs[Input 0]
+     path Update CustomerAccounts 2.Outputs[Sucsses] => Union All Update.Inputs[Union All Input 8]
+     path Update Customer Account 1.Outputs[OLE DB Command Error Output] => Union All Eror.Inputs[Union All Input 3]
+     path Update Customer Account 4.Outputs[OLE DB Command Error Output] => Union All Eror.Inputs[Union All Input 4]
+     path Update Customer Account 3.Outputs[OLE DB Command Error Output] => Union All Eror.Inputs[Union All Input 5]
+     path Update Customer Account 2.Outputs[OLE DB Command Error Output] => Union All Eror.Inputs[Union All Input 2]
+     path Update Customer Account 5.Outputs[OLE DB Command Error Output] => Union All Eror.Inputs[Union All Input 1]
+     path Update Customer Account 1.Outputs[OLE DB Command Output] => Union All Update.Inputs[Union All Input 1]
+     path Update Customer Account 3.Outputs[OLE DB Command Output] => Union All Update.Inputs[Union All Input 3]
+     path Update Customer Account 5.Outputs[OLE DB Command Output] => Union All Update.Inputs[Union All Input 5]
+     path Update Customer Account 4.Outputs[OLE DB Command Output] => Union All Update.Inputs[Union All Input 4]
+     path Update Customer Account 2.Outputs[OLE DB Command Output] => Union All Update.Inputs[Union All Input 2]
+     path Get Automated Joining.Outputs[OLE DB Source Output] => Sort.Inputs[Sort Input]
+     path Get Funds Without Linked Customer Accounts.Outputs[OLE DB Source Output] => Multicast.Inputs[Multicast Input 1]
+     path Add Row Number 1.Outputs[Output 0] => Split Rows For MultiThread 1.Inputs[Conditional Split Input]
+     path Component Task Name.Outputs[Output 0] => Set gen_name.Inputs[Derived Column Input]
+     path Create System Columns.Outputs[Output 0] => Fund Is Block To Deposit.Inputs[Lookup Input]
+     path Compare Filed including Null From DB Before Update.Outputs[Output 0] => Is Need To Update All.Inputs[Conditional Split Input]
+     path Get Error Description.Outputs[Output 0] => Add Column for etl process warning.Inputs[Derived Column Input]
+     path Dates To Local.Outputs[Output 0] => Compare Filed including Null From DB Before Update 1.Inputs[Input 0]
+     path Compare Filed including Null From DB Before Update 1.Outputs[Output 0] => Is Need To Update All 1.Inputs[Conditional Split Input]
+     path Add Row Number 2.Outputs[Output 0] => Split Rows For MultiThread 2.Inputs[Conditional Split Input]
+     path Add Row Number.Outputs[Output 0] => Split Rows For MultiThread.Inputs[Conditional Split Input]
+     path Dates To Local 1.Outputs[Output 0] => Add Row Number.Inputs[Input 0]
+     path Row Error Update Count.Outputs[Row Count Output 1] => Union All Error.Inputs[Union All Input 1]
+     path Row Count Update.Outputs[Row Count Output 1] => Set Error columns 2.Inputs[Derived Column Input]
+     path Row Error Create Count.Outputs[Row Count Output 1] => Union All Error.Inputs[Union All Input 3]
+     path Sort.Outputs[Sort Output] => Merge Join.Inputs[Merge Join Right Input]
+     path Sort 1.Outputs[Sort Output] => Merge Join.Inputs[Merge Join Left Input]
+     path Create Customer Account.Outputs[Success] => Union All Create.Inputs[Union All Input 4]
+     path Create Customer Account 4.Outputs[Success] => Union All Create.Inputs[Union All Input 3]
+     path Create Customer Account 2.Outputs[Success] => Union All Create.Inputs[Union All Input 7]
+     path Create Customer Account 3.Outputs[Success] => Union All Create.Inputs[Union All Input 1]
+     path Create Customer Account 1.Outputs[Success] => Union All Create.Inputs[Union All Input 2]
+     path Update CustomerAccounts 4.Outputs[Sucsses] => Union All Update.Inputs[Union All Input 7]
+     path Update CustomerAccounts 1.Outputs[Sucsses] => Union All Update.Inputs[Union All Input 11]
+     path Update CustomerAccounts 3.Outputs[Sucsses] => Union All Update.Inputs[Union All Input 6]
+     path Update CustomerAccounts.Outputs[Sucsses] => Union All Update.Inputs[Union All Input 9]
+     path Conditional Split.Outputs[Supported] => Dates To Local.Inputs[Input 0]
+     path Union All Create.Outputs[Union All Output 1] => Row Insert Count.Inputs[Row Count Input 1]
+     path Union All 1.Outputs[Union All Output 1] => Get Customer Account Guid.Inputs[Lookup Input]
+     path Union All Error.Outputs[Union All Output 1] => Get Error Description.Inputs[Input 0]
+     path Union All Eror.Outputs[Union All Output 1] => Row Count Update.Inputs[Row Count Input 1]
+     path Union All Error Update CustomerAccounts.Outputs[Union All Output 1] => Set Error columns 1.Inputs[Derived Column Input]
+     path Union All No Need To Update.Outputs[Union All Output 1] => Row No Nedd To Update Count.Inputs[Row Count Input 1]
+     path Union All Error Create Customer Account.Outputs[Union All Output 1] => Set Error columns.Inputs[Derived Column Input]
+     path Union All Update.Outputs[Union All Output 1] => Row Update Count.Inputs[Row Count Input 1]
+     path Union All.Outputs[Union All Output 1] => Count Filters.Inputs[Row Count Input 1]
+     path Conditional Split.Outputs[UnSupported] => Compare Filed including Null From DB Before Update.Inputs[Input 0]
+     path Is Need To Update All 1.Outputs[Update] => Add Row Number 2.Inputs[Input 0]
+     path Is Need To Update All.Outputs[Update] => Add Row Number 1.Inputs[Input 0]
+
+## DataFlow End ETL Process record
+  - ETL Record Finish | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 2 out 0
+  - Get gen_etlprocessid | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 0 out 1
+  - Lookup | Lookup  | conn [qsql]  | in 1 out 1
+     path Lookup.Outputs[Lookup Match Output] => ETL Record Finish.Inputs[Input 0]
+     path Get gen_etlprocessid.Outputs[Output 0] => Lookup.Inputs[Lookup Input]
+
+## DataFlow Get Sytem User Id
+  - add OrganizationName | DerivedColumn  | conn   | in 0 out 1
+  - Get organization id | Lookup  | conn [qsql]  | in 1 out 1
+  - Get User Id | OLEDBSource  | conn [qsql]  | in 0 out 1
+  - Set UserId And Organization Id | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 2 out 0
+     path add OrganizationName.Outputs[Derived Column Output] => Get organization id.Inputs[Lookup Input]
+     path Get organization id.Outputs[Lookup Match Output] => Set UserId And Organization Id.Inputs[Input 0]
+     path Get User Id.Outputs[OLE DB Source Output] => add OrganizationName.Inputs[Derived Column Input]
+
+## DataFlow Get Variables From SystemConfigurarion
+  - Get SystemConfigurations | OLEDBSource  | conn [qsql]  | in 0 out 2
+  - Set Variables | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 2 out 0
+     path Get SystemConfigurations.Outputs[OLE DB Source Output] => Set Variables.Inputs[Input 0]
+
+## DataFlow Set Joining email to Agent
+  - Add Column for etl process warning | DerivedColumn  | conn   | in 1 out 6
+  - Add Row Number 1 | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 0 out 1
+  - Component Task Name | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 0 out 0
+  - Get Customer Accounts to Send Mails | OLEDBSource  | conn [qsql]  | in 0 out 3
+  - insert etl process warning | OLEDBCommand  | conn [qsql]  | in 9 out 0
+  - Multicast | Multicast  | conn   | in 0 out 0
+  - Row Error Count | RowCount  | conn   | in 0 out 0
+  - Row Pipe Count | RowCount  | conn   | in 0 out 0
+  - Row Update Count | RowCount  | conn   | in 0 out 0
+  - Set Error columns | DerivedColumn  | conn   | in 2 out 4
+  - Split Rows For MultiThread 1 | ConditionalSplit  | conn   | in 1 out 0
+  - Union All Error | UnionAll  | conn   | in 10 out 2
+  - Union All Update | UnionAll  | conn   | in 5 out 1
+  - Update Customer Account 1 | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 3 out 3
+  - Update Customer Account 2 | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 3 out 3
+  - Update Customer Account 3 | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 3 out 3
+  - Update Customer Account 4 | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 3 out 3
+  - Update Customer Account 5 | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 3 out 3
+     path Split Rows For MultiThread 1.Outputs[Case 1] => Update Customer Account 1.Inputs[Input 0]
+     path Split Rows For MultiThread 1.Outputs[Case 2] => Update Customer Account 2.Inputs[Input 0]
+     path Split Rows For MultiThread 1.Outputs[Case 3] => Update Customer Account 3.Inputs[Input 0]
+     path Split Rows For MultiThread 1.Outputs[Case 4] => Update Customer Account 4.Inputs[Input 0]
+     path Split Rows For MultiThread 1.Outputs[Case Last] => Update Customer Account 5.Inputs[Input 0]
+     path Add Column for etl process warning.Outputs[Derived Column Output] => Row Error Count.Inputs[Row Count Input 1]
+     path Set Error columns.Outputs[Derived Column Output] => Add Column for etl process warning.Inputs[Derived Column Input]
+     path Update Customer Account 3.Outputs[Error] => Union All Error.Inputs[Union All Input 3]
+     path Update Customer Account 2.Outputs[Error] => Union All Error.Inputs[Union All Input 2]
+     path Update Customer Account 1.Outputs[Error] => Union All Error.Inputs[Union All Input 1]
+     path Update Customer Account 4.Outputs[Error] => Union All Error.Inputs[Union All Input 4]
+     path Update Customer Account 5.Outputs[Error] => Union All Error.Inputs[Union All Input 5]
+     path Multicast.Outputs[Multicast Output 2] => Row Pipe Count.Inputs[Row Count Input 1]
+     path Multicast.Outputs[Multicast Output 3] => Component Task Name.Inputs[Input 0]
+     path Update Customer Account 3.Outputs[Success] => Union All Update.Inputs[Union All Input 3]
+     path Update Customer Account 4.Outputs[Success] => Union All Update.Inputs[Union All Input 2]
+     path Update Customer Account 5.Outputs[Success] => Union All Update.Inputs[Union All Input 1]
+     path Update Customer Account 2.Outputs[Success] => Union All Update.Inputs[Union All Input 4]
+     path Update Customer Account 1.Outputs[Success] => Union All Update.Inputs[Union All Input 5]
+     path Get Customer Accounts to Send Mails.Outputs[OLE DB Source Output] => Multicast.Inputs[Multicast Input 1]
+     path Add Row Number 1.Outputs[Output 0] => Split Rows For MultiThread 1.Inputs[Conditional Split Input]
+     path Component Task Name.Outputs[Output 0] => Add Row Number 1.Inputs[Input 0]
+     path Row Error Count.Outputs[Row Count Output 1] => insert etl process warning.Inputs[OLE DB Command Input]
+     path Union All Error.Outputs[Union All Output 1] => Set Error columns.Inputs[Derived Column Input]
+     path Union All Update.Outputs[Union All Output 1] => Row Update Count.Inputs[Row Count Input 1]
+
+## DataFlow Update Consulting Field  In Customer Account From Transfer Request
+  - Add Column for etl process warning | DerivedColumn  | conn   | in 1 out 6
+  - Add Row Number 1 | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 0 out 1
+  - Additional Columns | DerivedColumn  | conn   | in 0 out 1
+  - Component Task Name | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 0 out 0
+  - Get Error Description | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 2 out 0
+  - Get Transfer Request | OLEDBSource  | conn [qsql]  | in 0 out 14
+  - insert etl process warning | OLEDBCommand  | conn [qsql]  | in 9 out 0
+  - Multicast | Multicast  | conn   | in 0 out 0
+  - Multicast 1 | Multicast  | conn   | in 0 out 0
+  - Multicast 2 | Multicast  | conn   | in 0 out 0
+  - Multicast 3 | Multicast  | conn   | in 0 out 0
+  - Multicast 4 | Multicast  | conn   | in 0 out 0
+  - Multicast 5 | Multicast  | conn   | in 0 out 0
+  - Row Count Pipe | RowCount  | conn   | in 0 out 0
+  - Row Error Count | RowCount  | conn   | in 0 out 0
+  - Row Update Count | RowCount  | conn   | in 0 out 0
+  - Set Warning columns | DerivedColumn  | conn   | in 1 out 4
+  - Set Warning columns TR | DerivedColumn  | conn   | in 1 out 4
+  - Split Rows For MultiThread 1 | ConditionalSplit  | conn   | in 1 out 0
+  - TR Row Error Count | RowCount  | conn   | in 0 out 0
+  - TR Row Update Count | RowCount  | conn   | in 0 out 0
+  - Transformation To Consulting Fields In Customer Account By Transfer Request | DerivedColumn  | conn   | in 12 out 0
+  - Union All | UnionAll  | conn   | in 40 out 20
+  - Union All Error | UnionAll  | conn   | in 80 out 16
+  - Union All Error TransferRequest | UnionAll  | conn   | in 90 out 18
+  - Union All Update | UnionAll  | conn   | in 70 out 14
+  - Union All Update TransferRequest | UnionAll  | conn   | in 80 out 16
+  - Update Customer Account (Unsupported) 1 | OLEDBCommand  | conn [qsql]  | in 7 out 0
+  - Update Customer Account (Unsupported) 2 | OLEDBCommand  | conn [qsql]  | in 7 out 0
+  - Update Customer Account (Unsupported) 3 | OLEDBCommand  | conn [qsql]  | in 7 out 0
+  - Update Customer Account (Unsupported) 4 | OLEDBCommand  | conn [qsql]  | in 7 out 0
+  - Update Customer Account (Unsupported) 5 | OLEDBCommand  | conn [qsql]  | in 7 out 0
+  - Update TransferRequest 1 | OLEDBCommand  | conn [qsql]  | in 2 out 0
+  - Update TransferRequest 2 | OLEDBCommand  | conn [qsql]  | in 2 out 0
+  - Update TransferRequest 3 | OLEDBCommand  | conn [qsql]  | in 2 out 0
+  - Update TransferRequest 4 | OLEDBCommand  | conn [qsql]  | in 2 out 0
+  - Update TransferRequest 5 | OLEDBCommand  | conn [qsql]  | in 2 out 0
+     path Split Rows For MultiThread 1.Outputs[Case 1] => Update Customer Account (Unsupported) 1.Inputs[OLE DB Command Input]
+     path Split Rows For MultiThread 1.Outputs[Case 2] => Update Customer Account (Unsupported) 2.Inputs[OLE DB Command Input]
+     path Split Rows For MultiThread 1.Outputs[Case 3] => Update Customer Account (Unsupported) 3.Inputs[OLE DB Command Input]
+     path Split Rows For MultiThread 1.Outputs[Case 4] => Update Customer Account (Unsupported) 4.Inputs[OLE DB Command Input]
+     path Split Rows For MultiThread 1.Outputs[Case Last] => Update Customer Account (Unsupported) 5.Inputs[OLE DB Command Input]
+     path Set Warning columns TR.Outputs[Derived Column Output] => Union All.Inputs[Union All Input 2]
+     path Set Warning columns.Outputs[Derived Column Output] => Union All.Inputs[Union All Input 1]
+     path Transformation To Consulting Fields In Customer Account By Transfer Request.Outputs[Derived Column Output] => Additional Columns.Inputs[Derived Column Input]
+     path Additional Columns.Outputs[Derived Column Output] => Add Row Number 1.Inputs[Input 0]
+     path Add Column for etl process warning.Outputs[Derived Column Output] => insert etl process warning.Inputs[OLE DB Command Input]
+     path Multicast 5.Outputs[Multicast Output 1] => Update TransferRequest 5.Inputs[OLE DB Command Input]
+     path Multicast 2.Outputs[Multicast Output 1] => Update TransferRequest 2.Inputs[OLE DB Command Input]
+     path Multicast 3.Outputs[Multicast Output 1] => Update TransferRequest 3.Inputs[OLE DB Command Input]
+     path Multicast 1.Outputs[Multicast Output 1] => Update TransferRequest 1.Inputs[OLE DB Command Input]
+     path Multicast 4.Outputs[Multicast Output 1] => Update TransferRequest 4.Inputs[OLE DB Command Input]
+     path Multicast 1.Outputs[Multicast Output 2] => Union All Update.Inputs[Union All Input 5]
+     path Multicast 5.Outputs[Multicast Output 2] => Union All Update.Inputs[Union All Input 3]
+     path Multicast 3.Outputs[Multicast Output 2] => Union All Update.Inputs[Union All Input 6]
+     path Multicast 2.Outputs[Multicast Output 2] => Union All Update.Inputs[Union All Input 1]
+     path Multicast 4.Outputs[Multicast Output 2] => Union All Update.Inputs[Union All Input 2]
+     path Multicast.Outputs[Multicast Output 2] => Row Count Pipe.Inputs[Row Count Input 1]
+     path Multicast.Outputs[Multicast Output 3] => Component Task Name.Inputs[Input 0]
+     path Update TransferRequest 4.Outputs[OLE DB Command Error Output] => Union All Error TransferRequest.Inputs[Union All Input 4]
+     path Update Customer Account (Unsupported) 4.Outputs[OLE DB Command Error Output] => Union All Error.Inputs[Union All Input 4]
+     path Update TransferRequest 3.Outputs[OLE DB Command Error Output] => Union All Error TransferRequest.Inputs[Union All Input 3]
+     path Update Customer Account (Unsupported) 2.Outputs[OLE DB Command Error Output] => Union All Error.Inputs[Union All Input 2]
+     path Update TransferRequest 2.Outputs[OLE DB Command Error Output] => Union All Error TransferRequest.Inputs[Union All Input 2]
+     path Update Customer Account (Unsupported) 1.Outputs[OLE DB Command Error Output] => Union All Error.Inputs[Union All Input 6]
+     path Update Customer Account (Unsupported) 3.Outputs[OLE DB Command Error Output] => Union All Error.Inputs[Union All Input 3]
+     path Update TransferRequest 1.Outputs[OLE DB Command Error Output] => Union All Error TransferRequest.Inputs[Union All Input 1]
+     path Update Customer Account (Unsupported) 5.Outputs[OLE DB Command Error Output] => Union All Error.Inputs[Union All Input 5]
+     path Update TransferRequest 5.Outputs[OLE DB Command Error Output] => Union All Error TransferRequest.Inputs[Union All Input 5]
+     path Update TransferRequest 3.Outputs[OLE DB Command Output] => Union All Update TransferRequest.Inputs[Union All Input 3]
+     path Update Customer Account (Unsupported) 1.Outputs[OLE DB Command Output] => Multicast 1.Inputs[Multicast Input 1]
+     path Update TransferRequest 5.Outputs[OLE DB Command Output] => Union All Update TransferRequest.Inputs[Union All Input 5]
+     path Update TransferRequest 4.Outputs[OLE DB Command Output] => Union All Update TransferRequest.Inputs[Union All Input 4]
+     path Update Customer Account (Unsupported) 5.Outputs[OLE DB Command Output] => Multicast 5.Inputs[Multicast Input 1]
+     path Update Customer Account (Unsupported) 3.Outputs[OLE DB Command Output] => Multicast 3.Inputs[Multicast Input 1]
+     path Update Customer Account (Unsupported) 2.Outputs[OLE DB Command Output] => Multicast 2.Inputs[Multicast Input 1]
+     path Update Customer Account (Unsupported) 4.Outputs[OLE DB Command Output] => Multicast 4.Inputs[Multicast Input 1]
+     path Update TransferRequest 1.Outputs[OLE DB Command Output] => Union All Update TransferRequest.Inputs[Union All Input 1]
+     path Update TransferRequest 2.Outputs[OLE DB Command Output] => Union All Update TransferRequest.Inputs[Union All Input 2]
+     path Get Transfer Request.Outputs[OLE DB Source Output] => Multicast.Inputs[Multicast Input 1]
+     path Component Task Name.Outputs[Output 0] => Transformation To Consulting Fields In Customer Account By Transfer Request.Inputs[Derived Column Input]
+     path Get Error Description.Outputs[Output 0] => Add Column for etl process warning.Inputs[Derived Column Input]
+     path Add Row Number 1.Outputs[Output 0] => Split Rows For MultiThread 1.Inputs[Conditional Split Input]
+     path Row Error Count.Outputs[Row Count Output 1] => Set Warning columns.Inputs[Derived Column Input]
+     path TR Row Error Count.Outputs[Row Count Output 1] => Set Warning columns TR.Inputs[Derived Column Input]
+     path Union All Update.Outputs[Union All Output 1] => Row Update Count.Inputs[Row Count Input 1]
+     path Union All.Outputs[Union All Output 1] => Get Error Description.Inputs[Input 0]
+     path Union All Update TransferRequest.Outputs[Union All Output 1] => TR Row Update Count.Inputs[Row Count Input 1]
+     path Union All Error TransferRequest.Outputs[Union All Output 1] => TR Row Error Count.Inputs[Row Count Input 1]
+     path Union All Error.Outputs[Union All Output 1] => Row Error Count.Inputs[Row Count Input 1]
+
+## DataFlow Update Consulting Field  In Fund Main From Transfer Request
+  - Add Column for etl process warning | DerivedColumn  | conn   | in 1 out 6
+  - Add Row Number 1 | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 0 out 1
+  - Add Row Number 2 | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 0 out 1
+  - Additional Columns | DerivedColumn  | conn   | in 0 out 1
+  - Aggregate | Aggregate  | conn   | in 2 out 2
+  - Component Task Name | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 0 out 0
+  - Get Error Description | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 2 out 0
+  - Get TRansfer Request | OLEDBSource  | conn [qsql]  | in 0 out 15
+  - insert etl process warning | OLEDBCommand  | conn [qsql]  | in 9 out 0
+  - Multicast | Multicast  | conn   | in 0 out 0
+  - Multicast 1 | Multicast  | conn   | in 0 out 0
+  - Multicast 2 | Multicast  | conn   | in 0 out 0
+  - Row Count Pipe | RowCount  | conn   | in 0 out 0
+  - Row Count Pipe 2 | RowCount  | conn   | in 0 out 0
+  - Row Error Count | RowCount  | conn   | in 0 out 0
+  - Row Update Count | RowCount  | conn   | in 0 out 0
+  - Set Warning columns | DerivedColumn  | conn   | in 1 out 4
+  - Set Warning columns TR | DerivedColumn  | conn   | in 1 out 4
+  - Split Rows For MultiThread 1 | ConditionalSplit  | conn   | in 1 out 0
+  - Split Rows For MultiThread 2 | ConditionalSplit  | conn   | in 1 out 0
+  - TR Row Error Count | RowCount  | conn   | in 0 out 0
+  - TR Row Update Count | RowCount  | conn   | in 0 out 0
+  - Transformation To Consulting Fields In Fund Main By Transfer Request | DerivedColumn  | conn   | in 12 out 0
+  - Union All | UnionAll  | conn   | in 29 out 22
+  - Union All Error TransferRequest | UnionAll  | conn   | in 25 out 5
+  - Union All Update TransferRequest | UnionAll  | conn   | in 15 out 3
+  - Union Error All | UnionAll  | conn   | in 80 out 16
+  - Union Update All | UnionAll  | conn   | in 80 out 16
+  - Update Fund Main 1 | OLEDBCommand  | conn [qsql]  | in 7 out 0
+  - Update Fund Main 2 | OLEDBCommand  | conn [qsql]  | in 7 out 0
+  - Update Fund Main 3 | OLEDBCommand  | conn [qsql]  | in 7 out 0
+  - Update Fund Main 4 | OLEDBCommand  | conn [qsql]  | in 7 out 0
+  - Update Fund Main 5 | OLEDBCommand  | conn [qsql]  | in 7 out 0
+  - Update TransfeRequest 5 | OLEDBCommand  | conn [qsql]  | in 2 out 0
+  - Update TransferRequest 1 | OLEDBCommand  | conn [qsql]  | in 2 out 0
+  - Update TransferRequest 2 | OLEDBCommand  | conn [qsql]  | in 2 out 0
+  - Update TransferRequest 4 | OLEDBCommand  | conn [qsql]  | in 2 out 0
+  - Update TrasferRequest 3 | OLEDBCommand  | conn [qsql]  | in 2 out 0
+     path Aggregate.Outputs[Aggregate Output 1] => Multicast 2.Inputs[Multicast Input 1]
+     path Split Rows For MultiThread 1.Outputs[Case 1] => Update Fund Main 1.Inputs[OLE DB Command Input]
+     path Split Rows For MultiThread 2.Outputs[Case 1] => Update TransferRequest 1.Inputs[OLE DB Command Input]
+     path Split Rows For MultiThread 1.Outputs[Case 2] => Update Fund Main 2.Inputs[OLE DB Command Input]
+     path Split Rows For MultiThread 2.Outputs[Case 2] => Update TransferRequest 2.Inputs[OLE DB Command Input]
+     path Split Rows For MultiThread 2.Outputs[Case 3] => Update TrasferRequest 3.Inputs[OLE DB Command Input]
+     path Split Rows For MultiThread 1.Outputs[Case 3] => Update Fund Main 3.Inputs[OLE DB Command Input]
+     path Split Rows For MultiThread 1.Outputs[Case 4] => Update Fund Main 4.Inputs[OLE DB Command Input]
+     path Split Rows For MultiThread 2.Outputs[Case 4] => Update TransferRequest 4.Inputs[OLE DB Command Input]
+     path Split Rows For MultiThread 1.Outputs[Case Last] => Update Fund Main 5.Inputs[OLE DB Command Input]
+     path Split Rows For MultiThread 2.Outputs[Conditional Split Default Output] => Update TransfeRequest 5.Inputs[OLE DB Command Input]
+     path Add Column for etl process warning.Outputs[Derived Column Output] => insert etl process warning.Inputs[OLE DB Command Input]
+     path Set Warning columns.Outputs[Derived Column Output] => Union All.Inputs[Union All Input 2]
+     path Transformation To Consulting Fields In Fund Main By Transfer Request.Outputs[Derived Column Output] => Additional Columns.Inputs[Derived Column Input]
+     path Additional Columns.Outputs[Derived Column Output] => Add Row Number 1.Inputs[Input 0]
+     path Set Warning columns TR.Outputs[Derived Column Output] => Union All.Inputs[Union All Input 1]
+     path Multicast 1.Outputs[Multicast Output 1] => Row Update Count.Inputs[Row Count Input 1]
+     path Multicast 2.Outputs[Multicast Output 1] => Add Row Number 2.Inputs[Input 0]
+     path Multicast 2.Outputs[Multicast Output 2] => Row Count Pipe 2.Inputs[Row Count Input 1]
+     path Multicast.Outputs[Multicast Output 2] => Component Task Name.Inputs[Input 0]
+     path Multicast 1.Outputs[Multicast Output 2] => Aggregate.Inputs[Aggregate Input 1]
+     path Multicast.Outputs[Multicast Output 3] => Row Count Pipe.Inputs[Row Count Input 1]
+     path Update TransferRequest 2.Outputs[OLE DB Command Error Output] => Union All Error TransferRequest.Inputs[Union All Input 2]
+     path Update Fund Main 2.Outputs[OLE DB Command Error Output] => Union Error All.Inputs[Union All Input 2]
+     path Update Fund Main 5.Outputs[OLE DB Command Error Output] => Union Error All.Inputs[Union All Input 5]
+     path Update TransferRequest 1.Outputs[OLE DB Command Error Output] => Union All Error TransferRequest.Inputs[Union All Input 1]
+     path Update Fund Main 1.Outputs[OLE DB Command Error Output] => Union Error All.Inputs[Union All Input 6]
+     path Update TransfeRequest 5.Outputs[OLE DB Command Error Output] => Union All Error TransferRequest.Inputs[Union All Input 5]
+     path Update TrasferRequest 3.Outputs[OLE DB Command Error Output] => Union All Error TransferRequest.Inputs[Union All Input 3]
+     path Update TransferRequest 4.Outputs[OLE DB Command Error Output] => Union All Error TransferRequest.Inputs[Union All Input 4]
+     path Update Fund Main 4.Outputs[OLE DB Command Error Output] => Union Error All.Inputs[Union All Input 4]
+     path Update Fund Main 3.Outputs[OLE DB Command Error Output] => Union Error All.Inputs[Union All Input 3]
+     path Update TransferRequest 4.Outputs[OLE DB Command Output] => Union All Update TransferRequest.Inputs[Union All Input 4]
+     path Update TransferRequest 2.Outputs[OLE DB Command Output] => Union All Update TransferRequest.Inputs[Union All Input 2]
+     path Update Fund Main 1.Outputs[OLE DB Command Output] => Union Update All.Inputs[Union All Input 5]
+     path Update TransfeRequest 5.Outputs[OLE DB Command Output] => Union All Update TransferRequest.Inputs[Union All Input 5]
+     path Update TransferRequest 1.Outputs[OLE DB Command Output] => Union All Update TransferRequest.Inputs[Union All Input 1]
+     path Update Fund Main 2.Outputs[OLE DB Command Output] => Union Update All.Inputs[Union All Input 1]
+     path Update Fund Main 3.Outputs[OLE DB Command Output] => Union Update All.Inputs[Union All Input 2]
+     path Update Fund Main 4.Outputs[OLE DB Command Output] => Union Update All.Inputs[Union All Input 3]
+     path Update TrasferRequest 3.Outputs[OLE DB Command Output] => Union All Update TransferRequest.Inputs[Union All Input 3]
+     path Update Fund Main 5.Outputs[OLE DB Command Output] => Union Update All.Inputs[Union All Input 4]
+     path Get TRansfer Request.Outputs[OLE DB Source Output] => Multicast.Inputs[Multicast Input 1]
+     path Component Task Name.Outputs[Output 0] => Transformation To Consulting Fields In Fund Main By Transfer Request.Inputs[Derived Column Input]
+     path Get Error Description.Outputs[Output 0] => Add Column for etl process warning.Inputs[Derived Column Input]
+     path Add Row Number 2.Outputs[Output 0] => Split Rows For MultiThread 2.Inputs[Conditional Split Input]
+     path Add Row Number 1.Outputs[Output 0] => Split Rows For MultiThread 1.Inputs[Conditional Split Input]
+     path Row Error Count.Outputs[Row Count Output 1] => Set Warning columns.Inputs[Derived Column Input]
+     path TR Row Error Count.Outputs[Row Count Output 1] => Set Warning columns TR.Inputs[Derived Column Input]
+     path Union All Error TransferRequest.Outputs[Union All Output 1] => TR Row Error Count.Inputs[Row Count Input 1]
+     path Union All.Outputs[Union All Output 1] => Get Error Description.Inputs[Input 0]
+     path Union Error All.Outputs[Union All Output 1] => Row Error Count.Inputs[Row Count Input 1]
+     path Union All Update TransferRequest.Outputs[Union All Output 1] => TR Row Update Count.Inputs[Row Count Input 1]
+     path Union Update All.Outputs[Union All Output 1] => Multicast 1.Inputs[Multicast Input 1]
+
+## SQL statements
+- Connect Funds to Customer Accounts\Get Funds Without Linked Customer Accounts | Microsoft.OLEDBSource.SqlCommand | [qsql] 
+    select ca.Gen_customeraccountId as Gen_customeraccountname, ca.gen_consultingenddate gen_consultingenddate, ca.gen_consultingstartdate gen_consultingstartdate, ca.gen_consultname, ca.gen_consultnumber, ca.gen_bankbranchadvisor, ca.gen_bankadvisor, f.gen_fundmainid, gen_fundnumber ,f.gen_consultingstartdate as fm_consultingstartdate ,f.gen_consultingenddate as fm_consultingenddate ,f.gen_consultnam
+- Connect Funds to Customer Accounts\insert etl process warning | Microsoft.OLEDBCommand.SqlCommand | [qsql] 
+    insert gen_etlprocesswarningBase ( gen_etlprocesswarningid ,[CreatedOn] ,[CreatedBy] ,[ModifiedOn] ,[ModifiedBy] ,[OrganizationId] ,[statecode] ,[statuscode] ,gen_name ,gen_etlubprocess ,gen_recordkey ,gen_warningdescription ,gen_warningtype ,gen_etlprocessid ) values(NEWID(),GETUTCDATE(),?,GETUTCDATE(),?,?,'0','1',?,?,?,?,?,?)
+- Create or Update Customer Accounts\Fund Is Block To Deposit | Microsoft.Lookup.SqlCommand | [qsql] 
+    select gen_fundmainid,cat.gen_customeraccounttypeid gen_customeraccounttype,f.gen_bankaccountnumber from gen_fundmain as f with(nolock) inner join product as p with(nolock) on productid = gen_fundtypename inner join gen_customeraccounttype as cat with(nolock) on cat.gen_id = p.Gen_producttypeid and cat.gen_bankname = f.gen_bankname where f.gen_IsDepositBlocked = '1'
+- Create or Update Customer Accounts\Fund Is Block To Deposit | Microsoft.Lookup.SqlCommandParam | [qsql] 
+    select * from (select gen_fundmainid,cat.gen_customeraccounttypeid gen_customeraccounttype,f.gen_bankaccountnumber from gen_fundmain as f with(nolock) inner join product as p with(nolock) on productid = gen_fundtypename inner join gen_customeraccounttype as cat with(nolock) on cat.gen_id = p.Gen_producttypeid and cat.gen_bankname = f.gen_bankname where f.gen_IsDepositBlocked = '1') [refTable] wher
+- Create or Update Customer Accounts\Get Automated Joining | Microsoft.OLEDBSource.SqlCommand | [qsql] 
+    select * from( select row_number() over (partition by aj.gen_applicantidentitynumber,aj.gen_documenttype, SUBSTRING( aj.gen_bankaccountnumberName,PATiNDEX('%[^0]%',aj.gen_bankaccountnumberName+'.'),LEN(aj.gen_bankaccountnumberName)) order by aj.createdon asc) as num, aj.gen_endadvisingdate gen_endadvisingdate, aj.gen_startadvisingdate gen_startadvisingdate, aj.gen_advisornumber, aj.gen_bankadvisor
+- Create or Update Customer Accounts\Get Customer Account Guid | Microsoft.Lookup.SqlCommand | [qsql] 
+    select ca.gen_name as gen_nameDB, gen_depositmfpercentage as gen_depositmfpercentageDB, gen_managementfeepercentage as gen_managementfeepercentageDB, gen_mfratedtotal as gen_mfratedtotalDB, gen_consultname as gen_consultnameDB, gen_producttypeid as gen_producttypeidDB, gen_address1_postalcode as gen_address1_postalcodeDB, gen_address1_buildingid as gen_address1_buildingidDB, gen_consultnumber as g
+- Create or Update Customer Accounts\Get Customer Account Guid | Microsoft.Lookup.SqlCommandParam | [qsql] 
+    select * from (select ca.gen_name as gen_nameDB, gen_depositmfpercentage as gen_depositmfpercentageDB, gen_managementfeepercentage as gen_managementfeepercentageDB, gen_mfratedtotal as gen_mfratedtotalDB, gen_consultname as gen_consultnameDB, gen_producttypeid as gen_producttypeidDB, gen_address1_postalcode as gen_address1_postalcodeDB, gen_address1_buildingid as gen_address1_buildingidDB, gen_con
+- Create or Update Customer Accounts\Get Funds Without Linked Customer Accounts | Microsoft.OLEDBSource.SqlCommand | [qsql] 
+    select temp.* from ( select row_number() over (partition by f.gen_bankname,f.gen_bankaccountnumber, p.gen_producttypeid order by f.gen_modifiedbybank desc) as num, f.gen_fundmainid, f.gen_depositmfpercentage, f.gen_managementfeepercentage, f.gen_consultname, f.gen_bankaccountnumber, p.gen_producttypeid, f.gen_address1_postalcode, f.gen_address1_buildingid, f.gen_consultnumber, f.gen_employernumber
+- Create or Update Customer Accounts\insert etl process warning | Microsoft.OLEDBCommand.SqlCommand | [qsql] 
+    insert gen_etlprocesswarningBase ( gen_etlprocesswarningid ,[CreatedOn] ,[CreatedBy] ,[ModifiedOn] ,[ModifiedBy] ,[OrganizationId] ,[statecode] ,[statuscode] ,gen_name ,gen_etlubprocess ,gen_recordkey ,gen_warningdescription ,gen_warningtype ,gen_etlprocessid ) values(NEWID(),GETUTCDATE(),?,GETUTCDATE(),?,?,'0','1',?,?,?,?,?,?)
+- Create or Update Customer Accounts\Update Customer Account 1 | Microsoft.OLEDBCommand.SqlCommand | [qsql] 
+    update Gen_customeraccountBase set gen_consultingenddate = ?, gen_consultingstartdate = ?, gen_customerdateofbirth = ?, gen_depositmfpercentage = ?, gen_managementfeepercentage = ?, gen_accountname = ?, gen_agencyname = ?, gen_agentname = ?, gen_bankname = ?, gen_brokernumber = ?, gen_contactname = ?, gen_employername = ?, gen_employernumber = ?, gen_estatetype = ?, gen_consultname = ?, gen_consul
+- Create or Update Customer Accounts\Update Customer Account 2 | Microsoft.OLEDBCommand.SqlCommand | [qsql] 
+    update Gen_customeraccountBase set gen_consultingenddate = ?, gen_consultingstartdate = ?, gen_customerdateofbirth = ?, gen_depositmfpercentage = ?, gen_managementfeepercentage = ?, gen_accountname = ?, gen_agencyname = ?, gen_agentname = ?, gen_bankname = ?, gen_brokernumber = ?, gen_contactname = ?, gen_employername = ?, gen_employernumber = ?, gen_estatetype = ?, gen_consultname = ?, gen_consul
+- Create or Update Customer Accounts\Update Customer Account 3 | Microsoft.OLEDBCommand.SqlCommand | [qsql] 
+    update Gen_customeraccountBase set gen_consultingenddate = ?, gen_consultingstartdate = ?, gen_customerdateofbirth = ?, gen_depositmfpercentage = ?, gen_managementfeepercentage = ?, gen_accountname = ?, gen_agencyname = ?, gen_agentname = ?, gen_bankname = ?, gen_brokernumber = ?, gen_contactname = ?, gen_employername = ?, gen_employernumber = ?, gen_estatetype = ?, gen_consultname = ?, gen_consul
+- Create or Update Customer Accounts\Update Customer Account 4 | Microsoft.OLEDBCommand.SqlCommand | [qsql] 
+    update Gen_customeraccountBase set gen_consultingenddate = ?, gen_consultingstartdate = ?, gen_customerdateofbirth = ?, gen_depositmfpercentage = ?, gen_managementfeepercentage = ?, gen_accountname = ?, gen_agencyname = ?, gen_agentname = ?, gen_bankname = ?, gen_brokernumber = ?, gen_contactname = ?, gen_employername = ?, gen_employernumber = ?, gen_estatetype = ?, gen_consultname = ?, gen_consul
+- Create or Update Customer Accounts\Update Customer Account 5 | Microsoft.OLEDBCommand.SqlCommand | [qsql] 
+    update Gen_customeraccountBase set gen_consultingenddate = ?, gen_consultingstartdate = ?, gen_customerdateofbirth = ?, gen_depositmfpercentage = ?, gen_managementfeepercentage = ?, gen_accountname = ?, gen_agencyname = ?, gen_agentname = ?, gen_bankname = ?, gen_brokernumber = ?, gen_contactname = ?, gen_employername = ?, gen_employernumber = ?, gen_estatetype = ?, gen_consultname = ?, gen_consul
+- End ETL Process record\Lookup | Microsoft.Lookup.SqlCommand | [qsql] 
+    select p.gen_etlprocessid , case when pw.gen_etlprocessid is null then 0 else 1 end as isWarningExist from gen_etlprocess p with (nolock) left join (select distinct gen_etlprocessId from gen_etlprocesswarning with (nolock)) as pw on p.gen_etlprocessId = pw.gen_etlprocessId
+- End ETL Process record\Lookup | Microsoft.Lookup.SqlCommandParam | [qsql] 
+    select * from (select p.gen_etlprocessid , case when pw.gen_etlprocessid is null then 0 else 1 end as isWarningExist from gen_etlprocess p left join (select distinct gen_etlprocessId from gen_etlprocesswarning ) as pw on p.gen_etlprocessId = pw.gen_etlprocessId) [refTable] where [refTable].[gen_etlprocessid] = ?
+- Get Sytem User Id\Get organization id | Microsoft.Lookup.SqlCommand | [qsql] 
+    SELECT LOWER([Name]) as Name,OrganizationId FROM OrganizationBase with (nolock)
+- Get Sytem User Id\Get organization id | Microsoft.Lookup.SqlCommandParam | [qsql] 
+    select * from (SELECT LOWER([Name]) as Name,OrganizationId FROM OrganizationBase with (nolock)) [refTable] where [refTable].[Name] = ?
+- Get Sytem User Id\Get User Id | Microsoft.OLEDBSource.SqlCommand | [qsql] 
+    select systemuserid from systemuser with (nolock) where lower(domainname) like '%crmadmin%'
+- Get Variables From SystemConfigurarion\Get SystemConfigurations | Microsoft.OLEDBSource.SqlCommand | [qsql] 
+    SELECT gen_key ,gen_Value FROM gen_etlvariable with (nolock) where gen_scope ='global' or gen_scope = 'Customer Account'
+- Set Joining email to Agent\Get Customer Accounts to Send Mails | Microsoft.OLEDBSource.SqlCommand | [qsql] 
+    select ca.Gen_customeraccountId, isnull(c.EMailAddress1,a.EMailAddress1) email, isnull(c.DoNotEMail,a.DoNotEMail) donotemail from Gen_customeraccount as ca with (nolock) left join Contact c on ca.Gen_agentname = c.contactid left join Account a on ca.Gen_agencyname = a.AccountID where ca.gen_joiningmailtoagent = 1
+- Set Joining email to Agent\insert etl process warning | Microsoft.OLEDBCommand.SqlCommand | [qsql] 
+    insert gen_etlprocesswarningBase ( gen_etlprocesswarningid ,[CreatedOn] ,[CreatedBy] ,[ModifiedOn] ,[ModifiedBy] ,[OrganizationId] ,[statecode] ,[statuscode] ,gen_name ,gen_etlubprocess ,gen_recordkey ,gen_warningdescription ,gen_warningtype ,gen_etlprocessid ) values(NEWID(),GETUTCDATE(),?,GETUTCDATE(),?,?,'0','1',?,?,?,?,?,?)
+- Update Aggrigations on Customer Accounts | ExecuteSQLTask | [qsql] 
+     update Gen_customeraccountBase set gen_accountbalance = sums.gen_accountbalance, Gen_periodofservice = sums.gen_periodofservice, Gen_fundcreationdate = sums.gen_fundcreationdate, gen_endexperiencereleasedate = sums.gen_endexperiencereleasedate from( select ca.Gen_customeraccountid, agg.gen_accountbalance, ca.Gen_accountbalance as Gen_accountbalanceDB, case when agg.gen_periodofservice=cast (0 as 
+- Update Consulting Field  In Customer Account From Transfer Request\Get Transfer Request | Microsoft.OLEDBSource.SqlCommand | [qsql] 
+    select tr.gen_transferrequestid, tr.gen_consultbank tr_consultbank, --בנק מייעץ tr.gen_consultnumber tr_consultnumber, --מספר יועץ tr.gen_bankadvisor tr_bankadvisor, --יועץ tr.gen_consultbankbranch tr_consultbankbranch, --סניף בנק יועץ tr.gen_consultingstartdate tr_consultingstartdate, --תאריך התחלת ייעוץ tr.gen_consultingenddate tr_consultingenddate, --תאריך תום ייעוץ ca.gen_consultname ca_consul
+- Update Consulting Field  In Customer Account From Transfer Request\insert etl process warning | Microsoft.OLEDBCommand.SqlCommand | [qsql] 
+    insert gen_etlprocesswarningBase ( gen_etlprocesswarningid ,[CreatedOn] ,[CreatedBy] ,[ModifiedOn] ,[ModifiedBy] ,[OrganizationId] ,[statecode] ,[statuscode] ,gen_name ,gen_etlubprocess ,gen_recordkey ,gen_warningdescription ,gen_warningtype ,gen_etlprocessid ) values(NEWID(),GETUTCDATE(),?,GETUTCDATE(),?,?,'0','1',?,?,?,?,?,?)
+- Update Consulting Field  In Customer Account From Transfer Request\Update Customer Account (Unsupported) 1 | Microsoft.OLEDBCommand.SqlCommand | [qsql] 
+    update Gen_customeraccountBase set gen_consultname = ?, gen_consultnumber = ?, gen_bankadvisor = ?, gen_bankbranchadvisor = ?, gen_consultingstartdate = ?, gen_consultingenddate = ? where Gen_customeraccountid = ?
+- Update Consulting Field  In Customer Account From Transfer Request\Update Customer Account (Unsupported) 2 | Microsoft.OLEDBCommand.SqlCommand | [qsql] 
+    update Gen_customeraccountBase set gen_consultname = ?, gen_consultnumber = ?, gen_bankadvisor = ?, gen_bankbranchadvisor = ?, gen_consultingstartdate = ?, gen_consultingenddate = ? where Gen_customeraccountid = ?
+- Update Consulting Field  In Customer Account From Transfer Request\Update Customer Account (Unsupported) 3 | Microsoft.OLEDBCommand.SqlCommand | [qsql] 
+    update Gen_customeraccountBase set gen_consultname = ?, gen_consultnumber = ?, gen_bankadvisor = ?, gen_bankbranchadvisor = ?, gen_consultingstartdate = ?, gen_consultingenddate = ? where Gen_customeraccountid = ?
+- Update Consulting Field  In Customer Account From Transfer Request\Update Customer Account (Unsupported) 4 | Microsoft.OLEDBCommand.SqlCommand | [qsql] 
+    update Gen_customeraccountBase set gen_consultname = ?, gen_consultnumber = ?, gen_bankadvisor = ?, gen_bankbranchadvisor = ?, gen_consultingstartdate = ?, gen_consultingenddate = ? where Gen_customeraccountid = ?
+- Update Consulting Field  In Customer Account From Transfer Request\Update Customer Account (Unsupported) 5 | Microsoft.OLEDBCommand.SqlCommand | [qsql] 
+    update Gen_customeraccountBase set gen_consultname = ?, gen_consultnumber = ?, gen_bankadvisor = ?, gen_bankbranchadvisor = ?, gen_consultingstartdate = ?, gen_consultingenddate = ? where Gen_customeraccountid = ?
+- Update Consulting Field  In Customer Account From Transfer Request\Update TransferRequest 1 | Microsoft.OLEDBCommand.SqlCommand | [qsql] 
+    update gen_transferrequest set gen_dateofcopyingconsultingdetails = GETUTCDATE(), ModifiedOn = GETUTCDATE(), ModifiedBy = ? where gen_transferrequestid = ?
+- Update Consulting Field  In Customer Account From Transfer Request\Update TransferRequest 2 | Microsoft.OLEDBCommand.SqlCommand | [qsql] 
+    update gen_transferrequest set gen_dateofcopyingconsultingdetails = GETUTCDATE(), ModifiedOn = GETUTCDATE(), ModifiedBy = ? where gen_transferrequestid = ?
+- Update Consulting Field  In Customer Account From Transfer Request\Update TransferRequest 3 | Microsoft.OLEDBCommand.SqlCommand | [qsql] 
+    update gen_transferrequest set gen_dateofcopyingconsultingdetails = GETUTCDATE(), ModifiedOn = GETUTCDATE(), ModifiedBy = ? where gen_transferrequestid = ?
+- Update Consulting Field  In Customer Account From Transfer Request\Update TransferRequest 4 | Microsoft.OLEDBCommand.SqlCommand | [qsql] 
+    update gen_transferrequest set gen_dateofcopyingconsultingdetails = GETUTCDATE(), ModifiedOn = GETUTCDATE(), ModifiedBy = ? where gen_transferrequestid = ?
+- Update Consulting Field  In Customer Account From Transfer Request\Update TransferRequest 5 | Microsoft.OLEDBCommand.SqlCommand | [qsql] 
+    update gen_transferrequest set gen_dateofcopyingconsultingdetails = GETUTCDATE(), ModifiedOn = GETUTCDATE(), ModifiedBy = ? where gen_transferrequestid = ?
+- Update Consulting Field  In Fund Main From Transfer Request\Get TRansfer Request | Microsoft.OLEDBSource.SqlCommand | [qsql] 
+    select tr.gen_transferrequestid, gen_dateofcopyingconsultingdetailstofund, tr.gen_consultbank tr_consultbank, --בנק מייעץ tr.gen_consultnumber tr_consultnumber, --מספר יועץ tr.gen_bankadvisor tr_bankadvisor, --יועץ tr.gen_consultbankbranch tr_consultbankbranch, --סניף בנק יועץ tr.gen_consultingstartdate tr_consultingstartdate, --תאריך התחלת ייעוץ tr.gen_consultingenddate tr_consultingenddate, --תא
+- Update Consulting Field  In Fund Main From Transfer Request\insert etl process warning | Microsoft.OLEDBCommand.SqlCommand | [qsql] 
+    insert gen_etlprocesswarningBase ( gen_etlprocesswarningid ,[CreatedOn] ,[CreatedBy] ,[ModifiedOn] ,[ModifiedBy] ,[OrganizationId] ,[statecode] ,[statuscode] ,gen_name ,gen_etlubprocess ,gen_recordkey ,gen_warningdescription ,gen_warningtype ,gen_etlprocessid ) values(NEWID(),GETUTCDATE(),?,GETUTCDATE(),?,?,'0','1',?,?,?,?,?,?)
+- Update Consulting Field  In Fund Main From Transfer Request\Update Fund Main 1 | Microsoft.OLEDBCommand.SqlCommand | [qsql] 
+    update Gen_fundmainbase set gen_consultname = ?, gen_consultnumber = ?, gen_bankadvisorname = ?, gen_consultantbankbranch = ?, gen_consultingstartdate = ?, gen_consultingenddate = ? where Gen_fundmainId = ?
+- Update Consulting Field  In Fund Main From Transfer Request\Update Fund Main 2 | Microsoft.OLEDBCommand.SqlCommand | [qsql] 
+    update Gen_fundmainbase set gen_consultname = ?, gen_consultnumber = ?, gen_bankadvisorname = ?, gen_consultantbankbranch = ?, gen_consultingstartdate = ?, gen_consultingenddate = ? where Gen_fundmainId = ?
+- Update Consulting Field  In Fund Main From Transfer Request\Update Fund Main 3 | Microsoft.OLEDBCommand.SqlCommand | [qsql] 
+    update Gen_fundmainbase set gen_consultname = ?, gen_consultnumber = ?, gen_bankadvisorname = ?, gen_consultantbankbranch = ?, gen_consultingstartdate = ?, gen_consultingenddate = ? where Gen_fundmainId = ?
+- Update Consulting Field  In Fund Main From Transfer Request\Update Fund Main 4 | Microsoft.OLEDBCommand.SqlCommand | [qsql] 
+    update Gen_fundmainbase set gen_consultname = ?, gen_consultnumber = ?, gen_bankadvisorname = ?, gen_consultantbankbranch = ?, gen_consultingstartdate = ?, gen_consultingenddate = ? where Gen_fundmainId = ?
+- Update Consulting Field  In Fund Main From Transfer Request\Update Fund Main 5 | Microsoft.OLEDBCommand.SqlCommand | [qsql] 
+    update Gen_fundmainbase set gen_consultname = ?, gen_consultnumber = ?, gen_bankadvisorname = ?, gen_consultantbankbranch = ?, gen_consultingstartdate = ?, gen_consultingenddate = ? where Gen_fundmainId = ?
+- Update Consulting Field  In Fund Main From Transfer Request\Update TransfeRequest 5 | Microsoft.OLEDBCommand.SqlCommand | [qsql] 
+    update gen_transferrequest set gen_dateofcopyingconsultingdetailstofund = GETUTCDATE(), ModifiedOn = GETUTCDATE(), ModifiedBy = ? where gen_transferrequestid = ?
+- Update Consulting Field  In Fund Main From Transfer Request\Update TransferRequest 1 | Microsoft.OLEDBCommand.SqlCommand | [qsql] 
+    update gen_transferrequest set gen_dateofcopyingconsultingdetailstofund = GETUTCDATE(), ModifiedOn = GETUTCDATE(), ModifiedBy = ? where gen_transferrequestid = ?
+- Update Consulting Field  In Fund Main From Transfer Request\Update TransferRequest 2 | Microsoft.OLEDBCommand.SqlCommand | [qsql] 
+    update gen_transferrequest set gen_dateofcopyingconsultingdetailstofund = GETUTCDATE(), ModifiedOn = GETUTCDATE(), ModifiedBy = ? where gen_transferrequestid = ?
+- Update Consulting Field  In Fund Main From Transfer Request\Update TransferRequest 4 | Microsoft.OLEDBCommand.SqlCommand | [qsql] 
+    update gen_transferrequest set gen_dateofcopyingconsultingdetailstofund = GETUTCDATE(), ModifiedOn = GETUTCDATE(), ModifiedBy = ? where gen_transferrequestid = ?
+- Update Consulting Field  In Fund Main From Transfer Request\Update TrasferRequest 3 | Microsoft.OLEDBCommand.SqlCommand | [qsql] 
+    update gen_transferrequest set gen_dateofcopyingconsultingdetailstofund = GETUTCDATE(), ModifiedOn = GETUTCDATE(), ModifiedBy = ? where gen_transferrequestid = ?
+- Update Paragraph14 and Employer Confirmation fields | ExecuteSQLTask | [qsql] 
+    update Gen_customeraccountBase set gen_paragraph14 = Gen_fundmain.gen_paragraph14, gen_employerconfirmation = Gen_fundmain.gen_employerconfirmation from Gen_fundmain join gen_customeraccountbase as ca with (nolock) on Gen_fundmain.Gen_customeraccountname = ca.Gen_customeraccountId where Gen_fundmain.gen_employerconfirmation is not null and Gen_fundmain.gen_paragraph14 is not null 
+- Update TransactionCurrencyId And ExchangeRate | ExecuteSQLTask | [qsql] 
+    update Gen_customeraccountBase set TransactionCurrencyId = (select top 1 TransactionCurrencyid from TransactionCurrency with (nolock) where CurrencyName = ?), ExchangeRate = 1.00000 where TransactionCurrencyId is null
+
+## Code write candidates (per owner)
+- Connect Funds to Customer Accounts\Add Row Number 1 {"output-buffer":5}
+- Connect Funds to Customer Accounts\Component Task Name {"sql-command":2}
+- Connect Funds to Customer Accounts\Dates To Local {"sql-command":2}
+- Connect Funds to Customer Accounts\Update Customer Account Guid in Fund {"crm-service":1,"crm-entity":6,"output-buffer":4,"crm-sdk-execute":3}
+- Connect Funds to Customer Accounts\Update Customer Account Guid in Fund 1 {"crm-service":1,"crm-entity":6,"output-buffer":4,"crm-sdk-execute":3}
+- Connect Funds to Customer Accounts\Update Customer Account Guid in Fund 2 {"crm-service":1,"crm-entity":6,"output-buffer":4,"crm-sdk-execute":3}
+- Connect Funds to Customer Accounts\Update Customer Account Guid in Fund 3 {"crm-service":1,"crm-entity":6,"output-buffer":4,"crm-sdk-execute":3}
+- Connect Funds to Customer Accounts\Update Customer Account Guid in Fund 4 {"crm-service":1,"crm-entity":6,"output-buffer":4,"crm-sdk-execute":3}
+- Create ETL Process record {"crm-entity":1,"crm-sdk-create":1,"variables-write":1}
+- Create or Update Customer Accounts\Add Row Number {"sql-command":2,"output-buffer":5}
+- Create or Update Customer Accounts\Add Row Number 1 {"sql-command":2,"output-buffer":5}
+- Create or Update Customer Accounts\Add Row Number 2 {"sql-command":2,"output-buffer":5}
+- Create or Update Customer Accounts\Compare Filed including Null From DB Before Update {"output-buffer":11}
+- Create or Update Customer Accounts\Compare Filed including Null From DB Before Update 1 {"output-buffer":6}
+- Create or Update Customer Accounts\Component Task Name {"sql-command":2}
+- Create or Update Customer Accounts\Create Customer Account {"crm-service":1,"crm-entity":26,"output-buffer":4,"crm-sdk-execute":3}
+- Create or Update Customer Accounts\Create Customer Account 1 {"crm-service":1,"crm-entity":26,"output-buffer":4,"crm-sdk-execute":3}
+- Create or Update Customer Accounts\Create Customer Account 2 {"crm-service":1,"crm-entity":26,"output-buffer":4,"crm-sdk-execute":3}
+- Create or Update Customer Accounts\Create Customer Account 3 {"crm-service":1,"crm-entity":26,"output-buffer":4,"crm-sdk-execute":3}
+- Create or Update Customer Accounts\Create Customer Account 4 {"crm-service":1,"crm-entity":26,"output-buffer":4,"crm-sdk-execute":3}
+- Create or Update Customer Accounts\Create System Columns {"sql-command":2,"output-buffer":2}
+- Create or Update Customer Accounts\Dates To Local {"sql-command":2}
+- Create or Update Customer Accounts\Dates To Local 1 {"sql-command":2}
+- Create or Update Customer Accounts\Get Error Description {"output-buffer":1}
+- Create or Update Customer Accounts\Update CustomerAccounts {"crm-service":1,"crm-entity":18,"output-buffer":4,"crm-sdk-execute":3}
+- Create or Update Customer Accounts\Update CustomerAccounts 1 {"crm-service":1,"crm-entity":18,"output-buffer":4,"crm-sdk-execute":3}
+- Create or Update Customer Accounts\Update CustomerAccounts 2 {"crm-service":1,"crm-entity":18,"output-buffer":4,"crm-sdk-execute":3}
+- Create or Update Customer Accounts\Update CustomerAccounts 3 {"crm-service":1,"crm-entity":18,"output-buffer":4,"crm-sdk-execute":3}
+- Create or Update Customer Accounts\Update CustomerAccounts 4 {"crm-service":1,"crm-entity":18,"output-buffer":4,"crm-sdk-execute":3}
+- End ETL Process record\ETL Record Finish {"sql-command":2,"crm-entity":3,"output-buffer":1,"crm-sdk-update":1}
+- End ETL Process record\Get gen_etlprocessid {"sql-command":2,"output-buffer":2}
+- Get Sytem User Id\Set UserId And Organization Id {"sql-command":2}
+- Set Joining email to Agent\Add Row Number 1 {"sql-command":2,"output-buffer":5}
+- Set Joining email to Agent\Component Task Name {"sql-command":2}
+- Set Joining email to Agent\Update Customer Account 1 {"crm-service":1,"crm-entity":3,"output-buffer":5,"crm-sdk-execute":3}
+- Set Joining email to Agent\Update Customer Account 2 {"crm-service":1,"crm-entity":3,"output-buffer":5,"crm-sdk-execute":3}
+- Set Joining email to Agent\Update Customer Account 3 {"crm-service":1,"crm-entity":3,"output-buffer":5,"crm-sdk-execute":3}
+- Set Joining email to Agent\Update Customer Account 4 {"crm-service":1,"crm-entity":3,"output-buffer":5,"crm-sdk-execute":3}
+- Set Joining email to Agent\Update Customer Account 5 {"crm-service":1,"crm-entity":3,"output-buffer":5,"crm-sdk-execute":3}
+- Update Consulting Field  In Customer Account From Transfer Request\Add Row Number 1 {"sql-command":2,"output-buffer":5}
+- Update Consulting Field  In Customer Account From Transfer Request\Component Task Name {"sql-command":2}
+- Update Consulting Field  In Customer Account From Transfer Request\Get Error Description {"output-buffer":1}
+- Update Consulting Field  In Fund Main From Transfer Request\Add Row Number 1 {"sql-command":2,"output-buffer":5}
+- Update Consulting Field  In Fund Main From Transfer Request\Add Row Number 2 {"sql-command":2,"output-buffer":5}
+- Update Consulting Field  In Fund Main From Transfer Request\Component Task Name {"sql-command":2}
+- Update Consulting Field  In Fund Main From Transfer Request\Get Error Description {"output-buffer":1}
+- Write To ETLProcessCounter {"variables-write":8,"crm-entity":2,"crm-sdk-create":1}
+- Write To ETLProcessCounter 1 {"variables-write":4,"crm-entity":2,"crm-sdk-create":1}
+- Write To ETLProcessCounter 2 {"variables-write":4,"crm-entity":2,"crm-sdk-create":1}
+- Write To ETLProcessCounter 3 {"variables-write":6,"crm-entity":4,"crm-sdk-create":2}
+- Write To ETLProcessCounter 4 {"variables-write":7,"crm-entity":4,"crm-sdk-create":2}
+- Package.EventHandlers[OnError]\Error ETL Process record {"crm-entity":4,"crm-sdk-update":1,"crm-sdk-create":1}
+
+## External refs (non-framework) CRM2015.Proxy

@@ -1,0 +1,323 @@
+{
+ "package": "0020_Preservation",
+ "analyst": "ssis-business-logic",
+ "source": {
+  "file": "source/DailyProcess/0020_Preservation.dtsx",
+  "sha256": "69CBA21E4A1769624497EBC9FC63DC7555AD20272BEC64070B4E8A70770B7511",
+  "lines": 6642
+ },
+ "scopeNote_he": "ניתוח לפי ה-DTSX בלבד. לחבילה אין DTS:Configuration (אין קובץ תצורה חיצוני). הכתיבה העסקית היחידה ל-CRM נעשית דרך רכיב KingswaySoft Dynamics CRM Destination על [Kingsway Connection] (ServerUrl=http://pcrm:5555/altshuler/, DTSX:9-11), כלומר דרך ה-SDK (Supported). החיבור [Crm Connection] = PSQL / ALTSHULER_MSCRM (DTSX:4-6) משמש בחבילה זו לקריאה בלבד (SELECT); אין בחבילה SQL DML על מסד ה-CRM. בחבילה שישה כותבי SDK בסך הכול: כותב עסקי אחד, רכיב ה-KingswaySoft Dynamics CRM Destination שכותב ל-gen_preservation (DTSX:3179-3197), וחמישה כותבי SDK ברכיבי סקריפט שכולם מסגרת ETL: Create ETL Process record (Create gen_etlprocess, DTSX:283-289), End ETL Process record\\ETL Record Finish (Update gen_etlprocess, DTSX:842-851), Close preservations\\ETL Warning (Create gen_etlprocesswarning, DTSX:4207-4220), Close Preservations ETL Counter (Create gen_etlprocesscounter, DTSX:5225-5235), ו-OnError\\Error ETL Process record (Update gen_etlprocess ויצירת annotation המקושרת אליו, DTSX:5816-5831). תוויות ערכי ה-Picklist (2, 57, 2) ושם הערך של ActionType=3 אינם שמורים ב-DTSX.",
+ "summary_he": "זרימת הנתונים 'Close preservations', שבתוך ה-Sequence 'Handle Expired Preservations', כותבת לתיקי שימור (gen_preservation) באמצעות פעולת כתיבה של רכיב KingswaySoft עם ActionType=3 (משמעות הקוד לפי תיעוד היצרן, לא מוצגת בקבצים; לפי המפתח gen_preservationid שנשלף מה-CRM, השערה: עדכון התיק הקיים); המשמעויות 'סגירה' ו'פג תוקף' נלקחות רק משמות המשימות האלה (השערה). תיק שימור נבחר באחד משני מקרים: (א) בשורת השליפה שלו gen_transferoutamountinactual אינו ריק (עמודה לא מסויגת; לא ידוע מאיזו טבלה) – בלי שום בדיקת תאריך או מצב; (ב) הוא במצב 1 ותאריך השימור האחרון שלו (מהמשיכה, מתיק שירות הלקוחות או מהעברת הפנסיה, לפי סדר עדיפות) קיים ומוקדם מ-dateadd(\"dd\",-1,getdate()). בכל תיק שנבחר נכתבים דרך ה-SDK הערכים: המצב (gen_currentstate) 2, תוצאת השימור (gen_preservationresault) 57 והתוצאה הכללית (gen_generalresult) 2; תוויות הערכים אינן בחבילה.",
+ "executionOrder": [
+  {
+   "step": 1,
+   "refId": "Package\\Get Variables From SystemConfigurarion",
+   "title_he": "טעינת משתני ETL (מסגרת)",
+   "trigger": "start (no incoming constraint)"
+  },
+  {
+   "step": 2,
+   "refId": "Package\\Create ETL Process record",
+   "title_he": "רשומת תהליך ETL (מסגרת)",
+   "trigger": "after Get Variables From SystemConfigurarion · Success (DTSX:5620)"
+  },
+  {
+   "step": 3,
+   "refId": "Package\\Handle Expired Preservations",
+   "title_he": "Handle Expired Preservations (Sequence; 'פג תוקף' לפי שם המשימה בלבד)",
+   "trigger": "after Create ETL Process record · Success (DTSX:5621)"
+  },
+  {
+   "step": "3.1",
+   "refId": "Package\\Handle Expired Preservations\\Close preservations",
+   "title_he": "כתיבה לתיקי שימור שנבחרו (Close preservations; KingswaySoft ActionType=3, משמעות הקוד לא מוצגת בקבצים – השערה: עדכון; 'סגירה' לפי שם הרכיב – השערה)",
+   "trigger": "first inside the sequence (no incoming constraint)"
+  },
+  {
+   "step": "3.2",
+   "refId": "Package\\Handle Expired Preservations\\Close Preservations ETL Counter",
+   "title_he": "מוני ETL (מסגרת)",
+   "trigger": "after Close preservations · Success (DTSX:5615)"
+  },
+  {
+   "step": 4,
+   "refId": "Package\\End ETL Process record",
+   "title_he": "סגירת תהליך ETL (מסגרת)",
+   "trigger": "after Handle Expired Preservations · Success (DTSX:5622)"
+  },
+  {
+   "step": "on error",
+   "refId": "Package.EventHandlers[OnError]\\Error ETL Process record",
+   "title_he": "סימון שגיאה ברשומת התהליך (מסגרת)",
+   "trigger": "OnError event handler (DTSX:5625)"
+  }
+ ],
+ "ignoredAsFramework": [
+  "Package\\Get Variables From SystemConfigurarion",
+  "Package\\Create ETL Process record",
+  "Package\\End ETL Process record",
+  "Package\\Handle Expired Preservations\\Close Preservations ETL Counter",
+  "Package.EventHandlers[OnError]\\Error ETL Process record",
+  "Package\\Handle Expired Preservations\\Close preservations\\Set PipeCounter",
+  "Package\\Handle Expired Preservations\\Close preservations\\Set UpdateCounter",
+  "Package\\Handle Expired Preservations\\Close preservations\\Set ErrorCounter",
+  "Package\\Handle Expired Preservations\\Close preservations\\Set Warning columns",
+  "Package\\Handle Expired Preservations\\Close preservations\\ETL Warning",
+  "LogProvider SSIS log provider for SQL Server → [SSIS_Logs Connection] (DTSX:21)"
+ ],
+ "components": [
+  {
+   "refId": "Package\\Handle Expired Preservations\\Close preservations",
+   "title_he": "כתיבה לתיקי שימור שנבחרו (KingswaySoft ActionType=3, משמעות הקוד לא מוצגת בקבצים – השערה: עדכון; לפי שמות המשימות: סגירת תיקים שפג תוקפם – השערה)",
+   "techName": "Close preservations",
+   "short_he": "נבחרים תיקי שימור שבשורת השליפה שלהם gen_transferoutamountinactual אינו ריק (העמודה אינה מסויגת בכינוי טבלה; לא ידוע אם היא של תיק השימור או של המשיכה, תיק שירות הלקוחות או העברת הפנסיה המקושרים, ומשמעותה לא הוכחה), או תיקים שמצבם הנוכחי 1 (התווית לא בחבילה; השערה: פתוח) ותאריך השימור האחרון שלהם עבר לפני יותר מיום. בכל תיק כזה החבילה כותבת ל-CRM ערכים קבועים במצב, בתוצאת השימור ובתוצאה הכללית, באמצעות רכיב KingswaySoft עם ActionType=3 (משמעות הקוד לפי תיעוד היצרן, לא מוצגת בקבצים; השערה: עדכון התיק הקיים).",
+   "flow_he": [
+    "שליפת תיקי שימור מ-Gen_Preservation עם תאריך השימור האחרון (משיכה ← שירות לקוחות ← העברת פנסיה).",
+    "סינון: gen_transferoutamountinactual לא ריק, או (תאריך קיים, קטן מ-getdate()-1 יום, ו-gen_currentstate = 1).",
+    "קביעת ערכים: gen_currentstate=2, gen_preservationresault=57, gen_generalresult=2.",
+    "כתיבה ל-gen_preservation דרך KingswaySoft CRM Destination (SDK) עם ActionType=3 (משמעות הקוד לפי תיעוד היצרן, לא מוצגת בקבצים; השערה: עדכון לפי gen_preservationid).",
+    "שורות שנכשלו בכתיבה מופנות לאזהרת ETL (מסגרת) והריצה ממשיכה."
+   ],
+   "short": {
+    "nodes": [
+     {
+      "type": "step",
+      "text": "החבילה מאתרת תיקי שימור ומחשבת לכל תיק את תאריך השימור האחרון שלו: מהמשיכה המקושרת, ואם אין, מתיק שירות הלקוחות, ואם אין, מהעברת הפנסיה."
+     },
+     {
+      "type": "decision",
+      "text": "האם תיק השימור עומד בתנאי הבחירה של השליפה?",
+      "branches": [
+       {
+        "label": "gen_transferoutamountinactual אינו ריק (טבלת המקור לא ידועה)",
+        "nodes": [
+         {
+          "type": "step",
+          "text": "התיק נבחר לכתיבה בלי קשר למצבו ולתאריך."
+         }
+        ]
+       },
+       {
+        "label": "מצב התיק הוא 1 (השערה: פתוח) ותאריך השימור האחרון עבר לפני יותר מיום",
+        "nodes": [
+         {
+          "type": "step",
+          "text": "התיק נבחר לכתיבה."
+         }
+        ]
+       },
+       {
+        "label": "אחרת",
+        "nodes": [
+         {
+          "type": "step",
+          "text": "התיק אינו מטופל בריצה זו."
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "type": "write",
+      "text": "בכל תיק שנבחר החבילה כותבת ל-CRM ערכים קבועים במצב, בתוצאת השימור ובתוצאה הכללית. הכתיבה נעשית ב-ActionType=3 של KingswaySoft, שמשמעותו אינה מוצגת בקבצים (השערה: עדכון התיק הקיים)."
+     },
+     {
+      "type": "end",
+      "text": "תיקי שימור שבשורת השליפה שלהם gen_transferoutamountinactual אינו ריק (טבלת המקור לא ידועה; משמעות העמודה השערה), או שמצבם 1 ותאריך השימור האחרון שלהם מוקדם מיום לפני הריצה, נכתבים עם מצב 2, תוצאת שימור 57 ותוצאה כללית 2 (השערה: כעדכון של התיק הקיים; השערה לגבי המשמעות: \"סגור\" ו\"לא שומר\"; התוויות לא נמצאות בחבילה)."
+     }
+    ]
+   },
+   "detailed": {
+    "nodes": [
+     {
+      "type": "step",
+      "text": "נשלפים תיקי השימור מטבלת תיקי השימור ב-CRM, יחד עם הרשומות המקושרות אליהם: המשיכה, תיק שירות הלקוחות והעברת הפנסיה.",
+      "tech": "Get preservations (OLEDBSource, [Crm Connection]=PSQL/ALTSHULER_MSCRM) DTSX:4801, SQL DTSX:4806: from Gen_Preservation p left join gen_withdrawal w on w.gen_withdrawalid = p.gen_withdrawalname left join gen_customercare t_out on t_out.Gen_customercareId = p.gen_preservationnumber left join gen_pensiontransferout pto on pto.gen_pensiontransferoutId = p.gen_pensiontransferout"
+     },
+     {
+      "type": "step",
+      "text": "לכל תיק מחושב תאריך השימור האחרון לפי סדר עדיפות: תאריך השימור האחרון שבמשיכה; אם הוא ריק, התאריך שבתיק שירות הלקוחות; אם גם הוא ריק, התאריך שבהעברת הפנסיה.",
+      "tech": "isnull(w.gen_lastdatepreservation, isnull(t_out.Gen_lastpreservationdate, pto.gen_LastDateForPreservation)) as Gen_lastpreservationdate (DTSX:4806)"
+     },
+     {
+      "type": "decision",
+      "text": "האם התיק עומד בתנאי הבחירה של השליפה?",
+      "tech": "where gen_transferoutamountinactual is not null or( isnull(...) is not null and isnull(...) < dateadd(\"dd\",-1,getdate()) and p.gen_currentstate = 1)",
+      "branches": [
+       {
+        "label": "כן: gen_transferoutamountinactual אינו ריק (טבלת המקור לא ידועה)",
+        "nodes": [
+         {
+          "type": "step",
+          "text": "התיק נבחר בלי לבדוק את מצבו ואת התאריך, כי ה-OR עוטף רק את שאר התנאים. גם תיק שכבר קיבל את הערכים 2/57/2 ייבחר וייכתב שוב בכל ריצה.",
+          "tech": "gen_transferoutamountinactual is not null — העמודה אינה מסויגת בכינוי טבלה; לא ידוע מאיזו טבלה היא נלקחת"
+         }
+        ]
+       },
+       {
+        "label": "כן: מצב 1 (השערה: פתוח) ותאריך השימור האחרון עבר",
+        "nodes": [
+         {
+          "type": "step",
+          "text": "התיק נבחר אם יש לו תאריך שימור אחרון, התאריך מוקדם מעכשיו פחות יום אחד, ומצבו הנוכחי הוא 1.",
+          "tech": "Gen_lastpreservationdate is not null and < dateadd(\"dd\",-1,getdate()) and p.gen_currentstate = 1"
+         }
+        ]
+       },
+       {
+        "label": "לא",
+        "nodes": [
+         {
+          "type": "step",
+          "text": "התיק אינו נשלף, והחבילה אינה כותבת אליו."
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "type": "step",
+      "text": "לכל תיק שנבחר נקבעים שלושה ערכים קבועים: מצב נוכחי 2, תוצאת שימור 57 ותוצאה כללית 2.",
+      "tech": "Set columns (DerivedColumn) DTSX:4849: gen_currentstate = 2; gen_preservationresault = 57; gen_generalresult = 2 (כל השלושה Picklist לפי ExternalColumns DTSX:3331, 3739, 3541)"
+     },
+     {
+      "type": "write",
+      "text": "החבילה כותבת לתיק השימור ב-CRM, עם המזהה שלו, את שלושת השדות האלה בלבד. סוג הפעולה נקבע ב-ActionType=3, שמשמעותו לפי תיעוד היצרן ואינה מוצגת בקבצים (השערה: עדכון התיק הקיים).",
+      "tech": "Dynamics CRM Destination (KingswaySoft) DTSX:3179 · gen_preservation · ActionType=3 (DTSX:3182; תווית ה-enum לא שמורה ב-DTSX, השערה: Upsert), RecordMatchingCriteria=1, מפתח gen_preservationid מהשליפה · input columns DTSX:3205-3208 · BatchSize=100, 20 threads · SDK"
+     },
+     {
+      "type": "decision",
+      "text": "האם הכתיבה ל-CRM הצליחה?",
+      "tech": "Dynamics CRM Destination.Inputs[Input] errorRowDisposition=\"RedirectRow\" (DTSX:3203)",
+      "branches": [
+       {
+        "label": "כן",
+        "nodes": [
+         {
+          "type": "step",
+          "text": "השורה נספרת במונה ETL (מסגרת)."
+         }
+        ]
+       },
+       {
+        "label": "לא",
+        "nodes": [
+         {
+          "type": "step",
+          "text": "השורה מופנית לרישום אזהרת ETL (מסגרת). הריצה אינה נעצרת והתיק נשאר כפי שהיה."
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "type": "end",
+      "text": "תיקי שימור שבשורת השליפה שלהם gen_transferoutamountinactual אינו ריק (טבלת המקור לא ידועה), או שמצבם 1 ותאריך השימור האחרון שלהם מוקדם מיום לפני הריצה, נכתבים עם מצב 2, תוצאת שימור 57 ותוצאה כללית 2 (השערה: כעדכון של התיק הקיים). תוויות הערכים אינן ידועות מהחבילה."
+     }
+    ]
+   },
+   "detail_he": [
+    {
+     "h": "מקור ואוכלוסייה",
+     "t": "כל רשומות Gen_Preservation ב-CRM (קריאת SQL דרך [Crm Connection]), מחוברות ב-LEFT JOIN ל-gen_withdrawal, gen_customercare ו-gen_pensiontransferout. נבחרים תיקים שבשורת השליפה שלהם gen_transferoutamountinactual אינו ריק (עמודה לא מסויגת; לא ידוע מאיזו מארבע הטבלאות), או תיקים במצב gen_currentstate = 1 שתאריך השימור האחרון המחושב שלהם קיים ומוקדם מ-getdate() פחות יום אחד."
+    },
+    {
+     "h": "התאמה לרשומות קיימות",
+     "t": "אין חיפוש. הרשומות נשלפות מ-CRM עצמו, והכתיבה נעשית עם gen_preservationid שנשלף (ActionType=3, RecordMatchingCriteria=1; משמעויות הקודים לפי תיעוד היצרן, לא מוצגות בקבצים; השערה: עדכון התיק הקיים)."
+    },
+    {
+     "h": "החלטות",
+     "t": "תאריך השימור האחרון נקבע לפי סדר עדיפות: משיכה, אחר כך שירות לקוחות, ולבסוף העברת פנסיה. תנאי הבחירה מובא בציטוט ב-decisions. בגלל קדימות האופרטורים, תיק עם gen_transferoutamountinactual נבחר בכל מצב ובכל תאריך."
+    },
+    {
+     "h": "כתיבה ל-CRM",
+     "t": "החבילה כותבת ל-gen_preservation דרך ה-SDK, באמצעות רכיב KingswaySoft עם ActionType=3 (משמעות הקוד לפי תיעוד היצרן, לא מוצגת בקבצים; השערה: עדכון), את השדות gen_currentstate=2, gen_preservationresault=57, gen_generalresult=2. שורות שנכשלו מופנות (RedirectRow) לאזהרות ETL והריצה ממשיכה."
+    },
+    {
+     "h": "תוצאה עסקית",
+     "t": "תיקי שימור שבשורת השליפה שלהם gen_transferoutamountinactual אינו ריק (טבלת המקור ומשמעות העמודה לא ידועות), או שמצבם 1 ותאריך השימור האחרון שלהם עבר לפני יותר מיום, נכתבים עם ערכים קבועים (השערה: כעדכון של התיק הקיים): מצב 2, תוצאת שימור 57 ותוצאה כללית 2. המשמעות העסקית של הערכים 2 ו-57 לא ידועה מהחבילה."
+    }
+   ],
+   "decisions": [
+    {
+     "where": "Get preservations (SQL WHERE, DTSX:4806)",
+     "condition": "gen_transferoutamountinactual is not null or( isnull(w.gen_lastdatepreservation,isnull(t_out.Gen_lastpreservationdate,pto.gen_LastDateForPreservation)) is not null and isnull(w.gen_lastdatepreservation,isnull(t_out.Gen_lastpreservationdate,pto.gen_LastDateForPreservation)) < dateadd(\"dd\",-1,getdate()) and p.gen_currentstate = 1)",
+     "meaning_he": "gen_transferoutamountinactual אינו ריק (עמודה לא מסויגת; טבלת המקור לא ידועה), או תיק במצב 1 שתאריך השימור האחרון שלו עבר לפני יותר מיום.",
+     "outcome_he": "התיק נבחר לכתיבה (2/57/2). אחרת הוא לא מטופל."
+    },
+    {
+     "where": "Get preservations (SQL SELECT, DTSX:4806)",
+     "condition": "isnull(w.gen_lastdatepreservation, isnull(t_out.Gen_lastpreservationdate, pto.gen_LastDateForPreservation))",
+     "meaning_he": "בחירת מקור תאריך השימור האחרון: משיכה, אחר כך שירות לקוחות, ולבסוף העברת פנסיה.",
+     "outcome_he": "משמש לתנאי הבחירה בלבד ואינו נכתב ל-CRM."
+    },
+    {
+     "where": "Dynamics CRM Destination (DTSX:3203)",
+     "condition": "errorRowDisposition=\"RedirectRow\"",
+     "meaning_he": "כישלון בכתיבה לתיק אינו עוצר את הריצה.",
+     "outcome_he": "השורה עוברת לאזהרת ETL (מסגרת)."
+    }
+   ],
+   "crmEffects": [
+    {
+     "entity": "gen_preservation",
+     "verb": "write (ActionType=3; משמעות הקוד לפי תיעוד היצרן, לא מוצגת בקבצים; השערה: Upsert/עדכון לפי מפתח ראשי gen_preservationid) · gen_currentstate=2, gen_preservationresault=57, gen_generalresult=2",
+     "mechanism": "SDK",
+     "when_he": "לכל תיק שעומד בתנאי הבחירה, בכל ריצה"
+    },
+    {
+     "entity": "gen_preservation, gen_withdrawal, gen_customercare, gen_pensiontransferout",
+     "verb": "read",
+     "mechanism": "SQL (SELECT דרך [Crm Connection])",
+     "when_he": "בתחילת זרימת הנתונים"
+    }
+   ],
+   "evidence": [
+    "0020_Preservation.dtsx sha 69CBA21E… · Get preservations DTSX:4801, SqlCommand DTSX:4806",
+    "Set columns DTSX:4849 (FriendlyExpression 2 / 57 / 2)",
+    "Dynamics CRM Destination DTSX:3179; DestinationEntity DTSX:3181; ActionType DTSX:3182; RecordMatchingCriteria DTSX:3185; input disposition DTSX:3203; input columns DTSX:3205-3208",
+    "ExternalColumns FieldType=Picklist: gen_currentstate DTSX:3331, gen_generalresult DTSX:3541, gen_preservationresault DTSX:3739; gen_preservationid Uniqueidentifier DTSX:3727",
+    "[Kingsway Connection] DTSX:9-11 (ServerUrl=http://pcrm:5555/altshuler/); [Crm Connection] DTSX:4-6",
+    "Precedence: Close preservations → Close Preservations ETL Counter Success DTSX:5615"
+   ],
+   "openQuestions_he": [
+    "מה התוויות של gen_currentstate=1/2, gen_preservationresault=57 ו-gen_generalresult=2? הן לא שמורות בחבילה.",
+    "מאיזו טבלה נלקחת העמודה הלא מסויגת gen_transferoutamountinactual (p, w, t_out או pto)? היא אינה מופיעה במטא-דאטה של gen_preservation ב-DTSX. גם gen_pensiontransferout, שבו השאילתה משתמשת על p, אינו מופיע שם, ולכן המטא-דאטה אינו הוכחה חותכת.",
+    "האם זה מכוון שתיק שבשורת השליפה שלו gen_transferoutamountinactual אינו ריק נבחר בלי תלות במצב ובתאריך, ולכן נכתב מחדש בכל ריצה ויכול לדרוס תוצאת שימור קודמת?",
+    "מה התווית המדויקת של ActionType=3 ו-RecordMatchingCriteria=1 ב-KingswaySoft? השערה: האפקט הוא עדכון רשומה קיימת, כי המזהה נשלף מ-CRM."
+   ]
+  }
+ ],
+ "findings_he": [
+  {
+   "severity": "medium",
+   "text": "קדימות OR בתנאי הבחירה: התנאי gen_transferoutamountinactual is not null עומד לבדו מחוץ לסוגריים. לכן כל תיק שבשורת השליפה שלו העמודה הזו אינה ריקה (טבלת המקור לא ידועה, ראו הממצא הבא) נבחר בלי בדיקת gen_currentstate = 1 ובלי בדיקת תאריך. בכל ריצה הוא נכתב מחדש ל-gen_currentstate=2, gen_preservationresault=57 ו-gen_generalresult=2, גם אם קיבל קודם ערכים אחרים. לא ידוע אם זה מכוון.",
+   "evidence": "Get preservations SqlCommand DTSX:4806 (שורות WHERE בטקסט ה-SQL)"
+  },
+  {
+   "severity": "low",
+   "text": "העמודה gen_transferoutamountinactual אינה מסויגת בכינוי טבלה בשאילתה שמחברת ארבע טבלאות. לא ידוע מאיזו ישות היא נלקחת.",
+   "evidence": "DTSX:4806 (SQL), DTSX:4814"
+  },
+  {
+   "severity": "info",
+   "text": "הכתיבה ל-CRM נעשית דרך KingswaySoft CRM Destination (SDK, Supported). אין בחבילה עדכוני SQL ישירים. [Crm Connection] משמש לקריאה בלבד.",
+   "evidence": "DTSX:3179-3200; survey SQL statements (SELECT בלבד)"
+  },
+  {
+   "severity": "info",
+   "text": "הערכים הקבועים 2/57/2 הם literal מוכחים בנתיב הכתיבה (Set columns ← Dynamics CRM Destination). תוויות ה-Picklist לא ידועות.",
+   "evidence": "DTSX:4849; DTSX:3205-3208"
+  },
+  {
+   "severity": "info",
+   "text": "שגיאות כתיבה מופנות (RedirectRow) לאזהרות ETL. כישלון בכתיבה לתיק אינו עוצר את הריצה, וייבחר שוב בריצה הבאה אם עדיין עומד בתנאי.",
+   "evidence": "DTSX:3203; paths Error Output → Set ErrorCounter → Set Warning columns → ETL Warning"
+  },
+  {
+   "severity": "low",
+   "text": "ההשוואה < dateadd(\"dd\",-1,getdate()) משתמשת בשעון השרת המקומי. ב-CRM שדות תאריך נשמרים בדרך כלל ב-UTC (ידע פלטפורמה, השערה), ולכן ייתכן היסט של שעות בגבול היום.",
+   "evidence": "DTSX:4806"
+  }
+ ]
+}

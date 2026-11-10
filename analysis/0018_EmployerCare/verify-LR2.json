@@ -1,0 +1,46 @@
+{
+  "verifier": "ssis-verifier",
+  "package": "0018_EmployerCare",
+  "scope": "logic-claims re-check round 2",
+  "checkedAt": "2026-11-07T18:00:00.000Z",
+  "checked": 3,
+  "results": [
+    {
+      "id": "L|Package\\Close Gen_employercare|title",
+      "hash": "237526ac2537",
+      "verdict": "WRONG",
+      "detail": "Units 2-5 match the DTSX: source WHERE Gen_employercare.Gen_CurrentState = 2 AND (Gen_depositereason not IN (6,7,8,9,11) or Gen_depositereason is null), INNER JOIN gen_customeraccount and Gen_fundmain (DTSX:1425-1432). Lookup Get All Transaction: gen_ftcurrentyear JOIN Gen_fundtransactiontype WHERE gen_transgrouptype = 1 AND gen_transactiontypeid NOT LIKE '%99%' GROUP BY gen_fundnumber (DTSX:1364-1369), join gen_fundmainid = gen_fundnumber (DTSX:1388-1390), NoMatchBehavior 1 with no path from No Match (DTSX:1379, paths 2473-2478). Aggregate group by Gen_employercareid (DTSX:580). Two units go beyond the evidence. Unit 1 (title_he) says as fact that the records are closed ('סגירת') and that a transaction was received for them ('שהתקבלה עבורם תנועה'). The meaning of state 3 comes only from the code comment '//Finished' (DTSX:1928) and the data-flow name 'Close Gen_employercare'. The short and detailed texts attribute it ('לפי הערת הקוד'), but the title does not. The lookup also does not link the transaction to the employer-care record: it accepts any qualifying transaction on any fund of the customer account, with no employer or date link. Unit 6 gives '(Finished)' with no attribution. That contradicts the package's own wording elsewhere ('לפי הערת הקוד: Finished').",
+      "evidence": "DTSX:1364-1369, 1379, 1388-1390, 1425-1432, 554-581, 1928 (OptionSetValue(3);//Finished), 2473-2478",
+      "wrongUnits": [
+        {
+          "unit": 1,
+          "problem": "'סגירת' states the meaning of state 3 as fact. That meaning comes only from the code comment and the component name. 'שהתקבלה עבורם תנועה' suggests a transaction tied to the employer-care record, but the match is any qualifying transaction on any fund of the customer account, with no employer or date link.",
+          "correct": "מעבר טיפולי מעסיק ממצב 2 למצב 3 (לפי הערת הקוד: Finished; לפי שם הרכיב: סגירה) כשלקופה של חשבון הלקוח יש תנועה מתאימה",
+          "evidence": "DTSX:1928, 1364-1369, 1425-1432"
+        },
+        {
+          "unit": 6,
+          "problem": "'(Finished)' is presented without attribution. It is a code comment only.",
+          "correct": "עדכון ב-CRM: מצב 3 (לפי הערת הקוד: Finished) ו-gen_modifiedbybank = מועד הריצה (משמעות השדה – השערה)",
+          "evidence": "DTSX:1928"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Close Gen_employercare|short",
+      "hash": "4b0e0ff3f160",
+      "verdict": "CONFIRMED",
+      "detail": "[1] Population is state 2 plus a NULL or not-in (6,7,8,9,11) deposit reason, joined to the funds of the customer account (DTSX:1425-1432). [2] Group 1 is on Gen_fundtransactiontype.gen_transgrouptype, and gen_transactiontypeid NOT LIKE '%99%' means 'contains 99 anywhere'. The column is unqualified; 0008_LeumiFile-PY places Gen_TransactionTypeID on gen_fundtransactiontype. The table meaning is labelled as hypothesis (DTSX:1364-1369). [3]-[4] state 3 is attributed to the code comment (DTSX:1928). 'מסומן מועד העדכון' = gen_modifiedbybank = DateTime.Now (main.cs:133). [5]-[6] No Match has no path, so the record is not updated (DTSX:1379, 2473-2478). [7] matches. The failure branch is not part of this simplified view; it is described in detailed [11].",
+      "evidence": "DTSX:1364-1369, 1379, 1388-1390, 1425-1432, 1928-1929, 2473-2478",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Close Gen_employercare|detailed",
+      "hash": "bc5180a6deb7",
+      "verdict": "CONFIRMED",
+      "detail": "All 12 units re-derived. [1] DTSX:1430-1432, including NULL. [2] INNER JOINs DTSX:1428-1429. [3] Lookup SQL DTSX:1364-1369, CacheType 0 (DTSX:1378). Rows with a NULL gen_transactiontypeid are also excluded by NOT LIKE; the tech text quotes the exact SQL. [4]-[8] JoinToReferenceColumn gen_fundnumber on gen_fundmainid (DTSX:1388-1390). NoMatchBehavior 1, and the No Match output has no path, so those rows are dropped. [9] Aggregate group-by Gen_employercareid (DTSX:580), the only output column. [10] main.cs:130-133: OptionSetValue(3)//Finished, gen_modifiedbybank = DateTime.Now, RequestType.Update through ExecuteMultipleExtension (external CRM.Proxy) in batches of 100, plus a final flush at EndOfRowset (main.cs:137-139, 185-187). Meanings are labelled. [11] ErrorBuffer lines are commented out (DTSX:1963-1964). The Error output is connected (DTSX:2475) but never receives rows. OnError handler (DTSX:34-41) script updates gen_etlprocess and creates an annotation. The text is conditional ('אם ...'), which is correct because ContinueOnError inside the external ExecuteMultipleExtension is unknown. Note, not a defect here: batches already sent before an exception stay committed. This is covered by L|exec. [12] consistent with [1].",
+      "evidence": "DTSX:1362-1436, 554-589, 1923-1987 (main.cs 127-191), 1963-1964, 2473-2478, 34-41",
+      "wrongUnits": []
+    }
+  ]
+}

@@ -1,0 +1,724 @@
+{
+ "verifier": "ssis-verifier",
+ "package": "0022_Company Workers",
+ "scope": "logic-claims all",
+ "checkedAt": "2026-11-07T11:27:21.752Z",
+ "checked": 73,
+ "results": [
+  {
+   "id": "L|summary",
+   "hash": "321e64b0bb1b",
+   "verdict": "WRONG",
+   "detail": "Unit 2 (scopeNote) checked: [CRM]=Psql/ALTSHULER_MSCRM DTSX:6; config DTSX:17; the 3 SDK writers are ETL-only (Create gen_etlprocess DTSX:278, Update DTSX:848, Update+annotation Create DTSX:5325/5334); End ETL Lookup on [CRM] DTSX:2235/2260; 8 business writes are OLEDBCommand UPDATEs. Unit 1 overstates: 'וכל השאר למשתמש קופות רגילות' is false as a universal. The Regular sources only select records whose owner joins SystemUser (INNER JOIN, so team-owned records are excluded) and whose owner DomainName != ? (records owned by users with NULL DomainName are excluded). Those funds/FT requests are never reassigned.",
+   "evidence": "DTSX:4644-4653 (Get regular funds), DTSX:4352-4360 (Get regular ftrequest), DTSX:3498-3507, 3206-3214",
+   "wrongUnits": [
+    {
+     "unit": 1,
+     "problem": "'all the rest go to the Regular Funds user' is not what the SQL does",
+     "correct": "Only funds/FT requests owned by a SystemUser whose DomainName is non-NULL and different from the target name are reassigned; team-owned records and records owned by users with NULL DomainName keep their owner.",
+     "evidence": "DTSX:4644 'join SystemUser on systemuserid = OwnerId where SystemUser.DomainName != ?'; DTSX:4352 same"
+    }
+   ]
+  },
+  {
+   "id": "L|exec",
+   "hash": "b2b7e6578b72",
+   "verdict": "CONFIRMED",
+   "detail": "Re-derived the chain from the PrecedenceConstraints DTSX:5115-5124: Get Variables → Create ETL → Update CW Funds → Update Regular Funds → Update Trans → MF Current Year → MF Previous Year → MF Archive → CW FTRequests → Regular FTRequest → End ETL. All constraints have no DTS:Value (= Success), LogicalAnd=True, no expressions. OnError handler DTSX:5127/5134. No disabled executables.",
+   "evidence": "DTSX:5115-5124, 5127, 5134",
+   "wrongUnits": []
+  },
+  {
+   "id": "L|ignored",
+   "hash": "ca9632933755",
+   "verdict": "CONFIRMED",
+   "detail": "Create ETL Process record only creates gen_etlprocess (DTSX:271-278). End ETL Process record = Get gen_etlprocessid (emits the ETLProcessRecordGuid variable, DTSX:1694-1697) → Lookup gen_etlprocess/warning → ETL Record Finish (updates gen_etlprocess statuscode/runtime, DTSX:840-848). OnError updates gen_etlprocess and creates an annotation (DTSX:5320-5334). The log provider writes to SRS.SSIS_Logs. Get Variables only reads gen_etlvariable and sets variables, and is correctly noted as the source of the two domain-name variables. None of these writes business CRM data or filters business records.",
+   "evidence": "DTSX:20, 95-278, 580-2300, 2306-3190, 5134-5334",
+   "wrongUnits": []
+  },
+  {
+   "id": "L|finding#1",
+   "hash": "ec2e51298c0b",
+   "verdict": "CONFIRMED",
+   "detail": "Eight OLEDBCommand UPDATEs SET OwnerId, OwningBusinessUnit, OwnerIdType on Gen_fundmainBase (×2), Gen_ftrequestBase/gen_ftrequestBase (×2), Gen_ftcurrentyearBase, Gen_mfcurrentyearBase, Gen_mfPreviousYearBase and Gen_mfArchiveBase, all on [CRM]. The platform side-effects are correctly labelled as a hypothesis (השערה).",
+   "evidence": "DTSX:3422, 3715, 3903, 4090, 4277, 4568, 4861, 5049",
+   "wrongUnits": []
+  },
+  {
+   "id": "L|finding#2",
+   "hash": "b06e2357e61b",
+   "verdict": "INCOMPLETE",
+   "detail": "The team exclusion is correct (INNER JOIN SystemUser). The claim that every fund or request of a non-company-worker 'owned by another user' is moved, and that every manual assignment is overwritten, omits the second filter. SystemUser.DomainName != ? is not true when DomainName is NULL, so records owned by users with NULL DomainName are never moved.",
+   "evidence": "DTSX:4644-4653, 4352-4360",
+   "wrongUnits": [
+    {
+     "unit": 0,
+     "problem": "Missing condition: the owner's DomainName must be non-NULL",
+     "correct": "Moved: funds/requests of non-company-worker customers owned by a SystemUser whose DomainName is non-NULL and != RegularFundsDomainName. Records owned by users with NULL DomainName (and team-owned records) are not overwritten.",
+     "evidence": "DTSX:4648 / 4356 'SystemUser.DomainName != ?'"
+    }
+   ]
+  },
+  {
+   "id": "L|finding#3",
+   "hash": "485c587df2ce",
+   "verdict": "INCOMPLETE",
+   "detail": "Technical facts are correct: NoMatchBehavior=0, CacheType=1, and the Lookup Match Output has errorRowDisposition=FailComponent (DTSX:3258/3284, 3551/3577, 4404/4430, 4697/4723). All successors are on Success constraints. However, the consequence depends on data and the finding states it unconditionally. The Lookup (partial cache, per row) only fails when at least one source row reaches it. If the source query returns no rows, the data flow succeeds even when the domain name does not exist, and the chain continues.",
+   "evidence": "DTSX:3550-3551, 3577, 3772-3775; precedence DTSX:5115-5124",
+   "wrongUnits": [
+    {
+     "unit": 0,
+     "problem": "Missing data condition for the failure",
+     "correct": "The flow fails only if the configured domain name is not in SystemUser AND the source query returns at least one row. With zero candidate rows the Lookup is never evaluated and the step succeeds.",
+     "evidence": "Lookup sits between Set Columns and Sort, DTSX:3772-3773"
+    }
+   ]
+  },
+  {
+   "id": "L|finding#4",
+   "hash": "a97f74bd42fc",
+   "verdict": "CONFIRMED",
+   "detail": "The configuration file C:\\Generix\\SSISConfigFile.dtsConfig (DTSX:17) was not supplied. The DTSX defaults are CompanyEmployeesDomainName='FormDB' (DTSX:27) and RegularFundsDomainName='FromDB' (DTSX:45). Set Variables (PostExecute) assigns every ReadWrite variable from gen_etlvariable (gen_scope='global' or PackageName) and throws if a key is missing. 'Placeholder' is hedged with 'כנראה'.",
+   "evidence": "DTSX:17, 27, 45, 2317-2326, 2432-2442, 3165",
+   "wrongUnits": []
+  },
+  {
+   "id": "L|finding#5",
+   "hash": "0169e90f12f9",
+   "verdict": "CONFIRMED",
+   "detail": "In the fund subqueries, gen_customeridnumber and Gen_identitynumber are unqualified (DTSX:3503-3507, 4649-4653). Gen_companyworker appears in no other supplied DTSX, so its schema, and therefore the binding, cannot be settled. The finding is correctly marked unverified.",
+   "evidence": "DTSX:3498-3507, 4644-4653; grep companyworker: only 0022",
+   "wrongUnits": []
+  },
+  {
+   "id": "L|finding#6",
+   "hash": "fecc0e669387",
+   "verdict": "CONFIRMED",
+   "detail": "The four Trans/MF sources carry ParameterMapping \"Parameter0:Input\",{8C07AFF0-B44D-4A94-BBCF-C5ECCAC23605}. No serialized variable has that DTSID (the variables are 96B6AFE4, E027326D, A709BA67, 25609754, 781FC0E7, 3C0A1E28 and Propagate 49754567). The SQL has no '?'. There is no DelayValidation anywhere. The outcome is correctly left open as alternatives.",
+   "evidence": "DTSX:3803, 3990, 4177, 4949; variables DTSX:24-50, 5131",
+   "wrongUnits": []
+  },
+  {
+   "id": "L|finding#7",
+   "hash": "0ec30d60ebdd",
+   "verdict": "CONFIRMED",
+   "detail": "Set Columns FriendlyExpression '8' feeds the OwnerIdType output column, which flows Sort → Param_2 of the UPDATE in all four reassignment flows (DTSX:3323, 3616, 4469, 4762). In Trans/MF, OwnerIdType comes from f.OwnerIdType in the source SQL.",
+   "evidence": "DTSX:3311/3323, 3604/3616, 4457/4469, 4750/4762; 3730, 4876; 3791, 3978, 4165, 4937",
+   "wrongUnits": []
+  },
+  {
+   "id": "L|Package (control flow)|title",
+   "hash": "7ff0aa9ca5cb",
+   "verdict": "WRONG",
+   "detail": "The flow_he steps match the precedence chain. short_he places the sentence 'רשומות בבעלות צוות, או שלבעלים שלהן אין שם דומיין, אינן נכללות' right after the FT/MF alignment sentence, so it reads as applying to FT/MF too. That is false: the Trans/MF sources (DTSX:3791, 3978, 4165, 4937) have no SystemUser join and no DomainName filter, so team-owned FT/MF records and records owned by users without a domain name ARE aligned. In addition, 'השערה: תנועות' is settled by the supplied files (see Update Trans|open).",
+   "evidence": "DTSX:3791-3798, 3978-3985, 4165-4172, 4937-4944; 0008_LeumiFile-PY.dtsx:69986, 82678",
+   "wrongUnits": [
+    {
+     "unit": 2,
+     "problem": "Exclusion of team-owned / no-domain records is presented as applying to FT current-year and MF records",
+     "correct": "The exclusion applies only to the fund and FT-request reassignment steps. FT current-year and MF alignment copies the fund owner whenever f.OwnerId != record.OwnerId, regardless of owner type.",
+     "evidence": "DTSX:4937-4944 'where f.OwnerId != ft.OwnerId'"
+    },
+    {
+     "unit": 2,
+     "problem": "'(השערה: תנועות)' is labelled as hypothesis although the files prove it",
+     "correct": "gen_ftcurrentyear rows are inserted by 0008\\FT (insert ftCurrentYearBase 1-5) only from the Conditional Split output 'תנועות והחזר דמי ניהול' (transactions and management-fee refunds), via Check if trans exists / Get trans type name. They are fund transaction records.",
+     "evidence": "0008_LeumiFile-PY.dtsx:69986, 82678, 63118"
+    }
+   ]
+  },
+  {
+   "id": "L|Package (control flow)|short",
+   "hash": "2d8ce901f49a",
+   "verdict": "WRONG",
+   "detail": "Units 1, 2, 4 and 5 are correct: no file connection; fund and FT-request rules; FT requests matched by ft.Gen_identitynumber; the team/NULL-domain exclusion explained correctly. Unit 3 labels the meaning of FT current-year records as 'השערה: תנועות', but the supplied files settle it.",
+   "evidence": "DTSX:3206-3214, 4352-4360; 0008_LeumiFile-PY.dtsx:69986, 82678, 63118",
+   "wrongUnits": [
+    {
+     "unit": 3,
+     "problem": "Hypothesis label on a meaning that the supplied files prove",
+     "correct": "gen_ftcurrentyear = fund transactions: 0008\\FT inserts Gen_ftCurrentYearBase only from Split by trans group type output 'תנועות והחזר דמי ניהול'.",
+     "evidence": "0008_LeumiFile-PY.dtsx:69986 (split output), path chain to insert ftCurrentYearBase 1-5 (63118)"
+    }
+   ]
+  },
+  {
+   "id": "L|Package (control flow)|detailed",
+   "hash": "07420d923260",
+   "verdict": "WRONG",
+   "detail": "Order, Success constraints and the OnError handler are correct. Unit 1 says an external config file may override the settings loaded from gen_etlvariable. The DTSX shows the opposite order: configurations are applied when the package loads, and Set Variables then assigns every ReadWrite variable (CompanyEmployeesDomainName, ConnStringSrsSsis_Logs, OrganizationName, RegularFundsDomainName, ServerName) from gen_etlvariable in PostExecute, or throws if a key is missing. A config value for these variables cannot survive. The config could only act indirectly (for example on the [CRM] connection string). Units 3, 4 and 7 state the reassignment without the team-owned/NULL-domain exclusion.",
+   "evidence": "DTSX:17, 2432-2442, 3165",
+   "wrongUnits": [
+    {
+     "unit": 1,
+     "problem": "Config file presented as possibly overriding the gen_etlvariable values",
+     "correct": "Runtime values of the domain-name variables always come from gen_etlvariable (or the package fails). The config file can only change them indirectly, e.g. by redirecting the [CRM] connection.",
+     "evidence": "main.cs PostExecute DTSX:2432-2442; ReadWriteVariables DTSX:3165"
+    },
+    {
+     "unit": 3,
+     "problem": "'קופות של עובדי החברה שאינן בבעלות משתמש עובדי החברה עוברות אליו' is unqualified",
+     "correct": "Only funds owned by a SystemUser with non-NULL DomainName != target are moved. Team-owned funds are not moved. The same applies to units 4 and 7.",
+     "evidence": "DTSX:3498-3507, 4644-4653, 3206-3214, 4352-4360"
+    }
+   ]
+  },
+  {
+   "id": "L|Package (control flow)|detail",
+   "hash": "63e757015b12",
+   "verdict": "CONFIRMED",
+   "detail": "Population (SystemUser-owned with non-NULL DomainName, team excluded by INNER JOIN), company-worker matching, target user by domainname, 8 direct SQL updates on Base tables via [CRM], and the hedged purpose (השערה) all match the DTSX.",
+   "evidence": "DTSX:3498-3507, 3206-3214, 4352-4360, 4644-4653, 3538-3551; DTSX:6",
+   "wrongUnits": []
+  },
+  {
+   "id": "L|Package (control flow)|decisions",
+   "hash": "b9fd0c97a6a1",
+   "verdict": "CONFIRMED",
+   "detail": "All 10 constraints are Success, serial chain; a failure stops the successors (the first constraint is at DTSX:5115, also Success).",
+   "evidence": "DTSX:5115-5124",
+   "wrongUnits": []
+  },
+  {
+   "id": "L|Package (control flow)|crm",
+   "hash": "049cfaba0896",
+   "verdict": "CONFIRMED",
+   "detail": "The six entities are updated on OwnerId, OwningBusinessUnit and OwnerIdType via direct SQL (OLEDBCommand on [CRM]). Unsupported.",
+   "evidence": "DTSX:3422, 3715, 3903, 4090, 4277, 4568, 4861, 5049",
+   "wrongUnits": []
+  },
+  {
+   "id": "L|Package (control flow)|open",
+   "hash": "83a922704738",
+   "verdict": "WRONG",
+   "detail": "The connection-string half is truly unknown (config file not supplied, DTSX:17). The 'or the variables' half is answered by the DTSX. Set Variables (PostExecute) overwrites every User variable that a config could set (all five ReadWrite variables) after configurations are applied at load, and throws if a key is missing. ETLProcessRecordGuid is set by Create ETL Process record.",
+   "evidence": "DTSX:17, 2432-2442, 3165, 278",
+   "wrongUnits": [
+    {
+     "unit": 1,
+     "problem": "Part of the open question is answerable",
+     "correct": "Variables: no effective override. The runtime values come from gen_etlvariable via Set Variables. Only the connection string (and other non-variable properties) may be overridden by the missing config.",
+     "evidence": "DTSX:2432-2442, 3165"
+    }
+   ]
+  },
+  {
+   "id": "L|Package\\Update CW Funds|title",
+   "hash": "fdec3300ae0e",
+   "verdict": "CONFIRMED",
+   "detail": "SQL (DomainName != CompanyEmployeesDomainName via {96B6AFE4}, exists in Gen_companyworker), Set Columns (OwnerIdType=8, DomainName=(DT_WSTR,50)@[User::CompanyEmployeesDomainName]), partial-cache Lookup on SystemUser.domainname with FailComponent, Sort on gen_fundmainid (key 1), and UPDATE Gen_fundmainBase all verified. short_he is qualified by flow_he[1] (SystemUser owner).",
+   "evidence": "DTSX:3498-3512, 3536-3586, 3604-3622, 3637-3704, 3715-3731, 3772-3775",
+   "wrongUnits": []
+  },
+  {
+   "id": "L|Package\\Update CW Funds|short",
+   "hash": "dc5e6eb6b60c",
+   "verdict": "WRONG",
+   "detail": "Units 1-6 are correct. Unit 7 states a universal end state that the SQL does not guarantee.",
+   "evidence": "DTSX:3498-3507",
+   "wrongUnits": [
+    {
+     "unit": 7,
+     "problem": "'כל הקופות שהלקוח שלהן מופיע ברשימת עובדי החברה נמצאות בבעלות המשתמש עובדי החברה' is false for team-owned funds and funds owned by users with NULL DomainName",
+     "correct": "Only company-worker funds owned by a SystemUser with a non-NULL DomainName are moved. Team-owned or NULL-domain-owned company-worker funds keep their owner.",
+     "evidence": "DTSX:3500-3502 'join SystemUser on systemuserid = OwnerId where SystemUser.DomainName != ?'"
+    }
+   ]
+  },
+  {
+   "id": "L|Package\\Update CW Funds|detailed",
+   "hash": "e13df5024901",
+   "verdict": "CONFIRMED",
+   "detail": "Every unit verified. Source on [CRM] with INNER JOIN SystemUser and DomainName != ? mapped to {96B6AFE4} = CompanyEmployeesDomainName. Exists subquery. OwnerIdType literal 8 and the DomainName cast. Set Variables keyed by variable name. Lookup NoMatch=0 / CacheType=1 / Match Output FailComponent / No Match Output not connected. The Sort is fully blocking and sits after the Lookup, so a Lookup failure happens before any UPDATE ('no record updated' holds). Sort key gen_fundmainid, EliminateDuplicates=false. UPDATE Param_0..3 = OwnerId, OwningBusinessUnit, OwnerIdType, gen_fundmainid, FailComponent.",
+   "evidence": "DTSX:3498-3512, 3550-3592, 3616-3622, 3639-3704, 3715-3731, 3772-3775, 2432-2442",
+   "wrongUnits": []
+  },
+  {
+   "id": "L|Package\\Update CW Funds|detail",
+   "hash": "82ea584aecdf",
+   "verdict": "WRONG",
+   "detail": "Units 1-4 match the SQL. Unit 5 states a universal outcome ('כל מה ששייך לעובדי החברה בבעלות משתמש ייעודי'). Only the purpose is labelled השערה, not the universal.",
+   "evidence": "DTSX:3498-3507",
+   "wrongUnits": [
+    {
+     "unit": 5,
+     "problem": "Universal outcome not guaranteed by the SQL",
+     "correct": "Company-worker funds owned by a SystemUser with a non-NULL DomainName end up with the CW user. Team-owned and NULL-domain-owned company-worker funds are untouched.",
+     "evidence": "DTSX:3500-3502"
+    }
+   ]
+  },
+  {
+   "id": "L|Package\\Update CW Funds|decisions",
+   "hash": "e4db8c8c0819",
+   "verdict": "CONFIRMED",
+   "detail": "The three conditions match: DomainName != ? (Parameter0 ← CompanyEmployeesDomainName), the exists subquery, and Lookup NoMatchBehavior=0 with Match Output FailComponent.",
+   "evidence": "DTSX:3498-3512, 3551, 3577",
+   "wrongUnits": []
+  },
+  {
+   "id": "L|Package\\Update CW Funds|crm",
+   "hash": "9650fbe30965",
+   "verdict": "CONFIRMED",
+   "detail": "Write: UPDATE Gen_fundmainBase SET OwnerId/OwningBusinessUnit/OwnerIdType(=8 literal) WHERE Gen_fundmainId via SQL. Reads: gen_fundmain, SystemUser, Gen_companyworker (source), SystemUser (Lookup).",
+   "evidence": "DTSX:3498, 3538-3548, 3715",
+   "wrongUnits": []
+  },
+  {
+   "id": "L|Package\\Update CW Funds|open",
+   "hash": "0b57db9d667e",
+   "verdict": "CONFIRMED",
+   "detail": "The runtime value of CompanyEmployeesDomainName is not in the files (DTSX default 'FormDB', DTSX:27). The unqualified-column binding cannot be settled: Gen_companyworker appears only in this package.",
+   "evidence": "DTSX:27, 3503-3507",
+   "wrongUnits": []
+  },
+  {
+   "id": "L|Package\\Update Regular Funds|title",
+   "hash": "c11e1b346e16",
+   "verdict": "CONFIRMED",
+   "detail": "SQL (DomainName != ? via {781FC0E7}=RegularFundsDomainName, not exists in Gen_companyworker), Set Columns (8, RegularFundsDomainName cast), Lookup FailComponent, Sort by gen_fundmainid, and UPDATE Gen_fundmainBase all verified.",
+   "evidence": "DTSX:4644-4658, 4682-4732, 4750-4768, 4783-4826, 4861-4877, 4918-4921",
+   "wrongUnits": []
+  },
+  {
+   "id": "L|Package\\Update Regular Funds|short",
+   "hash": "9197176e2a17",
+   "verdict": "WRONG",
+   "detail": "Units 1-6 are correct. Unit 7 states a universal end state.",
+   "evidence": "DTSX:4644-4653",
+   "wrongUnits": [
+    {
+     "unit": 7,
+     "problem": "'כל הקופות שהלקוח שלהן אינו מופיע ברשימת עובדי החברה נמצאות בבעלות המשתמש הקופות הרגילות' is false for team-owned funds and funds owned by users with NULL DomainName",
+     "correct": "Only non-company-worker funds owned by a SystemUser with a non-NULL DomainName != RegularFundsDomainName are moved. Team-owned and NULL-domain-owned funds keep their owner.",
+     "evidence": "DTSX:4646-4648"
+    }
+   ]
+  },
+  {
+   "id": "L|Package\\Update Regular Funds|detailed",
+   "hash": "3702cc02e1a2",
+   "verdict": "CONFIRMED",
+   "detail": "Every unit verified: same structure as CW Funds with {781FC0E7}=RegularFundsDomainName, not exists, Lookup Get User FailComponent (DTSX:4723), blocking Sort on gen_fundmainid, and UPDATE Param mapping DTSX:4874-4877.",
+   "evidence": "DTSX:4644-4658, 4696-4738, 4762-4768, 4785-4826, 4861-4877, 4918-4921",
+   "wrongUnits": []
+  },
+  {
+   "id": "L|Package\\Update Regular Funds|detail",
+   "hash": "cc1c0774be0b",
+   "verdict": "WRONG",
+   "detail": "Units 1-4 are correct. Unit 5 ('כל השאר בבעלות משתמש קופות רגילות אחד. כל בעלות אחרת של משתמש נדרסת בכל ריצה') is a universal that ignores the NULL-DomainName exclusion and team ownership.",
+   "evidence": "DTSX:4644-4653",
+   "wrongUnits": [
+    {
+     "unit": 5,
+     "problem": "Overstated outcome",
+     "correct": "Non-company-worker funds owned by any SystemUser whose DomainName is non-NULL and != target are overwritten each run. Funds owned by teams or by users with NULL DomainName are not.",
+     "evidence": "DTSX:4646-4648"
+    }
+   ]
+  },
+  {
+   "id": "L|Package\\Update Regular Funds|decisions",
+   "hash": "52e5bcd6eb49",
+   "verdict": "CONFIRMED",
+   "detail": "The conditions match DTSX:4644-4658 and Lookup DTSX:4697/4723.",
+   "evidence": "DTSX:4644-4658, 4697, 4723",
+   "wrongUnits": []
+  },
+  {
+   "id": "L|Package\\Update Regular Funds|crm",
+   "hash": "979a55828856",
+   "verdict": "CONFIRMED",
+   "detail": "UPDATE Gen_fundmainBase via SQL with OwnerIdType literal 8. The reads are correct.",
+   "evidence": "DTSX:4644, 4684, 4861, 4762",
+   "wrongUnits": []
+  },
+  {
+   "id": "L|Package\\Update Regular Funds|open",
+   "hash": "7feba8d3bf22",
+   "verdict": "CONFIRMED",
+   "detail": "Runtime value unknown (default 'FromDB' DTSX:45). Intent cannot be determined from the files. Same unresolved binding as CW Funds.",
+   "evidence": "DTSX:45, 4649-4653",
+   "wrongUnits": []
+  },
+  {
+   "id": "L|Package\\Update Trans|title",
+   "hash": "6d0eb912cf4c",
+   "verdict": "CONFIRMED",
+   "detail": "Get ft: Gen_ftCurrentYear ft join gen_fundmain f on gen_fundmainid = ft.gen_fundnumber where f.OwnerId != ft.OwnerId. Sort key Gen_ftCurrentYearId (1). UPDATE Gen_ftcurrentyearBase with values from the fund.",
+   "evidence": "DTSX:4937-4944, 4990-4993, 5049-5066",
+   "wrongUnits": []
+  },
+  {
+   "id": "L|Package\\Update Trans|short",
+   "hash": "1924303661c3",
+   "verdict": "CONFIRMED",
+   "detail": "Matches the SQL. The end state holds for records with a linked fund, which are the only ones that have 'their fund'.",
+   "evidence": "DTSX:4937-4944, 5049",
+   "wrongUnits": []
+  },
+  {
+   "id": "L|Package\\Update Trans|detailed",
+   "hash": "2b455810a681",
+   "verdict": "CONFIRMED",
+   "detail": "INNER JOIN, OwnerId inequality, values f.OwnerId/OwningBusinessUnit/OwnerIdType, Sort, UPDATE params Param_0..3, FailComponent DTSX:5061, and Success to MF Current Year DTSX:5119 all verified.",
+   "evidence": "DTSX:4937-4944, 4982-5019, 5049-5066, 5107-5108, 5119",
+   "wrongUnits": []
+  },
+  {
+   "id": "L|Package\\Update Trans|detail",
+   "hash": "6e89e22e9aaa",
+   "verdict": "CONFIRMED",
+   "detail": "Matches the SQL and the UPDATE.",
+   "evidence": "DTSX:4937-4944, 5049-5066",
+   "wrongUnits": []
+  },
+  {
+   "id": "L|Package\\Update Trans|decisions",
+   "hash": "c1850bcb0536",
+   "verdict": "CONFIRMED",
+   "detail": "f.OwnerId != ft.OwnerId verified.",
+   "evidence": "DTSX:4944",
+   "wrongUnits": []
+  },
+  {
+   "id": "L|Package\\Update Trans|crm",
+   "hash": "2f0072c134e8",
+   "verdict": "CONFIRMED",
+   "detail": "UPDATE Gen_ftcurrentyearBase from the fund values via SQL. Reads Gen_ftCurrentYear and gen_fundmain.",
+   "evidence": "DTSX:4937, 5049",
+   "wrongUnits": []
+  },
+  {
+   "id": "L|Package\\Update Trans|open",
+   "hash": "a2fd6a95e6a5",
+   "verdict": "WRONG",
+   "detail": "Unit 2 (orphan ParameterMapping {8C07AFF0}, no '?', no DelayValidation) is correctly left open. Unit 1 asks for the business meaning of Gen_ftCurrentYear and labels 'transactions' a hypothesis, but the supplied files settle it. In 0008_LeumiFile-PY, data flow 'FT' inserts Gen_ftCurrentYearBase (insert ftCurrentYearBase 1-5) only from rows of the Conditional Split output 'תנועות והחזר דמי ניהול' (Split by trans group type → Target_Fund_FinanceID To Int → Check if trans exists → ... → Get trans type name → ... → Split Rows For MultiThread → insert ftCurrentYearBase).",
+   "evidence": "0008_LeumiFile-PY.dtsx:69986, 82678, 63118 (insert into Gen_ftCurrentYearBase); 0022 DTSX:4949",
+   "wrongUnits": [
+    {
+     "unit": 1,
+     "problem": "Meaning labelled השערה although the supplied files prove it",
+     "correct": "Gen_ftCurrentYear holds fund transaction records (transactions and management-fee refunds) for the current year, loaded from the Leumi PY file by 0008\\FT.",
+     "evidence": "0008_LeumiFile-PY.dtsx:69986 (output 'תנועות והחזר דמי ניהול'), 63118"
+    }
+   ]
+  },
+  {
+   "id": "L|Package\\Update MF Current Year|title",
+   "hash": "81460105f977",
+   "verdict": "CONFIRMED",
+   "detail": "Get MF SQL, Sort key Gen_mfCurrentYearId (1), and UPDATE Gen_mfcurrentyearBase verified.",
+   "evidence": "DTSX:3978-3985, 4031-4034, 4090-4107",
+   "wrongUnits": []
+  },
+  {
+   "id": "L|Package\\Update MF Current Year|short",
+   "hash": "27a772337334",
+   "verdict": "CONFIRMED",
+   "detail": "Matches the SQL (INNER JOIN to fund, owner inequality, owner/BU/type copied from the fund).",
+   "evidence": "DTSX:3978-3985, 4090",
+   "wrongUnits": []
+  },
+  {
+   "id": "L|Package\\Update MF Current Year|detailed",
+   "hash": "27b7282e2792",
+   "verdict": "CONFIRMED",
+   "detail": "Every unit verified, including FailComponent DTSX:4102 and Success to MF Previous Year DTSX:5120.",
+   "evidence": "DTSX:3973-4107, 4148-4149, 5120",
+   "wrongUnits": []
+  },
+  {
+   "id": "L|Package\\Update MF Current Year|detail",
+   "hash": "32253a24af20",
+   "verdict": "CONFIRMED",
+   "detail": "Matches the SQL.",
+   "evidence": "DTSX:3978-3985, 4090-4107",
+   "wrongUnits": []
+  },
+  {
+   "id": "L|Package\\Update MF Current Year|decisions",
+   "hash": "7421e1517807",
+   "verdict": "CONFIRMED",
+   "detail": "f.OwnerId != mf.OwnerId verified.",
+   "evidence": "DTSX:3985",
+   "wrongUnits": []
+  },
+  {
+   "id": "L|Package\\Update MF Current Year|crm",
+   "hash": "b5a9e0b6f3e8",
+   "verdict": "CONFIRMED",
+   "detail": "Write and reads verified.",
+   "evidence": "DTSX:3978, 4090",
+   "wrongUnits": []
+  },
+  {
+   "id": "L|Package\\Update MF Current Year|open",
+   "hash": "c98fa1673d70",
+   "verdict": "CONFIRMED",
+   "detail": "MF entities (gen_mfcurrentyear/previousyear/archive) appear in no other supplied DTSX, so 'MF = management fees' cannot be proven. It is correctly labelled השערה. The orphan ParameterMapping question is correctly left open.",
+   "evidence": "DTSX:3990; grep mfcurrentyear|mfarchive|mfpreviousyear: only 0022",
+   "wrongUnits": []
+  },
+  {
+   "id": "L|Package\\Update MF Previous Year|title",
+   "hash": "b76d566beb1a",
+   "verdict": "CONFIRMED",
+   "detail": "Get MF SQL, Sort key Gen_mfPreviousYearId (1), and UPDATE Gen_mfPreviousYearBase verified.",
+   "evidence": "DTSX:4165-4172, 4236-4239, 4277-4294",
+   "wrongUnits": []
+  },
+  {
+   "id": "L|Package\\Update MF Previous Year|short",
+   "hash": "5e00f18cdedd",
+   "verdict": "CONFIRMED",
+   "detail": "Matches the SQL.",
+   "evidence": "DTSX:4165-4172, 4277",
+   "wrongUnits": []
+  },
+  {
+   "id": "L|Package\\Update MF Previous Year|detailed",
+   "hash": "779d72369722",
+   "verdict": "CONFIRMED",
+   "detail": "Every unit verified, including FailComponent DTSX:4289 and Success to MF Archive DTSX:5121.",
+   "evidence": "DTSX:4160-4294, 4335-4336, 5121",
+   "wrongUnits": []
+  },
+  {
+   "id": "L|Package\\Update MF Previous Year|detail",
+   "hash": "4cebd06e26d2",
+   "verdict": "CONFIRMED",
+   "detail": "Matches the SQL.",
+   "evidence": "DTSX:4165-4172, 4277-4294",
+   "wrongUnits": []
+  },
+  {
+   "id": "L|Package\\Update MF Previous Year|decisions",
+   "hash": "9991d81c9d42",
+   "verdict": "CONFIRMED",
+   "detail": "f.OwnerId != mf.OwnerId verified.",
+   "evidence": "DTSX:4172",
+   "wrongUnits": []
+  },
+  {
+   "id": "L|Package\\Update MF Previous Year|crm",
+   "hash": "de68b80252fc",
+   "verdict": "CONFIRMED",
+   "detail": "Write and reads verified.",
+   "evidence": "DTSX:4165, 4277",
+   "wrongUnits": []
+  },
+  {
+   "id": "L|Package\\Update MF Previous Year|open",
+   "hash": "a5eec4887cb0",
+   "verdict": "CONFIRMED",
+   "detail": "MF meaning cannot be proven from the supplied files and is correctly labelled. The ParameterMapping question at DTSX:4177 is correctly open.",
+   "evidence": "DTSX:4177",
+   "wrongUnits": []
+  },
+  {
+   "id": "L|Package\\Update MF Archive|title",
+   "hash": "b2ca4e8384ff",
+   "verdict": "CONFIRMED",
+   "detail": "Get MF SQL, Sort key Gen_mfArchiveId (1), and UPDATE Gen_mfArchiveBase verified.",
+   "evidence": "DTSX:3791-3798, 3862-3865, 3903-3920",
+   "wrongUnits": []
+  },
+  {
+   "id": "L|Package\\Update MF Archive|short",
+   "hash": "070e7c155ec7",
+   "verdict": "CONFIRMED",
+   "detail": "Matches the SQL.",
+   "evidence": "DTSX:3791-3798, 3903",
+   "wrongUnits": []
+  },
+  {
+   "id": "L|Package\\Update MF Archive|detailed",
+   "hash": "a58344360924",
+   "verdict": "CONFIRMED",
+   "detail": "Every unit verified, including FailComponent DTSX:3915 and Success to CW FTRequests DTSX:5122.",
+   "evidence": "DTSX:3786-3920, 3961-3962, 5122",
+   "wrongUnits": []
+  },
+  {
+   "id": "L|Package\\Update MF Archive|detail",
+   "hash": "240d8651e20f",
+   "verdict": "CONFIRMED",
+   "detail": "Matches the SQL.",
+   "evidence": "DTSX:3791-3798, 3903-3920",
+   "wrongUnits": []
+  },
+  {
+   "id": "L|Package\\Update MF Archive|decisions",
+   "hash": "a9b02fad4a95",
+   "verdict": "CONFIRMED",
+   "detail": "f.OwnerId != mf.OwnerId verified.",
+   "evidence": "DTSX:3798",
+   "wrongUnits": []
+  },
+  {
+   "id": "L|Package\\Update MF Archive|crm",
+   "hash": "ae6585850a50",
+   "verdict": "CONFIRMED",
+   "detail": "Write and reads verified.",
+   "evidence": "DTSX:3791, 3903",
+   "wrongUnits": []
+  },
+  {
+   "id": "L|Package\\Update MF Archive|open",
+   "hash": "4a6edd3101bb",
+   "verdict": "CONFIRMED",
+   "detail": "MF meaning cannot be proven from the supplied files and is correctly labelled. The ParameterMapping question at DTSX:3803 is correctly open.",
+   "evidence": "DTSX:3803",
+   "wrongUnits": []
+  },
+  {
+   "id": "L|Package\\Update CW FTRequests|title",
+   "hash": "a7daf883a211",
+   "verdict": "CONFIRMED",
+   "detail": "SQL (gen_ftrequest ft join SystemUser, DomainName != ? ← {96B6AFE4}, exists cw.gen_identitynumber = ft.Gen_identitynumber), Set Columns, Lookup FailComponent, Sort key gen_ftrequestid (1), and UPDATE Gen_ftrequestBase verified.",
+   "evidence": "DTSX:3206-3219, 3243-3299, 3311-3329, 3344-3387, 3422-3438, 3479-3482",
+   "wrongUnits": []
+  },
+  {
+   "id": "L|Package\\Update CW FTRequests|short",
+   "hash": "2fbc1828c29f",
+   "verdict": "WRONG",
+   "detail": "Units 1-6 are correct. Unit 7 states a universal end state.",
+   "evidence": "DTSX:3206-3214",
+   "wrongUnits": [
+    {
+     "unit": 7,
+     "problem": "'כל בקשות ה-FT שהלקוח שלהן מופיע ברשימת עובדי החברה נמצאות בבעלות המשתמש עובדי החברה' is false for team-owned requests and requests owned by users with NULL DomainName",
+     "correct": "Only company-worker requests owned by a SystemUser with a non-NULL DomainName != CompanyEmployeesDomainName are moved.",
+     "evidence": "DTSX:3208-3210"
+    }
+   ]
+  },
+  {
+   "id": "L|Package\\Update CW FTRequests|detailed",
+   "hash": "4c871e53fbec",
+   "verdict": "CONFIRMED",
+   "detail": "Every unit verified (source DTSX:3206-3219, Set Columns 3323/3329, Lookup 3257-3299, blocking Sort 3344-3387, UPDATE 3422-3438 with FailComponent 3433).",
+   "evidence": "DTSX:3201-3482",
+   "wrongUnits": []
+  },
+  {
+   "id": "L|Package\\Update CW FTRequests|detail",
+   "hash": "8764a548f6f2",
+   "verdict": "WRONG",
+   "detail": "Units 1-4 are correct. Unit 5 states a universal outcome ('כל מה ששייך לעובדי החברה בבעלות משתמש ייעודי').",
+   "evidence": "DTSX:3206-3214",
+   "wrongUnits": [
+    {
+     "unit": 5,
+     "problem": "Universal outcome not guaranteed",
+     "correct": "Team-owned and NULL-domain-owned company-worker FT requests are not moved.",
+     "evidence": "DTSX:3208-3210"
+    }
+   ]
+  },
+  {
+   "id": "L|Package\\Update CW FTRequests|decisions",
+   "hash": "9ae8d4846ae0",
+   "verdict": "CONFIRMED",
+   "detail": "Conditions verified.",
+   "evidence": "DTSX:3206-3219, 3258, 3284",
+   "wrongUnits": []
+  },
+  {
+   "id": "L|Package\\Update CW FTRequests|crm",
+   "hash": "5a666a2bb645",
+   "verdict": "CONFIRMED",
+   "detail": "UPDATE Gen_ftrequestBase via SQL (OwnerIdType literal 8). Reads verified.",
+   "evidence": "DTSX:3206, 3245, 3422, 3323",
+   "wrongUnits": []
+  },
+  {
+   "id": "L|Package\\Update CW FTRequests|open",
+   "hash": "dccbd149de7b",
+   "verdict": "WRONG",
+   "detail": "Unit 1 (runtime value of CompanyEmployeesDomainName) is truly unknown. Unit 2 asks for the business meaning of gen_ftrequest and says it is not defined. It is not defined in 0022, but the supplied 0009_LeumiFile-BY.dtsx labels it: data flow 'Create or update  Fund Trunsaction Request', Lookup 'Checl If Fund Transaction Request Exist' on gen_ftrequest, and OLE DB Command 'Create Fund Transaction Request 1/2' inserting into gen_ftrequestbase.",
+   "evidence": "0009_LeumiFile-BY.dtsx:46793, 48669, 48724, 54688, 54759",
+   "wrongUnits": [
+    {
+     "unit": 2,
+     "problem": "Question is answerable from the supplied files",
+     "correct": "gen_ftrequest = Fund Transaction Request (בקשה לתנועה בקופה), created/updated by 0009_LeumiFile-BY \\Foreach Loop Container\\Create or update  Fund Trunsaction Request.",
+     "evidence": "0009_LeumiFile-BY.dtsx:48724, 54688-54759"
+    }
+   ]
+  },
+  {
+   "id": "L|Package\\Update Regular FTRequest|title",
+   "hash": "3fa0abf7cc02",
+   "verdict": "CONFIRMED",
+   "detail": "SQL (not exists, {781FC0E7}), Set Columns, Lookup, Sort key gen_ftrequestid, and UPDATE gen_ftrequestBase verified.",
+   "evidence": "DTSX:4352-4365, 4389-4445, 4457-4475, 4490-4533, 4568-4584, 4625-4628",
+   "wrongUnits": []
+  },
+  {
+   "id": "L|Package\\Update Regular FTRequest|short",
+   "hash": "06f665bc1dbc",
+   "verdict": "WRONG",
+   "detail": "Units 1-6 are correct. Unit 7 states a universal end state.",
+   "evidence": "DTSX:4352-4360",
+   "wrongUnits": [
+    {
+     "unit": 7,
+     "problem": "'כל בקשות ה-FT שהלקוח שלהן אינו מופיע ברשימת עובדי החברה נמצאות בבעלות המשתמש הקופות הרגילות' is false for team-owned requests and requests owned by users with NULL DomainName",
+     "correct": "Only requests owned by a SystemUser with a non-NULL DomainName != RegularFundsDomainName are moved. Note also that requests with NULL Gen_identitynumber satisfy NOT EXISTS and are treated as non-company-worker.",
+     "evidence": "DTSX:4354-4360"
+    }
+   ]
+  },
+  {
+   "id": "L|Package\\Update Regular FTRequest|detailed",
+   "hash": "34ada0dfc777",
+   "verdict": "CONFIRMED",
+   "detail": "Every unit verified (source DTSX:4352-4365, Set Columns 4469/4475, Lookup 4403-4445, Sort 4490-4533, UPDATE gen_ftrequestBase 4568-4584 FailComponent 4579).",
+   "evidence": "DTSX:4347-4628",
+   "wrongUnits": []
+  },
+  {
+   "id": "L|Package\\Update Regular FTRequest|detail",
+   "hash": "2a235e17d846",
+   "verdict": "WRONG",
+   "detail": "Units 1-4 are correct. Unit 5 ('כל השאר ... כל בעלות אחרת של משתמש נדרסת בכל ריצה') ignores the NULL-DomainName and team exclusions.",
+   "evidence": "DTSX:4352-4360",
+   "wrongUnits": [
+    {
+     "unit": 5,
+     "problem": "Overstated outcome",
+     "correct": "Only requests owned by SystemUsers with a non-NULL DomainName != target are overwritten. Team-owned and NULL-domain-owned requests are not.",
+     "evidence": "DTSX:4354-4356"
+    }
+   ]
+  },
+  {
+   "id": "L|Package\\Update Regular FTRequest|decisions",
+   "hash": "5682b8176408",
+   "verdict": "CONFIRMED",
+   "detail": "Conditions verified.",
+   "evidence": "DTSX:4352-4365, 4404, 4430",
+   "wrongUnits": []
+  },
+  {
+   "id": "L|Package\\Update Regular FTRequest|crm",
+   "hash": "cab8ff461384",
+   "verdict": "CONFIRMED",
+   "detail": "UPDATE gen_ftrequestBase via SQL with OwnerIdType=8. Reads verified.",
+   "evidence": "DTSX:4352, 4391, 4568, 4469",
+   "wrongUnits": []
+  },
+  {
+   "id": "L|Package\\Update Regular FTRequest|open",
+   "hash": "d2b8b4abe598",
+   "verdict": "CONFIRMED",
+   "detail": "The runtime value of RegularFundsDomainName is not in the files (default 'FromDB').",
+   "evidence": "DTSX:45",
+   "wrongUnits": []
+  }
+ ]
+}

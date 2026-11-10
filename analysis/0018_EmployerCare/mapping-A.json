@@ -1,0 +1,113 @@
+{
+  "package": "0018_EmployerCare",
+  "dataFlows": [
+    "Package\\Close Gen_employercare",
+    "Package\\Update operation person"
+  ],
+  "analyst": "ssis-field-lineage",
+  "source": {
+    "file": "source/DailyProcess/0018_EmployerCare.dtsx",
+    "sha256": "D6F9EBA66CF8A0F5EA167A05EB2E97C324F912E0F3A421045651D73ACD049746"
+  },
+  "scriptOutputs": [],
+  "crmWrites": [
+    {
+      "component": "Package\\Close Gen_employercare\\Update employer care",
+      "identicalCopies": [],
+      "entity": "gen_employercare",
+      "verb": "UPDATE",
+      "mechanism": "SDK (CRM.Proxy ExecuteMultipleExtension, RequestType.Update, batches of 100)",
+      "status": "Supported",
+      "recordKey": "entity.Id = Row.Genemployercareid. Gen_employercareid = Group By output of 'Aggregate the Gen_employercare' (AggregationType 0 = GroupBy, DTSX:580) over Gen_employercareid from 'get Gen_employercare' (SQL on [CRM] = psql / altshuler_mscrm, DTSX:1425) - one update per distinct employer care.",
+      "recordKeyColumns": ["Gen_employercareid"],
+      "declaredRowFilters": [],
+      "condition": "Rows with NULL Gen_employercareid are skipped (main.cs:127-128). Source query: Gen_employercare.Gen_CurrentState = 2 AND (Gen_depositereason NOT IN (6,7,8,9,11) OR Gen_depositereason IS NULL), inner-joined to gen_customeraccount and Gen_fundmain (one row per fund main of the employer care's customer account). Lookup 'Get All Transaction' (NoMatchBehavior 1, no-match output unconnected) keeps only rows whose gen_fundmainid equals a gen_fundnumber in gen_ftcurrentyear joined to Gen_fundtransactiontype with gen_transgrouptype = 1 AND gen_transactiontypeid NOT LIKE '%99%' (DTSX:1364-1384). I.e. an employer care in state 2 is closed when at least one fund main of its customer account has such a current-year transaction. Duplicates are removed by the Aggregate. Runs after 'Create ETL Process record' succeeds.",
+      "attributes": [
+        {
+          "attribute": "gen_currentstate",
+          "from": [],
+          "expression": "entity[\"gen_currentstate\"] = new OptionSetValue(3) (comment '//Finished').",
+          "fixedValue": 3,
+          "condition": null,
+          "evidence": "Update employer care main.cs:132 (DTSX:1928, sha bee867f4fc3b)",
+          "excludeFromValue": [],
+          "declaredSources": [
+            {
+              "db": "get Gen_employercare: gen_fundmainid",
+              "role": "condition",
+              "why": "Lookup key of 'Get All Transaction' (gen_fundmainid = gen_fundnumber in gen_ftcurrentyear with gen_transgrouptype = 1 and gen_transactiontypeid NOT LIKE '%99%'); only matching rows reach the writer",
+              "evidence": "DTSX:1364-1384, 1425"
+            }
+          ]
+        },
+        {
+          "attribute": "gen_modifiedbybank",
+          "from": [],
+          "expression": "entity[\"gen_modifiedbybank\"] = DateTime.Now (current local date/time of the SSIS host at row processing; not a fixed value).",
+          "fixedValue": null,
+          "condition": null,
+          "evidence": "Update employer care main.cs:133 (DTSX:1929)",
+          "excludeFromValue": [],
+          "declaredSources": [
+            {
+              "db": "get Gen_employercare: gen_fundmainid",
+              "role": "condition",
+              "why": "Lookup key of 'Get All Transaction'; only employer cares with a matching current-year transaction are updated",
+              "evidence": "DTSX:1364-1384, 1425"
+            }
+          ]
+        }
+      ],
+      "evidence": "Update employer care main.cs:125-189 (component DTSX:1540; Entity(\"gen_employercare\") main.cs:130; ExecuteMultipleExtension(entitiesList, RequestType.Update, service) main.cs:99, 150)"
+    },
+    {
+      "component": "Package\\Update operation person\\Update CustomerCare",
+      "identicalCopies": [],
+      "entity": "gen_employercare",
+      "verb": "UPDATE",
+      "mechanism": "SDK (CRM.Proxy ExecuteMultipleExtension, RequestType.Update, batches of 100)",
+      "status": "Supported",
+      "recordKey": "employerCare[\"gen_employercareid\"] = Row.GenemployercareId (primary-key attribute; entity.Id not set). Gen_employercareId = ec.Gen_employercareId from 'get Gen_employercare' (SQL on [CRM], DTSX:6772).",
+      "recordKeyColumns": ["Gen_employercareId"],
+      "declaredRowFilters": [],
+      "condition": "Rows with NULL Gen_employercareId are skipped (main.cs:127-128). Source query: gen_employercare ec LEFT JOIN account a ON a.accountid = ec.gen_employername WHERE ec.gen_employername = accountid (turns it into an inner join) AND (gen_employeroperationpersonname != a.gen_operationperson OR (gen_employeroperationpersonname IS NULL AND a.gen_operationperson IS NOT NULL)) - only employer cares whose operation person differs from the employer account's gen_operationperson. Runs after 'Close Gen_employercare' succeeds.",
+      "attributes": [
+        {
+          "attribute": "gen_employeroperationpersonname",
+          "from": [
+            { "column": "gen_employeroperationpersonname", "role": "value" }
+          ],
+          "expression": "new EntityReference(\"account\", Row.genemployeroperationpersonname). The input column is the SQL alias 'a.gen_operationperson AS gen_employeroperationpersonname' = account.gen_operationperson of the employer account (ec.gen_employername) - copied unchanged as the lookup id. The WHERE clause guarantees a.gen_operationperson IS NOT NULL. The entity logical name \"account\" is hard-coded in the script; whether account.gen_operationperson really holds account ids is not provable from the DTSX (see unresolved).",
+          "fixedValue": null,
+          "condition": null,
+          "evidence": "Update CustomerCare main.cs:130-132 (DTSX:7270-7272, sha 55e9dbdc3d74); source SQL DTSX:6772-6780",
+          "excludeFromValue": [],
+          "declaredSources": []
+        }
+      ],
+      "evidence": "Update CustomerCare main.cs:125-189 (component DTSX:6884; Entity(\"gen_employercare\") main.cs:130; ExecuteMultipleExtension(..., RequestType.Update, ...) main.cs:99, 150)"
+    }
+  ],
+  "readWriteModifications": [],
+  "lookupBridges": [],
+  "unresolved": [
+    {
+      "where": "Update CustomerCare / gen_employeroperationpersonname",
+      "reason": "EntityReference target type is hard-coded as \"account\"; the target entity of account.gen_operationperson and of gen_employercare.gen_employeroperationpersonname is defined in the CRM metadata (out of scope). The value written is proven (a.gen_operationperson); the correctness of the entity type is not."
+    },
+    {
+      "where": "Update operation person\\get Gen_employercare SQL",
+      "reason": "gen_employeroperationpersonname in the WHERE clause is unqualified; it resolves to a column of gen_employercare or account depending on the CRM schema (not in scope). Most plausibly ec.gen_employeroperationpersonname (hypothesis)."
+    },
+    {
+      "where": "ExecuteMultipleExtension (CRM.Proxy)",
+      "reason": "External assembly not supplied (blocked_external_dependency): request construction and ContinueOnError behaviour cannot be verified."
+    }
+  ],
+  "notes": [
+    "Writers in lineage (5): 2 business CRM writers mapped (Update employer care: 2 attributes; Update CustomerCare: 1 attribute; 3 total). Excluded as ETL plumbing: Close Gen_employercare\\ETL Warning, Update operation person\\ETL Warning, End ETL Process record\\ETL Record Finish (plus Create/Error ETL Process record script tasks).",
+    "Update employer care: SDK faults are swallowed - ErrorBuffer.AddRow() and ErrorBuffer.Description are commented out (main.cs:167-168), so the Error -> Union All -> ETL Warning path never receives rows from this component. Update CustomerCare does emit faults to its Error output (main.cs:167-168), which only feeds ETL warnings.",
+    "The 'Close Gen_employercare' source returns one row per fund main; the Aggregate (GroupBy Gen_employercareid) after the lookup prevents duplicate updates of the same employer care.",
+    "gen_modifiedbybank is set with DateTime.Now (row processing time on the SSIS host), not a value from the database."
+  ]
+}

@@ -1,0 +1,62 @@
+{
+  "package": "0019_StandingOrder",
+  "dataFlows": [
+    "Package\\Update Standing Order First Transaction Received"
+  ],
+  "analyst": "ssis-field-lineage",
+  "source": {
+    "file": "source/DailyProcess/0019_StandingOrder.dtsx",
+    "sha256": "63C5C7487C33DE7314A248C3495D1F042D67D647DEB54F2A0039846942CEC653"
+  },
+  "scriptOutputs": [],
+  "crmWrites": [
+    {
+      "component": "Package\\Update Standing Order First Transaction Received\\update Standing Order",
+      "identicalCopies": [],
+      "entity": "gen_standingorder",
+      "verb": "UPDATE",
+      "mechanism": "SDK (IOrganizationService.Update, one call per row)",
+      "status": "Supported",
+      "recordKey": "standingOrder.Id = Row.GenstandingorderId. Gen_standingorderId = so.Gen_standingorderId from 'Get StandingOrders With First transaction' (SQL on [Prod] = psql / altshuler_mscrm, DTSX:3975), rows with RowNum = 1 only.",
+      "recordKeyColumns": [
+        "Gen_standingorderId"
+      ],
+      "declaredRowFilters": [],
+      "condition": "Every source row is updated (no filter in the script; exceptions are caught and sent to the Error output -> ETL Warning). Source query selects standing orders with so.gen_isfirsttransactionreceivied = 0 AND so.gen_ispastrecord = 0 that have a Gen_ftCurrentYear transaction (via Gen_fundmain on so.gen_customeraccount = f.Gen_customeraccountname) with Gen_TransTypeID = '53' AND Gen_transgrouptypeid = '02', matching bank details (right('0000000000000' + so.Gen_bankaccountnumber, 12) = right('0000000000000' + ft.Gen_CurrentAccountNumber, 12); so.Gen_branch = ft.Gen_CurrentAccountBranch; gen_banks.Gen_BankNumber = ft.Gen_CurrentAccountBank) and matching amount/date in one of two explicit branches: (a) so.gen_depositType = 2 (DTSX:3999) AND gen_amountofonetime = Gen_TransTotalAmount AND gen_onetimechargeadate <= gen_ActualExecutionDate; (b) so.gen_depositType <> 2 (DTSX:4006) AND gen_chargeamount = Gen_TransTotalAmount AND gen_monthlychargedate <= gen_ActualExecutionDate. A standing order with a NULL gen_depositType satisfies neither branch (NULL = 2 and NULL <> 2 are both UNKNOWN) and is therefore never updated. ROW_NUMBER() OVER (PARTITION BY ft.gen_transtotalamount, so.gen_bankname, so.gen_bankaccountnumber, so.gen_branch ORDER BY ft.gen_ActualExecutionDate ASC) (DTSX:3978) with WHERE RowNum = 1 (DTSX:4012): the partition is by amount, bank, bank account number and branch WITHOUT Gen_standingorderId, so when several qualifying standing orders share those values only ONE of them (the row with the earliest gen_ActualExecutionDate; ties broken arbitrarily, no deterministic order) is returned and updated per run. Runs after 'Create ETL Process record' succeeds.",
+      "attributes": [
+        {
+          "attribute": "statuscode",
+          "from": [],
+          "expression": "standingOrder[\"statuscode\"] = new OptionSetValue(FIRST_TRANSACTION_RECEIVED) with const int FIRST_TRANSACTION_RECEIVED = 100000009. statecode is not set by the script.",
+          "fixedValue": 100000009,
+          "condition": null,
+          "evidence": "update Standing Order main.cs:84, 126 (DTSX:4298, 4340, sha 0d253194f663)",
+          "excludeFromValue": [],
+          "declaredSources": []
+        },
+        {
+          "attribute": "gen_isfirsttransactionreceivied",
+          "from": [],
+          "expression": "standingOrder[\"gen_isfirsttransactionreceivied\"] = true (boolean literal; attribute name spelled 'receivied' in code and SQL).",
+          "fixedValue": true,
+          "condition": null,
+          "evidence": "update Standing Order main.cs:127 (DTSX:4341)",
+          "excludeFromValue": [],
+          "declaredSources": []
+        }
+      ],
+      "evidence": "update Standing Order main.cs:120-137 (component DTSX:4090; Entity(\"gen_standingorder\") main.cs:125; service.Update main.cs:129 / DTSX:4343); source SqlCommand DTSX:3975-4015"
+    }
+  ],
+  "readWriteModifications": [],
+  "lookupBridges": [],
+  "unresolved": [],
+  "notes": [
+    "Writers in lineage (3): 1 business CRM writer mapped (2 attributes). Excluded as ETL plumbing: Update Standing Order First Transaction Received\\ETL Warning and End ETL Process record\\ETL Record Finish (plus Create ETL Process record script task).",
+    "Both attributes are literals; the only DB-derived input is the record key Gen_standingorderId, chosen by the source query (conditions listed in the write condition).",
+    "ROW_NUMBER partition (DTSX:3978) is by ft.gen_transtotalamount, so.gen_bankname, so.gen_bankaccountnumber, so.gen_branch WITHOUT Gen_standingorderId, filtered RowNum = 1 (DTSX:4012): if several qualifying standing orders share the same amount, bank, account number and branch, only one of them is updated per run, chosen arbitrarily (earliest gen_ActualExecutionDate, ties undetermined); the others stay unmarked until a later run. Suspicious logic, documented as-is.",
+    "Only statuscode is set (100000009) without statecode; whether 100000009 belongs to the record's current statecode is defined in CRM metadata (out of scope).",
+    "No null check on Row.GenstandingorderId: a NULL would throw inside the try (caught), and again in the catch at main.cs:135 (uncaught) - hypothesis per SSIS buffer semantics; the SQL makes NULL practically impossible (key of the joined Gen_standingorder).",
+    "Standing orders with NULL gen_depositType are never selected: the amount/date filter uses gen_depositType = 2 (DTSX:3999) OR gen_depositType <> 2 (DTSX:4006), and both comparisons are UNKNOWN for NULL."
+  ]
+}

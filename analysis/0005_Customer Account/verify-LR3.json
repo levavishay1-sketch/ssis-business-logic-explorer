@@ -1,0 +1,269 @@
+{
+  "verifier": "ssis-verifier",
+  "package": "0005_Customer Account",
+  "scope": "logic-claims re-check round 3",
+  "checkedAt": "2026-11-07",
+  "checked": 19,
+  "results": [
+    {
+      "id": "L|finding#1",
+      "hash": "0dc13b892a9e",
+      "verdict": "CONFIRMED",
+      "detail": "Re-derived. There are 30 OLE DB Command components. 25 of them are business commands in 5 groups of 5: Update Customer Account 1-5 → Gen_customeraccountBase (DTSX:40982…); Update Customer Account (Unsupported) 1-5 → Gen_customeraccountBase; Update TransferRequest 1-5 (CA step) → 'update gen_transferrequest' (DTSX:73757…); Update Fund Main 1-5 → Gen_fundmainbase (DTSX:79193…); and Update TransferRequest 1-5 (fund step) → 'update gen_transferrequest' (DTSX:79598-79782). The other 5 are 'insert etl process warning' (insert gen_etlprocesswarningBase). There are 3 Execute SQL tasks (DTSX:68399, 79889, 79895). Some writes have no ModifiedOn: Aggregations, Paragraph14, Currency, Update Fund Main and Update CA (Unsupported). Others set ModifiedOn = GETUTCDATE(): Update Customer Account 1-5 and both TransferRequest groups. The plugin/Audit note is correctly marked as platform behaviour that is not shown in the files. The [qsql] design-time target is psql/ALTSHULER_MSCRM. The package has no DTS:Configuration and no dtsConfig, so no override note is needed. The view-vs-Base remark is correctly marked 'לא מוצג בקבצים'. For context, the supplied 0028 does write to gen_transferrequestBase (0028:11114).",
+      "evidence": "0005_Customer Account.dtsx:4-8, 40982, 68399, 73757-73941, 79193-79782, 79889, 79895; 0028_Fund Enrolment.dtsx:11114",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|finding#4",
+      "hash": "b8bb0d05c1fd",
+      "verdict": "WRONG",
+      "detail": "The mechanics are correct. Set gen_name (DTSX:34382) is (DT_WSTR,4)(DT_I4)gen_producttypeid + \"-\" + (DT_WSTR,12)(DT_I8)gen_bankaccountnumber, output wstr(17), with errorRowDisposition and truncationRowDisposition = FailComponent. It runs on every source row before the lookups. A failed data flow does not satisfy the Success constraint (DTSX:82413), so the later steps do not run. A flagged fund with no product or customer-account-type match is not read. The problem is that the text treats the unqualified column gen_existinfile as the fund's flag ('בקופה … gen_existinfile = 1'). In the source query (DTSX:33252) gen_existinfile appears without a table prefix in a three-table query (gen_fundmain f, product p, gen_customeraccounttype cat). Under the standard, ownership of such a column is accepted only when stated as unknown or argued explicitly, and no argument is given.",
+      "evidence": "DTSX:33252 (WHERE gen_existinfile = 1, unqualified), 34382, 68399, 82413",
+      "wrongUnits": [
+        {
+          "unit": "[1] 'gen_existinfile = 1' attributed to the fund",
+          "problem": "The ownership of an unqualified column in a multi-table query is stated without the required argument.",
+          "correct": "הוסף: gen_existinfile מופיעה בשאילתה בלי שם טבלה; אילו העמודה הייתה קיימת ביותר מטבלה אחת השאילתה הייתה נכשלת (לפי המשתמש החבילה רצה בפרודקשן), ול-gen_fundmain יש עמודה כזו (from gen_fundmain where Gen_existinfile = 1, DTSX:68399), ולכן זו העמודה של הקופה.",
+          "evidence": "DTSX:33252, 68399"
+        }
+      ]
+    },
+    {
+      "id": "L|finding#5",
+      "hash": "f898f17fefd9",
+      "verdict": "CONFIRMED",
+      "detail": "SQL DTSX:68399. The WHERE is abs(agg.gen_accountbalance - ca.Gen_accountbalance) > 1 OR one of three abs(datediff(\"HH\", agg.X, isnull(ca.X,0))) > 12. When ca.Gen_accountbalance is NULL the first test is unknown. agg.gen_accountbalance is never NULL (sum(isnull(...,0))). So the account is updated only if one of the date tests holds, and then the balance is written too, which the second sentence covers. The DATEDIFF boundary semantics are stated correctly. The statement is conditional and is not framed as a bug.",
+      "evidence": "DTSX:68399",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|finding#10",
+      "hash": "b8b59cae9814",
+      "verdict": "WRONG",
+      "detail": "The rest is correct. The source query (DTSX:33252) has no account-existence filter. Its joins are inner joins to product (productid = gen_fundtypename) and to gen_customeraccounttype (cat.gen_id = p.Gen_producttypeid AND cat.gen_bankname = f.gen_bankname). row_number() is partitioned by f.gen_bankname, f.gen_bankaccountnumber, p.gen_producttypeid, and num = 1 is kept. Create versus update is decided by the Get Customer Account Guid lookup (DTSX:32121; No Match → Multicast 2 → create path). The problem: the text says the source reads 'הקופות המסומנות gen_existinfile = 1' and funds 'שיש להן מוצר (productid = gen_fundtypename)'. gen_existinfile, productid and gen_fundtypename are all unqualified in a three-table query, and no ownership argument is given (standard, 'Accepted forms').",
+      "evidence": "DTSX:33252, 32121, 2588-2611 (p.productid), 68399; 0008_LeumiFile-PY.dtsx:5652 (fm.gen_fundtypename)",
+      "wrongUnits": [
+        {
+          "unit": "[1] ownership of gen_existinfile (and productid / gen_fundtypename)",
+          "problem": "Unqualified columns are attributed to the fund and the product without the ambiguity argument.",
+          "correct": "Add the ambiguity rule ('אילו העמודה הייתה קיימת ביותר מטבלה אחת השאילתה הייתה נכשלת; לפי המשתמש החבילה רצה בפרודקשן') plus evidence for each column: gen_existinfile on gen_fundmain (DTSX:68399, a single-table query); productid on product (p.productid, DTSX:2588 query); gen_fundtypename on gen_fundmain (fm.gen_fundtypename, 0008:5652).",
+          "evidence": "DTSX:33252, 68399, 2588; 0008:5652"
+        }
+      ]
+    },
+    {
+      "id": "L|Package (control flow)|detailed",
+      "hash": "ff563568b0f4",
+      "verdict": "WRONG",
+      "detail": "Order and constraints are correct. All 16 constraints (DTSX:82412-82427) have no DTS:Value or expression, so all are Success. Each target has exactly one incoming constraint and none is disabled. Every cited line matches. Steps [2]-[9] match the components: [4] matches main.cs:41 of Set Joining email; [5] matches DTSX:68399; [6] matches DTSX:79889; [7] matches the SQL comments; [9] matches CurrencyName = 'שקל חדש', the design-time value (DTSX:29-30), with no package configuration and not in any script's ReadWriteVariables. [15] is correct: in the fund step, success rows from Update Fund Main go to the Aggregate (group by gen_transferrequestid and SystemUserId, AggregationType 0) and then to Update TransferRequest. Unit [14] states as fact that the failure is recorded in the ETL process record. In the OnError handler (Error ETL Process record, DTSX:82437, Main at 82594-82620), the first CRM call is preceded by entity.Id = (Guid)Dts.Variables[\"ETLProcessRecordGuid\"].Value (DTSX:82604). ETLProcessRecordGuid is a String variable (DataType=8, DTSX:41-42), and Create ETL Process record assigns it .ToString() (DTSX:9869). In .NET, unboxing a string to Guid throws InvalidCastException, so according to the C# source neither the gen_etlprocess Update (82608) nor the annotation Create (82617) is reached. The compiled DLL was not decompiled. Either way, the files do not show that the failure is recorded. Under the standard, a statement about failure handling must be correct.",
+      "evidence": "DTSX:41-42, 9869, 82412-82427, 82437, 82594-82620",
+      "wrongUnits": [
+        {
+          "unit": "[14] 'והכשל נרשם ברשומת תהליך ה-ETL (מסגרת)'",
+          "problem": "The files do not show this. According to the source code, the handler's cast (Guid) of a String variable throws before the update.",
+          "correct": "השלבים שאחרי השלב שנכשל אינם רצים באותה ריצה. מטפל OnError (Error ETL Process record) מנסה לעדכן את רשומת תהליך ה-ETL לסטטוס 277880001 ולצרף הערה עם תיאור השגיאה (מסגרת); לפי קוד המקור הוא ממיר את המשתנה ETLProcessRecordGuid, שהוא מחרוזת, ל-Guid בהמרה ישירה, ולכן לא מוכח בקבצים שהרישום מתבצע (ה-DLL לא פוענח).",
+          "evidence": "DTSX:41-42, 9869, 82604-82617"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Create or Update Customer Accounts|title",
+      "hash": "4216525a19a7",
+      "verdict": "WRONG",
+      "detail": "Mechanics are correct. The inner joins, the row_number partition, the Fund Is Block lookup (DTSX:31966: gen_IsDepositBlocked = '1' on account number + type), the CA lookup (Full cache, DTSX:32230) and the AJ join are right. The AJ join uses first-created per identity number, document type and account number; num = 1 AND status 7; left outer; TreatNullsAsEqual. The 5050 rule (main.cs:19-20, 41-44) is right. The split is UnSupported = both broker numbers present and equal → SQL, Default → SDK. The comparison exclusions are right too. Compare (SQL path) has no gen_issmallaccount and no source gen_subproduct counterpart; Compare 1 has gen_productsubcustomeraccount but not gen_issmallaccount. Two units are not proven. (a) short_he and flow_he[1] attribute the unqualified gen_existinfile to the funds without the ambiguity argument. (b) flow_he[1] says '(האחרונה שעודכנה בבנק)', a meaning taken from the column name gen_modifiedbybank. The SQL only orders by f.gen_modifiedbybank desc. Supplied packages do set this column to the load time when bank files are processed (0004:92875 'gen_modifiedbybank = getdate()', 0008:23801), but the text gives no such attribution and no השערה label.",
+      "evidence": "DTSX:33252, 31966-31984, 32121-32237, 32038, 33700-33704, 18090, 68399; 0004_LeumiFile-MY.dtsx:92875; 0008_LeumiFile-PY.dtsx:23801",
+      "wrongUnits": [
+        {
+          "unit": "short_he / flow_he[1] 'gen_existinfile = 1' ownership",
+          "problem": "The unqualified column is attributed to the fund without an argument.",
+          "correct": "Add the ambiguity-rule argument with DTSX:68399 as evidence that gen_fundmain has Gen_existinfile.",
+          "evidence": "DTSX:33252, 68399"
+        },
+        {
+          "unit": "flow_he[1] '(האחרונה שעודכנה בבנק)'",
+          "problem": "This is a meaning taken from the column name gen_modifiedbybank.",
+          "correct": "הקופה עם gen_modifiedbybank המאוחר ביותר (בחבילות שסופקו השדה מקבל את זמן הריצה בעדכון מקובץ הבנק: 0004:92875, 0008:23801), או לסמן השערה.",
+          "evidence": "DTSX:33255; 0004:92875; 0008:23801"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Create or Update Customer Accounts|short",
+      "hash": "06ab37740ed9",
+      "verdict": "WRONG",
+      "detail": "The decisions and writes are correct. Blocked = TRUE/FALSE (DTSX:33607/33580). Create comes from the lookup No Match. Consulting fields are overridden by AJ values when not NULL (main.cs:146-162), using only the first-created joining for the combination and only in status 7. gen_joiningmailtoagent = 1 unless the product type id is '5050'. The SQL path writes about 40 fields, including gen_issmallaccount and gen_productsubcustomeraccount, which are not compared. On the SDK path, changed fields are sent plus always the blocked flag, and gen_mfratedtotal and gen_letterofbenefitindex are sent when non-NULL (Update CustomerAccounts main.cs:44-56). Two units in [1] are wrong. (a) Unqualified gen_existinfile is attributed to the funds without the argument. (b) 'זו שעודכנה לאחרונה על ידי הבנק' is a meaning taken from the column name gen_modifiedbybank with no attribution or השערה label.",
+      "evidence": "DTSX:33252-33255, 33580, 33607, 32121, 18090, 40982; Create Customer Account main.cs:41-44, 146-162; Update CustomerAccounts main.cs:44-121; 0004:92875; 0008:23801",
+      "wrongUnits": [
+        {
+          "unit": "[1] 'הקופות המסומנות gen_existinfile = 1'",
+          "problem": "The unqualified column's ownership is not argued.",
+          "correct": "Add the ambiguity-rule argument with DTSX:68399.",
+          "evidence": "DTSX:33252, 68399"
+        },
+        {
+          "unit": "[1] 'זו שעודכנה לאחרונה על ידי הבנק'",
+          "problem": "This is a meaning taken from the name gen_modifiedbybank.",
+          "correct": "זו שערך gen_modifiedbybank שלה הוא המאוחר ביותר (בחבילות שסופקו: זמן העדכון מקובץ הבנק, 0004:92875, 0008:23801), או לסמן השערה.",
+          "evidence": "DTSX:33255"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Create or Update Customer Accounts|detailed",
+      "hash": "744fee448ef4",
+      "verdict": "WRONG",
+      "detail": "Most units were re-derived and are correct. [2] CASE ProductTypeCode. [3] Set gen_name FailComponent. [4]-[8] the Fund Is Block lookup. [9] the CA lookup with CacheType=0. [11] AJ: the partition and order, num = 1 AND status 7 after numbering, Convert Product Type 4→2, 5→3, 2→4, Merge Join keys at sort positions 1-3 (bankaccountnumberO, ProductTypeFromDerivedColumn↔gen_documenttype, gen_customeridnumber↔gen_applicantidentitynumber), JoinType=1, TreatNullsAsEqual=true. [12] Dates To Local 1 inputs; gen_datereleaseoffunds is converted separately in code (.ToLocalTime(), main.cs:172). [13] the Create fields; consult fields overridden by AJ; bankadvisor and bankbranchadvisor only from AJ; kibbutz only when both values are present; gen_selfemployername ← gen_accountname (main.cs:126-127); ExecuteMultiple in batches of 10. The five Create copies differ only in whitespace, plus where the gen_mfratedtotal assignment sits in copy 4. [14]. [16] the split expression. [18] the Compare script semantics (string empty = NULL, Equals for Guid/int/bool, > 12 h, decimal > 0.01, double > 0.001; gen_subproductDB has no counterpart). [22] SQL with ModifiedBy = system user (Create System Columns ← User::UserId ← systemuser like '%crmadmin%') and ModifiedOn = GETUTCDATE(). [24]-[25] Dates To Local, then Compare 1 with exact Equals; gen_issmallaccount is absent. [29] matches main.cs:44-111 and Helpers.cs:85-108, and the five Update copies differ only in whitespace. Wrong or unproven units: (a) [1] and [30] attribute the unqualified gen_existinfile to the funds without the ambiguity argument. (b) [1] 'זו שתאריך העדכון שלה בבנק הוא האחרון' is a meaning taken from the column name gen_modifiedbybank, with no attribution or השערה label. (c) [22] says about 40 fields are overwritten 'בערכי הקופה', including gen_productsubcustomeraccount. In this UPDATE, the parameter for gen_productsubcustomeraccount (Param_26) is bound to input gen_subproduct = p.gen_subproduct from product (DTSX:33252 'p.gen_subproduct'). It is not bound to cat.gen_productsubcustomeraccount, which the Create path (lineage Merge Join → gen_productsubcustomeraccount) and the SDK Update path (Union All 1 → gen_productsubcustomeraccount) write. So the value written differs by path, and the text does not show it.",
+      "evidence": "DTSX:33252, 34382, 31964-31984, 32121-32237, 32038, 18124, 33700-33704, 34460-34775, 31041, 18090, 12421, 30078, 14893, 40982 (Param_26 ← gen_subproduct), 29333; Create Customer Account main.cs:39-228, 254; Update CustomerAccounts main.cs:40-121; Helpers.cs:8-108",
+      "wrongUnits": [
+        {
+          "unit": "[1]/[30] 'gen_existinfile = 1' ownership",
+          "problem": "The unqualified column is attributed to the fund without an argument.",
+          "correct": "Add the ambiguity-rule argument with DTSX:68399.",
+          "evidence": "DTSX:33252, 68399"
+        },
+        {
+          "unit": "[1] 'זו שתאריך העדכון שלה בבנק הוא האחרון'",
+          "problem": "This is a meaning taken from the column name gen_modifiedbybank.",
+          "correct": "הקופה עם gen_modifiedbybank המאוחר ביותר (בחבילות שסופקו נקבע לזמן הריצה בעדכון מקובץ הבנק: 0004:92875, 0008:23801), או לסמן השערה.",
+          "evidence": "DTSX:33255"
+        },
+        {
+          "unit": "[22] 'נדרסים בערכי הקופה … וכולל gen_productsubcustomeraccount'",
+          "problem": "In the SQL path gen_productsubcustomeraccount is written from product.gen_subproduct. In Create and in the SDK update it is written from gen_customeraccounttype.gen_productsubcustomeraccount, and the text does not show the difference.",
+          "correct": "ב-UPDATE הישיר gen_productsubcustomeraccount מקבל את p.gen_subproduct (מהמוצר), בעוד שביצירה ובעדכון ה-SDK הוא מקבל את cat.gen_productsubcustomeraccount (מסוג חשבון הלקוח).",
+          "evidence": "DTSX:33252, 40982 (Param_26 ← gen_subproduct); Create Customer Account main.cs:135-136; Update CustomerAccounts main.cs:109"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Create or Update Customer Accounts|detail",
+      "hash": "fe8150ba295c",
+      "verdict": "WRONG",
+      "detail": "Correct units: [2] matching; [3] decisions, including the blocked flag gen_IsDepositBlocked = '1', which is qualified as f.; [4] the CRM writes; [6] the upstream citations, which I verified. Those citations are: 0004:61789 insert into Gen_fundmainbase including Gen_existinfile; 0004:92874-92875 UPDATE Gen_fundmain Set gen_existinfile = 1; 0008:23784 and 0009:27026 gen_existinfile = true. No supplied package creates gen_automatedjoining: 0027 (1370-1376, 5936) and 0029 (29686) only Update. 0027 reads status-7 joinings (DTSX:984, and the SuspicionAsEmitted source also uses status 7) and updates gen_joiningstatus and gen_customeraccountid. Wrong units: [5] 'מהקופה המייצגת (זו שעודכנה אחרונה על ידי הבנק)' is a meaning taken from the column name gen_modifiedbybank with no attribution or השערה label. [1] presents the gen_existinfile = 1 filter together with gen_fundmain, and [6] ties it to gen_fundmain writers, but the column is unqualified in the three-table query (DTSX:33252) and no ambiguity argument is given.",
+      "evidence": "DTSX:33252, 31966, 68399; 0004_LeumiFile-MY.dtsx:61789-61900, 92874-92875; 0008_LeumiFile-PY.dtsx:23781-23784, 23801; 0009_LeumiFile-BY.dtsx:27019-27026; 0027_AutomatedJoining.dtsx:984, 1370-1376, 5936; 0029_POA.dtsx:29686",
+      "wrongUnits": [
+        {
+          "unit": "[5] 'זו שעודכנה אחרונה על ידי הבנק'",
+          "problem": "This is a meaning taken from the column name gen_modifiedbybank.",
+          "correct": "הקופה עם gen_modifiedbybank המאוחר ביותר (בחבילות שסופקו: זמן העדכון מקובץ הבנק, 0004:92875, 0008:23801), או לסמן השערה.",
+          "evidence": "DTSX:33255"
+        },
+        {
+          "unit": "[1] 'עם gen_existinfile = 1' as a gen_fundmain filter",
+          "problem": "The unqualified column's ownership is not argued.",
+          "correct": "Add the ambiguity-rule argument with DTSX:68399.",
+          "evidence": "DTSX:33252, 68399"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Create or Update Customer Accounts|decisions",
+      "hash": "78b130e0ef48",
+      "verdict": "CONFIRMED",
+      "detail": "[1] Fund Is Block To Deposit (DTSX:31964): f.gen_IsDepositBlocked = '1' (qualified), match on gen_bankaccountnumber + gen_customeraccounttype, Match → TRUE (33607), No Match → FALSE (33580). [2] Get Customer Account Guid: match on type + account number, Match → Multicast 1 → update paths, No Match → Multicast 2 → create. [3] The Conditional Split expression is verbatim, with UnSupported → Compare → SQL and Supported → Dates To Local → SDK. [4] Both splits use 'NeedToUpdateAll ==  TRUE'. The comparison exclusions are correct per the input lists of Compare (DTSX:12421) and Compare 1 (DTSX:14893). [5] matches main.cs:41-44 with constants at 19-20. [6] matches main.cs:146-162 (advisornumber → gen_consultnumber, start/end advising → consulting dates, bankadvisors → gen_consultname). [7] matches main.cs:164-175.",
+      "evidence": "DTSX:31964-31984, 32121-32237, 33580, 33607, 18090, 33634, 33667, 12421, 14893; Create Customer Account main.cs:19-20, 41-44, 146-175",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Create or Update Customer Accounts|crm",
+      "hash": "2595b18a04a0",
+      "verdict": "CONFIRMED",
+      "detail": "The three writers are correct. Create: Create Customer Account ×5, ExecuteMultiple RequestType.Create (main.cs:254), on lookup No Match. SQL Update: Update Customer Account 1-5 → Gen_customeraccountBase, on the UnSupported branch and Is Need To Update All = TRUE. SDK Update: Update CustomerAccounts ×5, ExecuteMultiple RequestType.Update, on the Supported (default) branch and Is Need To Update All 1 = TRUE. gen_issmallaccount is not an input of Compare 1.",
+      "evidence": "DTSX:18090, 33634, 33667, 40982-42290, 14893; Create Customer Account main.cs:254; Update CustomerAccounts main.cs:142",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Connect Funds to Customer Accounts|title",
+      "hash": "f65a872d7f4b",
+      "verdict": "WRONG",
+      "detail": "Mechanics are correct per SQL DTSX:2588. The joins are product (p.productid = gen_fundtypename), cat (p.Gen_producttypeid = cat.gen_id AND p.gen_bankname = cat.gen_bankname) and ca (type + f.Gen_BankAccountNumber). WHERE (f.Gen_customeraccountname IS NULL OR <> ca.Gen_customeraccountId). Dates To Local (DTSX:1697) runs, then the SDK update of gen_customeraccountname plus each consulting field only when !genX_IsNull && (fmX_IsNull || genX != fmX) (main.cs:36-65). The problem: short_he and flow_he[1] attribute 'Gen_existinfile = 1' to the funds, but in this four-table query Gen_existinfile is unqualified (DTSX:2588 '… and Gen_existinfile = 1'), and no ambiguity argument is given.",
+      "evidence": "DTSX:2588-2611, 1697, 68399; Update Customer Account Guid in Fund main.cs:36-65",
+      "wrongUnits": [
+        {
+          "unit": "short_he / flow_he[1] 'Gen_existinfile = 1' ownership",
+          "problem": "The unqualified column is attributed to the funds without an argument.",
+          "correct": "Add: Gen_existinfile אינה מוסמכת בשאילתה; אילו הייתה קיימת ביותר מטבלה אחת השאילתה הייתה נכשלת (לפי המשתמש החבילה רצה בפרודקשן); ל-gen_fundmain יש עמודה זו (DTSX:68399).",
+          "evidence": "DTSX:2588, 68399"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Connect Funds to Customer Accounts|short",
+      "hash": "9eb03ebecc8a",
+      "verdict": "WRONG",
+      "detail": "The flow is correct: selection, account determination by type (product type and product bank) and account number, linking, and per-field copying of account consulting values that are non-NULL and differ (main.cs:42-65). [9] is hedged ('אם העדכון הצליח'). Units [1] and [9] attribute the unqualified Gen_existinfile in the four-table query (DTSX:2588) to the funds without the ambiguity argument.",
+      "evidence": "DTSX:2588-2611, 68399; main.cs:36-65",
+      "wrongUnits": [
+        {
+          "unit": "[1]/[9] 'המסומנות gen_existinfile = 1'",
+          "problem": "The unqualified column's ownership is not argued.",
+          "correct": "Add the ambiguity-rule argument with DTSX:68399.",
+          "evidence": "DTSX:2588, 68399"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Connect Funds to Customer Accounts|detailed",
+      "hash": "eaabc18537ea",
+      "verdict": "WRONG",
+      "detail": "The tech of every unit matches DTSX:2588 and main.cs:36-65. The target entities are right: account, gen_agentcontract, gen_bankadvisor, gen_bankbranch. Dates To Local converts all four dates unless they equal CrmMinimumDate. There are 5 copies with identical code. Unit [1] says 'נבחרות קופות המסומנות gen_existinfile = 1', attributing the unqualified Gen_existinfile in the four-table query to the funds without the ambiguity argument. Minor, not counted: [14] 'נושאות את פרטי הייעוץ שלו' is qualified by [13] (a NULL value in the account does not overwrite the fund).",
+      "evidence": "DTSX:2588-2611, 1697, 3110, 68399; main.cs:36-65",
+      "wrongUnits": [
+        {
+          "unit": "[1] 'נבחרות קופות המסומנות gen_existinfile = 1'",
+          "problem": "The unqualified column's ownership is not argued.",
+          "correct": "Add the ambiguity-rule argument with DTSX:68399.",
+          "evidence": "DTSX:2588, 68399"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Update Aggrigations on Customer Accounts|title",
+      "hash": "63fe13e5d2e4",
+      "verdict": "CONFIRMED",
+      "detail": "SQL DTSX:68399. The aggregate is a single-table subquery on gen_fundmain WHERE Gen_existinfile = 1 GROUP BY Gen_customeraccountname, so ownership is unambiguous. It takes sum(isnull(balance,0)) and the minimums of gen_periodofservice, gen_fundcreationdate and Gen_ReleaseDate. The result is written to Gen_customeraccountBase only when abs(balance difference) > 1 or one abs(datediff(HH)) > 12. The DATEDIFF boundary note is correct.",
+      "evidence": "DTSX:68395-68400",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Update Aggrigations on Customer Accounts|short",
+      "hash": "d33bf5b6d740",
+      "verdict": "CONFIRMED",
+      "detail": "The steps, decision, write and end match DTSX:68399. The inner join means accounts with no flagged fund are not updated.",
+      "evidence": "DTSX:68399",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Update Aggrigations on Customer Accounts|detail",
+      "hash": "0be24d4d014b",
+      "verdict": "CONFIRMED",
+      "detail": "The source, inner join, link column, decision and the write with no ModifiedOn are correct (DTSX:68399). The fund-account link is set within this package by Connect Funds (gen_customeraccountname, main.cs:40). The upstream citations were verified: 0004:61789-61900, 92874-92875; 0008:23781-23784; 0009:27019-27026.",
+      "evidence": "DTSX:68399; Update Customer Account Guid in Fund main.cs:40; 0004:61789, 92874-92875; 0008:23781-23784; 0009:27019-27026",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Update Aggrigations on Customer Accounts|crm",
+      "hash": "588d2accd648",
+      "verdict": "CONFIRMED",
+      "detail": "There is one direct SQL UPDATE of Gen_customeraccountBase, with exactly the stated condition (DTSX:68399).",
+      "evidence": "DTSX:68399",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Update Consulting Field  In Fund Main From Transfer Request|detail",
+      "hash": "949f42849d26",
+      "verdict": "WRONG",
+      "detail": "The mechanics were verified. Get TRansfer Request (DTSX:77180) is a LEFT JOIN of Gen_fundmain on tr.gen_customeraccount = fm.gen_customeraccountname, with tr.Gen_transferType = 5 and tr.gen_tanferinstatus = 8 (SQL comments 'בין מסלולים' / 'הסתיים') and a per-field difference filter. Each field is ISNULL(tr_X) ? fm_X : tr_X (DTSX:77748-77783). Update Fund Main 1-5 → Gen_fundmainbase, errorRowDisposition = RedirectRow. Success rows go to Union Update All → Multicast 1 → Aggregate (group by gen_transferrequestid and SystemUserId, AggregationType 0) → Update TransferRequest (gen_dateofcopyingconsultingdetailstofund = GETUTCDATE(), ModifiedOn, ModifiedBy). So partial success still marks the request. A request with no funds (Gen_fundmainId NULL → 0 rows, no error) is also marked. No supplied package creates gen_transferrequest. 0036 updates gen_tanferinstatus for status-7 requests (0036:3584-3588, 3886-3889). 0028 and 0029 update other columns of the request (gen_fundenrolmentid, gen_powerofattorneymainexistence), and the text does not deny this. Wrong unit: [1] lists 'gen_dateofcopyingconsultingdetailstofund ריק' as a property of the transfer request, but in the source SQL the column is unqualified in a two-table query ('gen_dateofcopyingconsultingdetailstofund' in the SELECT and 'and gen_dateofcopyingconsultingdetailstofund is null', DTSX:77182, 77204), and no ambiguity argument is given.",
+      "evidence": "DTSX:77180-77204, 77748-77783, 75692, 79193-79782, 79599-79783; 0036_TransferRequest.dtsx:3584-3588, 3886-3889; 0028:11114; 0029:40559-40561",
+      "wrongUnits": [
+        {
+          "unit": "[1] 'gen_dateofcopyingconsultingdetailstofund ריק' as the request's marker",
+          "problem": "The unqualified column's ownership is not argued.",
+          "correct": "Add: העמודה אינה מוסמכת בשאילתה; אילו הייתה קיימת גם ב-Gen_fundmain השאילתה הייתה נכשלת (לפי המשתמש החבילה רצה בפרודקשן); החבילה מעדכנת gen_transferrequest.gen_dateofcopyingconsultingdetailstofund (DTSX:79599), ולכן זו העמודה של בקשת ההעברה.",
+          "evidence": "DTSX:77182, 77204, 79599"
+        }
+      ]
+    }
+  ],
+  "missingWrites": []
+}

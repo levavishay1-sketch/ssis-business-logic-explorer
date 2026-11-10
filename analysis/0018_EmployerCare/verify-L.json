@@ -1,0 +1,227 @@
+{
+  "verifier": "ssis-verifier",
+  "package": "0018_EmployerCare",
+  "scope": "logic-claims all",
+  "checkedAt": "2026-11-07T10:00:00Z",
+  "checked": 22,
+  "results": [
+    {
+      "id": "L|summary",
+      "hash": "e3ac7b86d2e9",
+      "verdict": "CONFIRMED",
+      "detail": "Re-derived: source SQL DTSX:1425-1432 (state 2, depositereason NOT IN (6,7,8,9,11) OR IS NULL, INNER JOIN customeraccount + Gen_fundmain); Lookup DTSX:1364-1369 (gen_ftcurrentyear JOIN Gen_fundtransactiontype, Gen_fundtransactiontype.gen_transgrouptype=1, gen_transactiontypeid NOT LIKE '%99%'), NoMatchBehavior=1 with No Match output unconnected; Update employer care main.cs (DTSX:1926-1929) sets gen_currentstate=OptionSetValue(3)//Finished and gen_modifiedbybank=DateTime.Now via ExecuteMultipleExtension Update. Update operation person SQL DTSX:6772-6779 and main.cs DTSX:7272. Single connection manager CRM (DTSX:4-6), EnableConfig=True (DTSX:1), config file DTSX:11; no OLE DB Command/Destination or Execute SQL task exists. 5 script components write to CRM (2 business + ETL Warning x2 [code text identical] + ETL Record Finish). Note: the 3 Script Tasks (Create ETL Process record, Error ETL Process record x2) also write gen_etlprocess/annotation, all plumbing, so the 'all business writes' statement still holds. '(or empty)' for depositereason is correct given the parentheses.",
+      "evidence": "DTSX:1,4-6,11,1364-1369,1379,1425-1432,1926-1929,6772-6779,7272",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|exec",
+      "hash": "7ab81e05b086",
+      "verdict": "CONFIRMED",
+      "detail": "Four PrecedenceConstraints DTSX:7925-7928, all without DTS:Value (default Success), no expressions, LogicalAnd. Chain Get Organization Variables -> Create ETL Process record -> Close Gen_employercare -> Update operation person -> End ETL Process record. Get Organization Variables has no incoming constraint. No disabled executables.",
+      "evidence": "DTSX:7925-7928",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|ignored",
+      "hash": "46143e3bc080",
+      "verdict": "CONFIRMED",
+      "detail": "Checked each: Get Organization Variables reads gen_etlvariable (DTSX:4672ff) and sets variables only; Create ETL Process record creates gen_etlprocess (DTSX:2663-2669); End ETL Process record looks up gen_etlprocess/warnings and updates gen_etlprocess (DTSX:3200-3209, 4598-4608); OnError handlers' Error ETL Process record update gen_etlprocess status + create annotation on gen_etlprocess (DTSX:241-256, 5689-5698); Union All / Set Warning columns / ETL Warning create gen_etlprocesswarning (DTSX:808-821, 6226). None writes a business entity or filters business data.",
+      "evidence": "DTSX:241-256,808-821,2663-2669,3200-3209,4598-4608,5689-5698,6226",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|finding#1",
+      "hash": "40e5faba3fc3",
+      "verdict": "CONFIRMED",
+      "detail": "Lookup reference query DTSX:1364-1369 has no date, employer or fund-specific filter; join only on gen_fundmainid=gen_fundnumber (DTSX:1384, JoinToReferenceColumn). gen_employername is not selected in the source SQL DTSX:1425-1432. 'Current year' scope labelled as hypothesis from table name only.",
+      "evidence": "DTSX:1364-1369,1384,1425-1432",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|finding#2",
+      "hash": "1733784c948f",
+      "verdict": "WRONG",
+      "detail": "Technical core is right (ErrorBuffer.AddRow/Description commented out at DTSX:1963-1964, so per-record faults returned in the ExecuteMultiple response are discarded and the Error output -> Union All never receives rows). But 'a closing failure is not documented anywhere' is overstated.",
+      "evidence": "DTSX:1963-1964 (main.cs:167-168); OnError handler DTSX:31-45, Error ETL Process record DTSX:236-256",
+      "wrongUnits": [
+        {
+          "unit": 1,
+          "problem": "Absolute claim 'not documented anywhere'. An exception thrown by ExecuteMultipleRequest (batch-level failure) is unhandled, fails the data flow and fires the Close Gen_employercare OnError handler, which sets gen_etlprocess.statuscode=277880001 and creates an annotation with the error text. Whether CRM.Proxy/ExecuteMultipleExtension (external assembly) logs faults internally is external_unknown.",
+          "correct": "Per-record faults returned in the ExecuteMultiple response are discarded inside the package (warning code commented out); a batch-level exception is recorded by the OnError handler in gen_etlprocess + annotation; logging inside the external CRM.Proxy assembly is unknown.",
+          "evidence": "DTSX:1963-1964; DTSX:236-256"
+        }
+      ]
+    },
+    {
+      "id": "L|finding#3",
+      "hash": "32772d454ff0",
+      "verdict": "CONFIRMED",
+      "detail": "main.cs:132 (DTSX:7272) hard-codes new EntityReference(\"account\", ...). Target of account.gen_operationperson / gen_employeroperationpersonname is not defined in any supplied file (other packages use 'systemuser' only for different entities' gen_operationpersonname, 0009:97233, which proves nothing here). Consequence worded conditionally; failed faults go Error -> Union All -> Set Warning columns -> ETL Warning (DTSX:7915-7918, main.cs:167-168).",
+      "evidence": "DTSX:7272, 7915-7918",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|finding#4",
+      "hash": "eab1295cd2a8",
+      "verdict": "CONFIRMED",
+      "detail": "WHERE gen_employeroperationpersonname != a.gen_operationperson OR (gen_employeroperationpersonname IS NULL AND a.gen_operationperson IS NOT NULL): when the account value is NULL, '!=' yields UNKNOWN and the second branch requires account NOT NULL, so the row is never selected; no other component clears it.",
+      "evidence": "DTSX:6778-6779",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|finding#5",
+      "hash": "a188e9156e9b",
+      "verdict": "CONFIRMED",
+      "detail": "Constraint 2 (DTSX:7927) Close -> Update operation person on Success; the operation-person SQL (DTSX:6772-6779) has no state filter, so records closed earlier in the same run are included.",
+      "evidence": "DTSX:7927, 6772-6779",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Close Gen_employercare|title",
+      "hash": "01c1ed2494e9",
+      "verdict": "WRONG",
+      "detail": "Units 1,2,4,5,6 verified against DTSX:1364-1369, 1425-1432, aggregate DTSX:554-589 (group by Gen_employercareid), main.cs DTSX:1926-1929. Unit 3 misstates NULL handling.",
+      "evidence": "DTSX:1430-1432",
+      "wrongUnits": [
+        {
+          "unit": 3,
+          "problem": "'שסיבת ההפקדה אינה 6,7,8,9,11 או ריקה' reads as 'is neither 6..11 nor empty', i.e. excludes empty reasons. The SQL includes empty reasons.",
+          "correct": "State 2 AND (Gen_depositereason NOT IN (6,7,8,9,11) OR Gen_depositereason IS NULL): records with an empty deposit reason ARE included.",
+          "evidence": "DTSX:1430-1432"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Close Gen_employercare|short",
+      "hash": "70b4f239d421",
+      "verdict": "WRONG",
+      "detail": "Flow structure is right (source -> Lookup match/no-match -> Update), but the decision text misstates the transaction-type operator.",
+      "evidence": "DTSX:1368",
+      "wrongUnits": [
+        {
+          "unit": 2,
+          "problem": "'לא קוד 99' implies exclusion of the exact code 99 only. The SQL is gen_transactiontypeid NOT LIKE '%99%', which excludes every code containing '99' anywhere (e.g. '199', '990').",
+          "correct": "Transaction type of group 1 (Gen_fundtransactiontype.gen_transgrouptype = 1) whose gen_transactiontypeid does NOT contain the substring '99'.",
+          "evidence": "DTSX:1367-1368"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Close Gen_employercare|detailed",
+      "hash": "92e4229b4cf4",
+      "verdict": "WRONG",
+      "detail": "Units 1,2,4-12 verified (SQL DTSX:1425-1432; Lookup CacheType=0 full, NoMatchBehavior=1, No Match output has no path DTSX:2473-2478; Aggregate group-by Gen_employercareid AggregationType 0; main.cs batches of 100, OptionSetValue(3)//Finished, DateTime.Now; commented ErrorBuffer). Unit 3 tech condition drops the table qualifier.",
+      "evidence": "DTSX:1364-1369",
+      "wrongUnits": [
+        {
+          "unit": 3,
+          "problem": "Tech text 'WHERE gen_transgrouptype = 1' omits the qualifier. The SQL filters Gen_fundtransactiontype.gen_transgrouptype (the transaction TYPE's group), and gen_ftcurrentyear has its own Gen_transgrouptype column (0008 inserts Gen_ftCurrentYearBase.Gen_transgrouptype, 0008_LeumiFile-PY.dtsx:63122), so the unqualified form can be read as the transaction's own group.",
+          "correct": "gen_ftcurrentyear JOIN Gen_fundtransactiontype ON Gen_fundtransactiontypeid = gen_ftcurrentyear.gen_transactiontypename WHERE Gen_fundtransactiontype.gen_transgrouptype = 1 AND gen_transactiontypeid NOT LIKE '%99%' GROUP BY gen_fundnumber.",
+          "evidence": "DTSX:1366-1367; 0008_LeumiFile-PY.dtsx:63122"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Close Gen_employercare|detail",
+      "hash": "08f9bebc8d07",
+      "verdict": "WRONG",
+      "detail": "Units 2-5 verified (Lookup DTSX:1362-1384, entity.Id = Row.Genemployercareid main.cs:131, state 3 literal main.cs:132, DateTime.Now main.cs:133, No Match unconnected). Unit 1 misstates NULL handling.",
+      "evidence": "DTSX:1430-1432",
+      "wrongUnits": [
+        {
+          "unit": 1,
+          "problem": "'שסיבת ההפקדה (Gen_depositereason) אינה 6,7,8,9,11 או NULL' lists NULL together with the excluded values, so it reads as excluding NULL. The SQL includes NULL.",
+          "correct": "Gen_CurrentState = 2 AND (Gen_depositereason NOT IN (6,7,8,9,11) OR Gen_depositereason IS NULL).",
+          "evidence": "DTSX:1430-1432"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Close Gen_employercare|decisions",
+      "hash": "d61ee450ae9f",
+      "verdict": "WRONG",
+      "detail": "Unit 1 matches DTSX:1430-1432 verbatim; unit 3 matches main.cs:127. Unit 2 condition is not rendered exactly.",
+      "evidence": "DTSX:1364-1369",
+      "wrongUnits": [
+        {
+          "unit": 2,
+          "problem": "Condition drops the table qualifier of gen_transgrouptype; the SQL tests Gen_fundtransactiontype.gen_transgrouptype, not the transaction row's own Gen_transgrouptype column (which exists, 0008_LeumiFile-PY.dtsx:63122).",
+          "correct": "gen_fundmainid IN { gen_fundnumber FROM gen_ftcurrentyear JOIN Gen_fundtransactiontype ON Gen_fundtransactiontype.Gen_fundtransactiontypeid = gen_ftcurrentyear.gen_transactiontypename WHERE Gen_fundtransactiontype.gen_transgrouptype = 1 AND gen_transactiontypeid NOT LIKE '%99%' }",
+          "evidence": "DTSX:1364-1369"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Close Gen_employercare|crm",
+      "hash": "d9c8af9056c5",
+      "verdict": "CONFIRMED",
+      "detail": "Entity gen_employercare, RequestType.Update via ExecuteMultipleExtension (SDK), gen_currentstate=3, gen_modifiedbybank=DateTime.Now; reached only via Lookup Match -> Aggregate -> Update.",
+      "evidence": "DTSX:1895,1926-1929,2473-2477",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Close Gen_employercare|open",
+      "hash": "211244924033",
+      "verdict": "CONFIRMED",
+      "detail": "All five questions are genuinely unresolved in the supplied files: no OptionSet labels for states/deposit reasons; 0008 maps trans type codes to gen_transgrouptype numbers (0008_LeumiFile-PY.dtsx:69197-69209) without meanings; gen_transactiontypeid is unqualified (DTSX:1368) and other packages only select it unqualified too (0008:62943); gen_modifiedbybank has no definition. Hypotheses are labelled.",
+      "evidence": "DTSX:1368; 0008_LeumiFile-PY.dtsx:62943,69197-69209",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Update operation person|title",
+      "hash": "0b05c094c5e6",
+      "verdict": "CONFIRMED",
+      "detail": "SQL DTSX:6772-6779 selects ec.Gen_employercareId and a.gen_operationperson where op person differs or is empty on the care and set on the account; main.cs DTSX:7271-7272 updates gen_employeroperationpersonname. 'שמוגדר בחשבון' correctly implies a non-empty account value.",
+      "evidence": "DTSX:6772-6779, 7271-7272",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Update operation person|short",
+      "hash": "60e12990ac86",
+      "verdict": "CONFIRMED",
+      "detail": "Decision 'exists and differs' matches the SQL (NULL on account side never selected; NULL on care with value on account selected = differs).",
+      "evidence": "DTSX:6777-6779",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Update operation person|detailed",
+      "hash": "86b337fc2254",
+      "verdict": "CONFIRMED",
+      "detail": "LEFT JOIN + WHERE ec.gen_employername = accountid is effectively INNER; no state filter; condition rendered verbatim; write EntityReference(\"account\", ...) in batches of 100 (main.cs:137); fault -> ErrorBuffer (main.cs:167-168) -> Union All -> Set Warning columns -> ETL Warning (paths DTSX:7915-7918).",
+      "evidence": "DTSX:6772-6779, 7271-7272, 7915-7918",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Update operation person|detail",
+      "hash": "35df95647e92",
+      "verdict": "CONFIRMED",
+      "detail": "All five units match SQL DTSX:6772-6779 and main.cs:131-132 (key set via attribute gen_employercareid, not entity.Id, still the CRM-fetched Gen_employercareId).",
+      "evidence": "DTSX:6772-6779, 7271-7272",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Update operation person|decisions",
+      "hash": "5a81cc51a888",
+      "verdict": "CONFIRMED",
+      "detail": "Unit 1 condition verbatim from DTSX:6777-6779; unit 2 main.cs:127 Row.GenemployercareId_IsNull -> return.",
+      "evidence": "DTSX:6777-6779; main.cs:127",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Update operation person|crm",
+      "hash": "c272ddceb690",
+      "verdict": "CONFIRMED",
+      "detail": "gen_employercare Update via ExecuteMultipleExtension (RequestType.Update DTSX:7239), attribute gen_employeroperationpersonname only.",
+      "evidence": "DTSX:7239, 7272",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Update operation person|open",
+      "hash": "2d4f9e295fa8",
+      "verdict": "CONFIRMED",
+      "detail": "Lookup targets are not defined in any supplied file; the WHERE-clause column gen_employeroperationpersonname is unqualified (SELECT alias cannot be referenced in WHERE, so it is a table column) and correctly labelled as hypothesis. Strong supporting indication (not proof): the script writes that attribute on gen_employercare (DTSX:7272), and the source has design-time external metadata, so the query compiled without ambiguity.",
+      "evidence": "DTSX:6774-6779, 7272",
+      "wrongUnits": []
+    }
+  ]
+}

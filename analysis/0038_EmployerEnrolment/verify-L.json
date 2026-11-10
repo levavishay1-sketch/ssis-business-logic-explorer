@@ -1,0 +1,168 @@
+{
+  "verifier": "ssis-verifier",
+  "package": "0038_EmployerEnrolment",
+  "scope": "logic-claims all",
+  "checkedAt": "2026-11-07T11:00:00Z",
+  "checked": 19,
+  "results": [
+    {
+      "id": "L|summary",
+      "hash": "65ef31e55c1d",
+      "verdict": "CONFIRMED",
+      "detail": "Source SQL DTSX:6076 (ee.CreatedOn >= GETDATE()-7, gen_currentstate=1, id-number join stripping leading zeros/spaces, fm.Gen_existinfile=1, product-type pairs); Check If To Send Mail (DTSX:3656-3684) requires gen_incorrectamount not null; Send Email To Maasikim creates email (regarding gen_employerenrolment, from queue MaasikimQueueId, to GviaQueueId for deposit type 1 / MaasikimQueueId for 2) + SendEmail; subject text 'התראה בגין מסך שגויים'. No Update of gen_employerenrolment anywhere. Scope: single [PSQL] CM (DTSX:4-6), used only by OLE DB sources/Lookup (incl. End ETL Lookup, also read-only); no DTS:Configurations and no EnableConfig in this package, so an override is possible only via the job/command line (stated as possibility, external_unknown).",
+      "evidence": "DTSX:4-6, 3656-3684, 6076, 6402-6505",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|exec",
+      "hash": "3188f92a4e72",
+      "verdict": "CONFIRMED",
+      "detail": "Constraints DTSX:7458 (Get Variables -> Create ETL), 7459 (Create ETL -> Send Email), 7460 (Send Email -> End ETL); no DTS:Value/expression = Success. No event handlers in the package.",
+      "evidence": "DTSX:7458-7460",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|ignored",
+      "hash": "93f293971ae4",
+      "verdict": "WRONG",
+      "detail": "Items 2-7 are plumbing (gen_etlprocess / gen_etlprocesswarning writes; Adding Error message derived columns; ETL Warning 1 2 1 1 code identical to 1 2 1). Item 1 is not pure plumbing.",
+      "evidence": "DTSX:2389-2430, 2656-2658, 3283, 6406-6407, 6467-6481",
+      "wrongUnits": [
+        {
+          "unit": 1,
+          "problem": "Get Variables From Etl Varibles supplies data that reaches CRM: it sets User::GviaQueueId and User::MaasikimQueueId (ReadWriteVariables DTSX:3283) from gen_etlvariable, and these GUIDs become the email 'from'/'to' activity parties (queue) in Send Email To Maasikim. They also decide failure: an absent/invalid value makes new Guid(...) throw. A step that determines the business recipients cannot be classed as ignored plumbing.",
+          "correct": "Get Variables From Etl Varibles must be documented as a business input: it loads the sender/recipient queue ids (GviaQueueId, MaasikimQueueId; design values empty, DTSX:20-25) used by the email Create (main.cs:75-76, 137-153), besides plumbing variables ServerName/OrganizationName.",
+          "evidence": "DTSX:20-25, 3283, 2656-2658, 6406-6407, 6467-6481"
+        }
+      ]
+    },
+    {
+      "id": "L|finding#1",
+      "hash": "d68660b5d8c7",
+      "verdict": "CONFIRMED",
+      "detail": "Check If To Send Mail main.cs:117-141 (DTSX:3658-3684) reads Row.genselfemployed with no _IsNull check and no try/catch; getter is Buffer.GetBoolean (DTSX:3942-3947). Failure of Send Email blocks Constraint 2 (Success) to End ETL (DTSX:7460). Consequences for earlier buffers are worded conditionally.",
+      "evidence": "DTSX:3658-3684, 3942-3947, 7460",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|finding#2",
+      "hash": "fa629618f24d",
+      "verdict": "CONFIRMED",
+      "detail": "Unchecked reads of genfundnumber, Gencustomername, EmployerNumber, gendeposittype inside try (DTSX:6409-6417); employerenrolment_customeridnumber cannot be NULL because it is in the join predicate. new Guid(...) of both queue variables (DTSX:6406-6407). Both catch blocks dereference InnerException.Message (DTSX:6431, 6441).",
+      "evidence": "DTSX:6402-6452",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|finding#3",
+      "hash": "a0fc5189ae0c",
+      "verdict": "CONFIRMED",
+      "detail": "SendMail is called after service.Create inside the same try (main.cs:154-156); on a token error with Retry<3 reConectCrmService calls Input0_ProcessInputRow(Row) again, creating and sending a new email. Note: the first email record remains created but unsent.",
+      "evidence": "DTSX:6431-6444, 6485-6487, 6527-6533",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|finding#4",
+      "hash": "0c2f08f14576",
+      "verdict": "CONFIRMED",
+      "detail": "No Update/flag in any component; window ee.CreatedOn >= GETDATE()-7; frequency unknown, worded conditionally.",
+      "evidence": "DTSX:6076, 6402-6505",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|finding#5",
+      "hash": "557794f06dff",
+      "verdict": "CONFIRMED",
+      "detail": "Join ee->fm only on stripped customer id number; other joins are on primary keys (Product, Account, Gen_employers), so duplicates arise only per qualifying fund; one email per row.",
+      "evidence": "DTSX:6076",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|finding#6",
+      "hash": "ff241f4f95c8",
+      "verdict": "CONFIRMED",
+      "detail": "catch (SoapException) else-branch sets Row.ErrorMessage without DirectRowToError (main.cs:105-108); with exclusion-group sync outputs the row is dropped. InnerException dereferenced unguarded in both catches.",
+      "evidence": "DTSX:6429-6449",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|finding#7",
+      "hash": "9cb2c6b70603",
+      "verdict": "CONFIRMED",
+      "detail": "Only the final else calls DirectRowToErrors (main.cs:140-141); other non-matching branches never direct the row (exclusion group 1) so it is dropped. (gen_producttype cannot actually be NULL here because the SQL requires 1/2/3; harmless.)",
+      "evidence": "DTSX:3658-3684, 7449",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|finding#8",
+      "hash": "acfb905e7e4b",
+      "verdict": "CONFIRMED",
+      "detail": "Only gendeposittype == 1 / == 2 branches; no else, no DirectRow (main.cs:86-95).",
+      "evidence": "DTSX:6416-6425",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|finding#9",
+      "hash": "50db6f47d175",
+      "verdict": "CONFIRMED",
+      "detail": "int Retry = 0 is a class field (main.cs:32), incremented in reConectCrmService (main.cs:198), never reset.",
+      "evidence": "main.cs:32, 196-202",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Send Email|title",
+      "hash": "c85471d4d840",
+      "verdict": "CONFIRMED",
+      "detail": "Matches SQL DTSX:6076, Check If To Send Mail and Send Email To Maasikim branches. Queue names are transliterations of the variable labels GviaQueueId/MaasikimQueueId.",
+      "evidence": "DTSX:6076, 3658-3684, 6416-6425",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Send Email|short",
+      "hash": "8af47785b572",
+      "verdict": "CONFIRMED",
+      "detail": "Population, decision (not self-employed + fundestate 1 + same employer, or self-employed + fundestate 2, plus incorrect amount) and deposit-type routing match the code; hypotheses labelled.",
+      "evidence": "DTSX:6076, 3658-3684, 6416-6425",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Send Email|detailed",
+      "hash": "e5f5d15f04c4",
+      "verdict": "CONFIRMED",
+      "detail": "All 29 units checked against SQL DTSX:6076, Check If To Send Mail main.cs:117-141, BufferWrapper DTSX:3942-3947, Send Email To Maasikim main.cs:71-202, Adding Error message 1 (WarningDescription expression), paths DTSX:7446-7451. Unit 1 tech says 'without leading zeros'; the SQL also strips leading spaces (PATINDEX '%[^0 ]%'), stated correctly in the detail claim. Side note (plumbing, not counted): for a type-mismatch row with NULL Gen_customername the WarningDescription expression yields NULL and ETL Warning 1 2 1 reads Row.WarningDescription without an IsNull check (DTSX:4719), which would also fail the data flow.",
+      "evidence": "DTSX:3335, 3658-3684, 3942-3947, 4719, 6076, 6402-6533, 7446-7451",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Send Email|detail",
+      "hash": "36700ca40dc2",
+      "verdict": "CONFIRMED",
+      "detail": "Population/joins, keys, decisions, SDK writes (email Create with regardingobjectid, activityparty queue from/to, directioncode=true; SendEmail IssueSend=true, TrackingToken \"\") and the hedged meanings all match.",
+      "evidence": "DTSX:6076, 3658-3684, 6402-6505",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Send Email|decisions",
+      "hash": "a53dc71c028d",
+      "verdict": "CONFIRMED",
+      "detail": "Unit 1 is the SQL WHERE verbatim; units 2-4 and 6 match main.cs:117-141 (row passes to Output 0 / Errors / dropped); unit 5 matches main.cs:86-95 (sender always MaasikimQueueId).",
+      "evidence": "DTSX:6076, 3658-3684, 6416-6425",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Send Email|crm",
+      "hash": "f5911ff5a710",
+      "verdict": "CONFIRMED",
+      "detail": "email Create via CrmProxy.Create (main.cs:154) and Execute SendEmail (main.cs:161-171); both SDK.",
+      "evidence": "DTSX:6481-6500",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Send Email|open",
+      "hash": "c59af81236d4",
+      "verdict": "CONFIRMED",
+      "detail": "No schedule, OptionSet labels, gen_etlvariable values or CRM2015.Proxy source exist in the supplied files; all correctly left open/hypothesis.",
+      "evidence": "DTSX:20-25, 1199",
+      "wrongUnits": []
+    }
+  ]
+}

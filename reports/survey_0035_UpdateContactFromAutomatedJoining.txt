@@ -1,0 +1,35 @@
+# 0035_UpdateContactFromAutomatedJoining.dtsx · 5D5792761C97AC9510E7C97BAC41BF1D81FA93FF2122514A0A5DFB75B5050F1E
+
+## Connection managers
+- [PSQL] OLEDB Data Source=PSQL;Initial Catalog=ALTSHULER_MSCRM;Integrated Security=SSPI;  
+
+## Executables (disabled marked !)
+-   Get Organization Variables | Microsoft.Pipeline  
+-   Update Contact From Joining | Microsoft.Pipeline  
+
+## Precedence
+- Get Organization Variables -> Update Contact From Joining | Success Constraint   
+
+## DataFlow Get Organization Variables
+  - Get Etl Variables | OLEDBSource  | conn [PSQL]  | in 0 out 2
+  - Set Variables | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 2 out 0
+     path Get Etl Variables.Outputs[OLE DB Source Output] => Set Variables.Inputs[Input 0]
+
+## DataFlow Update Contact From Joining
+  - Get Automated Joinings | OLEDBSource  | conn [PSQL]  | in 0 out 8
+  - Set field by other | DerivedColumn  | conn   | in 3 out 1
+  - Update Contact | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 6 out 2
+     path Set field by other.Outputs[Derived Column Output] => Update Contact.Inputs[Input 0]
+     path Get Automated Joinings.Outputs[OLE DB Source Output] => Set field by other.Inputs[Derived Column Input]
+
+## SQL statements
+- Get Organization Variables\Get Etl Variables | Microsoft.OLEDBSource.SqlCommand | [PSQL] 
+    select gen_key, gen_value from gen_etlvariable where (gen_scope = 'global' OR gen_scope = ?)
+- Update Contact From Joining\Get Automated Joinings | Microsoft.OLEDBSource.SqlCommand | [PSQL] 
+    select distinct case when (gen_automatedjoining.gen_newcompanyemailagreement = 1 and datediff(second, Contact.gen_emailagreementupdate ,gen_automatedjoining.CreatedOn)>0 ) then 1 else 0 end as UpdateEmailAgreement, case when (gen_automatedjoining.gen_newmarketinginquiriesagreement = 1 and DATEDIFF(second, Contact.gen_marketingagreementupdate, gen_automatedjoining.CreatedOn)>0 ) then 1 else 0 end a
+
+## Code write candidates (per owner)
+- Get Organization Variables\Set Variables {"sql-command":2}
+- Update Contact From Joining\Update Contact {"sql-command":2,"crm-service":1,"crm-entity":2,"output-buffer":3,"crm-sdk-update":1}
+
+## External refs (non-framework) CRM2015.Proxy

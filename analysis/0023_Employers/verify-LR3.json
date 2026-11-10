@@ -1,0 +1,164 @@
+{
+  "verifier": "ssis-verifier",
+  "package": "0023_Employers",
+  "scope": "logic-claims re-check round 3",
+  "checkedAt": "2026-11-07",
+  "checked": 15,
+  "results": [
+    {
+      "id": "L|summary",
+      "hash": "8b2393f5d212",
+      "verdict": "WRONG",
+      "detail": "Everything structural is correct. That covers trigger (1) (isFileExist, Constraint 4) and trigger (2) (Constraints 5 and 6 OR, no LogicalAnd). It also covers the MF Source design-time path with the config caveat (DTSX:9-11, 33) and the not-proven same-file note (finding#2 exists). The inner join to product is correct, and the 0004 ownership evidence is checked (0004:37558 new Entity(\"gen_employers\"), 37568 gen_corporatenumber, 37617 gen_fundtypename EntityReference product, 70147 Gen_employers.Gen_employersId, 70153 Gen_employers.gen_fundtypename = Product.ProductId). The all-accounts LEFT JOIN, the 0 for accounts without employers, the direct UPDATE dbo.AccountBase (Unsupported) gated by NULL/!=, and the NULL fee with both stored values causing FailComponent are all verified. WRONG: the file values are called 'שיעור הצבירה' and 'שיעור ההפקדה' (a rate). Nothing in the supplied files shows that the values in columns גמל/השתלמות/הפקדה are rates or percentages. They are cast with (DT_R8) and written to gen_mfaccumulation and gen_mfdeposit (convert DTSX:3820; Set Pension/Study Fund Columns DTSX:5917/5975). No other package references these attributes. The hypothesis label in the same sentence covers only 'MF = דמי ניהול', not the rate meaning. The package's own Set MF detailed [1] says 'הקבצים אינם מגדירים את משמעות הערכים בעמודות גמל, השתלמות והפקדה'.",
+      "evidence": "DTSX:3820 (DT_R8 casts), 5917/5975 (gen_mfaccumulation = provident_fund / study_fund, gen_mfdeposit = Dposit); grep of source/DailyProcess/*.dtsx: gen_mfaccumulation/gen_mfdeposit only in 0023",
+      "wrongUnits": [
+        {
+          "unit": "[1] 'שיעור הצבירה לפי סוג המוצר ... ושיעור ההפקדה (עמודת \"הפקדה\")'",
+          "problem": "This gives the file values a meaning (rate) without proof and without a השערה label.",
+          "correct": "Use a neutral wording such as 'ערך הצבירה (עמודת \"גמל\" או \"השתלמות\") ... וערך ההפקדה (עמודת \"הפקדה\")', or put 'שיעור' inside the hypothesis label (השערה: שיעורי דמי ניהול).",
+          "evidence": "DTSX:3820, 5917, 5975"
+        }
+      ]
+    },
+    {
+      "id": "L|exec",
+      "hash": "33f9994abf97",
+      "verdict": "CONFIRMED",
+      "detail": "The seven steps and their triggers match the DTSX. Constraint is 8053, Constraint 1 is 8054, Constraint 4 is 8057 (EvalOp=3 @[User::isFileExist]), and Constraint 2 is 8055. Constraint 6 (8059) and Constraint 5 (8058, EvalOp=3 !@[User::isFileExist]) have no DTS:LogicalAnd, so they are OR. Constraint 3 is 8056. No executable is disabled. The MF label is marked השערה.",
+      "evidence": "DTSX:8053-8059; isFileExist default 0 (DTSX:55-56)",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|finding#7",
+      "hash": "d7b55a84b523",
+      "verdict": "CONFIRMED",
+      "detail": "The SQL is CASE WHEN SUM(ISNULL(bal,0)) = 0 THEN 0 ELSE SUM(ISNULL(bal,0) * pct) / SUM(ISNULL(bal,0)) END. A NULL pct makes the product NULL, so SUM skips it in the numerator while the denominator includes the balance. All data-dependent outcomes are stated conditionally and are arithmetically correct. If all pct are NULL and the sum is non-zero, the result is NULL. When both stored values exist, Update3 (NULL != x) fails with FailComponent; when one stored value is NULL, order 0 or 1 catches the row first. Accounts without employers or funds get 0/0. The ownership argument for the stored-value columns uses the ambiguity rule and the AccountBase evidence (DTSX:7991-7993). It treats the 'account' view as exposing the AccountBase columns, which is CRM convention and is the same assumption the Unsupported classification relies on. The finding is not framed as a bug.",
+      "evidence": "DTSX:7796-7808 (get employers SQL); DTSX:7731-7771 (Check if to update orders 0-3, all FailComponent); DTSX:7991-7994",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package (control flow)|title",
+      "hash": "be25fd99ca4e",
+      "verdict": "CONFIRMED",
+      "detail": "Verified: short_he gives the branches, the 'not proven same file' note, the all-accounts population with 0, and the write condition. flow_he[2] matches Check File Existence ScriptMain.cs:36-53: the path is MFBenefitFilePath (with '\\' added) + MFBenefitFile, and Archive\\yyyy.MM.dd is created only if the file exists. flow_he[3]-[4] match DTSX:8055, 8057-8059.",
+      "evidence": "Check File Existence ScriptMain.cs:36-55 @DTSX:273; DTSX:3689-3693; DTSX:8053-8059",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package (control flow)|short",
+      "hash": "9284df072003",
+      "verdict": "CONFIRMED",
+      "detail": "[1]-[6]: the file check and the branch structure are correct. [7]: the calculation runs through Constraint 5 OR Constraint 6, over all accounts including those that get 0. A failure of Set MF or Move blocks it, because Constraint 6 needs Move Success and Constraint 5 is false when isFileExist=true. [8] is conditional and correct.",
+      "evidence": "DTSX:8055, 8057-8059; Check File Existence ScriptMain.cs:45-53",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package (control flow)|decisions",
+      "hash": "9905626b0b2e",
+      "verdict": "CONFIRMED",
+      "detail": "[1] is ScriptMain.cs:45 if (fileI.Exists), which sets isFileExist=true and creates the archive directory (48-53). [2]-[4] match Constraints 4/5/6, including EvalOp=3 and the missing LogicalAnd (OR).",
+      "evidence": "Check File Existence ScriptMain.cs:45-53; DTSX:8057-8059",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Set MF on employers|title",
+      "hash": "63cf4a4541a3",
+      "verdict": "WRONG",
+      "detail": "Structure verified. TRIM only trims (main.cs:51-58). convert maps ISNULL||\"\" to NULL and casts otherwise. Get Employer Nunmer uses an inner join to product, and the 0004 ownership evidence is checked. Merge Join is JoinType=1 with 1 key. Check if employer exist routes to the warning. Check Fund type: 200001/1 goes to provident_fund, 200000/2 goes to study_fund, the DE Output has no path, and NULL fails (FailComponent). The validity OR is correct, and the Update uses ExecuteMultiple with only non-NULL fields. The short_he management-fee wording is labelled השערה. WRONG: flow_he[1] 'המרת תאריכים ושיעורים' and flow_he[7] 'יש שיעור צבירה' call the file values rates with no evidence and no label. They are only DT_R8 numbers.",
+      "evidence": "DTSX:3820, 5917, 5975; no rate/percent evidence in any supplied DTSX for gen_mfaccumulation/gen_mfdeposit",
+      "wrongUnits": [
+        {
+          "unit": "flow_he[1] 'המרת תאריכים ושיעורים'; flow_he[7] 'יש שיעור צבירה'",
+          "problem": "Unproven meaning (rate) with no השערה label.",
+          "correct": "'המרת תאריכים ומספרים' / 'יש ערך צבירה', or label the rate meaning as השערה.",
+          "evidence": "convert DTSX:3820 ((DT_R8) casts)"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Set MF on employers|short",
+      "hash": "3847523bc068",
+      "verdict": "WRONG",
+      "detail": "Decisions [2]/[4] (inner join to product, warning even when records without a product exist, ownership argued with the ambiguity rule and 0004:37558/37568/37617/70147/70153) are correct. The branches in [6] (other type skipped, NULL type fails everything) are correct. [7] (deposit start date not NULL and < GETDATE(), OR accumulation non-NULL and start < now < end) and [9] (warning) are correct. [11] is labelled. WRONG: [6] 'נבחר שיעור הצבירה' and [7] 'יש שיעור צבירה' state a rate meaning for the file values without proof or label. [11] carries '(השערה: אלה דמי ניהול)', but [6] and [7] do not.",
+      "evidence": "Check Fund type DTSX:3702-3724; Check If Date Valid DTSX:3743-3771; convert DTSX:3820",
+      "wrongUnits": [
+        {
+          "unit": "[6] 'נבחר שיעור הצבירה'; [7] 'יש שיעור צבירה'",
+          "problem": "Unproven meaning (rate) with no label.",
+          "correct": "'נבחר ערך הצבירה' / 'יש ערך צבירה', or a השערה label.",
+          "evidence": "DTSX:3820, 5917, 5975"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Set MF on employers|detailed",
+      "hash": "13d0cf842631",
+      "verdict": "WRONG",
+      "detail": "All structural units were re-derived and match the DTSX, with one exception. Verified: header names via externalMetadataColumnId (ח פ→gen_corporatenumber … גמל→provident_fund_Source, השתלמות→study_fund_Source, הפקדה→Dposit_Source). MF Source has no PropertyExpression (DTSX:9-24). TRIM only trims, and with RetainNulls=false the convert expressions map \"\" to NULL. The 6 convert columns are FailComponent, and the blocking Sort after convert means no row reaches Create on a conversion failure. Get Employer Nunmer SQL and ownership are verified. Merge Join: JoinType=1, NumKeyColumns=1, TreatNullsAsEqual=true; both Sorts have EliminateDuplicates=false. The warning texts are verified ('מעסיק לא נמצא במאגר הנתונים', 'תאריך לא נכון או לא קיים', 'נכשל בקליטת הנתונים'). Check Fund type and Check If Date Valid conditions and orders are correct. Create (main.cs:121-182) is RequestType.Update with batches of 1000, and only non-NULL fields are sent. WRONG: [12], [14], [19], [23] and [27] call the file values 'שיעור הצבירה' / 'שיעור ההפקדה' as fact. Unit [1] of the same claim says the files do not define the meaning of these columns, so this is an unproven meaning and an internal inconsistency.",
+      "evidence": "DTSX:5836-5916 (externalMetadataColumnId), 3820, 5684-5699, 5730-5734, 6176/6317, 3702-3787, 5917/5975, 6033-6173; Create main.cs:121-182 @DTSX:3885",
+      "wrongUnits": [
+        {
+          "unit": "[12] 'שיעור הצבירה נלקח מעמודת \"גמל\"'; [14] 'שיעור הצבירה נלקח מעמודת \"השתלמות\"'; [19] 'שיעור ההפקדה (עמודת \"הפקדה\")'; [23] 'יש שיעור צבירה'; [27] 'שיעור הצבירה ... שיעור ההפקדה'",
+          "problem": "This states a rate meaning that [1] itself says is not defined in the files.",
+          "correct": "'ערך הצבירה' / 'ערך ההפקדה', or label as השערה.",
+          "evidence": "unit [1] of this claim; DTSX:3820, 5917, 5975"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Set MF on employers|detail",
+      "hash": "358ee19b1eb6",
+      "verdict": "WRONG",
+      "detail": "[1] is correct: CodePage 1255, Delimited, header. [2] has the matching and ownership argument with 0004 evidence verified, and the inner join to product. [4] lists 5 fields, only non-NULL. WRONG: [3] says 'סוג מוצר 200001/1 → שיעור הצבירה מ-provident_fund' and '(3) ... או שיש שיעור צבירה', which state a rate meaning without proof or label. [5] is acceptable because its 'שיעור' sits under '(השערה: אלה דמי ניהול)'.",
+      "evidence": "DTSX:3702, 3743, 3820, 5917, 5975",
+      "wrongUnits": [
+        {
+          "unit": "[3] 'שיעור הצבירה מ-provident_fund ... שיעור הצבירה מ-study_fund ... יש שיעור צבירה'",
+          "problem": "Unproven meaning (rate) with no label.",
+          "correct": "'ערך הצבירה מ-provident_fund' etc., or a השערה label.",
+          "evidence": "DTSX:3820, 5917, 5975"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Set MF on employers|decisions",
+      "hash": "91f191fea1bf",
+      "verdict": "CONFIRMED",
+      "detail": "[1] Merge Join is JoinType=1 on gen_corporatenumber, with the inner join to product in the source SQL and the ownership argued (ambiguity rule + 0004 lines, verified). [2] ISNULL(Gen_employersid) at EvaluationOrder 0 routes to the warning. [3]-[5] Check Fund type orders 0/1 + DE Output with no path; a NULL code fails through FailComponent on both outputs. [6]-[8] Check If Date Valid expressions match exactly. [9] Create main.cs:127-136.",
+      "evidence": "DTSX:5730-5734, 3785-3800, 3700-3724, 3740-3771; Create main.cs:127-136",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Update employer amount|title",
+      "hash": "5b6ab546d6e1",
+      "verdict": "CONFIRMED",
+      "detail": "short_he and flow_he[1]-[4] match the get employers SQL (LEFT JOINs, SUM, CASE), Check if to update (NULL or != leads to update) and UPDATE dbo.AccountBase (Unsupported). 'שיעור דמי הניהול' translates the source column Gen_managementFeePercentage, so it is not an unproven meaning. The ownership note points to the argued text.",
+      "evidence": "DTSX:7796-7808, 7731-7771, 7988-7994",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Update employer amount|short",
+      "hash": "7c2537be596a",
+      "verdict": "CONFIRMED",
+      "detail": "[1] matches the SQL, with the ownership argument. [2] matches Check if to update orders 0-3. [4] is the direct UPDATE dbo.AccountBase that bypasses CRM. [7] includes accounts without employers (0) and the failure caveat.",
+      "evidence": "DTSX:7796-7808, 7731-7771, 7991-7994",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Update employer amount|detailed",
+      "hash": "5687d818d2a1",
+      "verdict": "CONFIRMED",
+      "detail": "[1]-[7]: the SQL is copied exactly, and the NULL-rate behaviour is correct. [8]: stored values and the ownership argument. [9]: conditions Update/Update2/Update3/Update4, EvaluationOrder 0-3, all FailComponent. [11]: Update Account Param_0=Gen_EmployeesFundsValue, Param_1=Gen_employeesweightedmanagementfee, Param_2=accountid; with a NULL computed fee and one stored value NULL, the row passes order 0 or 1 and NULL is written. The design-time connection has the config caveat. [13]: the Default Output has no path. [15]: a NULL fee with both stored values present makes order 2 NULL, which is FailComponent, and End ETL (Success-only, DTSX:8056) does not run. [16]-[17] are correct, with the plugin impact labelled השערה.",
+      "evidence": "DTSX:7791-7812, 7731-7771, 7988-8031 (input errorRowDisposition=FailComponent), 8056",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Update employer amount|detail",
+      "hash": "f73d50e53278",
+      "verdict": "CONFIRMED",
+      "detail": "[1] covers all accounts via LEFT JOIN, gen_corporatename = accountid and gen_employernumber = Gen_employersId, with the ownership argued. [2] is correct. [3]: the first matching output wins, and NULL with both stored values fails. [4]: AccountBase direct SQL, Unsupported, two columns. [5] is correct, and the display caveat is stated.",
+      "evidence": "DTSX:7796-7808, 7731-7771, 7991-7994",
+      "wrongUnits": []
+    }
+  ]
+}

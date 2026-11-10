@@ -1,0 +1,202 @@
+{
+  "verifier": "ssis-verifier",
+  "package": "0017_CloseWithdrawalForecast",
+  "scope": "logic-claims re-check round 2",
+  "checkedAt": "2026-11-07",
+  "source": "source/DailyProcess/0017_CloseWithdrawalForecast.dtsx sha256 91AF73F3FBBF9A812BA9770E90C09E85D8C99C52324C6C26E2B75E0F9903DD5E",
+  "checked": 14,
+  "results": [
+    {
+      "id": "L|summary",
+      "hash": "161c98284914",
+      "verdict": "WRONG",
+      "detail": "scopeNote_he verified (single CM [CRM] used only by OLE DB sources/Lookup, EnableConfig=True + config file, no file/staging/DML, only business write = SDK update of gen_withdrawal, comments define only 3/14/15). summary_he: 'היא קובעת לכל בקשה סטטוס סיום (הסתיים / הסתיים חלקית / הסתיים – קיים פער) לפי סטטוסי ההיזון החוזר ...' is wrong for the state-10 (manual) flow: there the status is 3 by default and 15 on an amount gap; feedback statuses only filter selection and 14 is never set (manual main.cs:34-42). Also the written attribute gen_withdrawalfinishdate is not mentioned among the recorded values.",
+      "evidence": "0017_CloseWithdrawalForecast.dtsx:1447-1458 (manual main.cs:34-42), 151-161 (auto main.cs:30-39), 166-171 / 1457-1465 (writes incl. gen_withdrawalfinishdate)",
+      "wrongUnits": [
+        {
+          "unit": 1,
+          "problem": "Status determination by feedback statuses generalised to every request; false for state-10 requests.",
+          "correct": "במצב 8: 3 אם כל הפיצולים הרלוונטיים בסטטוס 4, אחרת 14; במצב 10: 3 כברירת מחדל ללא תלות בסטטוסי ההיזון; בשני הזרמים 15 במשיכה חלקית עם פער סכומים.",
+          "evidence": "0017_CloseWithdrawalForecast.dtsx:151-161, 1447-1455"
+        },
+        {
+          "unit": 1,
+          "problem": "Written attribute gen_withdrawalfinishdate omitted.",
+          "correct": "נרשמים גם תאריך סיום המשיכה (gen_withdrawalfinishdate, אותו ערך כמו תאריך המשיכה בפועל).",
+          "evidence": "0017_CloseWithdrawalForecast.dtsx:171, 1464"
+        }
+      ]
+    },
+    {
+      "id": "L|finding#1",
+      "hash": "0036c275937c",
+      "verdict": "CONFIRMED",
+      "detail": "Sums and min(valuedate) are aggregated per withdrawal over all 54/5 transactions of all funds of the request's customer account (join via gen_AccountNumber -> Gen_customeraccount -> Gen_fundmain -> gen_ftcurrentyear), window ft.gen_valuedate >= gen_datesenttothebank (auto) / gen_valuedate >= w.CreatedOn (manual); no direct link to the request. Consequence correctly stated conditionally; ownership of gen_datesenttothebank left unknown.",
+      "evidence": "0017_CloseWithdrawalForecast.dtsx:1104-1123, 2184-2203",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|finding#2",
+      "hash": "1bcfc47b56ad",
+      "verdict": "CONFIRMED",
+      "detail": "Auto: Fault -> ErrorBuffer.AddRow with ErrorDescription (main.cs:88-89) to output 'Error' which has no path (only path in the flow is OLE DB Source Output, DTSX:1193). Manual: loop handles only valid responses, no Fault branch (main.cs:74-86). Both: if response is null / lacks 'Responses' nothing is recorded and myEntities.Clear() runs. Requests not updated remain in state 8/10 and are re-selected only if they still meet the query. Correct.",
+      "evidence": "0017_CloseWithdrawalForecast.dtsx:189-214, 1483-1500, 1193, 2264",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Close automaty sended withdrawals|title",
+      "hash": "35a1f57e9e4a",
+      "verdict": "CONFIRMED",
+      "detail": "title_he is the translation of the component name. short_he: state 8, 54/5 in account funds, valuedate not earlier than gen_datesenttothebank with NULL exclusion and hypothesis labels, partition requirement (non-NULL, not 5/6), 3 when all such partitions are 4 else 14, 15 on partial withdrawal with amount mismatch (generic 'אינו תואם'), dates/amounts recorded; flow_he[4] lists all five written attributes. All match.",
+      "evidence": "0017_CloseWithdrawalForecast.dtsx:1094-1142, 151-171",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Close automaty sended withdrawals|short",
+      "hash": "ed1c291e34a4",
+      "verdict": "WRONG",
+      "detail": "[7] states the gap test as 'הסכום שנמשך בפועל (בשקלים שלמים) שונה מהערך Gen_withdrawalvalue' - it specifies the truncation but omits the absolute value. Code: Math.Truncate(Math.Abs(gentranstotalamount)) != Math.Truncate(Math.Abs(Genwithdrawalvalue)). Without Abs, a negative transaction sum of -1000 vs a requested 1000 would read as 'different' while the code treats them as equal. Also: [1] 'האחרות נשארות פתוחות' labels state 8 as 'open', a meaning taken from the component name 'get open withdrawal' without a השערה label (detailed says correctly 'נשארת במצבה'); [12] omits gen_withdrawalfinishdate from the written attributes. Note: 'בשקלים' assumes the currency; other packages set a currency name 'שקל חדש' (e.g. 0008:85554) but nothing ties it to these fields - prefer 'ביחידות שלמות (Math.Truncate)'.",
+      "evidence": "0017_CloseWithdrawalForecast.dtsx:156-161 (main.cs:35-39), 166-171, 1089",
+      "wrongUnits": [
+        {
+          "unit": 7,
+          "problem": "Absolute value omitted from the comparison.",
+          "correct": "האם זו משיכה חלקית שבה החלק השלם של הערך המוחלט של סכום התנועות שונה מהחלק השלם של הערך המוחלט של Gen_withdrawalvalue?",
+          "evidence": "0017_CloseWithdrawalForecast.dtsx:158"
+        },
+        {
+          "unit": 1,
+          "problem": "'נשארות פתוחות' - meaning of state 8 from the component name, unlabelled.",
+          "correct": "האחרות אינן מטופלות ונשארות במצבן (8).",
+          "evidence": "0017_CloseWithdrawalForecast.dtsx:1089, 1134-1136"
+        },
+        {
+          "unit": 12,
+          "problem": "Written attribute gen_withdrawalfinishdate missing.",
+          "correct": "... בתאריך המשיכה בפועל ובתאריך סיום המשיכה (שניהם תאריך הערך המוקדם, ToLocalTime), בסכום שנמשך בפועל ובסכום נטו.",
+          "evidence": "0017_CloseWithdrawalForecast.dtsx:165-171"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Close automaty sended withdrawals|detailed",
+      "hash": "82cea38cec90",
+      "verdict": "CONFIRMED",
+      "detail": "Every step re-derived: population gen_currentstate = 8; join chain and 54/5 filter; ft.gen_valuedate >= gen_datesenttothebank with NULL semantics and unknown ownership; sums with ISNULL and min(ft.gen_valuedate), GROUP BY w.Gen_withdrawalId, Gen_withdrawalvalue; partitions not in(5,6) (NULL excluded), min/max status, min(+0) flags; INNER JOIN trans/flpart; default 14, 3 if min=max=4, partial-withdrawal test with Abs+Truncate and ISNULL(...,0) -> 15 overriding; write of 5 attributes with ToLocalTime in tech; batches of 1000; fault/empty-response handling; unconnected Error output. Note: 'בשקלים שלמים' names a currency not shown for these fields; recommend 'ביחידות שלמות'. 'Partial withdrawal = min()==0' equals 'some partition has 0' only if no negative values exist (bit/option-set values; not shown).",
+      "evidence": "0017_CloseWithdrawalForecast.dtsx:1094-1142, 151-214, 1193",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Close automaty sended withdrawals|detail",
+      "hash": "5bb7588b3238",
+      "verdict": "WRONG",
+      "detail": "[1]-[4] correct (connection caveat present; ToLocalTime stated). [5] says 'ותשובה ריקה מהשרת אינה נבדקת'. The code does check it: 'if (response != null && response.Results != null && response.Results.Count > 0 && response.Results.ContainsKey(\"Responses\"))' (main.cs:72); when it fails nothing is recorded and the list is cleared (main.cs:93). The detailed claim and finding#2 describe this correctly; statements about failure handling must be correct.",
+      "evidence": "0017_CloseWithdrawalForecast.dtsx:193, 214 (auto main.cs:72, 93)",
+      "wrongUnits": [
+        {
+          "unit": 5,
+          "problem": "'תשובה ריקה מהשרת אינה נבדקת' contradicts the code.",
+          "correct": "אם מהשרת לא מתקבלת תשובה תקינה (null או בלי Responses), אין רישום והרשימה מתרוקנת.",
+          "evidence": "0017_CloseWithdrawalForecast.dtsx:193, 214"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Close automaty sended withdrawals|decisions",
+      "hash": "5170e2d49c39",
+      "verdict": "CONFIRMED",
+      "detail": "All four conditions quoted exactly (SQL WHERE 1134-1136/1117-1120, main.cs:32 -> DTSX:153, main.cs:35-37 -> DTSX:156-158); meanings carry the hypothesis labels and NULL semantics; outcomes 3/14/15 per code comments. Note: 'בשקלים שלמים' (currency) not shown in files; prefer 'ביחידות שלמות'.",
+      "evidence": "0017_CloseWithdrawalForecast.dtsx:1117-1136, 151-161",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Close automaty sended withdrawals|open",
+      "hash": "7a7f5cf725b1",
+      "verdict": "CONFIRMED",
+      "detail": "[1]-[3],[5] genuine open questions. [4] conclusion is correct; stronger evidence than the SDK write exists: 0014_AccountCourses.dtsx:3901 'left join Gen_withdrawal w ... and w.Gen_currentstate = 1' proves the SQL object Gen_withdrawal has the column - recommend citing it. gen_datesenttothebank appears nowhere else in the supplied files (grep), so 'not proven' is right. [6] correct: the only other Gen_withdrawalvalue occurrence is a KingswaySoft destination to gen_preservation (0020:3181, 3949). [7] correct: 0016:2125-2132 shows ft.gen_transtotalamount with ft = Gen_ftCurrentYear; gen_netoamountofaction appears only in INSERTs into Gen_ftCurrentYearBase (0008:63132 ff.).",
+      "evidence": "0014_AccountCourses.dtsx:3901; 0016_TransferOut.dtsx:2125-2132; 0020_Preservation.dtsx:3181, 3949; 0008_LeumiFile-PY.dtsx:63132",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Close manualy sended withdrawals|short",
+      "hash": "1f101ec005c1",
+      "verdict": "WRONG",
+      "detail": "[3] 'הסכום שנמשך בפועל (בשקלים שלמים) שונה מהערך Gen_withdrawalvalue' omits the absolute value used by the code (Math.Truncate(Math.Abs(...)) on both sides, main.cs:38). [1] 'האחרות נשארות פתוחות' labels state 10 as open from the component name 'get open withdrawal' without a השערה label. [8] omits gen_withdrawalfinishdate. Rest ([2],[4]-[7],[9]) correct.",
+      "evidence": "0017_CloseWithdrawalForecast.dtsx:1449-1465 (main.cs:36-52), 2171",
+      "wrongUnits": [
+        {
+          "unit": 3,
+          "problem": "Absolute value omitted from the comparison.",
+          "correct": "האם זו משיכה חלקית שבה החלק השלם של הערך המוחלט של סכום התנועות שונה מהחלק השלם של הערך המוחלט של Gen_withdrawalvalue?",
+          "evidence": "0017_CloseWithdrawalForecast.dtsx:1451"
+        },
+        {
+          "unit": 1,
+          "problem": "'נשארות פתוחות' - unlabelled meaning from the component name.",
+          "correct": "האחרות אינן מטופלות ונשארות במצבן (10).",
+          "evidence": "0017_CloseWithdrawalForecast.dtsx:2171, 2212-2213"
+        },
+        {
+          "unit": 8,
+          "problem": "Written attribute gen_withdrawalfinishdate missing.",
+          "correct": "... בתאריך המשיכה בפועל ובתאריך סיום המשיכה, בסכום שנמשך בפועל ובסכום נטו.",
+          "evidence": "0017_CloseWithdrawalForecast.dtsx:1463-1465"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Close manualy sended withdrawals|detailed",
+      "hash": "1eaa5d351139",
+      "verdict": "INCOMPLETE",
+      "detail": "All decisions and filters re-derived and correct (state 10; gen_valuedate >= w.CreatedOn; feedbackstatus '! =5' hedged; default 3; partial + Abs/Truncate gap -> 15; no Fault branch). Missing manipulation of written values: [19] says both dates are 'תאריך הערך המוקדם של התנועות' and its tech lists only attribute names, but the code writes Row.genvaluedate.ToLocalTime() to gen_dateofactualwithdrawal and gen_withdrawalfinishdate (main.cs:50-51), which the auto flow's detailed claim does document. Note: 'בשקלים שלמים' (currency) not shown for these fields.",
+      "evidence": "0017_CloseWithdrawalForecast.dtsx:1461-1465 (manual main.cs:48-52)",
+      "wrongUnits": [
+        {
+          "unit": 19,
+          "problem": "ToLocalTime() conversion of the written dates omitted.",
+          "correct": "gen_dateofactualwithdrawal ו-gen_withdrawalfinishdate = min(ft.gen_valuedate).ToLocalTime() (המרה לשעון המקומי של שרת ה-SSIS), רק אם הערך אינו ריק.",
+          "evidence": "0017_CloseWithdrawalForecast.dtsx:1461-1465"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Close manualy sended withdrawals|detail",
+      "hash": "0990c3d54cc6",
+      "verdict": "INCOMPLETE",
+      "detail": "[1]-[3],[5] correct. [4] lists the five written attributes but not their values; the auto-flow detail states them. Missing: gen_dateofactualwithdrawal / gen_withdrawalfinishdate = min(ft.gen_valuedate).ToLocalTime(); gen_actualwithdrawalamount = Money(sum of gen_transtotalamount); gen_nettransferamount = Money(sum of gen_netoamountofaction); gen_currentstate = 3/15.",
+      "evidence": "0017_CloseWithdrawalForecast.dtsx:1457-1472 (manual main.cs:44-59)",
+      "wrongUnits": [
+        {
+          "unit": 4,
+          "problem": "Values of the written attributes not stated (incl. ToLocalTime conversion).",
+          "correct": "gen_currentstate (3/15), gen_dateofactualwithdrawal ו-gen_withdrawalfinishdate (תאריך הערך המוקדם, ToLocalTime), gen_actualwithdrawalamount (סכום התנועות), gen_nettransferamount (סכום הנטו).",
+          "evidence": "0017_CloseWithdrawalForecast.dtsx:1457-1472"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Close manualy sended withdrawals|decisions",
+      "hash": "bc4742b58244",
+      "verdict": "WRONG",
+      "detail": "[2] and [3] correct. [1] meaning 'תנועה ... מיום יצירת הבקשה ואילך' turns the condition gen_valuedate >= w.CreatedOn into a day-level test. CreatedOn is a full datetime; a transaction whose value date falls on the creation day but whose stored datetime is earlier than the creation time (e.g. 00:00 vs creation at 10:00) is excluded by the SQL, whereas 'מיום ... ואילך' includes the whole creation day. The detailed claim states it correctly ('אינו מוקדם ממועד יצירת הבקשה').",
+      "evidence": "0017_CloseWithdrawalForecast.dtsx:2200",
+      "wrongUnits": [
+        {
+          "unit": 1,
+          "problem": "Datetime comparison rendered as day-granular 'from the creation day onward'.",
+          "correct": "בקשה במצב 10 שנרשמה לחשבון שלה תנועה מסוג 54/5 שתאריך הערך שלה אינו מוקדם ממועד יצירת הבקשה (השוואת תאריך ושעה מלאים).",
+          "evidence": "0017_CloseWithdrawalForecast.dtsx:2200"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Close manualy sended withdrawals|open",
+      "hash": "c95a5e8b318c",
+      "verdict": "CONFIRMED",
+      "detail": "[1],[3] open questions. [2] correct: the same subquery references ft.gen_valuedate (min(ft.gen_valuedate), DTSX:2189), so ft has the column and by the ambiguity rule the unqualified gen_valuedate (DTSX:2200) is ft's. [4] correct (no qualified Gen_withdrawalvalue in any supplied file).",
+      "evidence": "0017_CloseWithdrawalForecast.dtsx:2186-2203",
+      "wrongUnits": []
+    }
+  ],
+  "missingWrites": []
+}

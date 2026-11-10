@@ -1,0 +1,73 @@
+{
+  "verifier": "ssis-verifier",
+  "package": "0020_Preservation",
+  "scope": "logic-claims re-check round 2",
+  "checkedAt": "2026-11-07T15:00:00Z",
+  "checked": 8,
+  "results": [
+    {
+      "id": "L|summary",
+      "hash": "948d2130ad88",
+      "verdict": "WRONG",
+      "detail": "Unit 1 opens with 'החבילה סוגרת תיקי שימור (gen_preservation) שפג תוקפם' as a fact. (a) 'שפג תוקפם' is false for the first selection branch: the package's own finding#1 and the SQL show that a row with gen_transferoutamountinactual not null is selected with no date test and no state test, so those cases are not selected because they expired. (b) 'סוגרת' is a meaning taken only from the executable names 'Handle Expired Preservations' / 'Close preservations' (DTSX:3170, 3173); the package only writes gen_currentstate=2, gen_preservationresault=57, gen_generalresult=2 (Set columns DTSX:4849 block), and the package's own short[10]/detail[5] say the meaning of these values ('סגור') is a hypothesis or unknown. The summary does not present 'closing' as the task name. Fix: say the data flow is named 'Close preservations' inside 'Handle Expired Preservations', and do not call the whole population 'expired'. The rest of unit 1 is correct: the OR structure, the isnull priority withdrawal -> customercare -> pensiontransferout, date < dateadd(\"dd\",-1,getdate()) with p.gen_currentstate = 1, and the 3 literals written via the KingswaySoft destination. Unit 2 (scopeNote) verified: no DTS:Configuration; Kingsway Connection ServerUrl=http://pcrm:5555/altshuler/ (DTSX:9-11, no PropertyExpression); Crm Connection PSQL/ALTSHULER_MSCRM (DTSX:4-6) used only by 3 SELECT readers (Get preservations, Get SystemConfigurations, End ETL Lookup); the five script writers are gen_etlprocess create (283-289), gen_etlprocess update (842-851), gen_etlprocesswarning (4207-4220), gen_etlprocesscounter (5225-5235), and gen_etlprocess update plus annotation (5816-5831); no picklist labels or ActionType enum name in the DTSX.",
+      "evidence": "source/DailyProcess/0020_Preservation.dtsx (sha256 69CBA21E...7511): DTSX:3170, 3173 (executable names); SqlCommand DTSX:4806-4817 (WHERE 'gen_transferoutamountinactual is not null or( ... )'); Set columns DTSX:4849-4873; destination DTSX:3179-3208",
+      "wrongUnits": [1]
+    },
+    {
+      "id": "L|finding#1",
+      "hash": "2d17938c4d2f",
+      "verdict": "CONFIRMED",
+      "detail": "The WHERE is 'gen_transferoutamountinactual is not null or( <date> is not null and <date> < dateadd(\"dd\",-1,getdate()) and p.gen_currentstate = 1)'. The first predicate stands alone outside the parentheses, so it selects with no state or date test. The column is unqualified, and the claim says its table is unknown. Every selected row is mapped to the destination with literals 2/57/2, and IgnoreUnchangedFields=false, IgnoreNullValuedFields=false (DTSX:3187-3188), so the row is written again in every run where it is selected. Intent is correctly left unknown.",
+      "evidence": "DTSX:4813-4817; DTSX:3205-3208; Set columns DTSX:4861-4873",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Handle Expired Preservations\\Close preservations|title",
+      "hash": "4f6654b0a1fd",
+      "verdict": "CONFIRMED",
+      "detail": "title_he translates the executable names (Handle Expired Preservations / Close preservations). short_he correctly says the column is unqualified and its table and meaning are unknown, labels state 1 'פתוח' as השערה, and does not name the values. flow[1]: the joins and isnull priority match DTSX:4806-4812. flow[2]: the filter matches 4813-4817. flow[3]: literals 2/57/2 at 4861-4873. flow[4]: KingswaySoft CrmDestinationComponent on Kingsway Connection, gen_preservation, key gen_preservationid mapped from Get preservations (3181, 3205-3208). The update effect follows from the id read from CRM; the ActionType=3 label is left open elsewhere. flow[5]: input errorRowDisposition=RedirectRow (3203), Error Output -> Set ErrorCounter -> Set Warning columns -> ETL Warning (paths 4969-4974).",
+      "evidence": "DTSX:3170, 3173, 3179-3208, 4806-4817, 4849-4873, 4968-4974",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Handle Expired Preservations\\Close preservations|short",
+      "hash": "a8cf84f40495",
+      "verdict": "CONFIRMED",
+      "detail": "Unit 1: isnull(w.gen_lastdatepreservation, isnull(t_out.Gen_lastpreservationdate, pto.gen_LastDateForPreservation)) gives the priority withdrawal -> customercare -> pensiontransferout. Units 2-8: the branches match the OR structure. The amount branch has no state or date test, and the table is said to be unknown. The state 1 branch needs a non-null date < getdate()-1 day and p.gen_currentstate = 1, and 'פתוח' is labelled השערה. Otherwise the row is not selected. Unit 9: three literal fields. Unit 10: both selection conditions are correct, the values 2/57/2 are correct, and the meanings are labelled השערה.",
+      "evidence": "DTSX:4806-4817, 4861-4873, 3205-3208",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Handle Expired Preservations\\Close preservations|detailed",
+      "hash": "42b9d4bb4338",
+      "verdict": "CONFIRMED",
+      "detail": "Re-derived every node. Source: OLEDBSource on Crm Connection with the 3 LEFT JOINs on the stated keys (DTSX:4809-4812). Date priority: DTSX:4807. WHERE quoted correctly; node 5 explains the OR scope and leaves the column's table unknown. Node 7 conditions are exact. Set columns literals are DT i4 Expression 2/57/2. External columns gen_currentstate, gen_preservationresault and gen_generalresult are Picklist (3331/3739/3541), and gen_preservationid is Uniqueidentifier (3727). Destination: gen_preservation, ActionType=3 with the label marked השערה, RecordMatchingCriteria=1, RecordMatchingKeyFields empty, BatchSize=100, ConcurrentWritingThreadsInTotal=20, exactly 4 input columns. RedirectRow at 3203. Default Output -> Set UpdateCounter. Error Output -> ErrorCounter -> Warning columns -> ETL Warning. Gen_lastpreservationdate is not mapped to the destination.",
+      "evidence": "DTSX:3179-3208, 3331, 3541, 3727, 3739, 4801-4873, 4968-4974",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Handle Expired Preservations\\Close preservations|detail",
+      "hash": "494e2ff75ed2",
+      "verdict": "CONFIRMED",
+      "detail": "Population, joins, selection, no lookup (id read from CRM itself), date priority, SDK write of the three literal fields with RedirectRow and continue: all match. The unqualified column is stated as being of unknown table, and the meaning of 2/57 is stated as unknown. Wording note, not an error: [3] says 'בגלל קדימות האופרטורים'. The grouping is done by the explicit parentheses, with OR as the top-level operator, so the result is the same.",
+      "evidence": "DTSX:4806-4817, 4849-4873, 3179-3208",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Handle Expired Preservations\\Close preservations|decisions",
+      "hash": "e5d8ba8e7364",
+      "verdict": "CONFIRMED",
+      "detail": "[1] The condition matches the SqlCommand WHERE apart from whitespace. The meaning keeps the table unknown. [2] The isnull chain is in the SELECT and the WHERE only. Output column Gen_lastpreservationdate has no consumer: the destination inputs are gen_currentstate, gen_generalresult, gen_preservationid and gen_preservationresault. [3] errorRowDisposition=\"RedirectRow\" at DTSX:3203, and the error path ends in ETL Warning.",
+      "evidence": "DTSX:4806-4817, 3203-3208, 4969-4974",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Handle Expired Preservations\\Close preservations|open",
+      "hash": "2ed6e997decb",
+      "verdict": "CONFIRMED",
+      "detail": "(1) No label for these picklist values exists in any supplied DTSX: gen_preservationresault and gen_generalresult appear only in 0020. (2) gen_transferoutamountinactual appears once, in DTSX:4814, and in no other supplied DTSX. It is not among the 132 destination external columns, and neither is gen_pensiontransferout (only at 4812). (3) Intent is not documented. (4) ActionType=3 is the only KingswaySoft ActionType in all supplied packages, and no enum label is stored. The 'effect is update' reasoning is stated as inference from the id read from CRM.",
+      "evidence": "grep across source/DailyProcess/*.dtsx; DTSX:3182, 3185, 4812, 4814; 132 ExternalColumns under Dynamics CRM Destination.Inputs[Input]",
+      "wrongUnits": []
+    }
+  ]
+}

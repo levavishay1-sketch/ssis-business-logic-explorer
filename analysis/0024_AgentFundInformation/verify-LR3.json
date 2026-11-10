@@ -1,0 +1,79 @@
+{
+  "verifier": "ssis-verifier",
+  "package": "0024_AgentFundInformation",
+  "scope": "logic-claims re-check round 3",
+  "checkedAt": "2026-11-07",
+  "source": "source/DailyProcess/0024_AgentFundInformation.dtsx sha256 659C8F355B506D3D1772DC5A1165E80E3574B31C18BBCD1F2E43A836ADF6E2C4",
+  "checked": 6,
+  "results": [
+    {
+      "id": "L|summary",
+      "hash": "40490643e832",
+      "verdict": "WRONG",
+      "detail": "Verified: the table label; the 5 insert keys (incl. account); the two derivation routes; the dead-contact skip (N'נפטר'); the three delete rules (dead contact, no 6-key match to the population query, agent and agency both NULL via the Execute SQL Task DTSX:4481); business writes are direct SQL on [CRM]; the SDK framework writers are crmServiceProxy.Create DTSX:297 and crmServiceProxy.Update DTSX:3019 (no event handlers, no other SDK calls). The scopeNote is verified: [CRM] {EC67FF20} = Psql/ALTSHULER_MSCRM; destination, both OLE DB Commands and the Execute SQL Task (SQLTask:Connection={EC67FF20}) all use it; EnableConfig + DTSX:17; Create system columns and Set system variables are VB (the third VB script is only a one-row generator). Wrong unit: 'אף קובץ שסופק אינו קורא את הטבלה' is false. This package reads the table: the existence Lookup runs 'select * from [dbo].[Gen_allowedinformationforfundBase]' (DTSX:2139), and Delete Rows' source runs 'select ... from Gen_allowedinformationforfund' (DTSX:2608-2616). The package's own Create Fund View Table|detailed unit 9 and Delete Rows|detail unit 1 say so, so the summary contradicts them. What is true: no other supplied DTSX references the table (all 19 hits are in 0024), and 0024 reads it only to check existence and to select rows for deletion.",
+      "evidence": "DTSX:297, 2139, 2608-2616, 3019, 4481; grep -c allowedinformationforfund source/DailyProcess/*.dtsx -> only 0024 (19)",
+      "wrongUnits": [
+        {
+          "unit": "[1] summary_he: 'אף קובץ שסופק אינו קורא את הטבלה'",
+          "problem": "This package reads the table itself, in the existence Lookup and in the Delete Rows source. It also contradicts the package's own detailed/detail claims.",
+          "correct": "אף קובץ אחר שסופק אינו מפנה לטבלה; החבילה עצמה קוראת אותה רק לבדיקת קיום (Lookup) ולבחירת שורות למחיקה, והצרכן העסקי שלה לא ידוע (external_unknown).",
+          "evidence": "DTSX:2139 (Lookup SqlCommand), DTSX:2608-2616 (get allow information)"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Create Fund View Table|title",
+      "hash": "9fbc0a5d14a7",
+      "verdict": "CONFIRMED",
+      "detail": "short_he: the meanings of the existinfile flag and of the viewing permission are labelled השערה. 'ששוערכו מאז תחילת השנה שלפני שלוש שנים' = year(gen_revaluationdate) >= year(getdate())-3, which has no upper bound. Current POA = gen_currentstate = 1. Only new combinations (Lookup NoMatchBehavior 1, Match unconnected) and non-dead contacts are added. flow_he[1]-[4] follow the paths DTSX:2211-2214: Source -> Lookup (No Match) -> filtering customers dead (No Match) -> Create system columns -> OLE DB Destination. The agent/agency is now phrased as 'שנגזרים' from the POA (branch 1) or from the parent contract ac2 (branch 2).",
+      "evidence": "DTSX:1970-2084, 2137-2210, 1906-1964, 2211-2214, 608-683",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Create Fund View Table|short",
+      "hash": "5b3c06a8be0b",
+      "verdict": "WRONG",
+      "detail": "Units 2-11 verified: existence check on 5 keys (Full cache, Match unconnected); dead-contact filter; the insert writes the agent/agency, fund, contact, account, POW_MAIN and the commission flag; existing rows are untouched here; deletions happen later (Delete Rows, then the Execute SQL Task). Unit 1 is wrong in two places. (a) The condition 'ששנת השערוך שלהן היא השנה הנוכחית או אחת משלוש השנים שלפניה' does not match the SQL. 'year(gen_fundmain.gen_revaluationdate) >= year(getdate())-3' (DTSX:2049-2052, 2075-2076) has no upper bound, so revaluation dates in future years also qualify. The package's own detailed unit 1 and detail unit 1 say 'כולל תאריכים עתידיים'. (b) The parent-contract route is stated as applying 'כשבחוזה הסוכן של הקופה מסומן שיתוף מידע' only. The active branch 2 also requires 'gen_powerofattorney.Gen_agentname = gen_fundmain.gen_agentname or gen_powerofattorney.Gen_agencyname = gen_fundmain.gen_agencyname' (DTSX:2078-2082), and needs both the ac1 and ac2 inner joins. Also, the two routes are UNION ALL, not alternatives. A fund that qualifies for branch 2 gets rows from its POA (branch 1) as well. Minor wording note, not counted: the POA is joined to the fund's customer account (gen_powerofattorney.gen_customeraccount = gen_customeraccountid), so 'ללקוח שלהן' is better as 'לחשבון הלקוח שלהן'.",
+      "evidence": "DTSX:2033-2084 (active branches), 2049-2052, 2054, 2075-2082",
+      "wrongUnits": [
+        {
+          "unit": "[1] 'ששנת השערוך שלהן היא השנה הנוכחית או אחת משלוש השנים שלפניה'",
+          "problem": "This omits future revaluation years. The SQL condition is only a lower bound.",
+          "correct": "ששנת השערוך שלהן היא לפחות השנה הנוכחית פחות 3 (כולל שנים עתידיות)",
+          "evidence": "DTSX:2052, 2076: year(gen_fundmain.gen_revaluationdate) >= year(getdate())-3"
+        },
+        {
+          "unit": "[1] 'אלה שבייפוי הכוח, או, כשבחוזה הסוכן של הקופה מסומן שיתוף מידע, אלה של חוזה האב שלו'",
+          "problem": "The branch-2 condition is incomplete: the POA's agent or agency must also equal the fund's agent or agency. 'או' presents the two UNION ALL branches as alternatives per fund.",
+          "correct": "אלה שבייפוי הכוח; ובנוסף, כשבחוזה הסוכן של הקופה מסומן שיתוף מידע והסוכן או הסוכנות שבייפוי הכוח זהים לאלה של הקופה, גם אלה של חוזה האב שלו",
+          "evidence": "DTSX:2054-2082 (union all; ac1/ac2 joins; Gen_agentname/Gen_agencyname equality; Gen_isContractDataSharing = 1)"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Create Fund View Table|detailed",
+      "hash": "05d6d59c4ed8",
+      "verdict": "CONFIRMED",
+      "detail": "Unit 1: the condition is stated with 'כולל תאריכים עתידיים' and the raw SQL is in tech. The existinfile meaning is labelled השערה. Unit 2: 0030 'Get Active Poa' filters poa.Gen_currentstate = 1 'as ActivePoas' (0030 DTSX:4187-4222). Unit 3: two active UNION ALL branches; the other two are commented out. Units 5 and 7: left joins (branch 1 via gen_agents.gen_contactname = poa.gen_agentname and gen_agencie.gen_agencyname = poa.gen_agencyname; branch 2 via ac1/ac2 and the POA = fund agent-or-agency condition plus Gen_isContractDataSharing = 1). 'חוזה האב' and 'שיתוף מידע' match the SQL comment '--Agent with parent contracr and POA and data sharing'. Unit 8: ROW_NUMBER partitions by FUND_NUMBER, CONTACT_NAME, ACCOUNT_NAME, AGENT_NAME and AGENCY_NAME, ordered by POW_START_DATE desc only. The text says 'מספר קופה', which is correct (gen_fundnumber, not the GUID). IS_COMMISSION_AGENT uses isnull(...,0). Unit 9: Lookup Full cache (CacheType 0), NoMatchBehavior 1, 5 join columns; POW_MAIN is not a key. Unit 13: filtering customers dead, Full cache on Contact gen_customeragename = N'נפטר'. Unit 17: main.vb lines 18-36 (Guid.NewGuid, StateCode 0, StatusCode 1, SystemUserId / BusinessUnitId). Unit 18: the OLE DB Destination (AccessMode 0) writes to [dbo].[Gen_allowedinformationforfundBase] on [CRM]. Notes, not counted: the tech quotes the commented branch as 'Agents with parent contract without POA', but the SQL comment reads 'Agents with parent contracr without POA and data sharing = 1'. 'פעיל (statecode 0)' relies on the CRM platform convention.",
+      "evidence": "DTSX:608-683, 817-855 (main.vb), 1906-1964, 1970-2084, 2137-2214; 0030 DTSX:4187-4222",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Create Fund View Table|detail",
+      "hash": "d6bebc9e6db7",
+      "verdict": "CONFIRMED",
+      "detail": "Unit 1: the Gen_existinfile ownership is argued with the ambiguity rule plus 0034 'from  Gen_fundmain where  gen_existinfile = 1' (0034 DTSX:15). The revaluation condition is given as raw SQL (DTSX:2049-2052) with 'כולל תאריכים עתידיים'. The branch conditions and the RowNum rule match. Units 2-3: 5-key Lookup and the dead filter. Unit 4: the 16 destination mappings (DTSX:628-643) are exactly those listed: Gen_agencyname, Gen_agentname, Gen_contactname, Gen_accountname, Gen_fundname, Gen_powerofattorneymainname, gen_agentreceivescommissionnly, Gen_allowedinformationforfundId, CreatedOn, ModifiedOn, statecode, statuscode, OwnerId <- OwningUser, CreatedBy, ModifiedBy, OwningBusinessUnit. DeletionStateCode is computed (main.vb:29) but not mapped. Literals statuscode 1 (main.vb:27) and statecode 0 (main.vb:30). SystemUserId and BusinessUnitId come from the SystemUser Lookup on DomainName = @[User::UserName]. Unit 5: the meaning is labelled השערה and the branch-2 conditions are stated. Wording note, not counted: 'היחידה העסקית ... הם משתמש המערכת' means the BusinessUnitId of that user.",
+      "evidence": "DTSX:608-643, 817-855 (main.vb), 1906-1964, 1970-2084, 2137-2210; Get systemuser DTSX:5390-5394, 7314-7315; 0034 DTSX:15",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Delete Rows|detail",
+      "hash": "78ca02ade4ee",
+      "verdict": "CONFIRMED",
+      "detail": "Unit 1: the source selects 7 columns from Gen_allowedinformationforfund with no WHERE (DTSX:2608-2616). Unit 2: Multicast Output 2 goes to Get customers dead and Output 3 to Check if valid allow; Output 1 is dangling (DTSX:2722-2746). The validity Lookup SQL (DTSX:2227-2340) is identical to the insert query after whitespace normalisation. Its 6 join columns are AGENCY_NAME, AGENT_NAME, FUND_GUID, CONTACT_NAME, POW_MAIN and ACCOUNT_NAME. Unit 3: the Match path of the dead lookup and the No Match path of the validity lookup both go to 'delete Gen_allowedinformationforfundBase where Gen_allowedinformationforfundid = ?' (Param_0 <- Gen_allowedinformationforfundid). The population query does not exclude dead contacts, so a row may be deleted by one path or by both. The no-error outcome is labelled השערה. Unit 4: direct SQL on [CRM]. Unit 5: the rule is stated as 'no 6-key match' and the cases are given as a non-exhaustive list of examples. Every listed example is reachable from the SQL. NULL keys are deferred to the open question, and the meaning is labelled השערה.",
+      "evidence": "DTSX:2225-2463, 2529-2602, 2603-2620, 2663-2721, 2722-2746",
+      "wrongUnits": []
+    }
+  ],
+  "missingWrites": []
+}

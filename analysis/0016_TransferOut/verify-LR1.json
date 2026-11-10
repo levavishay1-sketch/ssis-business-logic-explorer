@@ -1,0 +1,68 @@
+{
+  "verifier": "ssis-verifier",
+  "package": "0016_TransferOut",
+  "scope": "logic-claims re-check after fixes",
+  "checkedAt": "2026-11-07T12:20:09Z",
+  "checked": 7,
+  "results": [
+    {
+      "id": "L|summary",
+      "hash": "1aefb8be4677",
+      "verdict": "CONFIRMED",
+      "detail": "Re-derived from the SQL (customercare state 1, transgrouptype 2, EntryDate > CreatedOn, sums/count grouped by care/account course/value date/appendix date), the splits (IsFull: Gen_isfulltransfer == TRUE -> transferCount > 0; Not full -> actual == expected, both not NULL), the Aggregate (min value date) and main.cs (OptionSetValue 3 / 34 from CURRENT_STATE_FINISHED / REJECT_REASON_PROPER, fund release date, appendix date, delivery delay). Scope note: there is no DTS:Configurations element; [psql] is used only by OLE DB sources and lookups; there is no SQL DML; the four SDK writers are Close Transfer Out (gen_customercare Update), ETL Warning (gen_etlprocesswarning Create), Create ETL Process record (gen_etlprocess Create) and ETL Record Finish (gen_etlprocess Update). The state-1 and 'transfer out' meanings are labelled as hypotheses.",
+      "evidence": "DTSX:2119-2145 SQL; DTSX:2091-2094 IsFull; DTSX:164 transferCount > 0; DTSX:1289 Compare sums; DTSX:88-141 Aggregate (gen_valuedate AggregationType 6); main.cs DTSX:341-342 constants, 379-396 row code; DTSX:1497/1509, 2588/2593, 3147/3155 framework SDK writers"
+    },
+    {
+      "id": "L|Package\\Close Transfer Out|title",
+      "hash": "698b28197426",
+      "verdict": "WRONG",
+      "detail": "The title 'closing transfer-out customer cares that were completed' states two meanings as fact. (1) 'Transfer out': the query has no filter by care type. This is only the package/data-flow name and the alias Tout, as the package's own detailed claim says. (2) 'Completed': the files do not show that the matching transactions mean completion. Only the result state is named FINISHED, through a code constant. short_he and flow_he are correct.",
+      "evidence": "DTSX:82 data flow name 'Close Transfer Out'; DTSX:2130-2137 FROM Gen_customercare as Tout ... WHERE (no care-type predicate); main.cs DTSX:342 CURRENT_STATE_FINISHED = 3",
+      "wrongUnits": [
+        { "unit": 1, "problem": "Meanings 'ניוד יוצא' and 'שהושלמו' are presented as fact", "correct": "e.g. 'סגירת טיפולי לקוח במצב 1 (Close Transfer Out; ניוד יוצא – לפי שם החבילה, השערה)' without 'שהושלמו', or label both as השערה", "evidence": "DTSX:82; DTSX:2130-2137" }
+      ]
+    },
+    {
+      "id": "L|Package\\Close Transfer Out|short",
+      "hash": "8c293698ec88",
+      "verdict": "WRONG",
+      "detail": "Steps 1-10 and 12 are correct and hedged. Step 11 says the care is updated 'as \"הסתיים\"' (finished). The code writes gen_currentstate = OptionSetValue(3). 'Finished' comes only from the constant name CURRENT_STATE_FINISHED, and the scope note says the OptionSet meaning in CRM is unknown. This text does not give the value or say that the label comes from the constant name.",
+      "evidence": "main.cs DTSX:342 const CURRENT_STATE_FINISHED = 3; DTSX:385-386 gen_rejectreason/gen_currentstate OptionSetValue",
+      "wrongUnits": [
+        { "unit": 11, "problem": "Label from a code constant presented as the CRM meaning", "correct": "'הטיפול מתעדכן ב-CRM: gen_currentstate = 3 (שם הקבוע בקוד: FINISHED), סיבה קבועה 34 (REJECT_REASON_PROPER), ...'", "evidence": "main.cs DTSX:341-342, 385-386" }
+      ]
+    },
+    {
+      "id": "L|Package\\Close Transfer Out|detailed",
+      "hash": "4750b899b223",
+      "verdict": "WRONG",
+      "detail": "Most steps are exact: the SQL, the expected = course amount x count calculation, the split conditions, NULL -> FailComponent, Aggregate grouping on care/delivery date/appendix date with min value date, ToLocalTime on the written dates, DateDiff on raw values (marked as general .NET knowledge), the 1000 batch and remainder flush, Fault -> ETL warning without the id, and gen_customercareid used instead of Entity.Id. Two problems remain. (a) Step 1 says 'תנועות השנה השוטפת' (current-year transactions) as fact. That comes only from the name of the unsupplied view Gen_ftCurrentYear. Rule 4 makes the view external_unknown, so its content must be labelled as a hypothesis based on the name. (b) Step 29 is incomplete. When ExcecuteBulk fails inside a row (for example no server response), the exception is caught and that row is routed to CastingError. But myEntities.Clear() is skipped, and the failing row's entity has already been added to the list. The failed batch, including the row reported as an error, stays queued. Count == 1000 can never hold again, so every later care is accumulated and sent in one ExecuteMultiple at end of rowset. That final call is outside any try, so a failure there fails the component. The ETL warning for the row therefore does not mean that the care was not closed.",
+      "evidence": "DTSX:2132 'join Gen_ftCurrentYear as ft'; main.cs DTSX:393 myEntities.Add, 395-396 Count == 1000 -> ExcecuteBulk, 398-408 catch -> DirectRowToCastingError, 425-433 throw ... myEntities.Clear(), 436-445 Input0_ProcessInput end-of-rowset flush (no try)",
+      "wrongUnits": [
+        { "unit": 1, "problem": "'תנועות השנה השוטפת' asserted from the view name only", "correct": "'תנועות מ-Gen_ftCurrentYear (לפי השם – תנועות השנה השוטפת; השערה, ה-View לא סופק)'", "evidence": "DTSX:2132" },
+        { "unit": 29, "problem": "Omits that a failed batch is not cleared: the error-routed row and its batch stay queued and are re-sent with all later rows in one request at end of input", "correct": "Add: 'הרשימה לא מתרוקנת; העדכונים של האצווה שנכשלה (כולל השורה שסומנה כשגיאה) וכל העדכונים הבאים נשלחים בבקשה אחת בסוף הקלט; כשל שם מכשיל את הרכיב'", "evidence": "main.cs DTSX:393-408, 425-445" }
+      ]
+    },
+    {
+      "id": "L|Package\\Close Transfer Out|detail",
+      "hash": "3c60b6337624",
+      "verdict": "CONFIRMED",
+      "detail": "Source and population (Gen_ftCurrentYear named neutrally), matching (gen_customercareid attribute, no Entity.Id), decisions 1-5, the write (constants 3/34 named as the code constants, conditional date attributes, batch of 1000, Supported through an external Proxy that was not inspected) and the hedged result all match the DTSX.",
+      "evidence": "DTSX:2119-2145; DTSX:2091-2094, 164, 1289; main.cs DTSX:379-391, 448-454"
+    },
+    {
+      "id": "L|Package\\Close Transfer Out|decisions",
+      "hash": "0005aa0e18b5",
+      "verdict": "CONFIRMED",
+      "detail": "All six decisions are exact: the WHERE clause (DTSX:2135-2137), 'Gen_isfulltransfer ==  TRUE' with FailComponent on the IsFull output (DTSX:2091), transferCount > 0 with 'Has not thansactions' not connected, the Compare sums expression with 'Sums Are Not Equal' not connected, Aggregate GroupBy x3 with AggregationType 6 on gen_valuedate, and DateDiff(DateInterval.Day, deliveryDate, valuedate) > 0, sent only if both dates are non-null (DateDiff semantics marked as general knowledge).",
+      "evidence": "DTSX:2135-2137, 2091-2094, 164, 1289, 88-141; paths DTSX:2412-2422; main.cs DTSX:391, 448-454"
+    },
+    {
+      "id": "L|Package\\Close Transfer Out|open",
+      "hash": "2ab7846a48a2",
+      "verdict": "CONFIRMED",
+      "detail": "All five open questions are real gaps that the files cannot answer. There is no care-type filter; the OptionSet meanings exist only as constant names; sum(ac.gen_transactionamount) is multiplied by the group row count; per-group partial closure happens through the Union All; a NULL Gen_isfulltransfer fails the component (FailComponent).",
+      "evidence": "DTSX:2119-2145; DTSX:2091; DTSX:2416,2420,2422 paths"
+    }
+  ]
+}

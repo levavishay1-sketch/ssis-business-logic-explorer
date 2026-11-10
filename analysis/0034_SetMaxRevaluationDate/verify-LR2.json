@@ -1,0 +1,73 @@
+{
+  "verifier": "ssis-verifier",
+  "package": "0034_SetMaxRevaluationDate",
+  "scope": "logic-claims re-check round 2",
+  "checkedAt": "2026-11-07T17:20:50Z",
+  "checked": 3,
+  "results": [
+    {
+      "id": "L|Package\\Execute SQL Task|short",
+      "hash": "59e51b2fb0e3",
+      "verdict": "WRONG",
+      "detail": "Units [2] and [3] are correct: CONVERT(varchar(10), MAX(DATEADD(hh,3,gen_revaluationdate)),103) gives dd/mm/yyyy, written by a direct UPDATE of [gen_SystemConfigurationBase].[gen_Value] WHERE gen_name='MaxRevaluationDate'. In unit [1] the flag is correctly labelled as unproven. Units [1] and [4] state the date boundary as fact ('before the start of the current month'). The SQL compares gen_revaluationdate with a string built as cast(YEAR(GETDATE()))+'/'+CAST(MONTH(GETDATE()))+'/'+'1' (for example '2026/11/1'). SQL Server converts that string to datetime implicitly, and for datetime a year-first numeric string depends on the session DATEFORMAT/language. Under mdy/ymd (for example us_english) it is the 1st of the current month. Under dmy (for example British) it is read as year-day-month, so '2026/11/1' becomes 11 January 2026. The connection (OLEDB SQLNCLI11, Integrated Security, DTSX:6) does not set a language, and the login's default language is not in the supplied files. Supporting evidence that the column is datetime: in 0004 the parameter that writes Gen_revaluationdate into Gen_fundmainbase is dbTimeStamp (0004 DTSX Create gen_FundMain ExternalColumns[Param_69]). Under the standard, runtime behaviour not shown in the files must be marked conditional. No DTS:Configurations in 0034, so the PCRM target is not overridable by config. Grep shows MaxRevaluationDate only in 0034.",
+      "evidence": "source/DailyProcess/0034_SetMaxRevaluationDate.dtsx:6 (connection string), :15 (SqlStatementSource); 0004_LeumiFile-MY.dtsx Create gen_FundMain Param_69 dataType=dbTimeStamp",
+      "wrongUnits": [
+        {
+          "unit": 1,
+          "problem": "'ושתאריך השערוך שלהן קודם לתחילת החודש הנוכחי' is stated as fact. The boundary is a string 'YYYY/M/1' that SQL Server converts implicitly to datetime. How it is read depends on the session DATEFORMAT, which is not in the supplied files.",
+          "correct": "ושתאריך השערוך שלהן קטן מהמחרוזת 'שנה/חודש/1' של היום (GETDATE). בהגדרת DATEFORMAT mdy/ymd (למשל us_english) זה ה-1 בחודש הנוכחי. בהגדרת dmy המחרוזת תתפרש כשנה-יום-חודש, למשל 11 בינואר. שפת החיבור לא מופיעה בקבצים שסופקו.",
+          "evidence": "DTSX:15"
+        },
+        {
+          "unit": 4,
+          "problem": "'תאריך השערוך המאוחר ביותר שלפני החודש הנוכחי' depends on the same unproven DATEFORMAT interpretation.",
+          "correct": "Make it conditional, in the same way as unit 1.",
+          "evidence": "DTSX:15"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Execute SQL Task|detailed",
+      "hash": "d15ce5d8a26f",
+      "verdict": "WRONG",
+      "detail": "Re-derived the other units. [1] PCRM is Psql/ALTSHULER_MSCRM, and 0034 has no configurations. [2] Writers of gen_existinfile=1 on gen_fundmain: 0004 UPDATE Gen_fundmain 'Set gen_existinfile = 1' (0004 DTSX:92874), and 0004 INSERT Gen_fundmainbase where column 75 = Gen_existinfile = Param_74 <- IsExistsFile = \"1\" from Add System Columns (0004 DTSX:61789, 61981, 58963). In 0008 and 0009, SDK entity[\"gen_existinfile\"]=true is set on new Entity(\"gen_fundmain\") (0008 DTSX:23784 etc., 0009 DTSX:27026 etc.). The only resets to 0 in any supplied package are on gen_ftrequestbase (0009 DTSX:189416) and gen_warningnotebase (0012 DTSX:92729), so 'no supplied package resets it on gen_fundmain' holds. [8] the 3-hour reason is labelled השערה. [9]-[13]: MAX over an empty set gives NULL, and the UPDATE then writes NULL; correct. [14]: an UPDATE with no matching row raises no error and there is no INSERT; correct. [15] direct SQL, Unsupported; correct. The problem is that [3], [5], [7] and [15] state the boundary as '1 בחודש הנוכחי' as fact. The comparison is gen_revaluationdate < 'YYYY/M/1' (an implicit string-to-datetime conversion), and the result depends on the session DATEFORMAT, which the supplied files do not show (see the short claim).",
+      "evidence": "0034 DTSX:6, :15; 0004 DTSX:92874, 61789, 61981, 58963; 0008 DTSX:23784; 0009 DTSX:27026, 189416; 0012 DTSX:92729",
+      "wrongUnits": [
+        {
+          "unit": 3,
+          "problem": "The decision 'האם תאריך השערוך של הרשומה קודם ל-1 בחודש הנוכחי?' is given as fact. The literal is a string whose datetime interpretation depends on DATEFORMAT/language (mdy/ymd gives the 1st of the month; dmy gives day M of January).",
+          "correct": "האם gen_revaluationdate קטן מהמחרוזת 'YYYY/M/1' של היום? (בהגדרת DATEFORMAT mdy/ymd זה ה-1 בחודש הנוכחי; בהגדרת dmy זה יום M בינואר. ההגדרה לא מופיעה בקבצים.)",
+          "evidence": "DTSX:15"
+        },
+        {
+          "unit": 15,
+          "problem": "The end result restates 'שלפני החודש הנוכחי' unconditionally (units [5] and [7] also depend on it).",
+          "correct": "Make it conditional on DATEFORMAT, as in unit 3.",
+          "evidence": "DTSX:15"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Execute SQL Task|detail",
+      "hash": "fc78afefddbe",
+      "verdict": "WRONG",
+      "detail": "Units [2]-[4] are correct: match by gen_name, no insert, direct UPDATE of the Base table through PCRM, Unsupported. In [1] the writers and the 'no reset' statement are correct (see the detailed claim), and NULL revaluation dates are excluded. In [5] the consumer is unknown, which is correct: no other supplied DTSX contains MaxRevaluationDate. [1] and [5] state the boundary 'לפני ה-1 בחודש של GETDATE()' / 'שלפני החודש הנוכחי' as fact. It depends on the implicit conversion of 'YYYY/M/1' to datetime under an unshown DATEFORMAT. Note: [3] quotes the SQL exactly and is fine.",
+      "evidence": "0034 DTSX:15; grep MaxRevaluationDate source/DailyProcess/*.dtsx shows only 0034",
+      "wrongUnits": [
+        {
+          "unit": 1,
+          "problem": "'gen_revaluationdate לפני ה-1 בחודש של GETDATE()' is an interpretation that holds only under DATEFORMAT mdy/ymd.",
+          "correct": "gen_revaluationdate < המחרוזת 'YYYY/M/1' של GETDATE() (ה-1 בחודש רק בהגדרת DATEFORMAT mdy/ymd; ההגדרה לא בקבצים).",
+          "evidence": "DTSX:15"
+        },
+        {
+          "unit": 5,
+          "problem": "'שלפני החודש הנוכחי' is unconditional.",
+          "correct": "Make it conditional on DATEFORMAT.",
+          "evidence": "DTSX:15"
+        }
+      ]
+    }
+  ],
+  "missingWrites": []
+}

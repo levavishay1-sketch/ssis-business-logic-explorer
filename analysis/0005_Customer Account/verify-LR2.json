@@ -1,0 +1,368 @@
+{
+  "verifier": "ssis-verifier",
+  "package": "0005_Customer Account",
+  "scope": "logic-claims re-check round 2",
+  "checkedAt": "2026-11-07",
+  "checked": 30,
+  "results": [
+    {
+      "id": "L|summary",
+      "hash": "a11f1bb6ea64",
+      "verdict": "CONFIRMED",
+      "detail": "Re-derived. The precedence chain (DTSX:82412-82427, 16 Success constraints, one incoming each) gives this order: Create/Update, Connect, Set Joining, Aggregations, Paragraph14, Consulting CA, Consulting FM, Currency. Only Create sets gen_joiningmailtoagent = 1 (main.cs:43); the term appears in no other supplied package. The Currency task updates TransactionCurrencyId IS NULL rows using variable CurrencyName = 'שקל חדש' (DTSX:29-31). There is no configuration and no expression, and no script writes this variable. scopeNote: the evidence configurations array is empty. All 42 component connections and the 3 Execute SQL tasks use [qsql] = psql/ALTSHULER_MSCRM. The direct SQL targets Gen_customeraccountBase, Gen_fundmainbase and gen_transferrequest (the view name, labelled as not shown). The SDK goes through CrmProxy. The package reads no files.",
+      "evidence": "DTSX:4-8, 29-31, 68399, 79889, 79895, 82412-82427; Create Customer Account main.cs:41-44",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|finding#1",
+      "hash": "af24f40be66b",
+      "verdict": "WRONG",
+      "detail": "The counts are correct. There are 30 OLE DB Commands: 25 business (5 groups of 5, SQL identical within each group) and 5 'insert etl process warning' (insert gen_etlprocesswarningbase). There are 3 Execute SQL tasks. The Base tables are Gen_customeraccountBase and Gen_fundmainbase. gen_transferrequest is the view name, labelled 'not shown in the files'. ModifiedOn is set only in Update Customer Account 1-5 and both Update TransferRequest groups; Aggregations, Paragraph14, Currency, Update Customer Account (Unsupported) and Update Fund Main do not set it. The problem is 'בלי פלאגינים, בלי Audit', which is stated as fact. That is CRM platform runtime behaviour, not shown in the supplied files, and database-side triggers (not supplied) are unknown. Under the standard it must be marked, e.g. 'לפי התנהגות CRM המתועדת, לא מוצג בקבצים'.",
+      "evidence": "DTSX:40982-41023 (ModifiedOn = GETUTCDATE()), 68399, 73352, 73757, 79193, 79598-79782, 79889, 79895",
+      "wrongUnits": [
+        {
+          "unit": "[1] 'בלי פלאגינים, בלי Audit'",
+          "problem": "Runtime CRM platform behaviour is stated as fact. Nothing in the supplied files shows plugin or audit registration or the absence of DB triggers.",
+          "correct": "Keep the claim but mark it: 'בלי ModifiedOn בחלק מהמקרים (מוצג בקבצים); עקיפת פלאגינים ו-Audit – לפי התנהגות CRM המתועדת, לא מוצג בקבצים'.",
+          "evidence": "rule: logic-verify-standard.md 'Runtime behaviour not shown in the files'"
+        }
+      ]
+    },
+    {
+      "id": "L|finding#4",
+      "hash": "3b4f57683919",
+      "verdict": "WRONG",
+      "detail": "Set gen_name is (DT_WSTR,4)(DT_I4)gen_producttypeid + \"-\" + (DT_WSTR,12)(DT_I8)gen_bankaccountnumber, with errorRowDisposition and truncationRowDisposition = FailComponent (DTSX:34382+). It sits on the main path before the create/update split, so a conversion failure fails the whole data flow. The Success-only chain then stops all later steps; this is correct. The population is overstated. Set gen_name sees only rows of Get Funds Without Linked Customer Accounts. Those are funds with gen_existinfile = 1 that also inner-join product (productid = gen_fundtypename) and gen_customeraccounttype (gen_id = producttypeid AND gen_bankname = fund bank) (DTSX:33252). A fund flagged gen_existinfile = 1 that has no matching product or customer-account-type row is never read, and its non-numeric account number fails nothing. A non-numeric gen_producttypeid, or an account number longer than 12 digits (truncation → FailComponent), fails the flow in the same way.",
+      "evidence": "DTSX:33252 (inner joins), 34382-34395 (FailComponent dispositions); precedence DTSX:82412-82427",
+      "wrongUnits": [
+        {
+          "unit": "[1] 'מספר חשבון לא מספרי בקופה אחת המסומנת gen_existinfile = 1 מכשיל את כל זרימת הנתונים'",
+          "problem": "It applies only to funds read by the source, which are gen_existinfile = 1 and joined to product and gen_customeraccounttype; not to every flagged fund.",
+          "correct": "אם בקופה שנקראת בשלב זה (gen_existinfile = 1, ויש לה מוצר וסוג חשבון לקוח תואמים) מספר החשבון או מזהה סוג המוצר אינו ניתן להמרה למספר (או ארוך מדי), כל זרימת הנתונים נכשלת, ובגלל אילוצי Success השלבים הבאים לא ירוצו.",
+          "evidence": "DTSX:33252, 34382"
+        }
+      ]
+    },
+    {
+      "id": "L|finding#10",
+      "hash": "26defcf3f6e6",
+      "verdict": "WRONG",
+      "detail": "The core point is correct. The source does not filter on linkage; there is no condition on Gen_customeraccountname. The create/update decision is made by the Get Customer Account Guid lookup, with the No Match output going to Create. 'קורא את כל הקופות המסומנות gen_existinfile = 1' is literally false: the query inner-joins product and gen_customeraccounttype (on gen_id = producttypeid and the fund's bank), so flagged funds without a matching row are not read. On ownership: gen_existinfile is unqualified in a three-table query. It belongs to gen_fundmain. The same package filters 'from gen_fundmain where Gen_existinfile = 1' (DTSX:68399), and by the ambiguity rule the column cannot also exist on product or gen_customeraccounttype.",
+      "evidence": "DTSX:33252, 32121-32237, 68399",
+      "wrongUnits": [
+        {
+          "unit": "[1] 'הוא קורא את כל הקופות המסומנות gen_existinfile = 1'",
+          "problem": "The inner joins to product and gen_customeraccounttype are omitted, so 'all' is not exact.",
+          "correct": "הוא קורא את הקופות המסומנות gen_existinfile = 1 שיש להן מוצר וסוג חשבון לקוח תואמים (קופה אחת לכל בנק, מספר חשבון וסוג מוצר), ולא רק קופות בלי חשבון.",
+          "evidence": "DTSX:33252"
+        }
+      ]
+    },
+    {
+      "id": "L|Package (control flow)|short",
+      "hash": "c96f9e1666d7",
+      "verdict": "CONFIRMED",
+      "detail": "The six steps match the executables and the linear Success chain (DTSX:82412-82427; no Failure, Completion or expression constraints). Step 2 is a summary: the Connect step also copies account consulting fields to the fund, and the detailed claim covers that. Step 5: the currency comes from the variable CurrencyName, whose only value in the files is 'שקל חדש'.",
+      "evidence": "DTSX:82412-82427, 79892-79898",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package (control flow)|detailed",
+      "hash": "cf2ab28d9179",
+      "verdict": "WRONG",
+      "detail": "Units 1-3 and 5-15 match: the precedence chain, the single Success incoming constraint per executable, the OnError handler (Error ETL Process record updates gen_etlprocess and creates a note) and the step contents. Unit 4 is wrong. 'נקבע אם המייל יישלח או ייכשל' states as fact that a mail will be sent or fail. The package sends no mail. Values 2 and 4 are known only through the code constants SENDING_JOINING_MAIL and FAILED_JOINING_MAIL, and this package's own Set Joining claim marks the CRM reaction to 2 as a השערה. This is a contradiction within the package. The criterion 'לפי כתובת המייל של הסוכן או הסוכנות' also leaves out the DoNotEMail flag, which is part of the decision. A NULL or true DoNotEMail gives 4 even when an email exists.",
+      "evidence": "Set Joining email to Agent\\Update Customer Account 1 main.cs:15-17, 41-48; SQL DTSX:62354-62360",
+      "wrongUnits": [
+        {
+          "unit": "[4] שלב 3",
+          "problem": "It presents mail sending or failure as fact and omits DoNotEMail from the decision.",
+          "correct": "שלב 3: בחשבונות שבהם gen_joiningmailtoagent = 1 (בקוד: AWAITING_EMAIL_SEND) נקבע 2 (בקוד: SENDING_JOINING_MAIL) אם יש כתובת מייל והסימון DoNotEMail קיים ושווה false, ואחרת 4 (בקוד: FAILED_JOINING_MAIL); המייל והסימון נלקחים כל אחד מאיש הקשר של הסוכן ואם ריק – מחשבון הסוכנות. החבילה עצמה אינה שולחת מייל.",
+          "evidence": "main.cs:41-48; DTSX:62354-62360"
+        }
+      ]
+    },
+    {
+      "id": "L|Package (control flow)|detail",
+      "hash": "a520f753b3be",
+      "verdict": "CONFIRMED",
+      "detail": "There are no file sources. Every source, lookup and Execute SQL task uses [qsql] (42 component connections plus the 3 SQLTask:Connection references to {EB09E3B0...}). There is no package configuration, so the design-time connection string is the only one in the files. The chain is Success-only and linear. SDK writes: gen_customeraccount Create and Update; gen_fundmain Update in Connect (link plus consulting fields). Direct SQL writes go to Gen_customeraccountBase, Gen_fundmainbase and gen_transferrequest.",
+      "evidence": "DTSX:4-8, 68399, 79889, 79895, 82412-82427",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Create or Update Customer Accounts|title",
+      "hash": "0770b3e1a639",
+      "verdict": "CONFIRMED",
+      "detail": "short_he and flow_he[1-6] match the code. Source: row_number over (bank, account, producttypeid) ordered by gen_modifiedbybank desc, num = 1. gen_name expression. Block lookup: gen_IsDepositBlocked = '1', joined on account and customer account type. Full-cache lookup on gen_customeraccounttype + gen_bankaccountnumber. Automated joining: first by createdon per (identity, documenttype, stripped account), then status 7. 5050 rule (main.cs:41-44). Split: UnSupported when both broker numbers are non-null and equal → SQL; otherwise SDK. 'מתעדכן רק כשיש הבדל' is stated as a necessary condition, which is correct. Note: the representative is chosen per (bank, account, producttypeid). The text's 'per customer account type and account' is equivalent only if gen_customeraccounttype has one row per (gen_id, bank), which is not provable from the files. This does not make the statement false.",
+      "evidence": "DTSX:33252, 31966-31979, 32121-32237, 32038-32054, 18090, 34382; Create Customer Account main.cs:41-44",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Create or Update Customer Accounts|short",
+      "hash": "c5b60a1d8368",
+      "verdict": "WRONG",
+      "detail": "Units 1-8 and 10 are correct. Units 9, 11 and 12 overstate the update condition. The SQL-branch gate, Compare Filed including Null From DB Before Update (DTSX:12421), has no gen_issmallaccount or gen_productsubcustomeraccount inputs. Only gen_subproductDB exists, and it has no source counterpart. Yet Update Customer Account 1-5 overwrites both columns (DTSX:41010, 41013). The SDK-branch gate, Compare ... 1 (DTSX:14893), has no gen_issmallaccount input, yet Update CustomerAccounts writes it (main.cs:108). A difference only in those fields therefore triggers no update. Unit 11's 'בשדות שהשתנו בלבד' contradicts the detailed claim of the same package and the code. gen_isaccountblockedfordeposits is always sent, and gen_mfratedtotal and gen_letterofbenefitindex are sent whenever they are non-null (main.cs:44-56). Unit 12 ('מעודכן לפי הקופה העדכנית ביותר') is consequently not guaranteed.",
+      "evidence": "Compare Filed ... (DTSX:12421) input list; Compare ... 1 (DTSX:14893) input list; DTSX:41010, 41013; Update CustomerAccounts main.cs:44-56, 108",
+      "wrongUnits": [
+        {
+          "unit": "[9] 'אם יש הבדל כלשהו בין הקופה לחשבון, כל שדות החשבון נדרסים'",
+          "problem": "Not every written field is compared: gen_issmallaccount and gen_productsubcustomeraccount are written but not compared.",
+          "correct": "אם יש הבדל באחד השדות המושווים (כל השדות הנכתבים חוץ מ-gen_issmallaccount ו-gen_productsubcustomeraccount), כל שדות החשבון נדרסים בעדכון SQL ישיר.",
+          "evidence": "DTSX:12421 inputs; DTSX:41010, 41013"
+        },
+        {
+          "unit": "[11] 'אם יש הבדל כלשהו ... בשדות שהשתנו בלבד'",
+          "problem": "gen_issmallaccount is not in the Compare 1 gate. Also, the blocked-for-deposits flag is always sent, and gen_mfratedtotal and the letter-of-benefit flag are sent when non-null, so it is not 'changed fields only'.",
+          "correct": "אם יש הבדל באחד השדות המושווים (חוץ מ-gen_issmallaccount), החשבון מתעדכן דרך ה-SDK בשדות שהשתנו, ובנוסף תמיד בחסימת ההפקדות וב-gen_mfratedtotal / אינדיקציית מכתב ההטבה כשיש להם ערך.",
+          "evidence": "DTSX:14893 inputs; main.cs:44-56, 108"
+        },
+        {
+          "unit": "[12] (end)",
+          "problem": "'מעודכן לפי הקופה העדכנית ביותר' is not guaranteed. Differences only in fields that are not compared are not written.",
+          "correct": "לכל צירוף שנקרא יש חשבון לקוח (אם היצירה הצליחה), ושדותיו מתעדכנים מהקופה המייצגת כשיש הבדל בשדה מושווה.",
+          "evidence": "as above"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Create or Update Customer Accounts|detailed",
+      "hash": "c7cd8173538b",
+      "verdict": "WRONG",
+      "detail": "The following units are correct. Units 1-10: SQL, CASE, Set gen_name with FailComponent, Partial-cache block lookup, Full-cache account lookup. Unit 12: Dates To Local 1 converts birth, consulting and advising dates. gen_datereleaseoffunds is converted in code (main.cs:172). Dates equal to CrmMinimumDate are skipped (Dates To Local 1 main.cs:147), which the text does not mention. Unit 13 code equivalence: I compared the 5 Create copies myself (Create 4 differs only in where the gen_mfratedtotal assignment sits). Units 14, 16, 20, 22 and 24: the UPDATE has 41 columns plus ModifiedBy (from User::UserId) and ModifiedOn = GETUTCDATE(). The 5 SQL texts and their mappings are identical. Unit 29: main.cs:40-121. The 5 Update CustomerAccounts copies are equal after whitespace normalisation. Units 11, 18, 25 and 30 are wrong; see wrongUnits. Also missing from unit 13: on Create, gen_selfemployername is filled from gen_accountname (main.cs:126-127), not from the fund's gen_selfemployername. The SQL and SDK update paths use gen_selfemployername.",
+      "evidence": "Compare Filed ... main.cs:115-247 (DTSX:12421); Compare ... 1 main.cs (DTSX:14893); Merge Join DTSX:33702-33704; Create Customer Account main.cs:126-127, 283-293; Update CustomerAccounts main.cs:170-180",
+      "wrongUnits": [
+        {
+          "unit": "[11] matching of the automated joining",
+          "problem": "'סוג מסמך שתואם לסוג המוצר' uses the wrong column. The value converted and matched to gen_documenttype is cat.gen_productsubcustomeraccount, not the product type. Unit 1 of the same claim uses 'סוג המוצר' for p.gen_producttypeid. The Merge Join also has TreatNullsAsEqual = true, so a NULL identity number matches a NULL applicant identity number. The text does not say this.",
+          "correct": "…וסוג מסמך (gen_documenttype) שתואם ל-gen_productsubcustomeraccount של סוג חשבון הלקוח אחרי המרה (4→2, 5→3, 2→4); ערכי NULL במפתחות נחשבים שווים (TreatNullsAsEqual).",
+          "evidence": "Convert Product Type DTSX:18124; Merge Join DTSX:33702-33704"
+        },
+        {
+          "unit": "[18] SQL-branch compare",
+          "problem": "The trigger list is incomplete and not exact. It omits that any Guid, int or bool difference (lookups, account type, indicators, flags) also sets NeedToUpdateAll, by exact Equals. It also omits that gen_issmallaccount and gen_productsubcustomeraccount are not compared at all, although the UPDATE writes them.",
+          "correct": "NeedToUpdateAll = true כשערך ריק מול ערך מלא, טקסט שונה (ריק = NULL), Guid/int/bool שונה, תאריך בהפרש של יותר מ-12 שעות, double בהפרש > 0.001; gen_issmallaccount ו-gen_productsubcustomeraccount אינם מושווים.",
+          "evidence": "Compare Filed ... main.cs:30-247; DTSX:41010, 41013"
+        },
+        {
+          "unit": "[25] SDK-branch compare",
+          "problem": "gen_issmallaccount is not an input of Compare 1, so a difference only there never reaches the SDK update, although Update CustomerAccounts would write it (main.cs:108).",
+          "correct": "Add: 'gen_issmallaccount אינו מושווה בשלב זה'.",
+          "evidence": "DTSX:14893 input list"
+        },
+        {
+          "unit": "[30] (end)",
+          "problem": "'מעודכן לפי הקופה העדכנית ביותר' is not guaranteed; see [18] and [25]. 'שורות שנכשלו נרשמות רק כאזהרות ETL' is incorrect failure handling. The final ExecuteMultiple flush at end of rowset runs outside try/catch (Create main.cs:289-291; Update CustomerAccounts main.cs:176-178). An exception there, or a null response (ApplicationException), fails the component and the data flow, so later steps do not run. Only per-item Faults and exceptions inside ProcessInputRow become ETL warnings.",
+          "correct": "…שורות שנכשלו ב-Fault או בחריגה בתוך עיבוד השורה נרשמות כאזהרות ETL; חריגה בשליחת המנה האחרונה מכשילה את השלב.",
+          "evidence": "Create Customer Account main.cs:283-293; Update CustomerAccounts main.cs:170-180"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Create or Update Customer Accounts|detail",
+      "hash": "c1349bc471e7",
+      "verdict": "WRONG",
+      "detail": "Units 1, 4, 5 and 6 are correct. The cross-package facts check out: 0004 inserts into Gen_fundmainbase including Gen_existinfile (0004:61789-61900) and runs 'Set gen_existinfile = 1' (0004:92874). 0008 (23781-23784) and 0009 (27019-27026) set gen_existinfile = true via SDK. No supplied package creates gen_automatedjoining; the only writes found are Updates (0027, 0029). 0027 reads status 7 (0027:984) and updates gen_joiningstatus and gen_customeraccountid (0027:1370-1376). Units 2 and 3 are wrong; see wrongUnits.",
+      "evidence": "DTSX:18124, 33252, 12421, 14893, 41010, 41013; 0004:61789-61900, 92874; 0008:23781-23784; 0009:27019-27026; 0027:984, 1370-1376",
+      "wrongUnits": [
+        {
+          "unit": "[2] 'סוג מסמך מול סוג המוצר אחרי המרה'",
+          "problem": "The converted column is cat.gen_productsubcustomeraccount, not the product type. In unit 1, 'סוג מוצר' means p.gen_producttypeid. NULL keys match (TreatNullsAsEqual = true).",
+          "correct": "…וסוג מסמך מול gen_productsubcustomeraccount של סוג חשבון הלקוח אחרי המרה (4→2, 5→3, 2→4); NULL במפתחות נחשב שווה.",
+          "evidence": "DTSX:18124, 33702-33704"
+        },
+        {
+          "unit": "[3] 'עדכון SQL ישיר של כל השדות אם יש הבדל כלשהו'",
+          "problem": "gen_issmallaccount and gen_productsubcustomeraccount are written but not compared, so 'any difference' is not exact.",
+          "correct": "…אם יש הבדל באחד השדות המושווים (gen_issmallaccount ו-gen_productsubcustomeraccount אינם מושווים).",
+          "evidence": "DTSX:12421 input list; DTSX:41010, 41013"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Connect Funds to Customer Accounts|short",
+      "hash": "12263eaafc62",
+      "verdict": "WRONG",
+      "detail": "Units 2-8 match the SQL and main.cs:36-65. The account type comes through product → gen_customeraccounttype, joined on p.gen_bankname, which is the product's bank, unlike the Create step's fund bank. The account number match is exact. The fund is linked, and each consulting field is written when the account value is non-null and the fund value is null or different. Dates are converted to local time on both sides first (Dates To Local, DTSX:1697). The 5 copies are equal after whitespace normalisation. Unit 1 is wrong. 'קופות שמופיעות בקובץ' states the meaning of gen_existinfile = 1 as a fact about a file. The meaning is taken only from the column name, and this package reads no file. The flag should be stated as such, as the Create claims do ('המסומנות כקיימות בקובץ' / gen_existinfile = 1). Unit 9 overstates the outcome: 'כל קופה ... מקושרת לחשבון הלקוח שלה'. A flagged fund is linked only when product, gen_customeraccounttype (on the product's bank) and a gen_customeraccount with the exact account number all join. Funds without such a match stay unlinked.",
+      "evidence": "DTSX:2588-2611; Update Customer Account Guid in Fund main.cs:36-65; Dates To Local DTSX:1697",
+      "wrongUnits": [
+        {
+          "unit": "[1] 'קופות שמופיעות בקובץ'",
+          "problem": "This is a meaning taken from the column name gen_existinfile, stated as fact.",
+          "correct": "נבחרות קופות המסומנות gen_existinfile = 1 שאינן מקושרות לחשבון הלקוח המתאים להן, או שמקושרות לחשבון אחר.",
+          "evidence": "DTSX:2588-2611"
+        },
+        {
+          "unit": "[9] (end)",
+          "problem": "'כל קופה' is not guaranteed. Funds with no matching product, account type or account by exact number are not linked.",
+          "correct": "כל קופה המסומנת Gen_existinfile = 1 שנמצא לה חשבון לקוח תואם (סוג חשבון לפי מוצר ובנק המוצר + מספר חשבון זהה) מקושרת אליו.",
+          "evidence": "DTSX:2588-2611"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Connect Funds to Customer Accounts|decisions",
+      "hash": "9b704562fa42",
+      "verdict": "CONFIRMED",
+      "detail": "Row 1 reproduces the SQL WHERE exactly (DTSX:2608-2611). On ownership, Gen_existinfile is unqualified across 4 tables. It is gen_fundmain's: the same package filters 'from gen_fundmain where Gen_existinfile = 1' (DTSX:68399), and by the ambiguity rule it cannot also exist on the other three tables. Row 2 reproduces main.cs:42-65 for all six fields: !genX_IsNull && (fmX_IsNull || genX != fmX).",
+      "evidence": "DTSX:2588-2611, 68399; main.cs:42-65",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Set Joining email to Agent|title",
+      "hash": "1adcadb473c8",
+      "verdict": "CONFIRMED",
+      "detail": "Source: Gen_customeraccount WHERE gen_joiningmailtoagent = 1, with isnull(c.EMailAddress1, a.EMailAddress1) and isnull(c.DoNotEMail, a.DoNotEMail) taken separately. Contact is joined on Gen_agentname and Account on Gen_agencyname. Decision: !email_IsNull && !donotemail_IsNull && donotemail == false → 2, else 4. Values 1, 2 and 4 are attributed to the code constants. The update is an SDK ExecuteMultiple Update. No mail is sent in the package.",
+      "evidence": "DTSX:62354-62360; Update Customer Account 1 main.cs:15-17, 41-48, 78",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Set Joining email to Agent|short",
+      "hash": "88deb2f82d2a",
+      "verdict": "CONFIRMED",
+      "detail": "All units match. The per-field fallback can take the email from the agency and the flag from the agent. A NULL DoNotEMail leads to 4, consistent with 'מותר לשלוח'. A failed update leaves the value at 1, which is re-selected because the source filter is = 1. I compared the 5 copies: 1 and 3 are equal after whitespace; 2, 4 and 5 differ only in braces around ExecuteBulk(), which does not change behaviour.",
+      "evidence": "DTSX:62354-62360; main.cs:41-57",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Set Joining email to Agent|detailed",
+      "hash": "e4abfb4b02d7",
+      "verdict": "CONFIRMED",
+      "detail": "Unit 1: gen_joiningmailtoagent appears only in 0005 (16 occurrences: 5 Create sets to 1, 5×2 Set Joining sets 2/4, 1 SQL filter), so '1 is set only on Create in this package' holds. The text names two origins of value-1 accounts without saying 'only'. A third origin also exists: accounts created in an earlier run in which this step never ran because a previous step failed. The unknown ratio is stated as unknown. Units 2-9 match: the batch size is 10, with a final flush at end of rowset, and the השערה label on the CRM reaction is present.",
+      "evidence": "grep gen_joiningmailtoagent over source/DailyProcess/*.dtsx; DTSX:62354-62360; main.cs:15-17, 41-57, 78",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Update Aggrigations on Customer Accounts|title",
+      "hash": "f22a003883bc",
+      "verdict": "WRONG",
+      "detail": "The aggregation itself is correct: sum of isnull(balance, 0); min of the three dates over gen_fundmain where Gen_existinfile = 1, grouped by Gen_customeraccountname; direct UPDATE of Gen_customeraccountBase. The date threshold is wrong. The SQL is abs(datediff(\"HH\", agg.X, isnull(ca.X, 0))) > 12. DATEDIFF counts hour boundaries crossed, not elapsed time (standard rule). 'שונה ביותר מ-12 שעות' / '±12 שעות' is therefore not exact. For example, 12h50m that crosses only 12 boundaries does not qualify, while 12h05m crossing 13 boundaries does.",
+      "evidence": "DTSX:68399 (WHERE abs(datediff(\"HH\", ...)) > 12)",
+      "wrongUnits": [
+        {
+          "unit": "short_he / flow_he[2] 'תאריך שונה ביותר מ-12 שעות' / 'תאריכים ±12 שעות'",
+          "problem": "DATEDIFF(HH) counts hour boundaries crossed, not elapsed hours.",
+          "correct": "…או שבין התאריכים נחצים יותר מ-12 גבולות שעה (DATEDIFF(HH) > 12).",
+          "evidence": "DTSX:68399"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Update Aggrigations on Customer Accounts|short",
+      "hash": "c3b08766f55d",
+      "verdict": "WRONG",
+      "detail": "Units 1 and 3-7 are correct: Gen_existinfile = 1, the earliest of each date, the direct SQL write, and accounts without such a fund are not updated (inner join). Unit 2 states the date test as elapsed time ('שונה ביותר מ-12 שעות'). The SQL uses abs(datediff(\"HH\", ...)) > 12, which counts hour boundaries crossed.",
+      "evidence": "DTSX:68399",
+      "wrongUnits": [
+        {
+          "unit": "[2] decision",
+          "problem": "DATEDIFF semantics are stated as elapsed time.",
+          "correct": "האם היתרה שונה ביותר מ-1, או שבאחד התאריכים DATEDIFF בשעות (מספר גבולות השעה שנחצים) גדול מ-12?",
+          "evidence": "DTSX:68399"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Update Aggrigations on Customer Accounts|detailed",
+      "hash": "9b38e3ac0425",
+      "verdict": "CONFIRMED",
+      "detail": "Every unit matches the SQL text. sum(isnull(balance, 0)); isnull(min(date), 0) and the CASE back to NULL. An inner join on Gen_customeraccountname, so a NULL group matches no account. The decision text 'הבדל מהותי' carries the exact datediff(HH) expression in tech, with no elapsed-time wording. Four columns are set, with no ModifiedOn or ModifiedBy. A NULL account balance makes the balance test unknown.",
+      "evidence": "DTSX:68395-68400",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Update Consulting Field  In Customer Account From Transfer Request|title",
+      "hash": "972d32a35e38",
+      "verdict": "CONFIRMED",
+      "detail": "Type 5 and status 8 have their labels attributed to the SQL comments ('--בין מסלולים', '-- הסתיים'). The selection requires gen_dateofcopyingconsultingdetails IS NULL plus a difference. The derived column is ca_X = ISNULL(tr_X) ? ca_X : tr_X for all 6 fields. UPDATE Gen_customeraccountBase, then update gen_transferrequest with gen_dateofcopyingconsultingdetails = GETUTCDATE(), on OLE DB Command Output only.",
+      "evidence": "DTSX:70686-70712, 71222-71265, 73352, 73757",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Update Consulting Field  In Customer Account From Transfer Request|short",
+      "hash": "cae6b8010d8b",
+      "verdict": "CONFIRMED",
+      "detail": "All units match. Five parallel OLE DB Commands are fed by ProcessNumber = counter % 5, there is no ORDER BY, and the SQL and mappings are identical across all 5 (Param_0-5 = ca_X, Param_6 = account id). So with several requests for one account, the last writer is not determined.",
+      "evidence": "DTSX:70686, 71135, 73349-73692",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Update Consulting Field  In Customer Account From Transfer Request|detailed",
+      "hash": "55907c0ad8ab",
+      "verdict": "CONFIRMED",
+      "detail": "Every unit is correct. The six-field pairing matches the SQL. The OLE DB Command errorRowDisposition is RedirectRow (DTSX:73368-73692), with the Error output going to Union All Error and the ETL warning. Update TransferRequest 1-5 runs on the success path only (Multicast 1-5), with ModifiedBy = SystemUserId from User::UserId. A failed account update leaves the request unmarked; it still differs, so it is re-selected.",
+      "evidence": "DTSX:70686-70712, 71222-71265, 73349-73952, 69204",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Update Consulting Field  In Customer Account From Transfer Request|detail",
+      "hash": "d0166f79b4da",
+      "verdict": "CONFIRMED",
+      "detail": "The cross-package statements hold. No supplied package creates gen_transferrequest: writes exist only in 0005 (direct SQL), 0028 (update gen_transferrequestBase set gen_fundenrolmentid), 0029 (gen_powerofattorneymainexistence) and 0036 (SDK Update of gen_tanferinstatus for status 7 with gen_SendToBankDate not null, 0036:3584-3586, 3886-3889). Units 2-5 match the SQL and the RedirectRow error flow.",
+      "evidence": "0036_TransferRequest.dtsx:3584-3586, 3886-3889; 0028:11114; 0029:40559; DTSX:73352, 73757",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Update Consulting Field  In Customer Account From Transfer Request|decisions",
+      "hash": "bf4cb8a1779b",
+      "verdict": "CONFIRMED",
+      "detail": "Both rows reproduce the SQL WHERE (DTSX:70704-70712) and the FriendlyExpressions (DTSX:71222-71265) exactly. The labels are attributed to the SQL comments.",
+      "evidence": "DTSX:70686-70712, 71222-71265",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Update Consulting Field  In Fund Main From Transfer Request|title",
+      "hash": "6a10998e4ce4",
+      "verdict": "CONFIRMED",
+      "detail": "The LEFT JOIN of Gen_fundmain on gen_customeraccountname is correct, as is the separate marker gen_dateofcopyingconsultingdetailstofund IS NULL. That marker is unqualified, but it belongs to gen_transferrequest: this package updates gen_transferrequest.gen_dateofcopyingconsultingdetailstofund (DTSX:79644), and the ambiguity rule applies. fm_X = ISNULL(tr_X) ? fm_X : tr_X. Fund-row failures go only to Union Error All. Successful fund rows go through Multicast 1 → Aggregate (group by request + SystemUserId) → Update TransferRequest. So partial success still marks the request.",
+      "evidence": "DTSX:77180-77210, 77740-77783, 75692-75760, 79193, 79598-79782",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Update Consulting Field  In Fund Main From Transfer Request|short",
+      "hash": "55a341265f2d",
+      "verdict": "CONFIRMED",
+      "detail": "All units match the data flow, and the partial-failure consequence is stated correctly. Unit 4's 'אם' is a sufficient condition and does not exclude the no-fund case that the detailed claim describes.",
+      "evidence": "DTSX:77180-77210, 75692, 79190-79793",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Update Consulting Field  In Fund Main From Transfer Request|detailed",
+      "hash": "b161e0ddf41e",
+      "verdict": "CONFIRMED",
+      "detail": "Every unit is correct. This includes unit 10: with the LEFT JOIN and no funds, fm.X is NULL, so the row qualifies if any tr.X is non-null. 'where Gen_fundmainId = NULL' affects 0 rows without error, so the row continues to the Aggregate and the request is marked. The SQL and mappings of Update Fund Main 1-5 and of the five TR updates (with typo names) are identical. AggregationType = 0 (group by) on both columns.",
+      "evidence": "DTSX:77180-77210, 77740-77783, 75692-75760, 79190-79793",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Update Consulting Field  In Fund Main From Transfer Request|detail",
+      "hash": "35f107f7b243",
+      "verdict": "WRONG",
+      "detail": "Units 1 and 3-6 are correct, and the cross-package statements were verified as in the CA detail. Unit 2 adds 'ולא רק הקופה שהועברה'. This presumes the transfer request refers to a specific transferred fund. No supplied file links gen_transferrequest to a fund: the query uses only tr.gen_customeraccount, and no package reads a fund field of gen_transferrequest. The presumption is a meaning taken from the entity name and the SQL comment, stated as fact.",
+      "evidence": "DTSX:77197-77198; grep of gen_transferrequest selects in source/DailyProcess (0028:10013, 0029:40246, 0036:3585)",
+      "wrongUnits": [
+        {
+          "unit": "[2] 'ולא רק הקופה שהועברה'",
+          "problem": "It presumes an unproven link from the request to one 'transferred' fund.",
+          "correct": "התאמה לרשומות קיימות: כל הקופות שבהן fm.gen_customeraccountname = tr.gen_customeraccount (בקבצים אין קישור מבקשת ההעברה לקופה מסוימת).",
+          "evidence": "DTSX:77197-77198"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Update Consulting Field  In Fund Main From Transfer Request|decisions",
+      "hash": "0141607554d7",
+      "verdict": "CONFIRMED",
+      "detail": "Row 1 reproduces the SQL WHERE (type 5, status 8, ...tofund IS NULL, six-field difference against fm) and the LEFT JOIN row-per-fund outcome. Row 2 reproduces the 6 FriendlyExpressions.",
+      "evidence": "DTSX:77180-77210, 77740-77783",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Update Consulting Field  In Fund Main From Transfer Request|crm",
+      "hash": "15b851886776",
+      "verdict": "CONFIRMED",
+      "detail": "gen_fundmain is a SQL Update (Gen_fundmainbase) per selected fund row. gen_transferrequest is a SQL Update once per request after the Aggregate, when at least one fund row of the request reached OLE DB Command Output. The no-fund NULL-id row also reaches it.",
+      "evidence": "DTSX:79193, 79598-79782, 75692",
+      "wrongUnits": []
+    }
+  ]
+}

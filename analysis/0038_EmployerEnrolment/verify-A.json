@@ -1,0 +1,132 @@
+{
+  "verifier": "ssis-verifier",
+  "package": "0038_EmployerEnrolment",
+  "scope": "mapping-A.json",
+  "checked": 19,
+  "results": [
+    {
+      "id": "Send Email To Maasikim|email|CREATE|subject",
+      "verdict": "CONFIRMED",
+      "detail": "Re-check: the \"NULL strings concatenate as empty\" text is gone. The claim now says that a NULL in the three columns throws ColumnIsNullException on read, and that the catch then dereferences a null InnerException, so the component fails and no e-mail with empty text is produced. A NULL gen_deposittype and an invalid queue GUID behave the same way. All cited lines are correct. BufferWrapper getters re-opened: employerenrolmentcustomeridnumber GetString DTSX:6819/6823, genfundnumber GetString 6849/6853, Gencustomername GetString 6879/6883, GenemployerenrolmentId GetGuid 6894/6898, gendeposittype GetInt32 6909/6913, EmployerNumber GetString 6924/6928; catch(Exception ex) reads ex.InnerException.Message at DTSX:6443. The exception behaviour is correctly labelled as general SSIS/.NET knowledge.",
+      "evidence": "DTSX:6402-6452, 6507-6512, 6819-6928",
+      "previousVerdict": "WRONG"
+    },
+    {
+      "id": "Send Email To Maasikim|email|CREATE|description",
+      "verdict": "CONFIRMED",
+      "detail": "Re-check: NULL handling is now stated for employerenrolment_customeridnumber, Gen_customername, EmployerNumber and gen_fundnumber. These use GetString with no check, a NULL throws, and the component fails. Only gen_incorrectamount is guarded. BufferWrapper getters re-opened: employerenrolmentcustomeridnumber GetString DTSX:6819/6823, genfundnumber GetString 6849/6853, Gencustomername GetString 6879/6883, GenemployerenrolmentId GetGuid 6894/6898, gendeposittype GetInt32 6909/6913, EmployerNumber GetString 6924/6928; catch(Exception ex) reads ex.InnerException.Message at DTSX:6443.",
+      "evidence": "DTSX:6409-6413, 6514-6526, 6819-6928, 6441-6452",
+      "previousVerdict": "INCOMPLETE"
+    },
+    {
+      "id": "Send Email To Maasikim|email|CREATE|regardingobjectid",
+      "verdict": "CONFIRMED",
+      "detail": "email[\"regardingobjectid\"] = EntityReference(\"gen_employerenrolment\", Row.GenemployerenrolmentId) (toEntityName1 field, DTSX:6364; assignment DTSX:6462). Created only for gendeposittype 1 or 2.",
+      "evidence": "DTSX:6364, 6414, 6417-6426, 6462"
+    },
+    {
+      "id": "Send Email To Maasikim|email|CREATE|directioncode",
+      "verdict": "CONFIRMED",
+      "detail": "Literal true.",
+      "evidence": "DTSX:6466"
+    },
+    {
+      "id": "Send Email To Maasikim|email|CREATE|from",
+      "verdict": "CONFIRMED",
+      "detail": "Both calls pass from = Maasikim = new Guid(Variables.MaasikimQueueId) as an activityparty on a queue (DTSX:6420, 6425, 6468-6479). The variable is set by 'Get Variables From Etl Varibles' (ReadWriteVariables User::GviaQueueId, User::MaasikimQueueId, ...; dictionary keyed by gen_key, case-insensitive, scope 'global' or System::PackageName). The default value in the DTSX is empty (DTSX:24).",
+      "evidence": "DTSX:20-27, 2389-2403, 2554-2700 (setter), 3283, 6406-6407, 6420-6425, 6468-6479"
+    },
+    {
+      "id": "Send Email To Maasikim|email|CREATE|to",
+      "verdict": "CONFIRMED",
+      "detail": "gendeposittype == 1 -> to = Gvia; == 2 -> to = Maasikim (DTSX:6417-6426). The activityparty uses entity 'queue'. Note: a NULL gendeposittype does not mean 'no email'; it fails the component (see subject).",
+      "evidence": "DTSX:6406-6407, 6417-6426, 6472-6484"
+    },
+    {
+      "id": "LOGIC scopeNote_he",
+      "verdict": "CONFIRMED",
+      "detail": "There is a single connection [PSQL] -> ALTSHULER_MSCRM, used only for reads. There is no DTS:Configuration element (grep 0) and no SQL DML. Writes go through CrmProxy only. There is no LogProvider in this package.",
+      "evidence": "DTSX:4-6; grep '<DTS:Configuration' = 0"
+    },
+    {
+      "id": "LOGIC summary_he",
+      "verdict": "CONFIRMED",
+      "detail": "Re-check: \"קופה פעילה\" was replaced by \"שמסומנת Gen_existinfile = 1 (משמעות הדגל לא ידועה; השערה: קופה שהופיעה בקובץ)\". The same change was made in decisions[0].meaning_he and the detailed node. The SQL condition fm.Gen_existinfile = 1 is at DTSX:6112.",
+      "evidence": "DTSX:6112",
+      "previousVerdict": "INCOMPLETE"
+    },
+    {
+      "id": "LOGIC executionOrder",
+      "verdict": "CONFIRMED",
+      "detail": "There are 3 constraints, all default Success (no DTS:Value): Get Variables -> Create ETL -> Send Email -> End ETL.",
+      "evidence": "DTSX:7458-7460"
+    },
+    {
+      "id": "LOGIC Send Email",
+      "verdict": "CONFIRMED",
+      "detail": "Re-check: all four missing points are now present: the NULL gen_selfemployed crash (decision + tech text, DTSX:3942-3947), NULL text columns and invalid queue GUIDs in the writer, the token-retry duplicate e-mail, and the employee/self-employed meaning labelled as a hypothesis in the short nodes. All were verified against the DTSX. A minor overstatement remains in findings_he[0] (see that item).",
+      "evidence": "DTSX:3656-3688, 3942-3947, 6402-6452, 6485-6533",
+      "previousVerdict": "INCOMPLETE"
+    },
+    {
+      "id": "LOGIC findings_he[0]",
+      "verdict": "CONFIRMED",
+      "detail": "Re-check 2: the finding now says that e-mails for rows processed in earlier buffers may already have been created and sent, and that the remaining rows in the run get none. This matches the pipeline: Check If To Send Mail and Send Email To Maasikim are both synchronous on the same path. The rest is unchanged and confirmed: Row.genselfemployed is read via Buffer.GetBoolean (DTSX:3942-3947) with no _IsNull check (DTSX:3660), the script has no try/catch, so the component and data flow fail and End ETL is skipped (Success constraint DTSX:7460). The exception behaviour is labelled as general SSIS knowledge.",
+      "evidence": "DTSX:3656-3688, 3942-3947, 7460; logic.json findings_he[0]",
+      "previousVerdict": "INCOMPLETE"
+    },
+    {
+      "id": "LOGIC findings_he[1]",
+      "verdict": "CONFIRMED",
+      "detail": "New finding. A NULL in gen_fundnumber, Gen_customername, EmployerNumber or gen_deposittype, or an invalid GviaQueueId/MaasikimQueueId, throws ColumnIsNullException or FormatException. The catch then calls ex.InnerException.Message, which throws NullReferenceException, and the component and data flow fail. BufferWrapper getters re-opened: employerenrolmentcustomeridnumber GetString DTSX:6819/6823, genfundnumber GetString 6849/6853, Gencustomername GetString 6879/6883, GenemployerenrolmentId GetGuid 6894/6898, gendeposittype GetInt32 6909/6913, EmployerNumber GetString 6924/6928; catch(Exception ex) reads ex.InnerException.Message at DTSX:6443.",
+      "evidence": "DTSX:6406-6414, 6441-6452, 6819-6928"
+    },
+    {
+      "id": "LOGIC findings_he[2]",
+      "verdict": "CONFIRMED",
+      "detail": "New finding. reConectCrmService calls Input0_ProcessInputRow(Row) again (DTSX:6527-6533), and service.Create (DTSX:6485) precedes SendMail/Execute (DTSX:6502). A token failure after a successful Create therefore creates a second e-mail for the same enrolment.",
+      "evidence": "DTSX:6430-6452, 6485, 6502, 6527-6533"
+    },
+    {
+      "id": "LOGIC findings_he[3]",
+      "verdict": "CONFIRMED",
+      "detail": "ee.CreatedOn >= GETDATE()-7, and nothing is written back to the enrolment. Re-sending within the window depends on the schedule, which is labelled unknown. (Re-check: this finding moved from findings_he[0] to findings_he[3] after the analyst inserted three new findings; text re-verified.)",
+      "evidence": "DTSX:6108"
+    },
+    {
+      "id": "LOGIC findings_he[4]",
+      "verdict": "CONFIRMED",
+      "detail": "JOIN Gen_fundmain on the stripped customer ID only, so several matching funds produce several rows and several emails. (Re-check: this finding moved from findings_he[1] to findings_he[4] after the analyst inserted three new findings; text re-verified.)",
+      "evidence": "DTSX:6101"
+    },
+    {
+      "id": "LOGIC findings_he[5]",
+      "verdict": "CONFIRMED",
+      "detail": "Both catch blocks dereference InnerException without a null check. In the SoapException non-token path, ErrorMessage is set but DirectRowToError is not called. Addition: the most likely trigger is a ColumnIsNullException from a NULL input column, or a FormatException from an invalid queue GUID; neither has an InnerException. (Re-check: this finding moved from findings_he[2] to findings_he[5] after the analyst inserted three new findings; text re-verified.)",
+      "evidence": "DTSX:6430-6452"
+    },
+    {
+      "id": "LOGIC findings_he[6]",
+      "verdict": "CONFIRMED",
+      "detail": "Rows that fail the inner checks, or have NULL producttype/fundestateid, are not directed to any output and are dropped. Only the else-branch goes to Errors -> ETL Warning. Note: a NULL gen_selfemployed is not dropped; it fails the component (see LOGIC Send Email). (Re-check: this finding moved from findings_he[3] to findings_he[6] after the analyst inserted three new findings; text re-verified.)",
+      "evidence": "DTSX:3656-3688, 4519-4522"
+    },
+    {
+      "id": "LOGIC findings_he[7]",
+      "verdict": "CONFIRMED",
+      "detail": "A deposit type other than 1/2 (and not NULL) sends nothing and logs nothing; the text now adds that NULL fails the component. Confirmed at DTSX:6417-6426 and getter 6909/6913. (Re-check: moved from findings_he[4] to findings_he[7].)",
+      "evidence": "DTSX:6417-6426"
+    },
+    {
+      "id": "LOGIC findings_he[8]",
+      "verdict": "CONFIRMED",
+      "detail": "int Retry = 0 is a field. It is incremented in reConectCrmService and never reset. (Re-check: this finding moved from findings_he[5] to findings_he[8] after the analyst inserted three new findings; text re-verified.)",
+      "evidence": "DTSX:6363, 6527-6533"
+    }
+  ],
+  "missingWrites": [],
+  "recheck": {
+    "date": "2026-11-06",
+    "note": "Re-check of previously WRONG/INCOMPLETE items after analyst fixes; previousVerdict kept on changed items."
+  }
+}

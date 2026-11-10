@@ -1,0 +1,106 @@
+{
+  "verifier": "ssis-verifier",
+  "package": "0015_TransferIn",
+  "scope": "logic-claims re-check",
+  "checkedAt": "2026-11-10",
+  "checked": 8,
+  "results": [
+    {
+      "id": "L|summary",
+      "hash": "3ed572f9014c",
+      "verdict": "CONFIRMED",
+      "detail": "Re-derived. Clone: SQL DTSX:11136-11173 (source account -> account created within <=24 hour boundaries, types 1/7). FT56: SQL DTSX:46144-46208 = state 1, types (1,7), INNER Gen_customeraccount/Gen_fundmain/Product/Gen_agentcontract, 56 transactions (current + previous year), LEFT JOIN cp ON fm.Gen_fundmainId = cp.gen_fundnumberdest ... cp.gen_coursepartitionId IS NULL (no partition of any request on that fund) - stated exactly; 'חיצוניות' labelled השערה from data-flow names. 56/57: CP external (56, DTSX:75517 area, types 1/7) and CP internal (57, DTSX:83719 area). Expected amount: Update TI intrnal expectes SQL DTSX:99520-99532 (types 5/6). Close 5/6: labels from annotation DTSX:115790 (ParentId Close TI internal); 5 = BetweenOurCourses, 6 = BetweenOurFunds (DTSX:25024). Close 1/7: need to update? DTSX:14395 (!ISNULL(Gen_receivedstamp) && gen_actualtransferdate > Gen_receivedstamp), else state unchanged. Joining only: Create TI - Joining Only Fixed Fields gen_transfertype = 2; Create CP - Joining Only. 53 step: SQL DTSX:92029-92080 Gen_ActionStatus = 11, transfertype = 1, gen_appendixdsent IS NULL in both UNION parts, transtypeid '53', ROW_NUMBER by gen_valuedate ASC RN=1; main.cs:43-53 gen_fixtransferdate = valuedate (code comment 'מועד קובע'), gen_moneyassociatingdate = entrydate (code comment 'תאריך שיוך כספים'), gen_actionstatus = OptionSetValue(12) literal. Writes: only gen_transferin/gen_coursepartition via ExecuteMultipleExtension (35 Update / 20 Create request types), plus ETL plumbing; 10 'insert gen_etlprocesswarningBase' OLE DB Commands on [CRM] at exactly 11303, 14277, 24924, 42727, 46353, 68630, 75658, 83859, 92119, 99571. scopeNote: no DTS:Configuration and no EnableConfig; [CRM] = psql/ALTSHULER_MSCRM (CM at DTSX:4, string DTSX:6); all sources (incl. plumbing gen_etlvariable/systemuser/OrganizationBase) on [CRM]. Notes (not graded, summary-level abstraction, nothing stated is false): the 56 definition also needs Gen_modeldependage != 2 and Gen_transgrouptypeid in ('01','02'); the 5/6 closing conditions (30 day-boundary window, type-5 checks) and action status 22 are given only in the Close TI internal claims; a second connection SSIS_Logs (DTSX:9-11) serves only the SQL Server log provider (plumbing).",
+      "evidence": "0015_TransferIn.dtsx:4-11,11136-11173,14395,25024,46144-46208,92029-92080,99520-99532,115790; Update TransferIn By Transaction main.cs:43-53",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package (control flow)|detail",
+      "hash": "0672bd8257cb",
+      "verdict": "WRONG",
+      "detail": "[1] correct (no file sources; every OLE DB source/lookup uses [CRM]). [2] correct: 23 constraints DTSX:110984-111007, no Value/Expression (Success), LogicalAnd=True, one incoming each; no disabled executables. Two units are literally false. [3] 'כתיבה ל-CRM: SDK בלבד' contradicts L|summary of the same package, which (correctly) states that ETL warnings are inserted into the CRM database by direct SQL through [CRM] (10 OLE DB Commands 'insert gen_etlprocesswarningBase'); the business writes listed are correct (gen_transferin Create: Clone, TI Joining; Update: FT56, expected, Close x2, 53; gen_coursepartition Create: FT56, CP Joining; Update: CP internal/external). [4] the parenthetical 'בפיצולים נכתבים רק gen_actualtransferamount ו-gen_actualtransferdate' contradicts [3] of the same claim (gen_coursepartition Create): SDK Create gen_coursepartition (FT56) writes 13 attributes and Create CoursePartition (CP Joining) writes 14 attributes. The intended fact is correct: no Create writes a state/status attribute, and the only partition updates (Update Course Partition, DTSX:76304-76305, 84504-84505) write only those two fields; so no step closes a partition. The rest of [4] (1/7 closing condition DTSX:14395; 5/6 by Close TI internal) is correct.",
+      "evidence": "0015_TransferIn.dtsx:11303,14277,24924,42727,46353,68630,75658,83859,92119,99571,76300-76306,84500-84506,110984-111007; SDK Create gen_coursepartition main.cs; Create CoursePartition main.cs (sha 148ee1cff8e4):41-103",
+      "wrongUnits": [
+        {
+          "unit": "[3] כתיבה ל-CRM: SDK בלבד",
+          "problem": "Exclusive 'SDK only' is false at package level and contradicts L|summary (direct SQL INSERT gen_etlprocesswarningBase via [CRM] in all 10 data flows).",
+          "correct": "כתיבה עסקית ל-CRM: SDK בלבד: gen_transferin (Create/Update), gen_coursepartition (Create/Update). (אזהרות ETL – מסגרת – נוספות ב-SQL ישיר דרך [CRM].)",
+          "evidence": "DTSX:11303 ... 99571 (10 x 'insert gen_etlprocesswarningBase', connection [CRM])"
+        },
+        {
+          "unit": "[4] (בפיצולים נכתבים רק gen_actualtransferamount ו-gen_actualtransferdate)",
+          "problem": "Partitions are also created in this package with many attributes (FT56, CP Joining); the statement is true only for the partition updates.",
+          "correct": "אף שלב לא סוגר פיצול מסלול: בעדכון פיצולים קיימים (Update CoursePartition internal/external) נכתבים רק gen_actualtransferamount ו-gen_actualtransferdate (DTSX:76304-76305, 84504-84505), וביצירת פיצולים (FT56, CP - Joining Only) לא נכתב שדה מצב.",
+          "evidence": "DTSX:76304-76305; DTSX:84504-84505; Create CoursePartition main.cs:41-103; SDK Create gen_coursepartition main.cs"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Close TI internal|detailed",
+      "hash": "50f77bbc8e92",
+      "verdict": "WRONG",
+      "detail": "Correct units: SQL DTSX:24801-24843 (state 1, types 5/6, CP actual amount and date NOT NULL, sum/min, HAVING ABS(DATEDIFF(day, min(actualdate), ti.CreatedOn)) < 30); [2] percent = expected * 0.15 (DTSX:25990); [3]-[6] Is Between Course or Funds (5/6, default unconnected); [7]-[13] need to update? evaluation order 0/1/2 + default (DTSX:25083 onward) and paths Not To Close/2/3 -> Union All 1, Need To Close + BetweenOurFunds -> Union All 2; [14] Create transferIn Column (DTSX:23882) 3/1/1/actualdate; [15] Create transferIn Column 1 (DTSX:23930) 22/actualdate; [16] Dates To Local (DTSX:23966) 5 inputs without gen_modifiedByBank, delay code identical (main.cs 3814bf877402:117-124); [17] Update transferin x5 (main.cs f64b92ff1b2a, identical inputs) writes only non-NULL changed fields incl. gen_rejectreason. Three units are wrong (see wrongUnits): [1] DATEDIFF stated as elapsed time; [7] ownership of unqualified gen_customersignaturedate / gen_receivedstamp assumed without argument; [18] outcome contradicts [7]-[13]. Note (accepted wording, not graded): 'מומרים לשעון מקומי' omits that dates before 2005 get +2 hours instead of ToLocalTime (Dates To Local main.cs:47-53, 67-73).",
+      "evidence": "0015_TransferIn.dtsx:23882,23930,23966,24801-24843,25024,25083-25196,25990,26284; Update transferin main.cs (sha f64b92ff1b2a):36-85",
+      "wrongUnits": [
+        {
+          "unit": "[1] נבחרות רק בקשות שהתאריך המוקדם רחוק פחות מ-30 יום מיצירת הבקשה",
+          "problem": "DATEDIFF(day, ...) counts day boundaries crossed, not elapsed time; 'רחוק פחות מ-30 יום' describes elapsed time (e.g. 29 days and a few minutes across 30 midnights is excluded).",
+          "correct": "נבחרות רק בקשות שבין תאריך ההעברה המוקדם בפיצולים לתאריך יצירת הבקשה עוברים פחות מ-30 גבולות יום (ABS(DATEDIFF(day, ...)) < 30, בכל כיוון, על הערכים השמורים לפני ההמרה לשעון מקומי).",
+          "evidence": "DTSX:24843 having ABS(DATEDIFF(day,min(cp.gen_actualtransferdate),ti.CreatedOn )) < 30"
+        },
+        {
+          "unit": "[7] חסר תאריך חתימת לקוח? חסרה חותמת 'נתקבל'?",
+          "problem": "gen_customersignaturedate and gen_receivedstamp are unqualified in a query joining gen_coursepartition and gen_transferin (SELECT and GROUP BY, DTSX:24810-24811, 24833-24834); the text treats them as the request's fields without stating the owner as unknown or giving the ambiguity argument.",
+          "correct": "Add the accepted-form argument: ti.gen_customersignaturedate and ti.gen_receivedstamp exist on gen_transferin (qualified at DTSX:11146, 11154, 14182); had the columns also existed on gen_coursepartition the query would fail; per the user the package runs in production; so these are the request's fields. (Or state the owner as unknown.)",
+          "evidence": "DTSX:24810-24811; DTSX:24833-24834; DTSX:11146; DTSX:11154; DTSX:14182"
+        },
+        {
+          "unit": "[18] העברות פנימיות שהכסף שלהן התקבל נסגרות, והשאר מסומנות בסטטוס 22",
+          "problem": "Every selected request already has actual amount and date (SQL filter), so this says all of them close; it contradicts [7]-[13]: a type-5 request with money but missing customer signature date or stamp, or outside 15% of the expected amount, gets action status 22 and is not closed. Requests whose earliest actual date is 30 or more day boundaries from creation are not touched at all, so 'השאר' is also too broad.",
+          "correct": "מבין בקשות מסוג 5/6 במצב 1 שיש להן פיצולים עם סכום ותאריך בפועל ופחות מ-30 גבולות יום מיצירתן: סוג 6 נסגר תמיד; סוג 5 נסגר רק כשיש תאריך חתימת לקוח וחותמת 'נתקבל' ואין סכום צפוי או שהסכום בפועל בטווח 15% ממנו; שאר בקשות סוג 5 שנבחרו מקבלות סטטוס פעולה 22, ובכולן נרשמים הסכום והתאריך בפועל (רק כשהם שונים מהקיים).",
+          "evidence": "DTSX:24801-24843; DTSX:25024; DTSX:25083; DTSX:23882; DTSX:23930"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Close TI External|detailed",
+      "hash": "d7bc786a6292",
+      "verdict": "CONFIRMED",
+      "detail": "[1] SQL DTSX:14175-14208 exact (state 1, types 1/7, CP amount and date NOT NULL, sum/min, no HAVING). [2] need to update? DTSX:14395 condition exact; default -> Create transferIn Column 1. [4] DTSX:13228 state 3, modifiedByBank = actualdate, actionstatus 1. [6] DTSX:13270 modifiedByBank only (Union All Input 2 has no state/actionstatus, so NULL). [7] Dates To Local DTSX:13300 has 6 inputs incl. gen_modifiedByBank and gen_modifiedbybankDB. [8] Set delevery delay main.cs:117-124 (false default, true only when both dates and Days > 0) and write rule Update transferin main.cs:57-60; consequence stated correctly. [9] Update transferin x5 identical (sha 9abf8490a8e4, same inputs) writes only non-NULL changed fields: state, modifiedbybank, amount, date, delay, actionstatus (main.cs:40-64). [10] outcome restricted to selected population and to changed values. Note (accepted wording): pre-2005 dates get +2h instead of ToLocalTime.",
+      "evidence": "0015_TransferIn.dtsx:13228,13270,13300,14175-14208,14395,14489,15446,15503,15866; Update transferin main.cs (sha 9abf8490a8e4):38-79",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Close TI External|detail",
+      "hash": "1aa7292afdd3",
+      "verdict": "CONFIRMED",
+      "detail": "[1] tables are CRM tables; CP actual amounts for types 1/7 are written by Update CoursePartition external (SQL DTSX:75517 area: state 1, types 1/7; write DTSX:76302-76305); no other supplied package writes gen_coursepartition.gen_actualtransferamount (0009 writes it only on gen_transferin). [2] join exact. [3] correct; type 6 closes without amount check (BetweenOurFunds -> Union All 2 -> Create transferIn Column), type 5 has the 15% check. [4] attribute list matches main.cs:40-64. [5] closing condition DTSX:14395 and the non-closed branch (DTSX:13270) exact. [6] sourceFeed correct.",
+      "evidence": "0015_TransferIn.dtsx:13228,13270,14175-14208,14395,25024,75517-75560,76302-76305; 0009_LeumiFile-BY.dtsx:97225",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Create CP - Joining Only|detailed",
+      "hash": "a6d0cf7681fe",
+      "verdict": "CONFIRMED",
+      "detail": "[1] SQL DTSX:42623-42653 joins and WHERE exact ('הצטרפות בלבד' = SQL comment). [2] CP2 row-level LEFT JOIN semantics described correctly incl. NULL CP2 fields and no de-duplication (no Sort/Aggregate on the path; Create per row). [6] Fixed Fields DTSX:42591 gen_isfulltransfer = 1; Dates To Local DTSX:41872 converts CreatedOn and gen_fundcreationdate. [7] attribute list matches Create CoursePartition main.cs:45-103 (13 attributes, each _IsNull-guarded); gen_fundfinanceid now attributed to both contradicting comments (SQL DTSX:42637, code DTSX:35665 / main.cs:78), meaning left unproven. [8] main.cs:57-60 else-if. [9] no 'chosen' wording; describes partitions linked via CP.gen_automatedjoining. x5 copies identical (sha 148ee1cff8e4, same inputs). Target-entity typing of the EntityReferences is covered by the separate open claim.",
+      "evidence": "0015_TransferIn.dtsx:35665,41872,42591,42623-42653; Create CoursePartition main.cs (sha 148ee1cff8e4):41-112",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Create CP - Joining Only|detail",
+      "hash": "0d22124aabec",
+      "verdict": "CONFIRMED",
+      "detail": "[1] tables correct; type 2 written by Create TI - Joining Only Fixed Fields (gen_transfertype = 2, RequestType.Create). Cross-package: only 0008, 0009, 0015 create gen_coursepartition; '[\"gen_automatedjoining\"]' is written only in 0015 on gen_transferin (DTSX:61327 etc.), 0028 on gen_fundenrolment and 0029 on gen_powerofattorneymain; 0009 only reads gen_automatedjoining; 0027 has no reference to gen_coursepartition -> external_unknown is correct. [2]-[3] keys and row-level decision exact. [4] SDK Create. [5] no 'chosen' wording. [6] sourceFeed correct.",
+      "evidence": "0015_TransferIn.dtsx:42623-42653,61327,68495-68504; 0028_Fund Enrolment.dtsx:1763-1770; 0029_POA.dtsx:22758-22761; 0009_LeumiFile-BY.dtsx:56692-56719",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Create CP - Joining Only|decisions",
+      "hash": "b305daa1a439",
+      "verdict": "CONFIRMED",
+      "detail": "[1] condition verbatim (DTSX:42647-42653, XML-decoded); meaning (a)/(b)/(c) and outcome (one Create per passing row, no de-duplication) match the row-level LEFT JOIN semantics. [2] main.cs:57-60 agent else agency.",
+      "evidence": "0015_TransferIn.dtsx:42647-42653; Create CoursePartition main.cs (sha 148ee1cff8e4):57-60",
+      "wrongUnits": []
+    }
+  ],
+  "missingWrites": []
+}

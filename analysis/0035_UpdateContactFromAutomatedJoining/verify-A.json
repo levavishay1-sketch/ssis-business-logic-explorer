@@ -1,0 +1,90 @@
+{
+  "verifier": "ssis-verifier",
+  "package": "0035_UpdateContactFromAutomatedJoining",
+  "scope": "mapping-A.json",
+  "checked": 13,
+  "results": [
+    {
+      "id": "Update Contact|contact|UPDATE|gen_notauthorizeforuse",
+      "verdict": "CONFIRMED",
+      "detail": "main.cs:130-137 (DTSX:1197-1201): OptionSetValue(Row.NotAuthorizedToUseDataSource) if not NULL, else explicit null. Derived Column 'Set field by other' output NotAuthorizedToUseDataSource (i4) = ISNULL(gen_notauthorizeforuse) && !ISNULL(gen_datechangeingfromauthorizedtonotautorized) && gen_notauthorizetousedatasource == 1 ? NULL(DT_I4) : gen_notauthorizetousedatasource, with the first two columns from Contact.* and the third from gen_automatedjoining.* in the source SELECT. Written unconditionally on every row with non-NULL ContactId; NULL joining value clears the attribute. Record key contact[\"contactid\"]=Row.ContactId (DTSX:1193). DISTINCT over the 8 selected columns verified. WHERE precedence verified: 'where gen_joiningstatus in(7,8) and (A) or (B)' = (status AND A) OR B. Errors output (excl. group 1) has no path; only 2 paths exist. No package configuration (does not load SSISConfigFile).",
+      "evidence": "0035_UpdateContactFromAutomatedJoining.dtsx:843-859 (SQL; join 856, WHERE 857-859), 925-926 (Derived Column), 943 main.cs:118-157, paths DTSX:1955-1964"
+    },
+    {
+      "id": "Update Contact|contact|UPDATE|donotsendmm",
+      "verdict": "CONFIRMED",
+      "detail": "main.cs:139-142 (DTSX:1206): if (!Row.gennewcompanyemailagreement_IsNull && Row.gennewcompanyemailagreement == 1) contact[\"donotsendmm\"] = false - literal false, otherwise attribute not in the update. Row.UpdateEmailAgreement / Row.UpdateMarketingAgreement are input columns [1]/[2] of the script but never read in main.cs. Hence a row selected only via branch B (or whose e-mail date check failed) still sends donotsendmm=false when the joining has gen_newcompanyemailagreement = 1. Note (strengthens the open question): donotsendmm and gen_quarterstatement are attributes of contact (written at main.cs:141/146), so they exist in the Contact view; an unqualified name that also existed in gen_automatedjoining would make the SELECT fail with 'ambiguous column name', so if the query runs these WHERE references bind to Contact.",
+      "evidence": "main.cs:139-142 (DTSX:943, 1206); SQL DTSX:844-852, 858"
+    },
+    {
+      "id": "Update Contact|contact|UPDATE|gen_quarterstatement",
+      "verdict": "CONFIRMED",
+      "detail": "main.cs:144-147 (DTSX:1211): if (!Row.gennewmarketinginquiriesagreement_IsNull && Row.gennewmarketinginquiriesagreement == 1) contact[\"gen_quarterstatement\"] = true - literal true; not sent otherwise; UpdateMarketingAgreement unused. Symmetric to donotsendmm.",
+      "evidence": "main.cs:144-147 (DTSX:943, 1211); SQL DTSX:848-852, 859"
+    },
+    {
+      "id": "LOGIC scopeNote / summary",
+      "verdict": "CONFIRMED",
+      "detail": "Single business write (contact Update via SDK); [PSQL] = PSQL/ALTSHULER_MSCRM read-only; no DTS:Configurations (no SSISConfigFile), no LogProviders, no EventHandlers; ServerName/OrganizationName from gen_etlvariable.",
+      "evidence": "DTSX:4-8, 24-31, 941"
+    },
+    {
+      "id": "LOGIC executionOrder",
+      "verdict": "CONFIRMED",
+      "detail": "Single constraint Get Organization Variables -> Update Contact From Joining, Success.",
+      "evidence": "DTSX:1971"
+    },
+    {
+      "id": "LOGIC Package\\Update Contact From Joining",
+      "verdict": "CONFIRMED",
+      "detail": "Detailed flow verified: source join on identity number, (status AND A) OR B, derived NotAuthorized logic, NULL ContactId skip, three attribute writes and their conditions, Errors output unconnected.",
+      "evidence": "DTSX:843-859, 909-940, 943 main.cs:118-157, 1955-1964"
+    },
+    {
+      "id": "LOGIC Package\\Update Contact From Joining (short nodes: meaning of donotsendmm / gen_quarterstatement)",
+      "verdict": "CONFIRMED",
+      "detail": "Re-check: every statement of meaning for donotsendmm (\"allowed to send mail\" / \"do not send\") and gen_quarterstatement (\"quarterly report\") in the short and detailed nodes is now marked as based on the field name and labelled השערה (hypothesis), and an open question says the package has no OptionSet or label evidence. Values written match the literals in main.cs:141 and 146.",
+      "evidence": "main.cs:141, 146 (DTSX:1206, 1211); logic.json lines 59, 68, 101, 172, 198, 294",
+      "previousVerdict": "UNVERIFIABLE",
+      "previousDetail": "Short/detailed nodes state as fact 'donotsendmm=false, i.e. it is allowed to send him mail' and 'the contact receives a quarterly statement/mailing (gen_quarterstatement)'. These meanings come from the attribute names / CRM conventions, not from the DTSX (no option metadata supplied); the component's own openQuestions say the meaning of gen_quarterstatement is not proven. Should be labelled as hypothesis.",
+      "recheckedOn": "2026-11-06"
+    },
+    {
+      "id": "LOGIC finding#1 (operator precedence in WHERE)",
+      "verdict": "CONFIRMED",
+      "detail": "SQL: 'where gen_joiningstatus in(7,8) and (A) or (B)'; AND binds tighter than OR -> (status in (7,8) AND A) OR B; branch-B rows selected for any gen_joiningstatus.",
+      "evidence": "DTSX:857-859"
+    },
+    {
+      "id": "LOGIC finding#2 (UpdateEmailAgreement / UpdateMarketingAgreement ignored)",
+      "verdict": "CONFIRMED",
+      "detail": "Both CASE columns are selected and bound as script inputs but never referenced in Input0_ProcessInputRow.",
+      "evidence": "DTSX:844-852; main.cs:118-157"
+    },
+    {
+      "id": "LOGIC finding#3 (gen_notauthorizeforuse always overwritten)",
+      "verdict": "CONFIRMED",
+      "detail": "Attribute set in both branches of the if/else on every processed row.",
+      "evidence": "main.cs:130-137; DTSX:925-926"
+    },
+    {
+      "id": "LOGIC finding#4 (update failures swallowed)",
+      "verdict": "CONFIRMED",
+      "detail": "catch -> Row.DirectRowToErrors(); Errors output has no path; no ETL warning/log provider in package.",
+      "evidence": "main.cs:151-155 (DTSX:1219); DTSX:1955-1964"
+    },
+    {
+      "id": "LOGIC finding#5 (join by identity number, multiple contacts / joinings)",
+      "verdict": "CONFIRMED",
+      "detail": "Plain inner join on gen_applicantidentitynumber = Contact.gen_identitynumber, no ORDER BY.",
+      "evidence": "DTSX:855-856"
+    },
+    {
+      "id": "LOGIC ignoredAsFramework",
+      "verdict": "CONFIRMED",
+      "detail": "Get Organization Variables reads gen_etlvariable and Set Variables only sets variables; no other Create/Update calls exist in the package (only contact Update at DTSX:1214).",
+      "evidence": "DTSX:19-90, 1191-1214"
+    }
+  ],
+  "missingWrites": []
+}

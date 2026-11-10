@@ -1,0 +1,658 @@
+{
+ "package": "0013_Heir_Daily",
+ "dataFlows": [
+  "Package\\Foreach Loop Container\\Split File",
+  "Package\\Foreach Loop Container\\Create And Update Heir"
+ ],
+ "analyst": "ssis-field-lineage",
+ "scriptOutputs": [],
+ "crmWrites": [
+  {
+   "component": "Package\\Foreach Loop Container\\Create And Update Heir\\Create Heir",
+   "identicalCopies": [],
+   "entity": "gen_heir",
+   "verb": "CREATE",
+   "mechanism": "SDK (CRM.Proxy ExecuteMultipleExtension, RequestType.Create, batches of 1000)",
+   "status": "Supported",
+   "recordKey": "new record (CRM-generated id; Ok output column CreatedAccountId is never assigned)",
+   "recordKeyColumns": [],
+   "declaredRowFilters": [
+    {
+     "file": "Source - Rasham",
+     "field": "SUG_REC",
+     "via": "Package\\Foreach Loop Container\\Split File\\Check If Contact Or Heir",
+     "why": "Only Rasham records with SUG_REC == \"2\" are written (output 'Heir Details' → Heir File Destination) to the heir file that this data flow re-reads; SUG_REC == \"1\" records go to the contact (deceased) file that is joined by 'Merge Join'; any other value goes to the unconnected Default output and is dropped",
+     "evidence": "DTSX 12064 (SUG_REC == \"1\"), 12072 (SUG_REC == \"2\"); Heir File Destination DTSX 12122-12151 (Overwrite=true); precedence Split File → Create And Update Heir"
+    },
+    {
+     "file": "Source - Contact Details",
+     "field": "MACHOZ",
+     "via": "Package\\Foreach Loop Container\\Create And Update Heir\\Merge Join",
+     "why": "INNER join (JoinType=2, NumKeyColumns=3, TreatNullsAsEqual=true) of heir rows with contact-file rows on MACHOZ/MIS_TIK/MIS_BAKASHA (= heir gen_region_STR_INT/gen_portfolionumber/gen_requestnumber, by sort-key position): a heir row reaches the writer only if a contact row with the same three keys exists; one output row per matching pair",
+     "evidence": "DTSX 6754-6756; Merge Join inputs DTSX 6762-6764 / 6779-6781; Sort key positions DTSX 6941/6947/6953, Sort 1 DTSX 7093/7099/7105"
+    },
+    {
+     "file": "Source - Contact Details",
+     "field": "MIS_TIK",
+     "via": "Package\\Foreach Loop Container\\Create And Update Heir\\Merge Join",
+     "why": "INNER join key #2 (MIS_TIK = heir gen_portfolionumber) — heir row without a matching contact row is dropped",
+     "evidence": "DTSX 6754-6756"
+    },
+    {
+     "file": "Source - Contact Details",
+     "field": "MIS_BAKASHA",
+     "via": "Package\\Foreach Loop Container\\Create And Update Heir\\Merge Join",
+     "why": "INNER join key #3 (MIS_BAKASHA = heir gen_requestnumber) — heir row without a matching contact row is dropped",
+     "evidence": "DTSX 6754-6756"
+    },
+    {
+     "file": "Source - Heir Details",
+     "field": "MACHOZ",
+     "via": "Package\\Foreach Loop Container\\Create And Update Heir\\Merge Join",
+     "why": "INNER join key #1 on the heir side (gen_region_STR_INT = contact MACHOZ)",
+     "evidence": "DTSX 6754-6756"
+    },
+    {
+     "file": "Source - Heir Details",
+     "field": "MIS_TIK",
+     "via": "Package\\Foreach Loop Container\\Create And Update Heir\\Merge Join",
+     "why": "INNER join key #2 on the heir side (gen_portfolionumber = contact MIS_TIK)",
+     "evidence": "DTSX 6754-6756"
+    },
+    {
+     "file": "Source - Heir Details",
+     "field": "MIS_BAKASHA",
+     "via": "Package\\Foreach Loop Container\\Create And Update Heir\\Merge Join",
+     "why": "INNER join key #3 on the heir side (gen_requestnumber = contact MIS_BAKASHA)",
+     "evidence": "DTSX 6754-6756"
+    },
+    {
+     "file": "Source - Heir Details",
+     "field": "SUG_PEULA",
+     "via": "Package\\Foreach Loop Container\\Create And Update Heir\\Heir",
+     "why": "SUG_PEULA is the last, CRLF-delimited column with MaximumWidth 1; truncationRowDisposition=RedirectRow sends rows whose remainder after position 189 is longer than 1 character to the error output → 'Derived Column' (sink), so they never reach the writer",
+     "evidence": "conn DTSX 116; source output columns DTSX 6641-6752 (RedirectRow); path Heir error output → Derived Column"
+    },
+    {
+     "file": "Source - Rasham",
+     "field": "MACHOZ",
+     "via": "Split File → files → Create And Update Heir\\Merge Join / Check If  Heir Exist",
+     "why": "Rasham MACHOZ becomes MACHOZ of both intermediate files (heir and contact), so it is the Merge Join key #1 and (as gen_region) a key of the routing Lookup 'Check If  Heir Exist' (No Match → this writer)",
+     "evidence": "conns DTSX 4-18, 49-63, 75-120, 121-135; Merge Join DTSX 6754-6756; Lookup DTSX 4070-4118"
+    },
+    {
+     "file": "Source - Rasham",
+     "field": "MIS_TIK",
+     "via": "Split File → files → Create And Update Heir\\Merge Join / Check If  Heir Exist",
+     "why": "Rasham MIS_TIK becomes MIS_TIK of both intermediate files: Merge Join key #2 and (as gen_portfolionumber) key of 'Check If  Heir Exist'",
+     "evidence": "conns DTSX 4-18, 49-63, 75-120, 121-135; DTSX 6754-6756; 4070-4118"
+    },
+    {
+     "file": "Source - Rasham",
+     "field": "MIS_BAKASHA",
+     "via": "Split File → files → Create And Update Heir\\Merge Join / Check If  Heir Exist",
+     "why": "Rasham MIS_BAKASHA becomes MIS_BAKASHA of both intermediate files: Merge Join key #3 and (as gen_requestnumber) key of 'Check If  Heir Exist'",
+     "evidence": "conns DTSX 4-18, 49-63, 75-120, 121-135; DTSX 6754-6756; 4070-4118"
+    },
+    {
+     "file": "Source - Rasham",
+     "field": "Column 0",
+     "via": "Split File → files → Check If Contact Exist / Check If  Heir Exist / Heir source truncation",
+     "why": "Rasham 'Column 0' (positions 24+) is copied verbatim into both intermediate files: in the contact (SUG_REC=1) record its characters 9-17 are MIS_ZEHUT_MORISH, the key of routing Lookup 'Check If Contact Exist' (No Match → dropped to 'Derived Column 2'); in the heir (SUG_REC=2) record characters 1-9 are MIS_ZEHUT, key of 'Check If  Heir Exist' (Match → Update, No Match → this writer), and a heir record whose 'Column 0' is longer than 167 characters (SUG_PEULA = character 167 = position 190, MaximumWidth 1; trailing spaces count) truncates SUG_PEULA → row redirected and dropped (a normal 167-character record is kept)",
+     "evidence": "conns DTSX 49-63, 75-120, 121-135; Lookups DTSX 4070-4118, 4254-4282"
+    }
+   ],
+   "condition": "Per Foreach iteration with @[User::SelectedFilePath] != \"\": Rasham record SUG_REC == \"2\" (Split File) → re-read via [Source - Heir Details] (rows with truncation/conversion errors redirected and dropped) → INNER Merge Join with a SUG_REC == \"1\" contact record having the same MACHOZ/MIS_TIK/MIS_BAKASHA → 'Set Heir Columns' (gen_status/gen_name computation errors redirected to 'Derived Column 1'; gen_region cast error fails the component) → 'Check If Contact Exist' Match (a CRM contact with gen_identitynumber = zero-padded MIS_ZEHUT_MORISH; No Match → 'Derived Column 2' sink) → 'Check If  Heir Exist' No Match (no gen_heir with gen_identitynumber = padded MIS_ZEHUT AND gen_portfolionumber = MIS_TIK AND gen_requestnumber = MIS_BAKASHA AND gen_region = (DT_I4)MACHOZ; full cache). Rows whose entity build throws go to CastingError (unconnected).",
+   "attributes": [
+    {
+     "attribute": "gen_address",
+     "from": [ { "column": "gen_address", "role": "value" } ],
+     "expression": "Row.genaddress as is (file KTOVET trimmed, empty → NULL by 'Trim All Input Columns 1'), only if not NULL",
+     "fixedValue": null,
+     "condition": "!Row.genaddress_IsNull",
+     "evidence": "main.cs:132-133",
+     "declaredSources": [
+      { "file": "Source - Rasham", "field": "Column 0", "role": "value", "why": "file-to-file bridge: the SUG_REC==\"2\" Rasham record is written by 'Split File' to @[User::HeirDetailsFilePath] ([Heir Details]: RaggedRight 1/9/9/3/1 + 'Column 0' to CRLF) and re-read by [Source - Heir Details] (same ConnectionString expression); Heir Details KTOVET (pos 133-152) = Rasham 'Column 0' characters 110-129 verbatim", "evidence": "conns DTSX 49-63, 98-120, 121-135; Split File DTSX 12072, 12122-12151" }
+     ]
+    },
+    {
+     "attribute": "gen_country",
+     "from": [ { "column": "gen_country", "role": "value" } ],
+     "expression": "Row.gencountry as is (file EREZ trimmed, empty → NULL), only if not NULL",
+     "fixedValue": null,
+     "condition": "!Row.gencountry_IsNull",
+     "evidence": "main.cs:135-136",
+     "declaredSources": [
+      { "file": "Source - Rasham", "field": "Column 0", "role": "value", "why": "file-to-file bridge (heir record SUG_REC==\"2\" → @[User::HeirDetailsFilePath] → [Source - Heir Details]); Heir Details EREZ (pos 172-183) = Rasham 'Column 0' characters 149-160", "evidence": "conns DTSX 49-63, 98-120, 121-135; Split File DTSX 12072, 12122-12151" }
+     ]
+    },
+    {
+     "attribute": "gen_city",
+     "from": [ { "column": "gen_city", "role": "value" } ],
+     "expression": "Row.gencity as is (file IR trimmed, empty → NULL), only if not NULL",
+     "fixedValue": null,
+     "condition": "!Row.gencity_IsNull",
+     "evidence": "main.cs:138-139",
+     "declaredSources": [
+      { "file": "Source - Rasham", "field": "Column 0", "role": "value", "why": "file-to-file bridge (heir record → [Source - Heir Details]); Heir Details IR (pos 153-164) = Rasham 'Column 0' characters 130-141", "evidence": "conns DTSX 49-63, 98-120, 121-135; Split File DTSX 12072, 12122-12151" }
+     ]
+    },
+    {
+     "attribute": "gen_customeridentitynumber",
+     "from": [ { "column": "gen_customeridentitynumber", "role": "value" } ],
+     "expression": "Row.gencustomeridentitynumber as is: contact-file MIS_ZEHUT_MORISH trimmed (empty → NULL, 'Trim All Input Columns'), then 'Append Zeros To Fields' (NULL/\"\" → \"\", \".\" removed, left-padded with '0' to 9) — therefore never NULL here; written only if not NULL",
+     "fixedValue": null,
+     "condition": "!Row.gencustomeridentitynumber_IsNull (always true after zero padding)",
+     "evidence": "main.cs:141-142",
+     "declaredSources": [
+      { "file": "Source - Rasham", "field": "Column 0", "role": "value", "why": "file-to-file bridge: the SUG_REC==\"1\" (deceased) Rasham record is written by 'Split File' to @[User::ContactDetailsFilePath] ([Contact Details]) and re-read by [Source - Contact Details]; MIS_ZEHUT_MORISH (pos 32-40) = Rasham 'Column 0' characters 9-17 of that record", "evidence": "conns DTSX 4-18, 75-97, 121-135; Split File DTSX 12064, 12092-12121" },
+      { "file": "Source - Contact Details", "field": "MACHOZ", "role": "key", "why": "Merge Join (inner, 3 keys) decides which contact record's MIS_ZEHUT_MORISH is attached to the heir row (MACHOZ = heir gen_region_STR_INT)", "evidence": "DTSX 6754-6756" },
+      { "file": "Source - Contact Details", "field": "MIS_TIK", "role": "key", "why": "Merge Join key #2 selects the contact record (MIS_TIK = heir gen_portfolionumber)", "evidence": "DTSX 6754-6756" },
+      { "file": "Source - Contact Details", "field": "MIS_BAKASHA", "role": "key", "why": "Merge Join key #3 selects the contact record (MIS_BAKASHA = heir gen_requestnumber)", "evidence": "DTSX 6754-6756" },
+      { "file": "Source - Heir Details", "field": "MACHOZ", "role": "key", "why": "heir-side Merge Join key #1 selecting the contact record", "evidence": "DTSX 6754-6756" },
+      { "file": "Source - Heir Details", "field": "MIS_TIK", "role": "key", "why": "heir-side Merge Join key #2 selecting the contact record", "evidence": "DTSX 6754-6756" },
+      { "file": "Source - Heir Details", "field": "MIS_BAKASHA", "role": "key", "why": "heir-side Merge Join key #3 selecting the contact record", "evidence": "DTSX 6754-6756" },
+      { "file": "Source - Rasham", "field": "MACHOZ", "role": "key", "why": "file-to-file bridge: Rasham MACHOZ (pos 1) becomes MACHOZ of both the heir and the contact intermediate files; INNER Merge Join key #1 selecting which SUG_REC==\"1\" contact record supplies this value", "evidence": "conns DTSX 4-18, 49-63, 75-120, 121-135; Split File Trim DTSX 12219; Merge Join DTSX 6754-6756" },
+      { "file": "Source - Rasham", "field": "MIS_TIK", "role": "key", "why": "file-to-file bridge: Rasham MIS_TIK (pos 2-10) becomes MIS_TIK of both the heir and the contact intermediate files; INNER Merge Join key #2 selecting which SUG_REC==\"1\" contact record supplies this value", "evidence": "conns DTSX 4-18, 49-63, 75-120, 121-135; Split File Trim DTSX 12219; Merge Join DTSX 6754-6756" },
+      { "file": "Source - Rasham", "field": "MIS_BAKASHA", "role": "key", "why": "file-to-file bridge: Rasham MIS_BAKASHA (pos 11-19) becomes MIS_BAKASHA of both the heir and the contact intermediate files; INNER Merge Join key #3 selecting which SUG_REC==\"1\" contact record supplies this value", "evidence": "conns DTSX 4-18, 49-63, 75-120, 121-135; Split File Trim DTSX 12219; Merge Join DTSX 6754-6756" }
+     ]
+    },
+    {
+     "attribute": "gen_firstname",
+     "from": [ { "column": "gen_firstname", "role": "value" } ],
+     "expression": "Row.genfirstname as is (file FIRST_NAME trimmed, empty → NULL), only if not NULL",
+     "fixedValue": null,
+     "condition": "!Row.genfirstname_IsNull",
+     "evidence": "main.cs:144-145",
+     "declaredSources": [
+      { "file": "Source - Rasham", "field": "Column 0", "role": "value", "why": "file-to-file bridge (heir record → [Source - Heir Details]); Heir Details FIRST_NAME (pos 83-132) = Rasham 'Column 0' characters 60-109", "evidence": "conns DTSX 49-63, 98-120, 121-135; Split File DTSX 12072, 12122-12151" }
+     ]
+    },
+    {
+     "attribute": "gen_lastname",
+     "from": [ { "column": "gen_lastname", "role": "value" } ],
+     "expression": "Row.genlastname as is (file LAST_NAME trimmed, empty → NULL), only if not NULL",
+     "fixedValue": null,
+     "condition": "!Row.genlastname_IsNull",
+     "evidence": "main.cs:147-148",
+     "declaredSources": [
+      { "file": "Source - Rasham", "field": "Column 0", "role": "value", "why": "file-to-file bridge (heir record → [Source - Heir Details]); Heir Details LAST_NAME (pos 33-82) = Rasham 'Column 0' characters 10-59", "evidence": "conns DTSX 49-63, 98-120, 121-135; Split File DTSX 12072, 12122-12151" }
+     ]
+    },
+    {
+     "attribute": "gen_name",
+     "from": [ { "column": "gen_name", "role": "value" } ],
+     "expression": "Row.genname as is; 'Set Heir Columns' gen_name = gen_firstname + \" \" + gen_lastname (DTSX 6909) on the trimmed values → NULL when either name is NULL (SSIS NULL propagation), in which case it is not written",
+     "fixedValue": null,
+     "condition": "!Row.genname_IsNull",
+     "evidence": "main.cs:150-151",
+     "declaredSources": [
+      { "file": "Source - Rasham", "field": "Column 0", "role": "value", "why": "file-to-file bridge (heir record → [Source - Heir Details]); FIRST_NAME = Rasham 'Column 0' characters 60-109, LAST_NAME = characters 10-59", "evidence": "conns DTSX 49-63, 98-120, 121-135; Split File DTSX 12072, 12122-12151" }
+     ]
+    },
+    {
+     "attribute": "gen_identitynumber",
+     "from": [ { "column": "gen_identitynumber", "role": "value" } ],
+     "expression": "Row.genidentitynumber as is: file MIS_ZEHUT trimmed (empty → NULL), then 'Append Zeros To Fields' (NULL/\"\" → \"\", \".\" removed, left-padded with '0' to 9) — never NULL here",
+     "fixedValue": null,
+     "condition": "!Row.genidentitynumber_IsNull (always true after zero padding)",
+     "evidence": "main.cs:153-154",
+     "declaredSources": [
+      { "file": "Source - Rasham", "field": "Column 0", "role": "value", "why": "file-to-file bridge (heir record → [Source - Heir Details]); Heir Details MIS_ZEHUT (pos 24-32) = Rasham 'Column 0' characters 1-9", "evidence": "conns DTSX 49-63, 98-120, 121-135; Split File DTSX 12072, 12122-12151" }
+     ]
+    },
+    {
+     "attribute": "gen_portfolionumber",
+     "from": [ { "column": "gen_portfolionumber", "role": "value" } ],
+     "expression": "Row.genportfolionumber as is (file MIS_TIK trimmed, empty → NULL), only if not NULL",
+     "fixedValue": null,
+     "condition": "!Row.genportfolionumber_IsNull",
+     "evidence": "main.cs:156-157",
+     "declaredSources": [
+      { "file": "Source - Rasham", "field": "MIS_TIK", "role": "value", "why": "file-to-file bridge: Rasham MIS_TIK (pos 2-10) trimmed by 'Split File\\Trim All Input Columns' (main.cs:51-58, Trim only) and written space-padded to [Heir Details] MIS_TIK (pos 2-10), re-read as [Source - Heir Details] MIS_TIK", "evidence": "conns DTSX 49-63, 98-120, 121-135; Split File Trim DTSX 12219; DTSX 12122-12151" }
+     ]
+    },
+    {
+     "attribute": "gen_postalcode",
+     "from": [ { "column": "gen_postalcode", "role": "value" } ],
+     "expression": "Row.genpostalcode as is (file MIKUD trimmed, empty → NULL), only if not NULL",
+     "fixedValue": null,
+     "condition": "!Row.genpostalcode_IsNull",
+     "evidence": "main.cs:159-160",
+     "declaredSources": [
+      { "file": "Source - Rasham", "field": "Column 0", "role": "value", "why": "file-to-file bridge (heir record → [Source - Heir Details]); Heir Details MIKUD (pos 165-171) = Rasham 'Column 0' characters 142-148", "evidence": "conns DTSX 49-63, 98-120, 121-135; Split File DTSX 12072, 12122-12151" }
+     ]
+    },
+    {
+     "attribute": "gen_requestnumber",
+     "from": [ { "column": "gen_requestnumber", "role": "value" } ],
+     "expression": "Row.genrequestnumber as is (file MIS_BAKASHA trimmed, empty → NULL), only if not NULL",
+     "fixedValue": null,
+     "condition": "!Row.genrequestnumber_IsNull",
+     "evidence": "main.cs:162-163",
+     "declaredSources": [
+      { "file": "Source - Rasham", "field": "MIS_BAKASHA", "role": "value", "why": "file-to-file bridge: Rasham MIS_BAKASHA (pos 11-19) trimmed by 'Split File\\Trim All Input Columns' and written space-padded to [Heir Details] MIS_BAKASHA (pos 11-19), re-read as [Source - Heir Details] MIS_BAKASHA", "evidence": "conns DTSX 49-63, 98-120, 121-135; Split File Trim DTSX 12219; DTSX 12122-12151" }
+     ]
+    },
+    {
+     "attribute": "gen_relationtype",
+     "from": [ { "column": "gen_relationtype", "role": "value" } ],
+     "expression": "Row.genrelationtype as is (file KIRVA_EL_MANOCH trimmed, empty → NULL) written as a plain string (not an option set), only if not NULL",
+     "fixedValue": null,
+     "condition": "!Row.genrelationtype_IsNull",
+     "evidence": "main.cs:165-166",
+     "declaredSources": [
+      { "file": "Source - Rasham", "field": "Column 0", "role": "value", "why": "file-to-file bridge (heir record → [Source - Heir Details]); Heir Details KIRVA_EL_MANOCH (pos 184-189) = Rasham 'Column 0' characters 161-166", "evidence": "conns DTSX 49-63, 98-120, 121-135; Split File DTSX 12072, 12122-12151" }
+     ]
+    },
+    {
+     "attribute": "gen_region",
+     "from": [ { "column": "gen_region", "role": "value" } ],
+     "expression": "new OptionSetValue(Row.genregion); 'Set Heir Columns' gen_region = (DT_I4)gen_region_STR_INT (DTSX 6915) where gen_region_STR_INT = file MACHOZ (1 char) trimmed, empty → NULL; NULL → not written; non-numeric → cast error with errorRowDisposition FailComponent (data flow fails)",
+     "fixedValue": null,
+     "condition": "!Row.genregion_IsNull",
+     "evidence": "main.cs:170-171",
+     "declaredSources": [
+      { "file": "Source - Rasham", "field": "MACHOZ", "role": "value", "why": "file-to-file bridge: Rasham MACHOZ (pos 1) trimmed by 'Split File\\Trim All Input Columns' and written to [Heir Details] MACHOZ (pos 1), re-read as [Source - Heir Details] MACHOZ", "evidence": "conns DTSX 49-63, 98-120, 121-135; Split File Trim DTSX 12219; DTSX 12122-12151" }
+     ]
+    },
+    {
+     "attribute": "gen_status",
+     "from": [ { "column": "gen_status", "role": "value" } ],
+     "expression": "new OptionSetValue(Row.genstatus); 'Set Heir Columns' gen_status = (SUG_PEULA == \"U\" || SUG_PEULA == \"C\") ? 1 : 2 (DTSX 6903) on trimmed SUG_PEULA; NULL SUG_PEULA → NULL → not written",
+     "fixedValue": null,
+     "condition": "!Row.genstatus_IsNull",
+     "evidence": "main.cs:173-174",
+     "declaredSources": [
+      { "file": "Source - Rasham", "field": "Column 0", "role": "condition", "why": "file-to-file bridge (heir record → [Source - Heir Details]); Heir Details SUG_PEULA (pos 190, rest of line) = Rasham 'Column 0' character 167; it only selects 1 or 2", "evidence": "conns DTSX 49-63, 98-120, 121-135; DTSX 6903" }
+     ]
+    },
+    {
+     "attribute": "gen_issueanceofanorderdate",
+     "from": [ { "column": "gen_issueanceofanorderdate", "role": "value" } ],
+     "expression": "DateTime.TryParse(Row.genissueanceofanorderdate) → written only when parse succeeds. Upstream: contact-file TAARICH_MATAN_ZAV_RASHAM trimmed (empty → NULL), then 'Format Dates' FormatYYYYMMDDtoDate (main.cs:54-80): 8 chars → yyyy/MM/dd, 6 chars → yyyy/MM/01, other length → NULL, NULL if !DateTime.TryParse",
+     "fixedValue": null,
+     "condition": "!Row.genissueanceofanorderdate_IsNull && DateTime.TryParse succeeds",
+     "evidence": "main.cs:178-182",
+     "declaredSources": [
+      { "file": "Source - Rasham", "field": "Column 0", "role": "value", "why": "file-to-file bridge: the SUG_REC==\"1\" (deceased) Rasham record → @[User::ContactDetailsFilePath] → [Source - Contact Details]; TAARICH_MATAN_ZAV_RASHAM (pos 157-164) = Rasham 'Column 0' characters 134-141 of that record", "evidence": "conns DTSX 4-18, 75-97, 121-135; Split File DTSX 12064, 12092-12121" },
+      { "file": "Source - Contact Details", "field": "MACHOZ", "role": "key", "why": "Merge Join (inner, 3 keys) selects the contact record whose date is attached to the heir row", "evidence": "DTSX 6754-6756" },
+      { "file": "Source - Contact Details", "field": "MIS_TIK", "role": "key", "why": "Merge Join key #2 selects the contact record", "evidence": "DTSX 6754-6756" },
+      { "file": "Source - Contact Details", "field": "MIS_BAKASHA", "role": "key", "why": "Merge Join key #3 selects the contact record", "evidence": "DTSX 6754-6756" },
+      { "file": "Source - Heir Details", "field": "MACHOZ", "role": "key", "why": "heir-side Merge Join key #1 selecting the contact record", "evidence": "DTSX 6754-6756" },
+      { "file": "Source - Heir Details", "field": "MIS_TIK", "role": "key", "why": "heir-side Merge Join key #2 selecting the contact record", "evidence": "DTSX 6754-6756" },
+      { "file": "Source - Heir Details", "field": "MIS_BAKASHA", "role": "key", "why": "heir-side Merge Join key #3 selecting the contact record", "evidence": "DTSX 6754-6756" },
+      { "file": "Source - Rasham", "field": "MACHOZ", "role": "key", "why": "file-to-file bridge: Rasham MACHOZ (pos 1) becomes MACHOZ of both the heir and the contact intermediate files; INNER Merge Join key #1 selecting which SUG_REC==\"1\" contact record supplies this value", "evidence": "conns DTSX 4-18, 49-63, 75-120, 121-135; Split File Trim DTSX 12219; Merge Join DTSX 6754-6756" },
+      { "file": "Source - Rasham", "field": "MIS_TIK", "role": "key", "why": "file-to-file bridge: Rasham MIS_TIK (pos 2-10) becomes MIS_TIK of both the heir and the contact intermediate files; INNER Merge Join key #2 selecting which SUG_REC==\"1\" contact record supplies this value", "evidence": "conns DTSX 4-18, 49-63, 75-120, 121-135; Split File Trim DTSX 12219; Merge Join DTSX 6754-6756" },
+      { "file": "Source - Rasham", "field": "MIS_BAKASHA", "role": "key", "why": "file-to-file bridge: Rasham MIS_BAKASHA (pos 11-19) becomes MIS_BAKASHA of both the heir and the contact intermediate files; INNER Merge Join key #3 selecting which SUG_REC==\"1\" contact record supplies this value", "evidence": "conns DTSX 4-18, 49-63, 75-120, 121-135; Split File Trim DTSX 12219; Merge Join DTSX 6754-6756" }
+     ]
+    },
+    {
+     "attribute": "gen_contactname",
+     "from": [ { "column": "gen_contactname", "role": "value" } ],
+     "expression": "new EntityReference(\"contact\", Row.gencontactname); gen_contactname = contactid returned by Lookup 'Check If Contact Exist' (select gen_identitynumber, contactid from contact; join gen_customeridentitynumber = gen_identitynumber; full cache) — the CRM id of the deceased customer, never a file value; always non-NULL on this path (Match output only)",
+     "fixedValue": null,
+     "condition": "!Row.gencontactname_IsNull",
+     "evidence": "main.cs:185-186; Lookup DTSX 4254-4282",
+     "declaredSources": [
+      { "file": "Source - Rasham", "field": "Column 0", "role": "key", "why": "file-to-file bridge: lookup key MIS_ZEHUT_MORISH (Contact Details pos 32-40) = Rasham 'Column 0' characters 9-17 of the SUG_REC==\"1\" record (zero-padded to 9)", "evidence": "conns DTSX 4-18, 75-97, 121-135; DTSX 4254-4282" },
+      { "file": "Source - Contact Details", "field": "MACHOZ", "role": "key", "why": "Merge Join selects which contact record's MIS_ZEHUT_MORISH is used as lookup key", "evidence": "DTSX 6754-6756" },
+      { "file": "Source - Contact Details", "field": "MIS_TIK", "role": "key", "why": "Merge Join key #2", "evidence": "DTSX 6754-6756" },
+      { "file": "Source - Contact Details", "field": "MIS_BAKASHA", "role": "key", "why": "Merge Join key #3", "evidence": "DTSX 6754-6756" },
+      { "file": "Source - Rasham", "field": "MACHOZ", "role": "key", "why": "file-to-file bridge: Rasham MACHOZ (pos 1) becomes MACHOZ of both the heir and the contact intermediate files; INNER Merge Join key #1 selecting which SUG_REC==\"1\" contact record supplies this value", "evidence": "conns DTSX 4-18, 49-63, 75-120, 121-135; Split File Trim DTSX 12219; Merge Join DTSX 6754-6756" },
+      { "file": "Source - Rasham", "field": "MIS_TIK", "role": "key", "why": "file-to-file bridge: Rasham MIS_TIK (pos 2-10) becomes MIS_TIK of both the heir and the contact intermediate files; INNER Merge Join key #2 selecting which SUG_REC==\"1\" contact record supplies this value", "evidence": "conns DTSX 4-18, 49-63, 75-120, 121-135; Split File Trim DTSX 12219; Merge Join DTSX 6754-6756" },
+      { "file": "Source - Rasham", "field": "MIS_BAKASHA", "role": "key", "why": "file-to-file bridge: Rasham MIS_BAKASHA (pos 11-19) becomes MIS_BAKASHA of both the heir and the contact intermediate files; INNER Merge Join key #3 selecting which SUG_REC==\"1\" contact record supplies this value", "evidence": "conns DTSX 4-18, 49-63, 75-120, 121-135; Split File Trim DTSX 12219; Merge Join DTSX 6754-6756" }
+     ]
+    }
+   ],
+   "evidence": "main.cs:125-236 (component DTSX line 4394; Entity(\"gen_heir\") main.cs:127; ExecuteMultipleExtension(myEntities, RequestType.Create, service) main.cs:209; flush at 1000 main.cs:191-192 and at EndOfRowset main.cs:244-247)"
+  },
+  {
+   "component": "Package\\Foreach Loop Container\\Create And Update Heir\\Update Heir",
+   "identicalCopies": [],
+   "entity": "gen_heir",
+   "verb": "UPDATE",
+   "mechanism": "SDK (CRM.Proxy ExecuteMultipleExtension, RequestType.Update, batches of 1000)",
+   "status": "Supported",
+   "recordKey": "heir.Id = Row.genheiriddb (main.cs:129) — gen_heirid returned by Lookup 'Check If  Heir Exist' (gen_heir with gen_identitynumber = zero-padded MIS_ZEHUT AND gen_portfolionumber = MIS_TIK AND gen_requestnumber = MIS_BAKASHA AND gen_region = (DT_I4)MACHOZ; full cache, DTSX 4070-4118)",
+   "recordKeyColumns": [ "gen_heiriddb" ],
+   "declaredRowFilters": [
+    {
+     "file": "Source - Rasham",
+     "field": "SUG_REC",
+     "via": "Package\\Foreach Loop Container\\Split File\\Check If Contact Or Heir",
+     "why": "Only Rasham records with SUG_REC == \"2\" reach the heir file re-read by this data flow; SUG_REC == \"1\" records form the contact file joined by 'Merge Join'; other values dropped (Default output unconnected)",
+     "evidence": "DTSX 12064, 12072; Heir File Destination DTSX 12122-12151"
+    },
+    {
+     "file": "Source - Contact Details",
+     "field": "MACHOZ",
+     "via": "Package\\Foreach Loop Container\\Create And Update Heir\\Merge Join",
+     "why": "INNER join (JoinType=2, 3 keys, TreatNullsAsEqual=true): heir row reaches the writer only if a contact row with the same MACHOZ/MIS_TIK/MIS_BAKASHA exists",
+     "evidence": "DTSX 6754-6756"
+    },
+    {
+     "file": "Source - Contact Details",
+     "field": "MIS_TIK",
+     "via": "Package\\Foreach Loop Container\\Create And Update Heir\\Merge Join",
+     "why": "INNER join key #2",
+     "evidence": "DTSX 6754-6756"
+    },
+    {
+     "file": "Source - Contact Details",
+     "field": "MIS_BAKASHA",
+     "via": "Package\\Foreach Loop Container\\Create And Update Heir\\Merge Join",
+     "why": "INNER join key #3",
+     "evidence": "DTSX 6754-6756"
+    },
+    {
+     "file": "Source - Heir Details",
+     "field": "MACHOZ",
+     "via": "Package\\Foreach Loop Container\\Create And Update Heir\\Merge Join",
+     "why": "INNER join key #1 on the heir side",
+     "evidence": "DTSX 6754-6756"
+    },
+    {
+     "file": "Source - Heir Details",
+     "field": "MIS_TIK",
+     "via": "Package\\Foreach Loop Container\\Create And Update Heir\\Merge Join",
+     "why": "INNER join key #2 on the heir side",
+     "evidence": "DTSX 6754-6756"
+    },
+    {
+     "file": "Source - Heir Details",
+     "field": "MIS_BAKASHA",
+     "via": "Package\\Foreach Loop Container\\Create And Update Heir\\Merge Join",
+     "why": "INNER join key #3 on the heir side",
+     "evidence": "DTSX 6754-6756"
+    },
+    {
+     "file": "Source - Heir Details",
+     "field": "SUG_PEULA",
+     "via": "Package\\Foreach Loop Container\\Create And Update Heir\\Heir",
+     "why": "last CRLF-delimited column, MaximumWidth 1, truncationRowDisposition=RedirectRow → rows with a longer remainder go to 'Derived Column' (sink)",
+     "evidence": "conn DTSX 116; source output columns DTSX 6641-6752"
+    },
+    {
+     "file": "Source - Rasham",
+     "field": "MACHOZ",
+     "via": "Split File → files → Create And Update Heir\\Merge Join / Check If  Heir Exist",
+     "why": "becomes MACHOZ of both intermediate files: Merge Join key #1 and (as gen_region) key of 'Check If  Heir Exist' (Match → this writer)",
+     "evidence": "conns DTSX 4-18, 49-63, 75-120, 121-135; DTSX 6754-6756; 4070-4118"
+    },
+    {
+     "file": "Source - Rasham",
+     "field": "MIS_TIK",
+     "via": "Split File → files → Create And Update Heir\\Merge Join / Check If  Heir Exist",
+     "why": "becomes MIS_TIK of both intermediate files: Merge Join key #2 and (as gen_portfolionumber) key of 'Check If  Heir Exist'",
+     "evidence": "conns DTSX 4-18, 49-63, 75-120, 121-135; DTSX 6754-6756; 4070-4118"
+    },
+    {
+     "file": "Source - Rasham",
+     "field": "MIS_BAKASHA",
+     "via": "Split File → files → Create And Update Heir\\Merge Join / Check If  Heir Exist",
+     "why": "becomes MIS_BAKASHA of both intermediate files: Merge Join key #3 and (as gen_requestnumber) key of 'Check If  Heir Exist'",
+     "evidence": "conns DTSX 4-18, 49-63, 75-120, 121-135; DTSX 6754-6756; 4070-4118"
+    },
+    {
+     "file": "Source - Rasham",
+     "field": "Column 0",
+     "via": "Split File → files → Check If Contact Exist / Check If  Heir Exist / Heir source truncation",
+     "why": "contact record characters 9-17 (MIS_ZEHUT_MORISH) are the key of 'Check If Contact Exist' (No Match dropped); heir record characters 1-9 (MIS_ZEHUT) are a key of 'Check If  Heir Exist' (Match → this writer); a heir record whose 'Column 0' is longer than 167 characters (SUG_PEULA = character 167 = position 190, MaximumWidth 1; trailing spaces count) truncates SUG_PEULA → row dropped (a normal 167-character record is kept)",
+     "evidence": "conns DTSX 49-63, 75-120, 121-135; DTSX 4070-4118, 4254-4282"
+    }
+   ],
+   "condition": "Same path as Create Heir up to 'Check If  Heir Exist', but its Match output (an existing gen_heir with the same padded MIS_ZEHUT, MIS_TIK, MIS_BAKASHA and (DT_I4)MACHOZ) → 'change empty strings to null' (CRM-side string columns: TRIM == \"\" → NULL) → Update Heir; the record is sent only when at least one compared attribute differs (needToUpdate, main.cs:220-230), otherwise the row goes to DontNeedToUpdate ('no need to' sink).",
+   "attributes": [
+    {
+     "attribute": "gen_firstname",
+     "from": [ { "column": "gen_firstname", "role": "value" }, { "column": "Gen_firstnamedb", "role": "condition" } ],
+     "expression": "heir[\"gen_firstname\"] = Row.genfirstname (file FIRST_NAME trimmed, empty → NULL)",
+     "fixedValue": null,
+     "condition": "Row.genfirstname_IsNull != Row.Genfirstnamedb_IsNull || (!Row.genfirstname_IsNull && !String.Equals(Row.genfirstname, Row.Genfirstnamedb)) — ordinal, case-sensitive comparison with the CRM value (blank → NULL)",
+     "evidence": "main.cs:131-135; IsEqual main.cs:295-338",
+     "declaredSources": [
+      { "file": "Source - Rasham", "field": "Column 0", "role": "value", "why": "file-to-file bridge (heir record SUG_REC==\"2\" → @[User::HeirDetailsFilePath] → [Source - Heir Details]); FIRST_NAME (pos 83-132) = Rasham 'Column 0' characters 60-109", "evidence": "conns DTSX 49-63, 98-120, 121-135; Split File DTSX 12072, 12122-12151" },
+      { "file": "Source - Rasham", "field": "MACHOZ", "role": "key", "why": "file-to-file bridge: Rasham MACHOZ (pos 1, trimmed by 'Split File\\Trim All Input Columns') → Heir Details MACHOZ → (DT_I4) gen_region (Set Heir Columns DTSX 6915) = key gen_regiondb of full-cache Lookup 'Check If  Heir Exist', which together with gen_identitynumber (Rasham 'Column 0' characters 1-9, zero-padded) and the other two keys selects the gen_heir record (gen_heiriddb → heir.Id) this update is sent to", "evidence": "conns DTSX 4-18, 49-63, 75-120, 121-135; Split File Trim DTSX 12219; Lookup DTSX 4070-4118; main.cs:129" },
+      { "file": "Source - Rasham", "field": "MIS_TIK", "role": "key", "why": "file-to-file bridge: Rasham MIS_TIK (pos 2-10, trimmed by 'Split File\\Trim All Input Columns') → Heir Details MIS_TIK → gen_portfolionumber = key gen_portfolionumberdb of full-cache Lookup 'Check If  Heir Exist', which together with gen_identitynumber (Rasham 'Column 0' characters 1-9, zero-padded) and the other two keys selects the gen_heir record (gen_heiriddb → heir.Id) this update is sent to", "evidence": "conns DTSX 4-18, 49-63, 75-120, 121-135; Split File Trim DTSX 12219; Lookup DTSX 4070-4118; main.cs:129" },
+      { "file": "Source - Rasham", "field": "MIS_BAKASHA", "role": "key", "why": "file-to-file bridge: Rasham MIS_BAKASHA (pos 11-19, trimmed by 'Split File\\Trim All Input Columns') → Heir Details MIS_BAKASHA → gen_requestnumber = key gen_requestnumberdb of full-cache Lookup 'Check If  Heir Exist', which together with gen_identitynumber (Rasham 'Column 0' characters 1-9, zero-padded) and the other two keys selects the gen_heir record (gen_heiriddb → heir.Id) this update is sent to", "evidence": "conns DTSX 4-18, 49-63, 75-120, 121-135; Split File Trim DTSX 12219; Lookup DTSX 4070-4118; main.cs:129" }
+     ]
+    },
+    {
+     "attribute": "gen_lastname",
+     "from": [ { "column": "gen_lastname", "role": "value" }, { "column": "Gen_lastnamedb", "role": "condition" } ],
+     "expression": "heir[\"gen_lastname\"] = Row.genlastname (file LAST_NAME trimmed, empty → NULL)",
+     "fixedValue": null,
+     "condition": "Row.genlastname_IsNull != Row.Genlastnamedb_IsNull || (!Row.genlastname_IsNull && !String.Equals(Row.genlastname, Row.Genlastnamedb))",
+     "evidence": "main.cs:138-142; IsEqual main.cs:295-338",
+     "declaredSources": [
+      { "file": "Source - Rasham", "field": "Column 0", "role": "value", "why": "file-to-file bridge (heir record → [Source - Heir Details]); LAST_NAME (pos 33-82) = Rasham 'Column 0' characters 10-59", "evidence": "conns DTSX 49-63, 98-120, 121-135; Split File DTSX 12072, 12122-12151" },
+      { "file": "Source - Rasham", "field": "MACHOZ", "role": "key", "why": "file-to-file bridge: Rasham MACHOZ (pos 1, trimmed by 'Split File\\Trim All Input Columns') → Heir Details MACHOZ → (DT_I4) gen_region (Set Heir Columns DTSX 6915) = key gen_regiondb of full-cache Lookup 'Check If  Heir Exist', which together with gen_identitynumber (Rasham 'Column 0' characters 1-9, zero-padded) and the other two keys selects the gen_heir record (gen_heiriddb → heir.Id) this update is sent to", "evidence": "conns DTSX 4-18, 49-63, 75-120, 121-135; Split File Trim DTSX 12219; Lookup DTSX 4070-4118; main.cs:129" },
+      { "file": "Source - Rasham", "field": "MIS_TIK", "role": "key", "why": "file-to-file bridge: Rasham MIS_TIK (pos 2-10, trimmed by 'Split File\\Trim All Input Columns') → Heir Details MIS_TIK → gen_portfolionumber = key gen_portfolionumberdb of full-cache Lookup 'Check If  Heir Exist', which together with gen_identitynumber (Rasham 'Column 0' characters 1-9, zero-padded) and the other two keys selects the gen_heir record (gen_heiriddb → heir.Id) this update is sent to", "evidence": "conns DTSX 4-18, 49-63, 75-120, 121-135; Split File Trim DTSX 12219; Lookup DTSX 4070-4118; main.cs:129" },
+      { "file": "Source - Rasham", "field": "MIS_BAKASHA", "role": "key", "why": "file-to-file bridge: Rasham MIS_BAKASHA (pos 11-19, trimmed by 'Split File\\Trim All Input Columns') → Heir Details MIS_BAKASHA → gen_requestnumber = key gen_requestnumberdb of full-cache Lookup 'Check If  Heir Exist', which together with gen_identitynumber (Rasham 'Column 0' characters 1-9, zero-padded) and the other two keys selects the gen_heir record (gen_heiriddb → heir.Id) this update is sent to", "evidence": "conns DTSX 4-18, 49-63, 75-120, 121-135; Split File Trim DTSX 12219; Lookup DTSX 4070-4118; main.cs:129" }
+     ]
+    },
+    {
+     "attribute": "gen_address",
+     "from": [ { "column": "gen_address", "role": "value" }, { "column": "Gen_addressdb", "role": "condition" } ],
+     "expression": "heir[\"gen_address\"] = Row.genaddress (file KTOVET trimmed, empty → NULL)",
+     "fixedValue": null,
+     "condition": "Row.genaddress_IsNull != Row.Genaddressdb_IsNull || (!Row.genaddress_IsNull && !String.Equals(Row.genaddress, Row.Genaddressdb))",
+     "evidence": "main.cs:144-148; IsEqual main.cs:295-338",
+     "declaredSources": [
+      { "file": "Source - Rasham", "field": "Column 0", "role": "value", "why": "file-to-file bridge (heir record → [Source - Heir Details]); KTOVET (pos 133-152) = Rasham 'Column 0' characters 110-129", "evidence": "conns DTSX 49-63, 98-120, 121-135; Split File DTSX 12072, 12122-12151" },
+      { "file": "Source - Rasham", "field": "MACHOZ", "role": "key", "why": "file-to-file bridge: Rasham MACHOZ (pos 1, trimmed by 'Split File\\Trim All Input Columns') → Heir Details MACHOZ → (DT_I4) gen_region (Set Heir Columns DTSX 6915) = key gen_regiondb of full-cache Lookup 'Check If  Heir Exist', which together with gen_identitynumber (Rasham 'Column 0' characters 1-9, zero-padded) and the other two keys selects the gen_heir record (gen_heiriddb → heir.Id) this update is sent to", "evidence": "conns DTSX 4-18, 49-63, 75-120, 121-135; Split File Trim DTSX 12219; Lookup DTSX 4070-4118; main.cs:129" },
+      { "file": "Source - Rasham", "field": "MIS_TIK", "role": "key", "why": "file-to-file bridge: Rasham MIS_TIK (pos 2-10, trimmed by 'Split File\\Trim All Input Columns') → Heir Details MIS_TIK → gen_portfolionumber = key gen_portfolionumberdb of full-cache Lookup 'Check If  Heir Exist', which together with gen_identitynumber (Rasham 'Column 0' characters 1-9, zero-padded) and the other two keys selects the gen_heir record (gen_heiriddb → heir.Id) this update is sent to", "evidence": "conns DTSX 4-18, 49-63, 75-120, 121-135; Split File Trim DTSX 12219; Lookup DTSX 4070-4118; main.cs:129" },
+      { "file": "Source - Rasham", "field": "MIS_BAKASHA", "role": "key", "why": "file-to-file bridge: Rasham MIS_BAKASHA (pos 11-19, trimmed by 'Split File\\Trim All Input Columns') → Heir Details MIS_BAKASHA → gen_requestnumber = key gen_requestnumberdb of full-cache Lookup 'Check If  Heir Exist', which together with gen_identitynumber (Rasham 'Column 0' characters 1-9, zero-padded) and the other two keys selects the gen_heir record (gen_heiriddb → heir.Id) this update is sent to", "evidence": "conns DTSX 4-18, 49-63, 75-120, 121-135; Split File Trim DTSX 12219; Lookup DTSX 4070-4118; main.cs:129" }
+     ]
+    },
+    {
+     "attribute": "gen_city",
+     "from": [ { "column": "gen_city", "role": "value" }, { "column": "Gen_citydb", "role": "condition" } ],
+     "expression": "heir[\"gen_city\"] = Row.gencity (file IR trimmed, empty → NULL)",
+     "fixedValue": null,
+     "condition": "Row.gencity_IsNull != Row.Gencitydb_IsNull || (!Row.gencity_IsNull && !String.Equals(Row.gencity, Row.Gencitydb))",
+     "evidence": "main.cs:150-154; IsEqual main.cs:295-338",
+     "declaredSources": [
+      { "file": "Source - Rasham", "field": "Column 0", "role": "value", "why": "file-to-file bridge (heir record → [Source - Heir Details]); IR (pos 153-164) = Rasham 'Column 0' characters 130-141", "evidence": "conns DTSX 49-63, 98-120, 121-135; Split File DTSX 12072, 12122-12151" },
+      { "file": "Source - Rasham", "field": "MACHOZ", "role": "key", "why": "file-to-file bridge: Rasham MACHOZ (pos 1, trimmed by 'Split File\\Trim All Input Columns') → Heir Details MACHOZ → (DT_I4) gen_region (Set Heir Columns DTSX 6915) = key gen_regiondb of full-cache Lookup 'Check If  Heir Exist', which together with gen_identitynumber (Rasham 'Column 0' characters 1-9, zero-padded) and the other two keys selects the gen_heir record (gen_heiriddb → heir.Id) this update is sent to", "evidence": "conns DTSX 4-18, 49-63, 75-120, 121-135; Split File Trim DTSX 12219; Lookup DTSX 4070-4118; main.cs:129" },
+      { "file": "Source - Rasham", "field": "MIS_TIK", "role": "key", "why": "file-to-file bridge: Rasham MIS_TIK (pos 2-10, trimmed by 'Split File\\Trim All Input Columns') → Heir Details MIS_TIK → gen_portfolionumber = key gen_portfolionumberdb of full-cache Lookup 'Check If  Heir Exist', which together with gen_identitynumber (Rasham 'Column 0' characters 1-9, zero-padded) and the other two keys selects the gen_heir record (gen_heiriddb → heir.Id) this update is sent to", "evidence": "conns DTSX 4-18, 49-63, 75-120, 121-135; Split File Trim DTSX 12219; Lookup DTSX 4070-4118; main.cs:129" },
+      { "file": "Source - Rasham", "field": "MIS_BAKASHA", "role": "key", "why": "file-to-file bridge: Rasham MIS_BAKASHA (pos 11-19, trimmed by 'Split File\\Trim All Input Columns') → Heir Details MIS_BAKASHA → gen_requestnumber = key gen_requestnumberdb of full-cache Lookup 'Check If  Heir Exist', which together with gen_identitynumber (Rasham 'Column 0' characters 1-9, zero-padded) and the other two keys selects the gen_heir record (gen_heiriddb → heir.Id) this update is sent to", "evidence": "conns DTSX 4-18, 49-63, 75-120, 121-135; Split File Trim DTSX 12219; Lookup DTSX 4070-4118; main.cs:129" }
+     ]
+    },
+    {
+     "attribute": "gen_postalcode",
+     "from": [ { "column": "gen_postalcode", "role": "value" }, { "column": "Gen_postalcodedb", "role": "condition" } ],
+     "expression": "heir[\"gen_postalcode\"] = Row.genpostalcode (file MIKUD trimmed, empty → NULL)",
+     "fixedValue": null,
+     "condition": "Row.genpostalcode_IsNull != Row.Genpostalcodedb_IsNull || (!Row.genpostalcode_IsNull && !String.Equals(Row.genpostalcode, Row.Genpostalcodedb))",
+     "evidence": "main.cs:156-160; IsEqual main.cs:295-338",
+     "declaredSources": [
+      { "file": "Source - Rasham", "field": "Column 0", "role": "value", "why": "file-to-file bridge (heir record → [Source - Heir Details]); MIKUD (pos 165-171) = Rasham 'Column 0' characters 142-148", "evidence": "conns DTSX 49-63, 98-120, 121-135; Split File DTSX 12072, 12122-12151" },
+      { "file": "Source - Rasham", "field": "MACHOZ", "role": "key", "why": "file-to-file bridge: Rasham MACHOZ (pos 1, trimmed by 'Split File\\Trim All Input Columns') → Heir Details MACHOZ → (DT_I4) gen_region (Set Heir Columns DTSX 6915) = key gen_regiondb of full-cache Lookup 'Check If  Heir Exist', which together with gen_identitynumber (Rasham 'Column 0' characters 1-9, zero-padded) and the other two keys selects the gen_heir record (gen_heiriddb → heir.Id) this update is sent to", "evidence": "conns DTSX 4-18, 49-63, 75-120, 121-135; Split File Trim DTSX 12219; Lookup DTSX 4070-4118; main.cs:129" },
+      { "file": "Source - Rasham", "field": "MIS_TIK", "role": "key", "why": "file-to-file bridge: Rasham MIS_TIK (pos 2-10, trimmed by 'Split File\\Trim All Input Columns') → Heir Details MIS_TIK → gen_portfolionumber = key gen_portfolionumberdb of full-cache Lookup 'Check If  Heir Exist', which together with gen_identitynumber (Rasham 'Column 0' characters 1-9, zero-padded) and the other two keys selects the gen_heir record (gen_heiriddb → heir.Id) this update is sent to", "evidence": "conns DTSX 4-18, 49-63, 75-120, 121-135; Split File Trim DTSX 12219; Lookup DTSX 4070-4118; main.cs:129" },
+      { "file": "Source - Rasham", "field": "MIS_BAKASHA", "role": "key", "why": "file-to-file bridge: Rasham MIS_BAKASHA (pos 11-19, trimmed by 'Split File\\Trim All Input Columns') → Heir Details MIS_BAKASHA → gen_requestnumber = key gen_requestnumberdb of full-cache Lookup 'Check If  Heir Exist', which together with gen_identitynumber (Rasham 'Column 0' characters 1-9, zero-padded) and the other two keys selects the gen_heir record (gen_heiriddb → heir.Id) this update is sent to", "evidence": "conns DTSX 4-18, 49-63, 75-120, 121-135; Split File Trim DTSX 12219; Lookup DTSX 4070-4118; main.cs:129" }
+     ]
+    },
+    {
+     "attribute": "gen_country",
+     "from": [ { "column": "gen_country", "role": "value" }, { "column": "Gen_countrydb", "role": "condition" }, { "column": "gen_city", "role": "condition" } ],
+     "expression": "heir[\"gen_country\"] = Row.gencountry (file EREZ trimmed, empty → NULL)",
+     "fixedValue": null,
+     "condition": "Row.gencountry_IsNull != Row.Gencountrydb_IsNull || (Row.gencity_IsNull == false && IsNeedToUpdate<String>(Row.gencountry, Row.Gencountrydb)) — BUG: the second operand tests gen_city's NULL flag instead of gen_country's, so a changed (both non-NULL) country is updated only when the heir's city (IR) is not NULL",
+     "evidence": "main.cs:162-166; IsEqual main.cs:295-338",
+     "declaredSources": [
+      { "file": "Source - Rasham", "field": "Column 0", "role": "value", "why": "file-to-file bridge (heir record → [Source - Heir Details]); EREZ (pos 172-183) = Rasham 'Column 0' characters 149-160 (IR, characters 130-141, also gates the update)", "evidence": "conns DTSX 49-63, 98-120, 121-135; Split File DTSX 12072, 12122-12151" },
+      { "file": "Source - Rasham", "field": "MACHOZ", "role": "key", "why": "file-to-file bridge: Rasham MACHOZ (pos 1, trimmed by 'Split File\\Trim All Input Columns') → Heir Details MACHOZ → (DT_I4) gen_region (Set Heir Columns DTSX 6915) = key gen_regiondb of full-cache Lookup 'Check If  Heir Exist', which together with gen_identitynumber (Rasham 'Column 0' characters 1-9, zero-padded) and the other two keys selects the gen_heir record (gen_heiriddb → heir.Id) this update is sent to", "evidence": "conns DTSX 4-18, 49-63, 75-120, 121-135; Split File Trim DTSX 12219; Lookup DTSX 4070-4118; main.cs:129" },
+      { "file": "Source - Rasham", "field": "MIS_TIK", "role": "key", "why": "file-to-file bridge: Rasham MIS_TIK (pos 2-10, trimmed by 'Split File\\Trim All Input Columns') → Heir Details MIS_TIK → gen_portfolionumber = key gen_portfolionumberdb of full-cache Lookup 'Check If  Heir Exist', which together with gen_identitynumber (Rasham 'Column 0' characters 1-9, zero-padded) and the other two keys selects the gen_heir record (gen_heiriddb → heir.Id) this update is sent to", "evidence": "conns DTSX 4-18, 49-63, 75-120, 121-135; Split File Trim DTSX 12219; Lookup DTSX 4070-4118; main.cs:129" },
+      { "file": "Source - Rasham", "field": "MIS_BAKASHA", "role": "key", "why": "file-to-file bridge: Rasham MIS_BAKASHA (pos 11-19, trimmed by 'Split File\\Trim All Input Columns') → Heir Details MIS_BAKASHA → gen_requestnumber = key gen_requestnumberdb of full-cache Lookup 'Check If  Heir Exist', which together with gen_identitynumber (Rasham 'Column 0' characters 1-9, zero-padded) and the other two keys selects the gen_heir record (gen_heiriddb → heir.Id) this update is sent to", "evidence": "conns DTSX 4-18, 49-63, 75-120, 121-135; Split File Trim DTSX 12219; Lookup DTSX 4070-4118; main.cs:129" }
+     ]
+    },
+    {
+     "attribute": "gen_relationtype",
+     "from": [ { "column": "gen_relationtype", "role": "value" }, { "column": "Gen_relationtypedb", "role": "condition" } ],
+     "expression": "heir[\"gen_relationtype\"] = Row.genrelationtype (file KIRVA_EL_MANOCH trimmed, empty → NULL; plain string)",
+     "fixedValue": null,
+     "condition": "Row.genrelationtype_IsNull != Row.Genrelationtypedb_IsNull || (!Row.genrelationtype_IsNull && !String.Equals(Row.genrelationtype, Row.Genrelationtypedb))",
+     "evidence": "main.cs:169-173; IsEqual main.cs:295-338",
+     "declaredSources": [
+      { "file": "Source - Rasham", "field": "Column 0", "role": "value", "why": "file-to-file bridge (heir record → [Source - Heir Details]); KIRVA_EL_MANOCH (pos 184-189) = Rasham 'Column 0' characters 161-166", "evidence": "conns DTSX 49-63, 98-120, 121-135; Split File DTSX 12072, 12122-12151" },
+      { "file": "Source - Rasham", "field": "MACHOZ", "role": "key", "why": "file-to-file bridge: Rasham MACHOZ (pos 1, trimmed by 'Split File\\Trim All Input Columns') → Heir Details MACHOZ → (DT_I4) gen_region (Set Heir Columns DTSX 6915) = key gen_regiondb of full-cache Lookup 'Check If  Heir Exist', which together with gen_identitynumber (Rasham 'Column 0' characters 1-9, zero-padded) and the other two keys selects the gen_heir record (gen_heiriddb → heir.Id) this update is sent to", "evidence": "conns DTSX 4-18, 49-63, 75-120, 121-135; Split File Trim DTSX 12219; Lookup DTSX 4070-4118; main.cs:129" },
+      { "file": "Source - Rasham", "field": "MIS_TIK", "role": "key", "why": "file-to-file bridge: Rasham MIS_TIK (pos 2-10, trimmed by 'Split File\\Trim All Input Columns') → Heir Details MIS_TIK → gen_portfolionumber = key gen_portfolionumberdb of full-cache Lookup 'Check If  Heir Exist', which together with gen_identitynumber (Rasham 'Column 0' characters 1-9, zero-padded) and the other two keys selects the gen_heir record (gen_heiriddb → heir.Id) this update is sent to", "evidence": "conns DTSX 4-18, 49-63, 75-120, 121-135; Split File Trim DTSX 12219; Lookup DTSX 4070-4118; main.cs:129" },
+      { "file": "Source - Rasham", "field": "MIS_BAKASHA", "role": "key", "why": "file-to-file bridge: Rasham MIS_BAKASHA (pos 11-19, trimmed by 'Split File\\Trim All Input Columns') → Heir Details MIS_BAKASHA → gen_requestnumber = key gen_requestnumberdb of full-cache Lookup 'Check If  Heir Exist', which together with gen_identitynumber (Rasham 'Column 0' characters 1-9, zero-padded) and the other two keys selects the gen_heir record (gen_heiriddb → heir.Id) this update is sent to", "evidence": "conns DTSX 4-18, 49-63, 75-120, 121-135; Split File Trim DTSX 12219; Lookup DTSX 4070-4118; main.cs:129" }
+     ]
+    },
+    {
+     "attribute": "gen_identitynumber",
+     "from": [ { "column": "gen_identitynumber", "role": "value" }, { "column": "gen_identitynumberdb", "role": "condition" } ],
+     "expression": "heir[\"gen_identitynumber\"] = Row.genidentitynumber (MIS_ZEHUT trimmed + zero-padded to 9) — DEAD on this path: see excludeFromValue",
+     "fixedValue": null,
+     "condition": "Row.genidentitynumber_IsNull != Row.genidentitynumberdb_IsNull || (!Row.genidentitynumber_IsNull && !String.Equals(Row.genidentitynumber, Row.genidentitynumberdb)) — never true for rows that reached Update Heir",
+     "evidence": "main.cs:175-179",
+     "excludeFromValue": [
+      { "field": "MIS_ZEHUT", "why": "Update Heir only receives rows from the Match output of full-cache Lookup 'Check If  Heir Exist', which joins this same column gen_identitynumber = gen_identitynumberdb (exact comparison); 'change empty strings to null' only nulls blank CRM values and the padded id is never blank. Both values are therefore equal and non-NULL, so the condition is always false and the attribute is never sent.", "evidence": "Lookup DTSX 4070-4118 (CacheType 0, JoinToReferenceColumn gen_identitynumberdb); DTSX 3990; main.cs:175-179" }
+     ],
+     "declaredSources": [
+      { "file": "Source - Rasham", "field": "Column 0", "role": "condition", "why": "file-to-file bridge; Heir Details MIS_ZEHUT = Rasham 'Column 0' characters 1-9 — compared only (write never fires, see excludeFromValue)", "evidence": "conns DTSX 49-63, 98-120, 121-135" },
+      { "file": "Source - Rasham", "field": "MACHOZ", "role": "key", "why": "file-to-file bridge: Rasham MACHOZ (pos 1, trimmed by 'Split File\\Trim All Input Columns') → Heir Details MACHOZ → (DT_I4) gen_region (Set Heir Columns DTSX 6915) = key gen_regiondb of full-cache Lookup 'Check If  Heir Exist', which together with gen_identitynumber (Rasham 'Column 0' characters 1-9, zero-padded) and the other two keys selects the gen_heir record (gen_heiriddb → heir.Id) this update is sent to", "evidence": "conns DTSX 4-18, 49-63, 75-120, 121-135; Split File Trim DTSX 12219; Lookup DTSX 4070-4118; main.cs:129" },
+      { "file": "Source - Rasham", "field": "MIS_TIK", "role": "key", "why": "file-to-file bridge: Rasham MIS_TIK (pos 2-10, trimmed by 'Split File\\Trim All Input Columns') → Heir Details MIS_TIK → gen_portfolionumber = key gen_portfolionumberdb of full-cache Lookup 'Check If  Heir Exist', which together with gen_identitynumber (Rasham 'Column 0' characters 1-9, zero-padded) and the other two keys selects the gen_heir record (gen_heiriddb → heir.Id) this update is sent to", "evidence": "conns DTSX 4-18, 49-63, 75-120, 121-135; Split File Trim DTSX 12219; Lookup DTSX 4070-4118; main.cs:129" },
+      { "file": "Source - Rasham", "field": "MIS_BAKASHA", "role": "key", "why": "file-to-file bridge: Rasham MIS_BAKASHA (pos 11-19, trimmed by 'Split File\\Trim All Input Columns') → Heir Details MIS_BAKASHA → gen_requestnumber = key gen_requestnumberdb of full-cache Lookup 'Check If  Heir Exist', which together with gen_identitynumber (Rasham 'Column 0' characters 1-9, zero-padded) and the other two keys selects the gen_heir record (gen_heiriddb → heir.Id) this update is sent to", "evidence": "conns DTSX 4-18, 49-63, 75-120, 121-135; Split File Trim DTSX 12219; Lookup DTSX 4070-4118; main.cs:129" }
+     ]
+    },
+    {
+     "attribute": "gen_customeridentitynumber",
+     "from": [ { "column": "gen_customeridentitynumber", "role": "value" }, { "column": "Gen_customeridentitynumberdb", "role": "condition" } ],
+     "expression": "heir[\"gen_customeridentitynumber\"] = Row.gencustomeridentitynumber (contact-file MIS_ZEHUT_MORISH trimmed + zero-padded to 9; never NULL)",
+     "fixedValue": null,
+     "condition": "Row.gencustomeridentitynumber_IsNull != Row.Gencustomeridentitynumberdb_IsNull || (!Row.gencustomeridentitynumber_IsNull && !String.Equals(Row.gencustomeridentitynumber, Row.Gencustomeridentitynumberdb))",
+     "evidence": "main.cs:182-186; IsEqual main.cs:295-338",
+     "declaredSources": [
+      { "file": "Source - Rasham", "field": "Column 0", "role": "value", "why": "file-to-file bridge: SUG_REC==\"1\" record → @[User::ContactDetailsFilePath] → [Source - Contact Details]; MIS_ZEHUT_MORISH (pos 32-40) = Rasham 'Column 0' characters 9-17 of that record", "evidence": "conns DTSX 4-18, 75-97, 121-135; Split File DTSX 12064, 12092-12121" },
+      { "file": "Source - Contact Details", "field": "MACHOZ", "role": "key", "why": "Merge Join (inner) selects which contact record is attached to the heir row", "evidence": "DTSX 6754-6756" },
+      { "file": "Source - Contact Details", "field": "MIS_TIK", "role": "key", "why": "Merge Join key #2", "evidence": "DTSX 6754-6756" },
+      { "file": "Source - Contact Details", "field": "MIS_BAKASHA", "role": "key", "why": "Merge Join key #3", "evidence": "DTSX 6754-6756" },
+      { "file": "Source - Heir Details", "field": "MACHOZ", "role": "key", "why": "heir-side Merge Join key #1", "evidence": "DTSX 6754-6756" },
+      { "file": "Source - Heir Details", "field": "MIS_TIK", "role": "key", "why": "heir-side Merge Join key #2", "evidence": "DTSX 6754-6756" },
+      { "file": "Source - Heir Details", "field": "MIS_BAKASHA", "role": "key", "why": "heir-side Merge Join key #3", "evidence": "DTSX 6754-6756" },
+      { "file": "Source - Rasham", "field": "MACHOZ", "role": "key", "why": "file-to-file bridge: Rasham MACHOZ (pos 1, trimmed by 'Split File\\Trim All Input Columns') → Heir Details MACHOZ → (DT_I4) gen_region (Set Heir Columns DTSX 6915) = key gen_regiondb of full-cache Lookup 'Check If  Heir Exist', which together with gen_identitynumber (Rasham 'Column 0' characters 1-9, zero-padded) and the other two keys selects the gen_heir record (gen_heiriddb → heir.Id) this update is sent to; also Rasham MACHOZ (pos 1) becomes MACHOZ of both the heir and the contact intermediate files; INNER Merge Join key #1 selecting which SUG_REC==\"1\" contact record supplies this value", "evidence": "conns DTSX 4-18, 49-63, 75-120, 121-135; Split File Trim DTSX 12219; Lookup DTSX 4070-4118; main.cs:129; Merge Join DTSX 6754-6756" },
+      { "file": "Source - Rasham", "field": "MIS_TIK", "role": "key", "why": "file-to-file bridge: Rasham MIS_TIK (pos 2-10, trimmed by 'Split File\\Trim All Input Columns') → Heir Details MIS_TIK → gen_portfolionumber = key gen_portfolionumberdb of full-cache Lookup 'Check If  Heir Exist', which together with gen_identitynumber (Rasham 'Column 0' characters 1-9, zero-padded) and the other two keys selects the gen_heir record (gen_heiriddb → heir.Id) this update is sent to; also Rasham MIS_TIK (pos 2-10) becomes MIS_TIK of both the heir and the contact intermediate files; INNER Merge Join key #2 selecting which SUG_REC==\"1\" contact record supplies this value", "evidence": "conns DTSX 4-18, 49-63, 75-120, 121-135; Split File Trim DTSX 12219; Lookup DTSX 4070-4118; main.cs:129; Merge Join DTSX 6754-6756" },
+      { "file": "Source - Rasham", "field": "MIS_BAKASHA", "role": "key", "why": "file-to-file bridge: Rasham MIS_BAKASHA (pos 11-19, trimmed by 'Split File\\Trim All Input Columns') → Heir Details MIS_BAKASHA → gen_requestnumber = key gen_requestnumberdb of full-cache Lookup 'Check If  Heir Exist', which together with gen_identitynumber (Rasham 'Column 0' characters 1-9, zero-padded) and the other two keys selects the gen_heir record (gen_heiriddb → heir.Id) this update is sent to; also Rasham MIS_BAKASHA (pos 11-19) becomes MIS_BAKASHA of both the heir and the contact intermediate files; INNER Merge Join key #3 selecting which SUG_REC==\"1\" contact record supplies this value", "evidence": "conns DTSX 4-18, 49-63, 75-120, 121-135; Split File Trim DTSX 12219; Lookup DTSX 4070-4118; main.cs:129; Merge Join DTSX 6754-6756" }
+     ]
+    },
+    {
+     "attribute": "gen_status",
+     "from": [ { "column": "gen_status", "role": "value" }, { "column": "Gen_statusdb", "role": "condition" } ],
+     "expression": "heir[\"gen_status\"] = new OptionSetValue(Row.genstatus); gen_status = (SUG_PEULA == \"U\" || SUG_PEULA == \"C\") ? 1 : 2 (DTSX 6903), NULL when SUG_PEULA is NULL",
+     "fixedValue": null,
+     "condition": "Row.genstatus_IsNull != Row.Genstatusdb_IsNull || (!Row.genstatus_IsNull && Row.genstatus != Row.Genstatusdb)",
+     "evidence": "main.cs:190-194; IsEqual Int32 main.cs:322-323",
+     "declaredSources": [
+      { "file": "Source - Rasham", "field": "Column 0", "role": "condition", "why": "file-to-file bridge; Heir Details SUG_PEULA (pos 190) = Rasham 'Column 0' character 167, selects 1 or 2", "evidence": "conns DTSX 49-63, 98-120, 121-135; DTSX 6903" },
+      { "file": "Source - Rasham", "field": "MACHOZ", "role": "key", "why": "file-to-file bridge: Rasham MACHOZ (pos 1, trimmed by 'Split File\\Trim All Input Columns') → Heir Details MACHOZ → (DT_I4) gen_region (Set Heir Columns DTSX 6915) = key gen_regiondb of full-cache Lookup 'Check If  Heir Exist', which together with gen_identitynumber (Rasham 'Column 0' characters 1-9, zero-padded) and the other two keys selects the gen_heir record (gen_heiriddb → heir.Id) this update is sent to", "evidence": "conns DTSX 4-18, 49-63, 75-120, 121-135; Split File Trim DTSX 12219; Lookup DTSX 4070-4118; main.cs:129" },
+      { "file": "Source - Rasham", "field": "MIS_TIK", "role": "key", "why": "file-to-file bridge: Rasham MIS_TIK (pos 2-10, trimmed by 'Split File\\Trim All Input Columns') → Heir Details MIS_TIK → gen_portfolionumber = key gen_portfolionumberdb of full-cache Lookup 'Check If  Heir Exist', which together with gen_identitynumber (Rasham 'Column 0' characters 1-9, zero-padded) and the other two keys selects the gen_heir record (gen_heiriddb → heir.Id) this update is sent to", "evidence": "conns DTSX 4-18, 49-63, 75-120, 121-135; Split File Trim DTSX 12219; Lookup DTSX 4070-4118; main.cs:129" },
+      { "file": "Source - Rasham", "field": "MIS_BAKASHA", "role": "key", "why": "file-to-file bridge: Rasham MIS_BAKASHA (pos 11-19, trimmed by 'Split File\\Trim All Input Columns') → Heir Details MIS_BAKASHA → gen_requestnumber = key gen_requestnumberdb of full-cache Lookup 'Check If  Heir Exist', which together with gen_identitynumber (Rasham 'Column 0' characters 1-9, zero-padded) and the other two keys selects the gen_heir record (gen_heiriddb → heir.Id) this update is sent to", "evidence": "conns DTSX 4-18, 49-63, 75-120, 121-135; Split File Trim DTSX 12219; Lookup DTSX 4070-4118; main.cs:129" }
+     ]
+    },
+    {
+     "attribute": "gen_contactname",
+     "from": [ { "column": "gen_contactname", "role": "value" }, { "column": "Gen_contactnamedb", "role": "condition" } ],
+     "expression": "heir[\"gen_contactname\"] = new EntityReference(\"contact\", Row.gencontactname); gen_contactname = contactid from Lookup 'Check If Contact Exist' keyed by zero-padded MIS_ZEHUT_MORISH (CRM id, never a file value; non-NULL on this path)",
+     "fixedValue": null,
+     "condition": "Row.gencontactname_IsNull != Row.Gencontactnamedb_IsNull || (!Row.gencontactname_IsNull && !Guid.Equals(Row.gencontactname, Row.Gencontactnamedb))",
+     "evidence": "main.cs:199-203; IsEqual Guid main.cs:319-320; Lookup DTSX 4254-4282",
+     "declaredSources": [
+      { "file": "Source - Rasham", "field": "Column 0", "role": "key", "why": "file-to-file bridge: lookup key MIS_ZEHUT_MORISH = Rasham 'Column 0' characters 9-17 of the SUG_REC==\"1\" record", "evidence": "conns DTSX 4-18, 75-97, 121-135; DTSX 4254-4282" },
+      { "file": "Source - Contact Details", "field": "MACHOZ", "role": "key", "why": "Merge Join selects the contact record whose MIS_ZEHUT_MORISH is the lookup key", "evidence": "DTSX 6754-6756" },
+      { "file": "Source - Contact Details", "field": "MIS_TIK", "role": "key", "why": "Merge Join key #2", "evidence": "DTSX 6754-6756" },
+      { "file": "Source - Contact Details", "field": "MIS_BAKASHA", "role": "key", "why": "Merge Join key #3", "evidence": "DTSX 6754-6756" },
+      { "file": "Source - Rasham", "field": "MACHOZ", "role": "key", "why": "file-to-file bridge: Rasham MACHOZ (pos 1, trimmed by 'Split File\\Trim All Input Columns') → Heir Details MACHOZ → (DT_I4) gen_region (Set Heir Columns DTSX 6915) = key gen_regiondb of full-cache Lookup 'Check If  Heir Exist', which together with gen_identitynumber (Rasham 'Column 0' characters 1-9, zero-padded) and the other two keys selects the gen_heir record (gen_heiriddb → heir.Id) this update is sent to; also Rasham MACHOZ (pos 1) becomes MACHOZ of both the heir and the contact intermediate files; INNER Merge Join key #1 selecting which SUG_REC==\"1\" contact record supplies this value", "evidence": "conns DTSX 4-18, 49-63, 75-120, 121-135; Split File Trim DTSX 12219; Lookup DTSX 4070-4118; main.cs:129; Merge Join DTSX 6754-6756" },
+      { "file": "Source - Rasham", "field": "MIS_TIK", "role": "key", "why": "file-to-file bridge: Rasham MIS_TIK (pos 2-10, trimmed by 'Split File\\Trim All Input Columns') → Heir Details MIS_TIK → gen_portfolionumber = key gen_portfolionumberdb of full-cache Lookup 'Check If  Heir Exist', which together with gen_identitynumber (Rasham 'Column 0' characters 1-9, zero-padded) and the other two keys selects the gen_heir record (gen_heiriddb → heir.Id) this update is sent to; also Rasham MIS_TIK (pos 2-10) becomes MIS_TIK of both the heir and the contact intermediate files; INNER Merge Join key #2 selecting which SUG_REC==\"1\" contact record supplies this value", "evidence": "conns DTSX 4-18, 49-63, 75-120, 121-135; Split File Trim DTSX 12219; Lookup DTSX 4070-4118; main.cs:129; Merge Join DTSX 6754-6756" },
+      { "file": "Source - Rasham", "field": "MIS_BAKASHA", "role": "key", "why": "file-to-file bridge: Rasham MIS_BAKASHA (pos 11-19, trimmed by 'Split File\\Trim All Input Columns') → Heir Details MIS_BAKASHA → gen_requestnumber = key gen_requestnumberdb of full-cache Lookup 'Check If  Heir Exist', which together with gen_identitynumber (Rasham 'Column 0' characters 1-9, zero-padded) and the other two keys selects the gen_heir record (gen_heiriddb → heir.Id) this update is sent to; also Rasham MIS_BAKASHA (pos 11-19) becomes MIS_BAKASHA of both the heir and the contact intermediate files; INNER Merge Join key #3 selecting which SUG_REC==\"1\" contact record supplies this value", "evidence": "conns DTSX 4-18, 49-63, 75-120, 121-135; Split File Trim DTSX 12219; Lookup DTSX 4070-4118; main.cs:129; Merge Join DTSX 6754-6756" }
+     ]
+    },
+    {
+     "attribute": "gen_issueanceofanorderdate",
+     "from": [ { "column": "gen_issueanceofanorderdate", "role": "value" }, { "column": "Gen_issueanceofanorderdatedb", "role": "condition" } ],
+     "expression": "DateTime.TryParse(Row.genissueanceofanorderdate) (main.cs:209, executed for every row before any NULL check) → heir[\"gen_issueanceofanorderdate\"] = parsed date, only when the parse succeeded. Upstream: contact-file TAARICH_MATAN_ZAV_RASHAM trimmed (empty → NULL) and 'Format Dates' yyyymmdd → yyyy/MM/dd (6 chars → yyyy/MM/01, else NULL)",
+     "fixedValue": null,
+     "condition": "(Row.genissueanceofanorderdate_IsNull != Row.Genissueanceofanorderdatedb_IsNull || (!Row.genissueanceofanorderdate_IsNull && parsed.Date != Row.Genissueanceofanorderdatedb.AddHours(3).Date)) && parse succeeded — the CRM value is shifted +3 hours before comparing dates",
+     "evidence": "main.cs:208-218; IsEqual DateTime main.cs:309-313",
+     "declaredSources": [
+      { "file": "Source - Rasham", "field": "Column 0", "role": "value", "why": "file-to-file bridge: SUG_REC==\"1\" record → [Source - Contact Details]; TAARICH_MATAN_ZAV_RASHAM (pos 157-164) = Rasham 'Column 0' characters 134-141 of that record", "evidence": "conns DTSX 4-18, 75-97, 121-135; Split File DTSX 12064, 12092-12121" },
+      { "file": "Source - Contact Details", "field": "MACHOZ", "role": "key", "why": "Merge Join (inner) selects the contact record whose date is attached", "evidence": "DTSX 6754-6756" },
+      { "file": "Source - Contact Details", "field": "MIS_TIK", "role": "key", "why": "Merge Join key #2", "evidence": "DTSX 6754-6756" },
+      { "file": "Source - Contact Details", "field": "MIS_BAKASHA", "role": "key", "why": "Merge Join key #3", "evidence": "DTSX 6754-6756" },
+      { "file": "Source - Heir Details", "field": "MACHOZ", "role": "key", "why": "heir-side Merge Join key #1", "evidence": "DTSX 6754-6756" },
+      { "file": "Source - Heir Details", "field": "MIS_TIK", "role": "key", "why": "heir-side Merge Join key #2", "evidence": "DTSX 6754-6756" },
+      { "file": "Source - Heir Details", "field": "MIS_BAKASHA", "role": "key", "why": "heir-side Merge Join key #3", "evidence": "DTSX 6754-6756" },
+      { "file": "Source - Rasham", "field": "MACHOZ", "role": "key", "why": "file-to-file bridge: Rasham MACHOZ (pos 1, trimmed by 'Split File\\Trim All Input Columns') → Heir Details MACHOZ → (DT_I4) gen_region (Set Heir Columns DTSX 6915) = key gen_regiondb of full-cache Lookup 'Check If  Heir Exist', which together with gen_identitynumber (Rasham 'Column 0' characters 1-9, zero-padded) and the other two keys selects the gen_heir record (gen_heiriddb → heir.Id) this update is sent to; also Rasham MACHOZ (pos 1) becomes MACHOZ of both the heir and the contact intermediate files; INNER Merge Join key #1 selecting which SUG_REC==\"1\" contact record supplies this value", "evidence": "conns DTSX 4-18, 49-63, 75-120, 121-135; Split File Trim DTSX 12219; Lookup DTSX 4070-4118; main.cs:129; Merge Join DTSX 6754-6756" },
+      { "file": "Source - Rasham", "field": "MIS_TIK", "role": "key", "why": "file-to-file bridge: Rasham MIS_TIK (pos 2-10, trimmed by 'Split File\\Trim All Input Columns') → Heir Details MIS_TIK → gen_portfolionumber = key gen_portfolionumberdb of full-cache Lookup 'Check If  Heir Exist', which together with gen_identitynumber (Rasham 'Column 0' characters 1-9, zero-padded) and the other two keys selects the gen_heir record (gen_heiriddb → heir.Id) this update is sent to; also Rasham MIS_TIK (pos 2-10) becomes MIS_TIK of both the heir and the contact intermediate files; INNER Merge Join key #2 selecting which SUG_REC==\"1\" contact record supplies this value", "evidence": "conns DTSX 4-18, 49-63, 75-120, 121-135; Split File Trim DTSX 12219; Lookup DTSX 4070-4118; main.cs:129; Merge Join DTSX 6754-6756" },
+      { "file": "Source - Rasham", "field": "MIS_BAKASHA", "role": "key", "why": "file-to-file bridge: Rasham MIS_BAKASHA (pos 11-19, trimmed by 'Split File\\Trim All Input Columns') → Heir Details MIS_BAKASHA → gen_requestnumber = key gen_requestnumberdb of full-cache Lookup 'Check If  Heir Exist', which together with gen_identitynumber (Rasham 'Column 0' characters 1-9, zero-padded) and the other two keys selects the gen_heir record (gen_heiriddb → heir.Id) this update is sent to; also Rasham MIS_BAKASHA (pos 11-19) becomes MIS_BAKASHA of both the heir and the contact intermediate files; INNER Merge Join key #3 selecting which SUG_REC==\"1\" contact record supplies this value", "evidence": "conns DTSX 4-18, 49-63, 75-120, 121-135; Split File Trim DTSX 12219; Lookup DTSX 4070-4118; main.cs:129; Merge Join DTSX 6754-6756" }
+     ]
+    }
+   ],
+   "evidence": "main.cs:123-274 (component DTSX line 9182; Entity(\"gen_heir\") main.cs:125; heir.Id main.cs:129; ExecuteMultipleExtension(myEntities, RequestType.Update, service) main.cs:247)"
+  }
+ ],
+ "readWriteModifications": [
+  {
+   "component": "Package\\Foreach Loop Container\\Create And Update Heir\\Trim All Input Columns 1",
+   "column": "*",
+   "from": [],
+   "expression": "reflection over every string property of the heir row: if (!String.IsNullOrEmpty(str)) str = str.Trim(); if (str == \"\") str = null",
+   "condition": null,
+   "evidence": "main.cs:33-60 (DTSX 8046)"
+  },
+  {
+   "component": "Package\\Foreach Loop Container\\Create And Update Heir\\Trim All Input Columns",
+   "column": "*",
+   "from": [],
+   "expression": "reflection over every string property of the contact row (MACHOZ, MIS_TIK, MIS_BAKASHA, gen_customeridentitynumber, gen_issueanceofanorderdate): if (!String.IsNullOrEmpty(str)) str = str.Trim(); if (str == \"\") str = null",
+   "condition": null,
+   "evidence": "main.cs:33-57 (DTSX 7157)"
+  },
+  {
+   "component": "Package\\Foreach Loop Container\\Create And Update Heir\\Append Zeros To Fields",
+   "column": "*",
+   "from": [],
+   "expression": "FormatField(str, input column length 9): if (String.IsNullOrEmpty(str)) str = \"\"; if (str.Contains(\".\")) str = str.Replace(\".\", \"\"); while (str.Length < 9) str = \"0\" + str — applied to gen_identitynumber and gen_customeridentitynumber (NULL becomes \"000000000\")",
+   "condition": null,
+   "evidence": "main.cs:18-66 (DTSX 3159; cachedLength 9 at DTSX 3952-3953)"
+  },
+  {
+   "component": "Package\\Foreach Loop Container\\Create And Update Heir\\Format Dates",
+   "column": "gen_issueanceofanorderdate",
+   "from": [],
+   "expression": "FormatYYYYMMDDtoDate(str, 50): NULL/empty → NULL; str.Trim().Length == 8 → str.Substring(0,4) + \"/\" + str.Substring(4,2) + \"/\" + str.Substring(6,2); == 6 → yyyy + \"/\" + MM + \"/01\"; any other length → NULL; NULL if !DateTime.TryParse(str)",
+   "condition": null,
+   "evidence": "main.cs:38-80 (DTSX 5853; cachedLength 50 at DTSX 6630)"
+  }
+ ],
+ "lookupBridges": [],
+ "unresolved": [
+  {
+   "where": "Create Heir / Update Heir (all attributes)",
+   "reason": "blocked_external_dependency: CRM.Proxy (CrmProxy, ExecuteMultipleExtension, RequestType) is an external assembly not supplied. That RequestType.Create/Update issue Create/Update requests and options such as ContinueOnError are not provable from the DTSX; only the entity/attribute assignments in main.cs are proven."
+  },
+  {
+   "where": "Update Heir main.cs:133,140,146,152,158,164,171,177,184,192 ('clear' branch: file value NULL, CRM value not NULL), main.cs:162 (gen_country compared while both NULL and gen_city not NULL) and main.cs:209 (TryParse(Row.genissueanceofanorderdate) without an _IsNull check)",
+   "reason": "The code reads a NULL buffer column through the generated accessor (Buffer.GetString/GetInt32...). Whether that returns null or throws is SSIS runtime behaviour not provable from the DTSX. If it throws, the catch routes the row to CastingError (unconnected) and NO attribute of that heir is updated — for main.cs:209 this would affect every matched heir whose order date is NULL/invalid."
+  },
+  {
+   "where": "Package\\End ETL Process record\\ETL Record Finish (OPEN Get gen_etlprocessid.Output 0.gen_etlprocessid)",
+   "reason": "ETL plumbing (gen_etlprocess finish record) — out of scope by CLAUDE.md focus; not mapped."
+  }
+ ],
+ "notes": [
+  "The real input file is [Source - Rasham] (@[User::SelectedFilePath]). Data flow 'Split File' copies its records to two intermediate RaggedRight files: SUG_REC == \"2\" → [Heir Details] (@[User::HeirDetailsFilePath]) and SUG_REC == \"1\" → [Contact Details] (@[User::ContactDetailsFilePath]), both Overwrite=true, no header. 'Create And Update Heir' re-reads them through [Source - Heir Details] / [Source - Contact Details] (same ConnectionString variables, set once from gen_etlvariable by 'Set Variables'). The re-read splits Rasham 'Column 0' (position 24 onward) into the detail fields by position. This file-to-file bridge is invisible to the deterministic lineage, so the Rasham fields are declared (declaredSources / declaredRowFilters) with the character offsets.",
+  "BUG (likely): Update Heir main.cs:162 tests Row.gencity_IsNull instead of Row.gencountry_IsNull — a changed country is updated only if the heir's city is not NULL.",
+  "Update Heir never updates gen_name (Create sets gen_name = first + \" \" + last), so a changed first/last name leaves gen_name stale; gen_region, gen_portfolionumber and gen_requestnumber are not updated either (they are lookup keys).",
+  "Update Heir gen_identitynumber assignment (main.cs:175-179) can never fire: it is compared with the value the full-cache lookup matched on.",
+  "Merge Join is INNER (JoinType=2): heirs whose request (MACHOZ+MIS_TIK+MIS_BAKASHA) has no SUG_REC=1 contact record in the same file are silently dropped; several contact records with the same three keys multiply the heir row (each copy is created/updated).",
+  "Heirs whose deceased (padded MIS_ZEHUT_MORISH) has no CRM contact go to 'Derived Column 2' (sink) — no gen_heir is created. The flat-file connections 'Contact Don't Exist', 'Convertion Failed Error' and 'Heir Load Failed Error' are not used by any component; all error/no-match outputs end in Derived Column sinks.",
+  "Lookups use full cache loaded before the rows flow: two identical heir rows (same id/portfolio/request/region) in one file both take the No Match path and create two gen_heir records. If several CRM contacts share gen_identitynumber, the lookup returns one of them (not deterministic from the DTSX).",
+  "gen_status: SUG_PEULA 'U' or 'C' → 1, any other non-NULL value → 2, NULL → NULL (not set on create). gen_name is NULL (not written) when either name is NULL.",
+  "Create Heir: Ok output column CreatedAccountId is never assigned (only OkBuffer.AddRow(), main.cs:219). Update compares dates as parsed.Date vs CRM value .AddHours(3).Date (fixed +3h offset).",
+  "Out of scope (ETL plumbing): 'Create ETL Process record', 'End ETL Process record' (writer ETL Record Finish → gen_etlprocess), 'Get Variables From SystemConfigurarion', zip/folder/archive script tasks."
+ ]
+}

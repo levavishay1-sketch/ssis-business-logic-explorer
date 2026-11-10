@@ -1,0 +1,229 @@
+{
+  "package": "0033_FundSetMF",
+  "analyst": "ssis-business-logic",
+  "source": {
+    "file": "source/DailyProcess/0033_FundSetMF.dtsx",
+    "sha256": "FA8ADCB09451C3FDCE5B8D078969BDBD45FB38F72BAC5D0809AC9E405D7FCA2E",
+    "lines": 39
+  },
+  "scopeNote_he": "החבילה כוללת משימת SQL אחת בלבד (Execute SQL Task), בלי זרימות נתונים, בלי משתנים, בלי קובץ תצורה (configurations ריק ב-evidence), בלי Event Handlers ובלי לוג. מנהל החיבור היחיד [CRM] מצביע על Data Source=PSQL; Initial Catalog=ALTSHULER_MSCRM (DTSX:4-6), אותו קטלוג שבו חבילות אחרות קוראות ישויות CRM (למשל 0014: [CRM] → gen_accountcourses; זו מחרוזת החיבור בזמן תכנון של 0014, וקובץ התצורה C:\\Generix\\SSISConfigFile.dtsConfig שלא סופק (0014 DTSX:17) עשוי לדרוס אותה). לא ידוע אם ה-Job שמריץ את החבילה דורס את מחרוזת החיבור (למשל dtexec /CONN) – מחוץ להיקף.",
+  "summary_he": "החבילה מאפסת את השדה gen_depositmfpercentage (\"אחוז דמי ניהול מהפקדה\" לפי שם השדה בלבד — השערה) בכל רשומה שבה הוא בדיוק 9.9, גם בטבלת Gen_fundmain וגם בטבלת Gen_customeraccount. העדכון מבוצע ב-SQL ישיר על טבלאות ה-Base במסד של CRM (ALTSHULER_MSCRM), כלומר עוקף את ה-SDK (Unsupported). המשמעות העסקית של הערך 9.9 אינה מוגדרת בחבילה (השערה: ערך סימון שפירושו \"אין נתון\").",
+  "executionOrder": [
+    {
+      "step": 1,
+      "refId": "Package\\Execute SQL Task",
+      "title_he": "איפוס gen_depositmfpercentage שערכו 9.9",
+      "trigger": "start (אין Precedence Constraints בחבילה; משימה יחידה, DTSX:12)"
+    }
+  ],
+  "ignoredAsFramework": [],
+  "components": [
+    {
+      "refId": "Package\\Execute SQL Task",
+      "title_he": "איפוס gen_depositmfpercentage 9.9 ל-0",
+      "techName": "Execute SQL Task",
+      "short_he": "כל ערך 9.9 בשדה gen_depositmfpercentage (\"אחוז דמי ניהול מהפקדה\" לפי שם השדה בלבד — השערה) מוחלף ב-0, ברמת הקופה/חשבון (Gen_fundmain) וברמת חשבון הלקוח (Gen_customeraccount), בעדכון SQL ישיר על מסד CRM.",
+      "flow_he": [
+        "איתור רשומות Gen_fundmain שבהן gen_depositmfpercentage = 9.9 ועדכונן ל-0",
+        "איתור רשומות Gen_customeraccount שבהן gen_depositmfpercentage = 9.9 ועדכונן ל-0"
+      ],
+      "short": {
+        "nodes": [
+          {
+            "type": "step",
+            "text": "החבילה פונה ישירות למסד הנתונים של CRM, בלי לעבור דרך שירותי CRM."
+          },
+          {
+            "type": "decision",
+            "text": "האם השדה gen_depositmfpercentage ברשומה שווה בדיוק ל-9.9?",
+            "branches": [
+              {
+                "label": "כן",
+                "nodes": [
+                  {
+                    "type": "write",
+                    "text": "השדה gen_depositmfpercentage מתאפס ל-0, גם ברשומות הקופה/חשבון וגם ברשומות חשבון הלקוח."
+                  }
+                ]
+              },
+              {
+                "label": "לא",
+                "nodes": [
+                  {
+                    "type": "step",
+                    "text": "הרשומה נשארת ללא שינוי."
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "type": "end",
+            "text": "אחרי הריצה לא נשארות רשומות עם הערך 9.9; במקומו מופיע 0. המשמעות העסקית של 9.9 אינה מוגדרת בחבילה (השערה: ערך סימון)."
+          }
+        ]
+      },
+      "detailed": {
+        "nodes": [
+          {
+            "type": "step",
+            "text": "המשימה מתחברת למסד הנתונים של CRM דרך מנהל החיבור CRM.",
+            "tech": "Connection [CRM]: Data Source=PSQL; Initial Catalog=ALTSHULER_MSCRM; Integrated Security=SSPI",
+            "evidence": "DTSX:4-6, SQLTask:Connection DTSX:15"
+          },
+          {
+            "type": "step",
+            "text": "אין סינון נוסף לפי קופה, לקוח או תאריך: האוכלוסייה היא כל הרשומות בשתי הטבלאות.",
+            "tech": "SQL ללא תנאי מלבד הערך 9.9",
+            "evidence": "DTSX:15"
+          },
+          {
+            "type": "decision",
+            "text": "האם ברשומת הקופה/חשבון השדה gen_depositmfpercentage שווה 9.9?",
+            "tech": "where Gen_depositmfpercentage = 9.9",
+            "branches": [
+              {
+                "label": "כן",
+                "nodes": [
+                  {
+                    "type": "write",
+                    "text": "השדה gen_depositmfpercentage ברשומת הקופה/חשבון מתעדכן ל-0.",
+                    "tech": "gen_fundmain · UPDATE Gen_fundmainBase set Gen_depositmfpercentage = 0 · SQL (Unsupported)"
+                  }
+                ]
+              },
+              {
+                "label": "לא",
+                "nodes": [
+                  {
+                    "type": "step",
+                    "text": "הרשומה אינה משתנה."
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "type": "decision",
+            "text": "האם ברשומת חשבון הלקוח השדה gen_depositmfpercentage שווה 9.9?",
+            "tech": "Where Gen_depositmfpercentage = 9.9",
+            "branches": [
+              {
+                "label": "כן",
+                "nodes": [
+                  {
+                    "type": "write",
+                    "text": "השדה gen_depositmfpercentage ברשומת חשבון הלקוח מתעדכן ל-0.",
+                    "tech": "gen_customeraccount · UPDATE Gen_customeraccountBase set Gen_depositmfpercentage = 0 · SQL (Unsupported)"
+                  }
+                ]
+              },
+              {
+                "label": "לא",
+                "nodes": [
+                  {
+                    "type": "step",
+                    "text": "הרשומה אינה משתנה."
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "type": "step",
+            "text": "שני העדכונים נשלחים כפקודה אחת (Batch אחד) באותה משימה, בלי טרנזקציה מוגדרת בחבילה ובלי עדכון שדות מערכת כמו מועד שינוי או משתמש מעדכן.",
+            "tech": "SqlStatementSource אחד, אין TransactionOption מוגדר ברמת המשימה, אין SET ModifiedOn",
+            "evidence": "DTSX:12-15"
+          },
+          {
+            "type": "end",
+            "text": "הערך 9.9 מוחלף ב-0 בשתי הישויות. כיוון שהכתיבה עוקפת את CRM, לוגיקה שרצה בשירותי CRM (Plugins, Workflows, Audit) לא מופעלת על השינוי הזה (התנהגות פלטפורמה כללית, לא מתוך החבילה)."
+          }
+        ]
+      },
+      "detail_he": [
+        {
+          "h": "מקור ואוכלוסייה",
+          "t": "כל הרשומות בטבלאות Gen_fundmainBase ו-Gen_customeraccountBase במסד ALTSHULER_MSCRM. אין קובץ קלט ואין סינון נוסף (DTSX:15)."
+        },
+        {
+          "h": "התאמה לרשומות קיימות",
+          "t": "אין התאמה לנתון חיצוני; העדכון חל במקום על כל רשומה שעומדת בתנאי Gen_depositmfpercentage = 9.9."
+        },
+        {
+          "h": "החלטות",
+          "t": "תנאי יחיד בכל אחת משתי הפקודות: Gen_depositmfpercentage = 9.9 (השוואה מדויקת לערך 9.9; ערכים כמו 9.99 לא נכללים)."
+        },
+        {
+          "h": "כתיבה ל-CRM",
+          "t": "UPDATE ישיר ב-SQL על Gen_fundmainBase ועל Gen_customeraccountBase – שתי טבלאות Base של ישויות CRM – דרך החיבור [CRM] → PSQL/ALTSHULER_MSCRM. סיווג: Unsupported (DML ישיר על מסד CRM)."
+        },
+        {
+          "h": "תוצאה עסקית",
+          "t": "הערך 9.9 בשדה gen_depositmfpercentage מוחלף ב-0 ברמת הקופה/חשבון וברמת חשבון הלקוח. מה מייצג 9.9 עסקית – לא ידוע מהחבילה (השערה: ערך סימון ל\"אין נתון\")."
+        }
+      ],
+      "decisions": [
+        {
+          "where": "Execute SQL Task (DTSX:15) – פקודה 1",
+          "condition": "where  Gen_depositmfpercentage = 9.9",
+          "meaning_he": "רשומת קופה/חשבון (gen_fundmain) שהשדה gen_depositmfpercentage שלה הוא 9.9.",
+          "outcome_he": "Gen_depositmfpercentage מתעדכן ל-0."
+        },
+        {
+          "where": "Execute SQL Task (DTSX:15) – פקודה 2",
+          "condition": "Where  Gen_depositmfpercentage = 9.9",
+          "meaning_he": "רשומת חשבון לקוח (gen_customeraccount) שהשדה gen_depositmfpercentage שלה הוא 9.9.",
+          "outcome_he": "Gen_depositmfpercentage מתעדכן ל-0."
+        }
+      ],
+      "crmEffects": [
+        {
+          "entity": "gen_fundmain (טבלה Gen_fundmainBase)",
+          "verb": "UPDATE gen_depositmfpercentage = 0",
+          "mechanism": "SQL",
+          "when_he": "בכל ריצה, לכל רשומה שבה הערך הוא 9.9. Unsupported – SQL ישיר על מסד CRM."
+        },
+        {
+          "entity": "gen_customeraccount (טבלה Gen_customeraccountBase)",
+          "verb": "UPDATE gen_depositmfpercentage = 0",
+          "mechanism": "SQL",
+          "when_he": "בכל ריצה, לכל רשומה שבה הערך הוא 9.9. Unsupported – SQL ישיר על מסד CRM."
+        }
+      ],
+      "evidence": [
+        "DTSX:4-8 ConnectionManager [CRM] DTSID {371022BD-CBFF-42EE-BAE1-872B8F26C0C4}: Data Source=PSQL;Initial Catalog=ALTSHULER_MSCRM",
+        "DTSX:12 Executable Package\\Execute SQL Task (Microsoft.ExecuteSQLTask)",
+        "DTSX:15 SQLTask:Connection={371022BD-...} SqlStatementSource (שתי פקודות UPDATE)",
+        "evidence/0033_FundSetMF.json: precedenceConstraints=[], configurations=[], dataFlows=[]"
+      ],
+      "openQuestions_he": [
+        "מה המשמעות העסקית של הערך 9.9 בשדה gen_depositmfpercentage (\"אחוז דמי ניהול מהפקדה\" לפי שם השדה בלבד — השערה)? לא ידוע. כותבי השדה gen_depositmfpercentage בחבילות שסופקו הם, בין היתר: ב-SDK — 0008_LeumiFile-PY ו-0009_LeumiFile-BY ל-gen_fundmain (DTSX 0008:23804, 0009:27047), ו-0005_Customer Account ל-gen_customeraccount (DTSX 0005:18360, 42817); ב-SQL ישיר (Unsupported) — 0004_LeumiFile-MY — ל-Gen_fundmainbase ברכיב Create gen_FundMain (insert, DTSX 0004:61785-61822) ול-Gen_fundmain ברכיב Update gen_fundmain (UPDATE Gen_fundmain, DTSX 0004:92870-92883), שניהם על חיבור [CRM], ו-0005_Customer Account ל-Gen_customeraccountBase ברכיבים Update Customer Account 1-5 (update, DTSX 0005:40979-42295) על חיבור [qsql] = psql/ALTSHULER_MSCRM. בחבילה 0004_LeumiFile-MY ערך 9.99 מומר ל-0 (DTSX 0004:59853); כאן התנאי הוא 9.9, ולא ידוע אם זה אותו כלל. אם אחד הכותבים מעביר בפועל את הערך 9.9 תלוי בנתוני הקבצים, שאינם בידינו.",
+        "האם העדכון הישיר ב-SQL מכוון (למשל לביצועים) ומקובל, למרות שהוא עוקף Audit/Plugins של CRM?",
+        "מתי ובאיזו תדירות החבילה רצה? אין בחבילה מידע על תזמון."
+      ]
+    }
+  ],
+  "findings_he": [
+    {
+      "severity": "high",
+      "text": "כתיבה ישירה ב-SQL לטבלאות Base של CRM (Gen_fundmainBase, Gen_customeraccountBase) – Unsupported. העדכון אינו עובר דרך שירותי CRM, ולכן אינו מעדכן ModifiedOn/ModifiedBy ואינו מפעיל Plugins/Workflows/Audit (התנהגות פלטפורמה כללית).",
+      "evidence": "DTSX:6 (ALTSHULER_MSCRM), DTSX:15"
+    },
+    {
+      "severity": "low",
+      "text": "תיאור החבילה (\"backup all tabales that will be changed in end of year process\") ושם היישום במחרוזת החיבור (SSIS-EndOfYearBackup) אינם תואמים לתוכן – החבילה לא מגבה דבר אלא מעדכנת נתונים. כנראה הועתקה מחבילת גיבוי (השערה).",
+      "evidence": "DTSX:1 DTS:Description, DTSX:6 Application Name"
+    },
+    {
+      "severity": "info",
+      "text": "חבילה 0004_LeumiFile-MY ממירה gen_depositmfpercentage == 9.99 ל-0 (Derived Column \"Change gen_depositmfpercentage From 99 To 0\"), בעוד שחבילה זו מאפסת את הערך 9.9. ייתכן שמדובר בשני ערכי סימון שונים, או באי-התאמה – לא ידוע.",
+      "evidence": "0004_LeumiFile-MY.dtsx:59854; 0033 DTSX:15"
+    },
+    {
+      "severity": "info",
+      "text": "אין בחבילה טרנזקציה מפורשת, טיפול בשגיאות, לוג או רשומת תהליך ETL. אם הפקודה השנייה נכשלת, הראשונה כבר בוצעה (תלוי בהתנהגות ברירת המחדל של OLE DB – autocommit).",
+      "evidence": "DTSX:12-15; evidence: logProviders=0"
+    }
+  ]
+}

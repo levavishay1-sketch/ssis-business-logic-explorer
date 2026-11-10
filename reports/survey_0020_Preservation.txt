@@ -1,0 +1,71 @@
+# 0020_Preservation.dtsx · 69CBA21E4A1769624497EBC9FC63DC7555AD20272BEC64070B4E8A70770B7511
+
+## Connection managers
+- [Crm Connection] OLEDB Data Source=PSQL;Initial Catalog=ALTSHULER_MSCRM;Integrated Security=SSPI;  
+- [Kingsway Connection] DynamicsCRM   
+- [SSIS_Logs Connection] OLEDB Data Source=PSRS;Initial Catalog=SSIS_Logs;Integrated Security=SSPI;  
+
+## Executables (disabled marked !)
+-   Create ETL Process record | Microsoft.ScriptTask  
+-   End ETL Process record | Microsoft.Pipeline  
+-   Get Variables From SystemConfigurarion | Microsoft.Pipeline  
+-   Handle Expired Preservations | STOCK:SEQUENCE  
+-   Handle Expired Preservations\Close preservations | Microsoft.Pipeline  
+-   Handle Expired Preservations\Close Preservations ETL Counter | Microsoft.ScriptTask  
+-   Package.EventHandlers[OnError] | EventHandler  
+-   Package.EventHandlers[OnError]\Error ETL Process record | Microsoft.ScriptTask  
+
+## Precedence
+- Get Variables From SystemConfigurarion -> Create ETL Process record | Success Constraint   
+- Create ETL Process record -> Handle Expired Preservations | Success Constraint   
+- Handle Expired Preservations -> End ETL Process record | Success Constraint   
+- Handle Expired Preservations\Close preservations -> Handle Expired Preservations\Close Preservations ETL Counter | Success Constraint   
+
+## DataFlow End ETL Process record
+  - ETL Record Finish | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 2 out 0
+  - Get gen_etlprocessid | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 0 out 1
+  - Lookup | Lookup  | conn [Crm Connection]  | in 1 out 1
+     path Lookup.Outputs[Lookup Match Output] => ETL Record Finish.Inputs[Input 0]
+     path Get gen_etlprocessid.Outputs[Output 0] => Lookup.Inputs[Lookup Input]
+
+## DataFlow Get Variables From SystemConfigurarion
+  - Get SystemConfigurations | OLEDBSource  | conn [Crm Connection]  | in 0 out 2
+  - Set Variables | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 2 out 0
+     path Get SystemConfigurations.Outputs[OLE DB Source Output] => Set Variables.Inputs[Input 0]
+
+## DataFlow Handle Expired Preservations\Close preservations
+  - Dynamics CRM Destination | ManagedComponentHost (KingswaySoft.IntegrationToolkit.DynamicsCrm.CrmDestinationComponent) | conn [Kingsway Connection]  | in 4 out 0
+  - ETL Warning | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 4 out 0
+  - Get preservations | OLEDBSource  | conn [Crm Connection]  | in 0 out 2
+  - Set columns | DerivedColumn  | conn   | in 0 out 3
+  - Set ErrorCounter | RowCount  | conn   | in 0 out 0
+  - Set PipeCounter | RowCount  | conn   | in 0 out 0
+  - Set UpdateCounter | RowCount  | conn   | in 0 out 0
+  - Set Warning columns | DerivedColumn  | conn   | in 0 out 2
+     path Dynamics CRM Destination.Outputs[Default Output] => Set UpdateCounter.Inputs[Row Count Input 1]
+     path Set Warning columns.Outputs[Derived Column Output] => ETL Warning.Inputs[Input 0]
+     path Set columns.Outputs[Derived Column Output] => Dynamics CRM Destination.Inputs[Input]
+     path Dynamics CRM Destination.Outputs[Error Output] => Set ErrorCounter.Inputs[Row Count Input 1]
+     path Get preservations.Outputs[OLE DB Source Output] => Set PipeCounter.Inputs[Row Count Input 1]
+     path Set PipeCounter.Outputs[Row Count Output 1] => Set columns.Inputs[Derived Column Input]
+     path Set ErrorCounter.Outputs[Row Count Output 1] => Set Warning columns.Inputs[Derived Column Input]
+
+## SQL statements
+- End ETL Process record\Lookup | Microsoft.Lookup.SqlCommand | [Crm Connection] 
+    select p.gen_etlprocessid , case when pw.gen_etlprocessid is null then 0 else 1 end as isWarningExist from gen_etlprocess p left join (select distinct gen_etlprocessId from gen_etlprocesswarning ) as pw on p.gen_etlprocessId = pw.gen_etlprocessId
+- End ETL Process record\Lookup | Microsoft.Lookup.SqlCommandParam | [Crm Connection] 
+    select * from (select p.gen_etlprocessid , case when pw.gen_etlprocessid is null then 0 else 1 end as isWarningExist from gen_etlprocess p left join (select distinct gen_etlprocessId from gen_etlprocesswarning ) as pw on p.gen_etlprocessId = pw.gen_etlprocessId) [refTable] where [refTable].[gen_etlprocessid] = ?
+- Get Variables From SystemConfigurarion\Get SystemConfigurations | Microsoft.OLEDBSource.SqlCommand | [Crm Connection] 
+    SELECT gen_key ,gen_Value FROM gen_etlvariable where gen_scope ='global' or gen_scope = ?
+- Handle Expired Preservations\Close preservations\Get preservations | Microsoft.OLEDBSource.SqlCommand | [Crm Connection] 
+    select gen_preservationid, isnull(w.gen_lastdatepreservation,isnull(t_out.Gen_lastpreservationdate,pto.gen_LastDateForPreservation)) as Gen_lastpreservationdate from Gen_Preservation p with(nolock) left join gen_withdrawal as w with(nolock) on w.gen_withdrawalid = p.gen_withdrawalname left join gen_customercare as t_out with(nolock) on t_out.Gen_customercareId = p.gen_preservationnumber left join 
+
+## Code write candidates (per owner)
+- Create ETL Process record {"crm-entity":1,"crm-sdk-create":1,"variables-write":1}
+- End ETL Process record\ETL Record Finish {"sql-command":2,"crm-entity":3,"output-buffer":1,"crm-sdk-update":1}
+- End ETL Process record\Get gen_etlprocessid {"sql-command":2,"output-buffer":2}
+- Handle Expired Preservations\Close preservations\ETL Warning {"crm-entity":3,"crm-sdk-create":1}
+- Handle Expired Preservations\Close Preservations ETL Counter {"variables-write":4,"sql-command":1,"crm-entity":2,"crm-sdk-create":1}
+- Package.EventHandlers[OnError]\Error ETL Process record {"crm-entity":4,"crm-sdk-update":1,"crm-sdk-create":1}
+
+## External refs (non-framework) CRM2015.Proxy, crm2015.proxy

@@ -1,0 +1,156 @@
+{
+  "verifier": "ssis-verifier",
+  "package": "0025_Agents_Agencies",
+  "scope": "mapping-A.json",
+  "source": {
+    "file": "source/DailyProcess/0025_Agents_Agencies.dtsx",
+    "sha256": "829a8bdefb30a1c25460dba62a83427763ebf1ebec1ee73f0cf1de50e83d0b0b"
+  },
+  "checked": 23,
+  "results": [
+    {
+      "id": "Update Agents|gen_agents|UPDATE|gen_agentvalue",
+      "verdict": "CONFIRMED",
+      "detail": "SqlCommand \"Update Gen_agentsBase set gen_agentvalue = ? where gen_agentsid = ?\": ? #0 -> Param_0 = balance (cy), ? #1 -> Param_1 = gen_agentsid; positional count and externalMetadataColumnId verified. Conditional Split Update Agent = !ISNULL(gen_agentsid), EvaluationOrder 0; a Conditional Split sends each row to the first true output. One UPDATE per (agent, agency) pair that passes HAVING, so for an agent with several pairs (several agencies, or with and without an agency) the last processed pair wins (no ORDER BY). SQL re-read: sum(isnull(gen_accountbalance,0)) as balance (cy) over UNION ALL of (a) gen_fundmain f join gen_agentcontract ac on ac.Gen_agentcontractId = f.gen_brokernumber -> ac.gen_agentname/gen_agencyname and (b) the same plus join gen_agentcontract acc on acc.Gen_agentcontractId = ac.gen_agencycontractnumber -> acc.gen_agentname/gen_agencyname; left join gen_agents / Gen_agencie; group by gen_agentsid, gen_agencieid, gen_agentvalue, gen_agencyvalue; having ABS(sum - isnull(gen_agentvalue,0) + isnull(gen_agencyvalue,0)) > 1 (the agency value is ADDED, as the claim says). No filter on gen_fundmain. Connection [CRM]; Unsupported. Precedence Create ETL Process record -> Update agents balance (DTSX:7072).",
+      "evidence": "DTSX:5014-5037, 5061-5090, 5171-5186, 5217-5219, 7072"
+    },
+    {
+      "id": "Update Agencies|gen_agencie|UPDATE|gen_agencyvalue",
+      "verdict": "CONFIRMED",
+      "detail": "Re-check after fix: the \"several rows per agency -> last wins\" sentence is gone. The write condition now states that rows routed to Update Agency have gen_agentsid NULL and therefore gen_agentvalue NULL, giving one GROUP BY group per agency and at most one UPDATE per agency per run. It also states that HAVING reduces to ABS(sum + isnull(gen_agencyvalue,0)) > 1, so the agency is rewritten every run. Both points verified against DTSX:5061-5090 and the split at DTSX:5028/5036. Params unchanged and correct: ? #0 -> Param_0 = balance, ? #1 -> Param_1 = gen_agencieid (DTSX:5130-5142).",
+      "evidence": "DTSX:5014-5047, 5061-5090, 5127-5142, 5218",
+      "previousVerdict": "WRONG"
+    },
+    {
+      "id": "update agetns commissionpostponed field|gen_agents|UPDATE|gen_commissionpostponed",
+      "verdict": "CONFIRMED",
+      "detail": "main.cs:71-73: new Entity(\"gen_agents\"), Id = Row.GenagentsId, entity[\"gen_commissionpostponed\"] = true (literal), every row. Source SQL DTSX:6007-6012 matches the claim. gen_commissionpostponed != 1 excludes NULL flags (SQL three-valued logic). Batch of 1000 (main.cs:79-80) and final batch at EndOfRowset (main.cs:126-128); faults with resultItem.Fault go to ErrorBuffer (ETL warning). Caveats, consistent with the claim: ContinueOnError / ReturnResponses live in the external CRM.Proxy (external_unknown). An exception in the final ExcecuteBulk (main.cs:126-128) is outside try/catch and would fail the data flow. Data flow precedence: Set Gen_commissionpostponed (disabled) -> update agents commissionpostponed field (DTSX:7074) -> update agencies commissionpostponed field (DTSX:7075). A disabled task is skipped and treated as success, so successors run.",
+      "evidence": "main.cs:71-80, 95-129; DTSX:6002-6012, 6123, 7061-7064, 7074"
+    },
+    {
+      "id": "update agetns commissionpostponed field|gen_agents|UPDATE|gen_pausereason",
+      "verdict": "CONFIRMED",
+      "detail": "I re-ran claims.mjs after the mapping update: the DB origin Gen_agents.gen_pausereason is now INFL only, excluded via {db:\"Gen_agents.gen_pausereason\"}. Verified that every row passes the Derived Column. The only path into set 'pausereason' field is the OLE DB Source Output (DTSX:7064). The only path out of it is Derived Column Output -> script Input 0 (DTSX:7061). The component is synchronous with no row filtering. Its Error Output is unconnected and the gen_pausereason input has errorRowDisposition FailComponent, so no row bypasses it. gen_pausereason is replaced in place (input column with Expression): ISNULL(gen_licenseexpdate) || DATEDIFF(\"dd\",GETDATE(),gen_licenseexpdate) < 0 ? 5 : 4 (DTSX:6055). ?: has the lowest precedence. For a non-NULL date DATEDIFF is non-NULL; for a NULL date the ISNULL operand is TRUE, so the result is 5. The result is never NULL, so the main.cs:74 guard always passes and OptionSetValue(4|5) is written; the original DB value never reaches CRM. Correctly not a fixedValue (a choice between two literals driven by gen_licenseexpdate). 5/4 labels unknown. GETDATE() here is the SSIS host clock, while the source SQL uses the DB server GETDATE(). Under clock skew the 4/5 split may not match the SQL selection. Data flow precedence: Set Gen_commissionpostponed (disabled) -> update agents commissionpostponed field (DTSX:7074) -> update agencies commissionpostponed field (DTSX:7075). A disabled task is skipped and treated as success, so successors run.",
+      "evidence": "DTSX:6047-6055, 7061, 7064; main.cs:74-75"
+    },
+    {
+      "id": "update agencies commissionpostponed field|gen_agencie|UPDATE|gen_commissionpostponed",
+      "verdict": "CONFIRMED",
+      "detail": "Script is identical to the agents script except main.cs:71-72 (Entity(\"gen_agencie\"), Id = Row.GenagencieId); checked by diff. entity[\"gen_commissionpostponed\"] = true. Source SQL DTSX:3946-3951 (gen_bookkeepingexp / gen_taxdeductionexp column names) matches the claim. Same external-proxy caveats as the agents claim. Precedence after update agents commissionpostponed field (DTSX:7075).",
+      "evidence": "main.cs (sha 213708d439cc):71-80; DTSX:3941-3951, 4062, 5000-5003, 7075"
+    },
+    {
+      "id": "update agencies commissionpostponed field|gen_agencie|UPDATE|gen_pausereason",
+      "verdict": "CONFIRMED",
+      "detail": "Re-run claims.mjs: exclusion now {db:\"Gen_agencie.gen_pausereason\"}. Same proof as agents. Path get Agencies details -> set 'pausereason' field (DTSX:5003) -> Derived Column Output -> script (DTSX:5000) is the only route. The Derived Column Error Output is unconnected and gen_pausereason has FailComponent. The expression at DTSX:3994 is identical and replaces gen_pausereason (lineage to get Agencies details), so only 5/4 is written.",
+      "evidence": "DTSX:3986-3994, 5000, 5003; main.cs:74-75"
+    },
+    {
+      "id": "Set Gen_commissionpostponed|gen_agents|UPDATE|gen_commissionpostponed",
+      "verdict": "CONFIRMED",
+      "detail": "DTS:Disabled=\"True\" (DTSX:3156). Statement 1: Update Gen_agentsBase set Gen_commissionpostponed = 1 where ((Gen_bookkeepingexpdate not null and < getutcdate()) or (Gen_LicenseExpDate not null and < getutcdate())) AND (Gen_commissionpostponed IS NULL OR = 0). Connection {D51CCED1-...} = [CRM]. Correctly marked disabled / not active.",
+      "evidence": "DTSX:3156-3160"
+    },
+    {
+      "id": "Set Gen_commissionpostponed|gen_agencie|UPDATE|gen_commissionpostponed",
+      "verdict": "CONFIRMED",
+      "detail": "Statement 2: Update Gen_agencieBase set Gen_commissionpostponed = 1, same shape with gen_bookkeepingexp. Disabled. Correct.",
+      "evidence": "DTSX:3160"
+    },
+    {
+      "id": "LOGIC scopeNote_he",
+      "verdict": "CONFIRMED",
+      "detail": "Connections: CRM (Psql/ALTSHULER_MSCRM, DTSID D51CCED1) and SRS.SSIS_Logs; no flat file. EnableConfig=True with the unsupplied config file; CRM.Proxy is external. Mechanism split (SQL vs SDK) is correct.",
+      "evidence": "DTSX:1, 4-9, 17, 3160"
+    },
+    {
+      "id": "LOGIC summary_he",
+      "verdict": "CONFIRMED",
+      "detail": "Per-pair sums written to gen_agentvalue/gen_agencyvalue by SQL; postponement flag plus reason 5/4 by SDK. It omits that NULL postponement flags are skipped, but findings_he[4] covers that.",
+      "evidence": "DTSX:5061, 6007, 6055"
+    },
+    {
+      "id": "LOGIC executionOrder",
+      "verdict": "CONFIRMED",
+      "detail": "Chain 7071-7076 matches. Disabled task is handled correctly. OnError handler Error ETL Process record (gen_etlprocess update + annotation, DTSX:7250-7265) is plumbing.",
+      "evidence": "DTSX:7071-7076, 7086, 7250-7265"
+    },
+    {
+      "id": "LOGIC components[0]",
+      "verdict": "CONFIRMED",
+      "detail": "Re-check after fix. short_he, the write nodes, the end node, the short tree and detail_he \"תוצאה עסקית\" now say: an agent keeps the partial sum of the last processed (agent, agency) pair, not its portfolio total; an agency gets a single update holding only the agent-less pairs. This matches the GROUP BY (DTSX:5083-5089), the split order (DTSX:5028/5036) and the absence of ORDER BY. Residual wording: the decision node still reads \"פער ... מול הערכים השמורים\". Its tech line says the expression is taken literally (כלשונו), and findings_he[3] explains the distortion, so it is no longer misleading as fact.",
+      "evidence": "DTSX:5014-5037, 5061-5090",
+      "previousVerdict": "INCOMPLETE"
+    },
+    {
+      "id": "LOGIC components[1]",
+      "verdict": "CONFIRMED",
+      "detail": "Source SQL, Derived Column replacement (every row passes it), script writes, batches and CastingError unconnected are all verified. The ETL-warning branch depends on the external ExecuteMultiple settings, which is acknowledged in openQuestions.",
+      "evidence": "DTSX:6002-6055, 7061-7064; main.cs:67-129"
+    },
+    {
+      "id": "LOGIC components[2]",
+      "verdict": "CONFIRMED",
+      "detail": "Same logic for agencies. The script diff is limited to lines 71-72 (verified). The warning text at DTSX:4047 says \"בסוכן\" in the agency flow (verified).",
+      "evidence": "DTSX:3941-4047, 5000-5003"
+    },
+    {
+      "id": "LOGIC components[3]",
+      "verdict": "CONFIRMED",
+      "detail": "Disabled; would have used getutcdate(), checked only bookkeeping/licence, and set no pause reason.",
+      "evidence": "DTSX:3156-3160, 7073-7074"
+    },
+    {
+      "id": "LOGIC findings_he[0]",
+      "verdict": "CONFIRMED",
+      "detail": "Both OLE DB Commands are on [CRM] as direct UPDATEs on the Base tables.",
+      "evidence": "DTSX:5127-5132, 5171-5176, 4-6"
+    },
+    {
+      "id": "LOGIC findings_he[1]",
+      "verdict": "CONFIRMED",
+      "detail": "EvaluationOrder 0 = !ISNULL(gen_agentsid). Rows with both IDs go only to Update Agents. Agency value comes only from agent-less rows (NULL or unmatched contract agent).",
+      "evidence": "DTSX:5025-5037"
+    },
+    {
+      "id": "LOGIC findings_he[2]",
+      "verdict": "CONFIRMED",
+      "detail": "GROUP BY includes gen_agencieid, so an agent with several agencies (or with NULL agency) gets several rows. No ORDER BY, so the last row wins. For agencies this cannot happen: one group per agency, see the Update Agencies verdict.",
+      "evidence": "DTSX:5083-5089"
+    },
+    {
+      "id": "LOGIC findings_he[3]",
+      "verdict": "CONFIRMED",
+      "detail": "Re-check after fix. (a) Agent-less pairs: after an update the test is ABS(2*sum), so the row is rewritten every run. (b) Pairs with both agent and agency: if sum = agentvalue the test is ABS(agencyvalue) > 1, causing a needless rewrite. A needed update is skipped when sum - agentvalue is within 1 of -agencyvalue (|(sum-agentvalue)+agencyvalue| <= 1). Both follow from the HAVING at DTSX:5090.",
+      "evidence": "DTSX:5090",
+      "previousVerdict": "INCOMPLETE"
+    },
+    {
+      "id": "LOGIC findings_he[4]",
+      "verdict": "CONFIRMED",
+      "detail": "gen_commissionpostponed != 1 rejects NULL in both sources. The disabled task used IS NULL OR = 0.",
+      "evidence": "DTSX:6007-6008, 3946-3947, 3160"
+    },
+    {
+      "id": "LOGIC findings_he[5]",
+      "verdict": "CONFIRMED",
+      "detail": "The only values written to gen_commissionpostponed are true (main.cs:73, both scripts) and 1 (disabled task). Nothing resets it.",
+      "evidence": "main.cs:73; DTSX:3160"
+    },
+    {
+      "id": "LOGIC findings_he[6]",
+      "verdict": "CONFIRMED",
+      "detail": "Re-check after fix. The entity is queued at main.cs:77 before ExcecuteBulk (79-80), so it is not lost. A throw skips Clear (117); the count passes 1000 and never equals 1000 again, so there are no more intermediate batches. Everything goes into the final ExcecuteBulk at main.cs:126-128, which is outside try/catch, so a failure there fails the data flow. The >1000 limit is labelled השערה. Verified against both scripts (identical except lines 71-72).",
+      "evidence": "main.cs:67-129; DTSX:5000-5003, 7061-7064",
+      "previousVerdict": "INCOMPLETE"
+    },
+    {
+      "id": "LOGIC findings_he[7]",
+      "verdict": "CONFIRMED",
+      "detail": "DTS:Disabled=\"True\".",
+      "evidence": "DTSX:3156"
+    }
+  ],
+  "missingWrites": [],
+  "recheckedOn": "2026-11-06"
+}

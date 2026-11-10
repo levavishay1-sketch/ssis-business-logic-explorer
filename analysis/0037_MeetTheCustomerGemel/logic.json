@@ -1,0 +1,1142 @@
+{
+ "package": "0037_MeetTheCustomerGemel",
+ "analyst": "ssis-business-logic",
+ "source": {
+  "file": "source/DailyProcess/0037_MeetTheCustomerGemel.dtsx",
+  "sha256": "5E09225B4B61C58BB29A4ECC574D36B525C1AE13F33A0467CE297AFB2E55C214"
+ },
+ "scopeNote_he": "החיבורים [CRM] ו-[qsql] (DTSX:4-11) מצביעים שניהם על Data Source=psql;Initial Catalog=ALTSHULER_MSCRM. כל הקריאות העסקיות עוברות דרך [qsql]. אין בחבילה כתיבת SQL. כל הכתיבה ל-CRM היא דרך CRM SDK (CrmProxy + ExecuteMultipleExtension, RequestType.Update, ספריית CRM2015.Proxy שלא סופקה), אל השרת והארגון שבמשתנים ServerName/OrganizationName מ-gen_etlvariable, שערכיהם לא ידועים. [qsrs.SSIS_Logs] משמש ללוג בלבד. ב-DTSX אין DTS:Configuration (evidence.configurations = []). הקובץ C:\\Generix\\SSISConfigFile.dtsConfig, שלא סופק, או ה-Job, יכולים לדרוס חיבורים בזמן ריצה. external_unknown. משמעויות הסטטוסים וסוגי המוצר לקוחות מהערות המפתח ב-SQL ומשמות הקבועים בקוד, ולא אומתו מול הגדרות ה-Option Set.",
+ "summary_he": "החבילה מטפלת ברשומות 'הכר את הלקוח' (gen_meetthecustomer) בסטטוס 1/2 ('חדש/בטיפול' לפי הערה ב-SQL). רוב הזרמים בוחרים רק רשומות של לקוחות-מראש (gen_precustomer = 1). הזרם 'לפי מספר חשבון מקדים' לא מסנן לפי gen_precustomer, ולכן מטפל גם ברשומות שאינן של לקוחות-מראש. היא מנסה לקשר כל רשומה לישות קיימת ב-CRM: תוכנית לקוח, או חשבון לקוח (קופת גמל) לפי ת.ז. ומספר חשבון בנק, לפי הצטרפות אוטומטית שהסתיימה, או לפי מספר חשבון מקדים. בהתאמה, הרשומה מקושרת ולעיתים מקבלת סטטוס 3 ('FINISH' לפי שם הקבוע). רשומה בלי התאמה שגילה מעל 180 יום מסומנת בסטטוס 8 ('NO_ACCOUNT' לפי שם הקבוע), אבל רק בשני זרמים. בשני זרמים אחרים יש פער בקוד: הסטטוס 8 לא נכתב, ובמקומו נשלח עדכון ריק או סטטוס 3.",
+ "executionOrder": [
+  {
+   "step": 1,
+   "refId": "Package\\Link Pre Meet The Customer To Customer Program",
+   "title_he": "קישור ל'תוכנית לקוח'",
+   "trigger": "אחרי Package\\Create ETL Process record · Success (Constraint 1, DTSX:11246). שרשרת קודמת: Get Organization Variables → Create ETL Process record · Success (DTSX:11245)"
+  },
+  {
+   "step": 2,
+   "refId": "Package\\Link Pre Meet The Customer To Customer Account",
+   "title_he": "קישור לחשבון לקוח לפי ת.ז. וחשבון בנק",
+   "trigger": "אחרי step 1 · Success (Constraint 2, DTSX:11247)"
+  },
+  {
+   "step": 3,
+   "refId": "Package\\Link Meet The Customer To Customer Account By Automated Joining",
+   "title_he": "קישור לחשבון לקוח לפי הצטרפות אוטומטית",
+   "trigger": "אחרי step 2 · Success (Constraint 3, DTSX:11248)"
+  },
+  {
+   "step": 4,
+   "refId": "Package\\Link Meet The Customer To Customer Account By Mini Automated Joining",
+   "title_he": "קישור לפי הצטרפות אוטומטית מקוצרת (מושבת)",
+   "trigger": "אחרי step 3 · Success (Constraint 4, DTSX:11249). המשימה מושבתת (DTS:Disabled=True, DTSX:4642) ולא מבצעת כתיבה"
+  },
+  {
+   "step": 5,
+   "refId": "Package\\Link Meet The Customer To Customer Account By Pre Account Number",
+   "title_he": "קישור לחשבון לקוח לפי מספר חשבון מקדים",
+   "trigger": "אחרי step 4 · Success (Constraint 5, DTSX:11250). לפי התנהגות SSIS הסטנדרטית, משימה מושבתת לא חוסמת את ההמשך (ידע כללי, לא מהחבילה). אחריו: End ETL Proccess record · Success (DTSX:11251)"
+  }
+ ],
+ "ignoredAsFramework": [
+  "Package\\Get Organization Variables",
+  "Package\\Create ETL Process record",
+  "Package\\End ETL Proccess record",
+  "LogProvider 'SSIS log provider for SQL Server' → [qsrs.SSIS_Logs] (DTSX:21)"
+ ],
+ "components": [
+  {
+   "refId": "Package\\Link Pre Meet The Customer To Customer Program",
+   "title_he": "קישור 'הכר את הלקוח' לתוכנית לקוח",
+   "techName": "Link Pre Meet The Customer To Customer Program",
+   "short_he": "רשומות 'הכר את הלקוח' של תוכנית לקוח מקושרות לתוכנית ולאיש הקשר לפי ת.ז. רשומות ותיקות בלי התאמה אמורות להיסגר, אבל בפועל הקוד לא כותב להן את סטטוס הסגירה.",
+   "flow_he": [
+    "שליפת רשומות 'הכר את הלקוח' מסוג 3 ('תוכנית לקוח' לפי הערה) של לקוח-מראש, בסטטוס 1/2, בלי תוכנית לקוח מקושרת",
+    "חיפוש Gen_programmain (מוצר מסוג 200004) לפי ת.ז.",
+    "נמצא: קישור לתוכנית ולאיש הקשר, וסטטוס 3 אם יש ציון מחושב",
+    "לא נמצא ומעל 180 יום: נשלח עדכון בלי שדות, או סטטוס 3 אם יש ציון (פער בקוד). פחות מ-180 יום: אין כתיבה"
+   ],
+   "short": {
+    "nodes": [
+     {
+      "type": "step",
+      "text": "נבחרות רשומות 'הכר את הלקוח' פתוחות של לקוחות-מראש מסוג תוכנית לקוח, שעדיין לא קושרו לתוכנית."
+     },
+     {
+      "type": "decision",
+      "text": "האם קיימת ב-CRM תוכנית לקוח עם אותה תעודת זהות?",
+      "branches": [
+       {
+        "label": "כן",
+        "nodes": [
+         {
+          "type": "write",
+          "text": "הרשומה מקושרת לתוכנית הלקוח ולאיש הקשר שלה. אם קיים לה ציון מחושב, היא מסומנת כהסתיימה."
+         }
+        ]
+       },
+       {
+        "label": "לא",
+        "nodes": [
+         {
+          "type": "decision",
+          "text": "האם הרשומה נוצרה לפני יותר מ-180 יום?",
+          "branches": [
+           {
+            "label": "כן",
+            "nodes": [
+             {
+              "type": "write",
+              "text": "הרשומה אמורה להיסגר, אבל בגלל פער בקוד היא לא מקבלת את סטטוס הסגירה. אם יש לה ציון מחושב היא מסומנת כהסתיימה, ואחרת נשלח עדכון ריק."
+             }
+            ]
+           },
+           {
+            "label": "לא",
+            "nodes": [
+             {
+              "type": "step",
+              "text": "הרשומה לא מתעדכנת ותיבדק שוב בריצה הבאה."
+             }
+            ]
+           }
+          ]
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "type": "end",
+      "text": "רשומות 'הכר את הלקוח' של תוכניות לקוח מקושרות לתוכנית המתאימה."
+     }
+    ]
+   },
+   "detailed": {
+    "nodes": [
+     {
+      "type": "step",
+      "text": "האוכלוסייה היא רשומות 'הכר את הלקוח' בסטטוס 1/2, מסוג מוצר 3 ('תוכנית לקוח' לפי הערה), של לקוח-מראש, בלי תוכנית לקוח, בלי הצטרפות אוטומטית ובלי הצטרפות מקוצרת.",
+      "tech": "gen_meetthecustomer where gen_status in(1,2) AND gen_producttype = 3 AND gen_precustomer = 1 AND gen_customerprogram Is Null AND gen_automatedjoining Is Null AND gen_miniautomatedjoining Is Null; ת.ז. מרופדת ל-9 ספרות: REPLACE(STR(gen_precustomeridnumber, 9), SPACE(1), '0')",
+      "evidence": "get meet the customer detalis DTSX:9944"
+     },
+     {
+      "type": "step",
+      "text": "ההתאמה נעשית מול תוכניות לקוח שהמוצר שלהן מסוג 200004 (בחבילה זו הקוד לא מוסבר. בחבילות 0028/0031 הערך מסומן GeneralPension ו-'--clalit'), לפי ת.ז. מרופדת ל-9 ספרות.",
+      "tech": "Lookup Get Customer Program Details (Full cache): Gen_programmain join product where producttypecode = 200004; gen_precustomeridnumber = gen_customeridnumber",
+      "evidence": "DTSX:9870-9886; 0028_Fund Enrolment.dtsx:6918-6920; 0031_PoaAccountUpdateDaily.dtsx:7627"
+     },
+     {
+      "type": "step",
+      "text": "השליפה לא מסננת רשומות בלי ת.ז. אם לרשומה אין ת.ז., וקיימת תוכנית כזו שגם בה אין ת.ז., ה-Lookup עם Full cache מתאים ביניהן (התנהגות SSIS כללית). במקרה כזה הרשומה תקושר לאותה תוכנית ולאיש הקשר שלה, ואם יש לה ציון מחושב היא תקבל סטטוס 3.",
+      "tech": "get meet the customer detalis: אין תנאי gen_precustomeridnumber is not null (DTSX:9944); ת.ז. NULL נשארת NULL אחרי REPLACE(STR(...)); Get Customer Program Details CacheType=0 (Full cache) DTSX:9880",
+      "evidence": "DTSX:9944, 9880"
+     },
+     {
+      "type": "decision",
+      "text": "האם נמצאה תוכנית לקוח עם אותה ת.ז.?",
+      "tech": "Lookup Match / No Match (NoMatchBehavior=1)",
+      "branches": [
+       {
+        "label": "כן",
+        "nodes": [
+         {
+          "type": "write",
+          "text": "הרשומה מקושרת לתוכנית הלקוח ולאיש הקשר שרשום בתוכנית.",
+          "tech": "gen_meetthecustomer · Update: gen_customerprogram = EntityReference(gen_programmain, Gen_programmainId); gen_contactname = EntityReference(contact, gen_customername) · SDK (ExecuteMultiple, 500 בכל פעם)",
+          "evidence": "update meet the customer by customer account main.cs:142-149"
+         },
+         {
+          "type": "decision",
+          "text": "האם לרשומה יש ציון מחושב?",
+          "tech": "!Row.gencalculatescore_IsNull (main.cs:151)",
+          "branches": [
+           {
+            "label": "כן",
+            "nodes": [
+             {
+              "type": "write",
+              "text": "הסטטוס נקבע ל-3 ('FINISH' לפי שם הקבוע).",
+              "tech": "gen_status = OptionSetValue(3)"
+             }
+            ]
+           },
+           {
+            "label": "לא",
+            "nodes": [
+             {
+              "type": "step",
+              "text": "הסטטוס לא משתנה."
+             }
+            ]
+           }
+          ]
+         }
+        ]
+       },
+       {
+        "label": "לא",
+        "nodes": [
+         {
+          "type": "decision",
+          "text": "האם הרשומה נוצרה לפני יותר מ-180 יום?",
+          "tech": "Set Status To Wrong: DATEADD(\"DD\",-180,GETDATE()) <= createdon ? gen_status : 8; Conditional Split 'Wrong Records': gen_status == 8 (ה-Default Output לא מחובר)",
+          "branches": [
+           {
+            "label": "כן (gen_status=8 בזרם)",
+            "nodes": [
+             {
+              "type": "step",
+              "text": "בתוך הקוד, רק סטטוס 4 נבדק כ'שגוי', ולכן רשומה עם 8 נכנסת לענף הקישור. אין לה תוכנית לקישור.",
+              "tech": "main.cs:34 WRONG = 4; main.cs:137 if (Row.genstatus == WRONG)"
+             },
+             {
+              "type": "write",
+              "text": "אם יש לרשומה ציון מחושב, היא מסומנת בסטטוס 3. אחרת נשלח עדכון בלי שדות. הסטטוס 8 לא נכתב.",
+              "tech": "gen_meetthecustomer · Update (gen_status=3 או ללא מאפיינים) · SDK"
+             }
+            ]
+           },
+           {
+            "label": "לא",
+            "nodes": [
+             {
+              "type": "step",
+              "text": "אין כתיבה. הרשומה תיבחר שוב בריצה הבאה."
+             }
+            ]
+           }
+          ]
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "type": "end",
+      "text": "רשומות עם התאמה מקושרות לתוכנית הלקוח. רשומות ותיקות בלי התאמה לא נסגרות בסטטוס 8, בניגוד למה ששם הפלט 'Wrong Records' מרמז."
+     }
+    ]
+   },
+   "detail_he": [
+    {
+     "h": "מקור ואוכלוסייה",
+     "t": "gen_meetthecustomer: gen_status in(1,2) ('New Or InProcess' לפי הערה), gen_producttype = 3 ('Customer Program' לפי הערה), gen_precustomer = 1, gen_customerprogram/gen_automatedjoining/gen_miniautomatedjoining Is Null (DTSX:9944)."
+    },
+    {
+     "h": "התאמה לרשומות קיימות",
+     "t": "Lookup עם Full cache מול Gen_programmain join product, where producttypecode = 200004 (בחבילות 0028/0031 הערך מסומן GeneralPension ו-'--clalit'), לפי ת.ז. מרופדת ל-9 (DTSX:9872). השליפה לא מוציאה רשומות בלי ת.ז. (DTSX:9944). אם קיימת גם תוכנית בלי ת.ז., Full cache מתאים NULL ל-NULL (התנהגות SSIS כללית, DTSX:9880), והרשומה תקושר אליה. אם יש כמה תוכניות לאותה ת.ז., לא ידוע איזו תיבחר."
+    },
+    {
+     "h": "החלטות",
+     "t": "Match מוביל לקישור, ו-gen_calculatescore לא NULL מוביל לסטטוס 3. No Match: DATEADD(\"DD\",-180,GETDATE()) <= createdon ? gen_status : 8 (DTSX:10002). רק gen_status == 8 ממשיך (DTSX:9850), והשאר נזרקים. בסקריפט, WRONG = 4 (main.cs:34, 137), ולכן הענף 'שגוי' לא מתקיים אף פעם עבור 8."
+    },
+    {
+     "h": "כתיבה ל-CRM",
+     "t": "ExecuteMultipleExtension(myEntities, RequestType.Update), בקבוצות של 500 (main.cs:162-163, 178-201). שדות: gen_customerprogram, gen_contactname, gen_status. כשלים מ-ExecuteMultiple נכתבים ל-ErrorBuffer, שאינו מחובר לשום רכיב."
+    },
+    {
+     "h": "תוצאה עסקית",
+     "t": "קישור 'הכר את הלקוח' לתוכנית הלקוח ולאיש הקשר. הסגירה של רשומות ותיקות בלי התאמה לא מתבצעת כמצופה."
+    }
+   ],
+   "decisions": [
+    {
+     "where": "get meet the customer detalis (DTSX:9944)",
+     "condition": "gen_status in(1,2) AND gen_producttype = 3 AND gen_precustomer = 1 AND gen_customerprogram Is Null AND gen_automatedjoining Is Null AND gen_miniautomatedjoining Is Null",
+     "meaning_he": "רשומות פתוחות של תוכנית לקוח שעדיין לא קושרו.",
+     "outcome_he": "נכנסות להתאמה."
+    },
+    {
+     "where": "Set Status To Wrong (DTSX:10002)",
+     "condition": "DATEADD(\"DD\",-180,GETDATE()) <= createdon ? gen_status : 8",
+     "meaning_he": "רשומה בלי התאמה שגילה מעל 180 יום מקבלת 8 בזרם.",
+     "outcome_he": "עוברת ל-Conditional Split."
+    },
+    {
+     "where": "Conditional Split (DTSX:9850)",
+     "condition": "gen_status == 8",
+     "meaning_he": "רק רשומות ותיקות בלי התאמה ממשיכות.",
+     "outcome_he": "Default Output לא מחובר, ולכן רשומות צעירות בלי התאמה לא נכתבות."
+    },
+    {
+     "where": "update meet the customer by customer account main.cs:137",
+     "condition": "Row.genstatus == WRONG (WRONG = 4)",
+     "meaning_he": "בדיקת 'שגוי' בקוד.",
+     "outcome_he": "לא מתקיים עבור הערך 8, ולכן הרשומה נכנסת לענף else."
+    },
+    {
+     "where": "main.cs:151",
+     "condition": "!Row.gencalculatescore_IsNull",
+     "meaning_he": "קיים ציון מחושב.",
+     "outcome_he": "gen_status = 3."
+    }
+   ],
+   "crmEffects": [
+    {
+     "entity": "gen_meetthecustomer",
+     "verb": "Update gen_customerprogram, gen_contactname, gen_status(3)",
+     "mechanism": "SDK",
+     "when_he": "כשנמצאה תוכנית לקוח. gen_status=3 רק אם יש gen_calculatescore."
+    },
+    {
+     "entity": "gen_meetthecustomer",
+     "verb": "Update gen_status(3), או עדכון ללא מאפיינים",
+     "mechanism": "SDK",
+     "when_he": "בלי התאמה ומעל 180 יום מיצירה."
+    }
+   ],
+   "evidence": [
+    "DTSX:9831 Executable",
+    "DTSX:9939/9944 get meet the customer detalis",
+    "DTSX:9870-9886 Get Customer Program Details (Lookup, CacheType 0, NoMatchBehavior 1)",
+    "DTSX:9995/10002 Set Status To Wrong; DTSX:9837/9850 Conditional Split",
+    "DTSX:10023 Union All: Input 2 (no match) without Gen_programmainId/gen_customername",
+    "DTSX:10131 update meet the customer by customer account, main.cs (DTSX:10133, sha 5eae2600bdb4) lines 33-34, 129-213"
+   ],
+   "openQuestions_he": [
+    "מה המשמעות של סטטוס 8, ומה הייתה הכוונה, 4 או 8? בשני זרמים אחרים הקבוע STATUS_NO_ACCOUNT = 8.",
+    "מה ההשפעה בפועל של Update בלי מאפיינים ב-CRM (למשל על ModifiedOn או Plugins)? לא ידוע. המימוש של ExecuteMultipleExtension לא סופק.",
+    "בחבילה זו אין הסבר ל-producttypecode = 200004. בחבילות אחרות הערך מסומן: ב-0028 'as GeneralPension' (0028_Fund Enrolment.dtsx:6918-6920), וב-0031 בהערה '--clalit' ליד gen_includinggeneralpension (0031_PoaAccountUpdateDaily.dtsx:7627). לא הוכח שזו המשמעות בחבילה זו."
+   ]
+  },
+  {
+   "refId": "Package\\Link Pre Meet The Customer To Customer Account",
+   "title_he": "קישור 'הכר את הלקוח' לחשבון לקוח לפי ת.ז. וחשבון בנק",
+   "techName": "Link Pre Meet The Customer To Customer Account",
+   "short_he": "רשומות 'הכר את הלקוח' של קופות גמל/השתלמות מקושרות לחשבון הלקוח ולאיש הקשר לפי ת.ז. ומספר חשבון. רשומות ותיקות בלי התאמה מסומנות בסטטוס 8.",
+   "flow_he": [
+    "שליפת רשומות פתוחות מסוג 1/2/4 של לקוח-מראש, בלי חשבון מקושר ועם ת.ז.",
+    "ריפוד מספר החשבון המקדים ל-12 ספרות",
+    "חיפוש חשבון לקוח (סוג נכס '0149', נפתח אחרי 01/01/2018) לפי ת.ז. ומספר חשבון בנק",
+    "נמצא: קישור לחשבון ולאיש קשר, וסטטוס 3 אם יש ציון",
+    "לא נמצא ומעל 180 יום: סטטוס 8. אחרת אין כתיבה"
+   ],
+   "short": {
+    "nodes": [
+     {
+      "type": "step",
+      "text": "נבחרות רשומות 'הכר את הלקוח' פתוחות של לקוחות-מראש בקופות גמל/השתלמות, שעדיין לא קושרו לחשבון לקוח."
+     },
+     {
+      "type": "decision",
+      "text": "האם קיים חשבון לקוח עם אותה תעודת זהות ואותו מספר חשבון?",
+      "branches": [
+       {
+        "label": "כן",
+        "nodes": [
+         {
+          "type": "write",
+          "text": "הרשומה מקושרת לחשבון הלקוח ולאיש הקשר. אם יש לה ציון מחושב, היא מסומנת כהסתיימה."
+         }
+        ]
+       },
+       {
+        "label": "לא",
+        "nodes": [
+         {
+          "type": "decision",
+          "text": "האם הרשומה נוצרה לפני יותר מ-180 יום?",
+          "branches": [
+           {
+            "label": "כן",
+            "nodes": [
+             {
+              "type": "write",
+              "text": "הרשומה מסומנת בסטטוס 'אין חשבון'."
+             }
+            ]
+           },
+           {
+            "label": "לא",
+            "nodes": [
+             {
+              "type": "step",
+              "text": "הרשומה לא מתעדכנת ותיבדק שוב בהמשך."
+             }
+            ]
+           }
+          ]
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "type": "end",
+      "text": "לקוחות-מראש שפתחו קופה מקושרים לחשבון הלקוח שלהם. רשומות ותיקות בלי קופה נסגרות."
+     }
+    ]
+   },
+   "detailed": {
+    "nodes": [
+     {
+      "type": "step",
+      "text": "האוכלוסייה היא רשומות 'הכר את הלקוח' בסטטוס 1/2, מסוגי מוצר 1/2/4 ('גמל או השתלמות' לפי הערה), של לקוח-מראש עם ת.ז., בלי חשבון גמל מקושר ובלי הצטרפות אוטומטית או מקוצרת.",
+      "tech": "gen_status in(1,2) AND gen_producttype in (1,2,4) AND gen_precustomer = 1 AND gen_gemelaccountnumber Is Null AND gen_automatedjoining Is Null AND gen_miniautomatedjoining Is Null AND gen_precustomeridnumber is not null",
+      "evidence": "get meet the customer detalis DTSX:8313"
+     },
+     {
+      "type": "step",
+      "text": "מספר החשבון המקדים מנוקה מרווחים, ואם אורכו עד 12 תווים הוא מרופד באפסים משמאל ל-12. הת.ז. מרופדת ל-9.",
+      "tech": "LTRIM(RTRIM(gen_pregemelaccountnumber)); Add Zeros To Customer Account main.cs:37-39 PadLeft(12,'0')",
+      "evidence": "DTSX:8313, 7428"
+     },
+     {
+      "type": "step",
+      "text": "ההתאמה נעשית מול חשבונות לקוח עם סוג נכס '0149', תת-מוצר 1/2/4 ותאריך פתיחה אחרי 01/01/2018, לפי ת.ז. ומספר חשבון בנק. משמעות '0149' לא ידועה.",
+      "tech": "Lookup Get Customer Account Details (Full cache): join gen_precustomeridnumber=gen_customeridnumber, gen_pregemelaccountnumber=gen_bankaccountnumber; where Gen_EstateTypeID = '0149' and gen_productsubcustomeraccount in(1,2,4) and gen_fundcreationdate > '01/01/2018'",
+      "evidence": "DTSX:8176-8224"
+     },
+     {
+      "type": "decision",
+      "text": "האם נמצא חשבון לקוח מתאים?",
+      "tech": "Lookup Match / No Match",
+      "branches": [
+       {
+        "label": "כן",
+        "nodes": [
+         {
+          "type": "decision",
+          "text": "האם מספר החשבון והת.ז. של החשבון שנמצא זהים לאלה של הרשומה? (השוויון נבדק כבר ב-Lookup, אבל Lookup עם Full cache מתאים גם NULL ל-NULL, לפי התנהגות SSIS הכללית)",
+          "tech": "main.cs:140-164",
+          "branches": [
+           {
+            "label": "שניהם זהים",
+            "nodes": [
+             {
+              "type": "write",
+              "text": "הרשומה מקושרת לחשבון הלקוח ולאיש הקשר של החשבון.",
+              "tech": "gen_meetthecustomer · Update: gen_gemelaccountnumber = EntityReference(gen_customeraccount), gen_contactname = EntityReference(contact, Gen_contactname) · SDK",
+              "evidence": "main.cs:144-152"
+             },
+             {
+              "type": "decision",
+              "text": "האם יש ציון מחושב?",
+              "tech": "!Row.gencalculatescore_IsNull (main.cs:154)",
+              "branches": [
+               {
+                "label": "כן",
+                "nodes": [
+                 {
+                  "type": "write",
+                  "text": "הסטטוס נקבע ל-3 ('FINISH' לפי שם הקבוע).",
+                  "tech": "gen_status = 3"
+                 }
+                ]
+               },
+               {
+                "label": "לא",
+                "nodes": [
+                 {
+                  "type": "step",
+                  "text": "הסטטוס לא משתנה."
+                 }
+                ]
+               }
+              ]
+             }
+            ]
+           },
+           {
+            "label": "אותו חשבון, ת.ז. שונה; או ערך חסר",
+            "nodes": [
+             {
+              "type": "write",
+              "text": "הרשומה מסומנת בסטטוס 4 ('WORNG' לפי שם הקבוע). ת.ז. שונה לא צפויה, כי ה-Lookup מחייב שוויון. אבל ערך חסר אפשרי: רשומה בלי מספר חשבון מקדים (NULL) יכולה להיות מותאמת לחשבון לקוח שגם בו מספר הבנק NULL ואותה ת.ז. (Full cache מתאים NULL ל-NULL, לפי התנהגות SSIS הכללית). רשומה כזו תקבל סטטוס 4.",
+              "tech": "gen_status = 4 (main.cs:157-164; DTSX:8813-8834). המקור לא מסנן gen_pregemelaccountnumber is not null (DTSX:8313-8322). Lookup CacheType 0 (DTSX:8218)"
+             }
+            ]
+           }
+          ]
+         }
+        ]
+       },
+       {
+        "label": "לא",
+        "nodes": [
+         {
+          "type": "decision",
+          "text": "האם הרשומה נוצרה לפני יותר מ-180 יום?",
+          "tech": "Set Status To No Account: DATEADD(\"DD\",-180,GETDATE()) <= createdon ? gen_status : 8; Conditional Split: gen_status == 8",
+          "branches": [
+           {
+            "label": "כן",
+            "nodes": [
+             {
+              "type": "write",
+              "text": "הרשומה מסומנת בסטטוס 8 ('STATUS_NO_ACCOUNT' לפי שם הקבוע).",
+              "tech": "gen_meetthecustomer · Update gen_status = 8 · SDK (main.cs:34, 136-137)"
+             }
+            ]
+           },
+           {
+            "label": "לא",
+            "nodes": [
+             {
+              "type": "step",
+              "text": "אין כתיבה. הרשומה ממשיכה לזרמים הבאים ולריצות הבאות."
+             }
+            ]
+           }
+          ]
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "type": "end",
+      "text": "רשומות עם קופה מתאימה מקושרות. רשומות ותיקות בלי קופה מסומנות 'אין חשבון', ולכן לא ייבחרו בזרמים הבאים, שמסננים סטטוס 1/2."
+     }
+    ]
+   },
+   "detail_he": [
+    {
+     "h": "מקור ואוכלוסייה",
+     "t": "gen_meetthecustomer בסינון DTSX:8313: סטטוס 1/2, מוצר 1/2/4, gen_precustomer = 1, ת.ז. קיימת, ובלי gen_gemelaccountnumber, gen_automatedjoining ו-gen_miniautomatedjoining."
+    },
+    {
+     "h": "התאמה לרשומות קיימות",
+     "t": "Lookup עם Full cache מול Gen_customeraccount join Gen_estatecodeid (Gen_EstateTypeID = '0149', gen_productsubcustomeraccount in(1,2,4), gen_fundcreationdate > '01/01/2018'), לפי ת.ז. (9 ספרות) ומספר חשבון בנק (12 ספרות אחרי ריפוד, DTSX:8178). העמודה productsubcustomeraccount, שבה ה-CASE מחליף בין 2 ל-4, מועברת לסקריפט אבל לא נבדקת בו ולא נכתבת."
+    },
+    {
+     "h": "החלטות",
+     "t": "Match: קישור, וסטטוס 3 אם יש ציון. ענף 'ת.ז. שונה' או ערך חסר מוביל לסטטוס 4. ערך חסר אפשרי כאשר gen_pregemelaccountnumber הוא NULL, כי Full cache מתאים NULL ל-NULL (התנהגות SSIS כללית). No Match: מעל 180 יום מקבל 8 (DTSX:8376, 8156), והשאר נזרקים."
+    },
+    {
+     "h": "כתיבה ל-CRM",
+     "t": "ExecuteMultipleExtension Update בקבוצות של 500 (main.cs:170-171, 186-209). שדות: gen_gemelaccountnumber, gen_contactname, gen_status. ErrorBuffer לא מחובר."
+    },
+    {
+     "h": "תוצאה עסקית",
+     "t": "השלמת הקשר בין 'הכר את הלקוח' של לקוח-מראש לבין חשבון הקופה שנפתח בפועל, וסגירת רשומות שלא נפתחה להן קופה תוך 180 יום."
+    }
+   ],
+   "decisions": [
+    {
+     "where": "get meet the customer detalis (DTSX:8313)",
+     "condition": "gen_status in(1,2) AND gen_producttype in (1,2,4) AND gen_precustomer = 1 AND gen_gemelaccountnumber Is Null AND gen_automatedjoining Is Null AND gen_miniautomatedjoining Is Null AND gen_precustomeridnumber is not null",
+     "meaning_he": "רשומות פתוחות של לקוח-מראש בקופות גמל/השתלמות, בלי קישור.",
+     "outcome_he": "נכנסות להתאמה."
+    },
+    {
+     "where": "Add Zeros To Customer Account main.cs:37",
+     "condition": "!genpregemelaccountnumber_IsNull && genpregemelaccountnumber.Length <= 12",
+     "meaning_he": "נרמול מספר החשבון.",
+     "outcome_he": "PadLeft(12,'0')."
+    },
+    {
+     "where": "Set Status To No Account (DTSX:8376) + Conditional Split (DTSX:8156)",
+     "condition": "DATEADD(\"DD\",-180,GETDATE()) <= createdon ? gen_status : 8 ; gen_status == 8",
+     "meaning_he": "בלי התאמה ומעל 180 יום.",
+     "outcome_he": "סטטוס 8. בלי התאמה ופחות מ-180 יום: אין כתיבה."
+    },
+    {
+     "where": "update meet the customer by customer Account main.cs:136-164",
+     "condition": "genstatus == 8 → 8; else אם bankaccountnumber == genpregemelaccountnumber && genprecustomeridnumber == customeridnumber → קישור (+3 אם gencalculatescore לא NULL); אם אותו חשבון ות.ז. שונה, או ערך חסר → 4",
+     "meaning_he": "כללי הסטטוס בסקריפט.",
+     "outcome_he": "ראה ענפים."
+    }
+   ],
+   "crmEffects": [
+    {
+     "entity": "gen_meetthecustomer",
+     "verb": "Update gen_gemelaccountnumber, gen_contactname, gen_status(3)",
+     "mechanism": "SDK",
+     "when_he": "כשנמצא חשבון לקוח. סטטוס 3 רק אם יש ציון מחושב."
+    },
+    {
+     "entity": "gen_meetthecustomer",
+     "verb": "Update gen_status = 8",
+     "mechanism": "SDK",
+     "when_he": "בלי התאמה ומעל 180 יום מיצירה."
+    },
+    {
+     "entity": "gen_meetthecustomer",
+     "verb": "Update gen_status = 4",
+     "mechanism": "SDK",
+     "when_he": "בהתאמה עם ת.ז. שונה (לא צפוי) או עם ערך מפתח חסר. האפשרות השנייה קיימת כאשר gen_pregemelaccountnumber הוא NULL ומותאם ל-NULL ב-Full cache (התנהגות SSIS כללית)."
+    }
+   ],
+   "evidence": [
+    "DTSX:7420 Executable",
+    "DTSX:8308/8313 get meet the customer detalis",
+    "DTSX:7426 Add Zeros To Customer Account, main.cs (DTSX:7428) lines 37-39",
+    "DTSX:8176-8224 Get Customer Account Details (Lookup, CacheType 0)",
+    "DTSX:8369/8376 Set Status To No Account; DTSX:8143/8156 Conditional Split",
+    "DTSX:8546 update meet the customer by customer Account, main.cs (DTSX:8548, sha 4b281cbaa97c) lines 32-34, 128-221"
+   ],
+   "openQuestions_he": [
+    "משמעות Gen_EstateTypeID = '0149' לא ידועה.",
+    "למה התאריך כאן הוא gen_fundcreationdate > '01/01/2018', ובזרם 'מספר חשבון מקדים' הוא >= '2019-01-01'? לא ידוע.",
+    "ההנחה שמספר חשבון הבנק שמור ב-CRM כ-12 ספרות עם אפסים מובילים לא אומתה."
+   ]
+  },
+  {
+   "refId": "Package\\Link Meet The Customer To Customer Account By Automated Joining",
+   "title_he": "קישור 'הכר את הלקוח' לחשבון לקוח לפי הצטרפות אוטומטית",
+   "techName": "Link Meet The Customer To Customer Account By Automated Joining",
+   "short_he": "רשומות 'הכר את הלקוח' שמקושרות להצטרפות אוטומטית שהסתיימה מקושרות לחשבון לקוח שמספר חשבון הבנק שלו זהה למספר שבהצטרפות (מרופד ל-12 ספרות), לאיש הקשר ולת.ז. של אותו חשבון. גם כאן הסגירה של רשומות ותיקות בלי התאמה לא נכתבת כמצופה.",
+   "flow_he": [
+    "שליפת רשומות פתוחות מסוג 1/2/4 של לקוח-מראש, עם הצטרפות אוטומטית ובלי חשבון מקושר",
+    "חיפוש הצטרפות שסטטוס ההצטרפות שלה 8 ('Finish' לפי הערה), וחשבון לקוח לפי מספר חשבון בנק",
+    "נמצא: קישור לחשבון, לאיש הקשר ולת.ז., וסטטוס 3 אם יש ציון",
+    "לא נמצא ומעל 180 יום: עדכון ריק או סטטוס 3 (פער בקוד). אחרת אין כתיבה"
+   ],
+   "short": {
+    "nodes": [
+     {
+      "type": "step",
+      "text": "נבחרות רשומות 'הכר את הלקוח' פתוחות של לקוחות-מראש בקופות גמל/השתלמות, שיש להן הצטרפות אוטומטית ואין להן חשבון מקושר."
+     },
+     {
+      "type": "decision",
+      "text": "האם ההצטרפות האוטומטית הסתיימה ונמצא חשבון לקוח עם אותו מספר חשבון בנק?",
+      "branches": [
+       {
+        "label": "כן",
+        "nodes": [
+         {
+          "type": "write",
+          "text": "הרשומה מקושרת לחשבון הלקוח, לאיש הקשר ולתעודת הזהות שלו. אם יש לה ציון מחושב, היא מסומנת כהסתיימה."
+         }
+        ]
+       },
+       {
+        "label": "לא",
+        "nodes": [
+         {
+          "type": "decision",
+          "text": "האם הרשומה נוצרה לפני יותר מ-180 יום?",
+          "branches": [
+           {
+            "label": "כן",
+            "nodes": [
+             {
+              "type": "write",
+              "text": "הרשומה אמורה להיסגר, אבל בגלל פער בקוד נשלח עדכון ריק, או סימון 'הסתיימה' אם יש לה ציון מחושב."
+             }
+            ]
+           },
+           {
+            "label": "לא",
+            "nodes": [
+             {
+              "type": "step",
+              "text": "הרשומה לא מתעדכנת."
+             }
+            ]
+           }
+          ]
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "type": "end",
+      "text": "רשומות עם הצטרפות אוטומטית שהסתיימה מקושרות לחשבון לקוח שנמצא לפי מספר חשבון הבנק של ההצטרפות בלבד."
+     }
+    ]
+   },
+   "detailed": {
+    "nodes": [
+     {
+      "type": "step",
+      "text": "האוכלוסייה היא רשומות 'הכר את הלקוח' בסטטוס 1/2, מסוגי מוצר 1/2/4, של לקוח-מראש, עם הצטרפות אוטומטית ובלי חשבון גמל מקושר.",
+      "tech": "gen_status in (1,2) AND gen_producttype in (1,2,4) AND gen_precustomer = 1 AND gen_gemelaccountnumber Is Null AND gen_automatedjoining Is Not Null",
+      "evidence": "Get All Meet The Customer By Closed Automated Joining DTSX:3179"
+     },
+     {
+      "type": "step",
+      "text": "ההתאמה נעשית לפי מזהה ההצטרפות, ורק מול הצטרפויות שסטטוס ההצטרפות שלהן 8 ('Finish' לפי הערה). חשבון הלקוח נמצא לפי מספר חשבון הבנק של ההצטרפות, מרופד באפסים ל-12.",
+      "tech": "Lookup Get Automated Joining Details (Full cache): gen_automatedjoining join Gen_customeraccount on gen_bankaccountnumber = right(REPLICATE('0',12) + LTRIM(gen_automatedjoining.gen_bankaccountnumberName),12) Where gen_joiningstatus = 8; key meetTheCustomerAutomatedJoiningId = gen_automatedjoiningid",
+      "evidence": "DTSX:3226-3246"
+     },
+     {
+      "type": "decision",
+      "text": "האם נמצאו הצטרפות שהסתיימה וחשבון לקוח תואם?",
+      "tech": "Lookup Match / No Match",
+      "branches": [
+       {
+        "label": "כן",
+        "nodes": [
+         {
+          "type": "write",
+          "text": "הרשומה מקושרת לחשבון הלקוח ולאיש הקשר שלו, ומספר הזהות של חשבון הלקוח נכתב לרשומה.",
+          "tech": "gen_meetthecustomer · Update: gen_gemelaccountnumber = EntityReference(gen_customeraccount), gen_contactname = EntityReference(contact), gen_identitynumber = Gen_customeraccount.gen_customeridnumber · SDK",
+          "evidence": "Update MeetTheCustomers main.cs:77-84"
+         },
+         {
+          "type": "decision",
+          "text": "האם יש ציון מחושב?",
+          "tech": "!Row.gencalculatescore_IsNull (main.cs:86)",
+          "branches": [
+           {
+            "label": "כן",
+            "nodes": [
+             {
+              "type": "write",
+              "text": "הסטטוס נקבע ל-3 ('STATUS_FINISH').",
+              "tech": "gen_status = 3"
+             }
+            ]
+           },
+           {
+            "label": "לא",
+            "nodes": [
+             {
+              "type": "step",
+              "text": "הסטטוס לא משתנה."
+             }
+            ]
+           }
+          ]
+         }
+        ]
+       },
+       {
+        "label": "לא",
+        "nodes": [
+         {
+          "type": "decision",
+          "text": "האם הרשומה נוצרה לפני יותר מ-180 יום?",
+          "tech": "Derived Column: DATEADD(\"DD\",-180,GETDATE()) <= CreatedOn ? gen_status : 8; Conditional Split 'Wrong Records': gen_status == 8",
+          "branches": [
+           {
+            "label": "כן (gen_status=8 בזרם)",
+            "nodes": [
+             {
+              "type": "step",
+              "text": "הקוד בודק רק סטטוס 4 כ'שגוי', ולכן רשומה עם 8 נכנסת לענף הקישור בלי נתוני חשבון.",
+              "tech": "main.cs:32 STATUS_WRONG = 4; main.cs:72"
+             },
+             {
+              "type": "write",
+              "text": "אם יש ציון מחושב, הרשומה מסומנת בסטטוס 3. אחרת נשלח עדכון בלי שדות. הסטטוס 8 לא נכתב.",
+              "tech": "gen_meetthecustomer · Update (gen_status=3 או ללא מאפיינים) · SDK"
+             }
+            ]
+           },
+           {
+            "label": "לא",
+            "nodes": [
+             {
+              "type": "step",
+              "text": "אין כתיבה."
+             }
+            ]
+           }
+          ]
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "type": "end",
+      "text": "רשומות של הצטרפות אוטומטית שהסתיימה מקושרות לחשבון הלקוח. רשומות ותיקות בלי התאמה לא נסגרות בסטטוס 8."
+     }
+    ]
+   },
+   "detail_he": [
+    {
+     "h": "מקור ואוכלוסייה",
+     "t": "gen_meetthecustomer לפי DTSX:3179. בזרם הזה אין סינון על gen_miniautomatedjoining."
+    },
+    {
+     "h": "התאמה לרשומות קיימות",
+     "t": "Lookup עם Full cache לפי gen_automatedjoiningid. חשבון הלקוח מזוהה רק לפי מספר חשבון בנק (12 ספרות), ולא לפי ת.ז. (DTSX:3228). אם יש כמה חשבונות לקוח עם אותו מספר בנק, לא ידוע איזה ייבחר."
+    },
+    {
+     "h": "החלטות",
+     "t": "Match: קישור + gen_identitynumber, וסטטוס 3 אם יש ציון. No Match: 180 יום (DTSX:3154) ו-gen_status == 8 (DTSX:3126). הסקריפט בודק STATUS_WRONG = 4 (main.cs:32, 72), ולכן לא מזהה 8."
+    },
+    {
+     "h": "כתיבה ל-CRM",
+     "t": "ExecuteMultipleExtension Update בקבוצות של 500 (main.cs:93-94, 109-132). ErrorBuffer לא מחובר."
+    },
+    {
+     "h": "תוצאה עסקית",
+     "t": "קישור רשומות עם הצטרפות אוטומטית שהסתיימה לחשבון לקוח שנמצא לפי מספר חשבון הבנק של ההצטרפות בלבד."
+    }
+   ],
+   "decisions": [
+    {
+     "where": "Get All Meet The Customer By Closed Automated Joining (DTSX:3179)",
+     "condition": "gen_status in (1,2) AND gen_producttype in (1,2,4) AND gen_precustomer = 1 AND gen_gemelaccountnumber Is Null AND gen_automatedjoining Is Not Null",
+     "meaning_he": "רשומות פתוחות עם הצטרפות אוטומטית.",
+     "outcome_he": "נכנסות להתאמה."
+    },
+    {
+     "where": "Get Automated Joining Details (DTSX:3228)",
+     "condition": "gen_joiningstatus = 8 ; Gen_customeraccount.gen_bankaccountnumber = right(REPLICATE('0',12)+LTRIM(gen_bankaccountnumberName),12)",
+     "meaning_he": "הצטרפות שהסתיימה וחשבון לקוח עם אותו מספר בנק.",
+     "outcome_he": "Match מוביל לקישור."
+    },
+    {
+     "where": "Derived Column (DTSX:3154) + Conditional Split (DTSX:3126)",
+     "condition": "DATEADD(\"DD\",-180,GETDATE()) <= CreatedOn ? gen_status : 8 ; gen_status == 8",
+     "meaning_he": "בלי התאמה ומעל 180 יום.",
+     "outcome_he": "מגיע לסקריפט עם 8, ושם נבדק רק 4."
+    },
+    {
+     "where": "Update MeetTheCustomers main.cs:72, 86",
+     "condition": "Row.genstatus == STATUS_WRONG (4) ; !Row.gencalculatescore_IsNull",
+     "meaning_he": "כללי הסטטוס בסקריפט.",
+     "outcome_he": "4 לא מגיע אף פעם. ציון לא NULL מוביל לסטטוס 3."
+    }
+   ],
+   "crmEffects": [
+    {
+     "entity": "gen_meetthecustomer",
+     "verb": "Update gen_gemelaccountnumber, gen_contactname, gen_identitynumber, gen_status(3)",
+     "mechanism": "SDK",
+     "when_he": "כשנמצאה הצטרפות שהסתיימה וחשבון תואם."
+    },
+    {
+     "entity": "gen_meetthecustomer",
+     "verb": "Update gen_status(3), או עדכון ללא מאפיינים",
+     "mechanism": "SDK",
+     "when_he": "בלי התאמה ומעל 180 יום."
+    }
+   ],
+   "evidence": [
+    "DTSX:3107 Executable",
+    "DTSX:3174/3179 source; DTSX:3226-3246 Lookup",
+    "DTSX:3146/3154 Derived Column; DTSX:3113/3126 Conditional Split",
+    "Union All Input 2 (no match) carries gen_calculatescore but not account/contact/identity columns",
+    "DTSX:3396 Update MeetTheCustomers, main.cs (DTSX:3398, sha 6e6dd4954fa5) lines 31-32, 65-144"
+   ],
+   "openQuestions_he": [
+    "משמעות gen_joiningstatus = 8 נלקחת מההערה '--> Finish' בלבד.",
+    "למה ההתאמה לחשבון היא לפי מספר בנק בלבד, בלי ת.ז.? הכוונה לא ידועה."
+   ]
+  },
+  {
+   "refId": "Package\\Link Meet The Customer To Customer Account By Mini Automated Joining",
+   "title_he": "קישור לפי הצטרפות אוטומטית מקוצרת (מושבת)",
+   "techName": "Link Meet The Customer To Customer Account By Mini Automated Joining",
+   "short_he": "משימה מושבתת (DTS:Disabled=True), ולכן לא רצה ולא כותבת ל-CRM. היא מתועדת לשלמות בלבד.",
+   "flow_he": [
+    "מושבת: אין כתיבה פעילה"
+   ],
+   "short": {
+    "nodes": [
+     {
+      "type": "step",
+      "text": "השלב הזה מושבת בחבילה ואינו רץ."
+     },
+     {
+      "type": "end",
+      "text": "אין לו השפעה על CRM."
+     }
+    ]
+   },
+   "detailed": {
+    "nodes": [
+     {
+      "type": "step",
+      "text": "המשימה מסומנת כמושבתת, ולכן אינה רצה.",
+      "tech": "DTS:Disabled=\"True\"",
+      "evidence": "DTSX:4642"
+     },
+     {
+      "type": "step",
+      "text": "אילו הייתה פעילה: היא בוחרת רשומות פתוחות של לקוח-מראש בלי חשבון ובלי הצטרפות מקוצרת, ומחפשת הצטרפות מקוצרת של הצטרפות שהסתיימה.",
+      "tech": "source: gen_status in (1,2) AND gen_producttype in (1,2,4) AND gen_precustomer = 1 AND gen_gemelaccountnumber Is Null AND gen_miniautomatedjoining Is Null; lookup: gen_miniautomatedjoining join gen_automatedjoining Where gen_joiningstatus = 8",
+      "evidence": "DTSX:4714, 4760"
+     },
+     {
+      "type": "step",
+      "text": "אילו הייתה פעילה: רשומה בלי התאמה שנוצרה ב-3 הימים האחרונים הייתה מקבלת סטטוס 4.",
+      "tech": "DATEADD(\"DD\",-3,GETDATE()) < CreatedOn ? 4 : gen_status ; Conditional Split gen_status == 4",
+      "evidence": "DTSX:4689, 4661"
+     },
+     {
+      "type": "write",
+      "text": "אילו הייתה פעילה: קישור לחשבון הלקוח ולאיש הקשר, או סטטוס 4. כרגע לא מתבצע.",
+      "tech": "gen_meetthecustomer · Update gen_gemelaccountnumber, gen_contactname / gen_status=4 · SDK (main.cs:72-81, DTSX:4904) — inactive"
+     },
+     {
+      "type": "end",
+      "text": "אין השפעה בפועל כל עוד המשימה מושבתת."
+     }
+    ]
+   },
+   "detail_he": [
+    {
+     "h": "מקור ואוכלוסייה",
+     "t": "מושבת (DTSX:4642). השאילתה DTSX:4714 מתועדת בלבד."
+    },
+    {
+     "h": "התאמה לרשומות קיימות",
+     "t": "לא פעיל. ה-Lookup בודק gen_automatedjoiningid (DTSX:4760), אבל המקור מסנן gen_miniautomatedjoining Is Null."
+    },
+    {
+     "h": "החלטות",
+     "t": "לא פעיל: DATEADD(\"DD\",-3,GETDATE()) < CreatedOn ? 4 : gen_status (DTSX:4689); gen_status == 4 (DTSX:4661)."
+    },
+    {
+     "h": "כתיבה ל-CRM",
+     "t": "אין כתיבה פעילה."
+    },
+    {
+     "h": "תוצאה עסקית",
+     "t": "אין."
+    }
+   ],
+   "decisions": [],
+   "crmEffects": [],
+   "evidence": [
+    "DTSX:4642 DTS:Disabled=\"True\"",
+    "DTSX:4904 main.cs sha 2acd1944ae6b"
+   ],
+   "openQuestions_he": [
+    "למה המשימה הושבתה? לא ידוע."
+   ]
+  },
+  {
+   "refId": "Package\\Link Meet The Customer To Customer Account By Pre Account Number",
+   "title_he": "קישור 'הכר את הלקוח' לחשבון לקוח לפי מספר חשבון מקדים",
+   "techName": "Link Meet The Customer To Customer Account By Pre Account Number",
+   "short_he": "רשומות 'הכר את הלקוח' עם מספר חשבון מקדים מקושרות לחשבון לקוח לפי מספר החשבון (accountnumber) של ה-Account שמקושר לחשבון הלקוח ולפי מספר חשבון הבנק. מה מייצג ה-Account הזה לא ידוע (השערה: מעסיק). רשומות שקושרו מסומנות כהסתיימו. רשומות ותיקות בלי התאמה מסומנות 'אין חשבון'.",
+   "flow_he": [
+    "שליפת רשומות פתוחות מסוג 1/4 עם מספר חשבון מקדים, בלי חשבון מקושר ובלי הצטרפויות",
+    "חיפוש חשבון לקוח (סוג נכס '0149', נפתח מ-2019-01-01) לפי Account.accountnumber ומספר בנק בלי אפסים מובילים",
+    "נמצא: קישור לחשבון וסטטוס 3",
+    "לא נמצא ומעל 180 יום: סטטוס 8. אחרת אין כתיבה"
+   ],
+   "short": {
+    "nodes": [
+     {
+      "type": "step",
+      "text": "נבחרות רשומות 'הכר את הלקוח' פתוחות בקופות גמל, שיש בהן מספר חשבון מקדים ואין להן חשבון מקושר."
+     },
+     {
+      "type": "decision",
+      "text": "האם קיים חשבון לקוח שמספר החשבון ומספר חשבון הבנק שלו תואמים לרשומה?",
+      "branches": [
+       {
+        "label": "כן",
+        "nodes": [
+         {
+          "type": "write",
+          "text": "הרשומה מקושרת לחשבון הלקוח ומסומנת כהסתיימה."
+         }
+        ]
+       },
+       {
+        "label": "לא",
+        "nodes": [
+         {
+          "type": "decision",
+          "text": "האם הרשומה נוצרה לפני יותר מ-180 יום?",
+          "branches": [
+           {
+            "label": "כן",
+            "nodes": [
+             {
+              "type": "write",
+              "text": "הרשומה מסומנת בסטטוס 'אין חשבון'."
+             }
+            ]
+           },
+           {
+            "label": "לא",
+            "nodes": [
+             {
+              "type": "step",
+              "text": "הרשומה לא מתעדכנת."
+             }
+            ]
+           }
+          ]
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "type": "end",
+      "text": "רשומות עם מספר חשבון מקדים מקושרות לקופה שנפתחה, או נסגרות אחרי 180 יום."
+     }
+    ]
+   },
+   "detailed": {
+    "nodes": [
+     {
+      "type": "step",
+      "text": "האוכלוסייה היא רשומות 'הכר את הלקוח' בסטטוס 1/2, מסוגי מוצר 1/4 ('גמל, גמל להשקעה' לפי הערה), עם מספר חשבון מקדים, בלי חשבון גמל ובלי הצטרפות אוטומטית או מקוצרת. אין כאן סינון על לקוח-מראש.",
+      "tech": "gen_status in (1,2) and gen_preaccountnumber is not null and gen_producttype in (1, 4) and gen_gemelaccountnumber is null and gen_automatedjoining is null and gen_miniautomatedjoining is null",
+      "evidence": "Get All Meet The Customer with preaccountnumber DTSX:6008"
+     },
+     {
+      "type": "step",
+      "text": "ההתאמה נעשית מול חשבונות לקוח עם סוג נכס '0149' ותאריך פתיחה מ-2019-01-01. המספר המקדים מושווה למספר החשבון של ה-Account המקושר לחשבון הלקוח, ומספר הבנק המקדים מושווה למספר הבנק של החשבון בלי אפסים מובילים.",
+      "tech": "Lookup Get Customer Account Matches (Full cache): Gen_customeraccount ca join Gen_estatecodeid join Account on Account.AccountId = ca.Gen_accountname; where Gen_EstateTypeID = '0149' and ca.gen_fundcreationdate >= '2019-01-01'; gen_preaccountnumber = Account.accountnumber, gen_pregemelaccountnumber = CAbankaccountnumberNoZeros",
+      "evidence": "DTSX:6065-6103"
+     },
+     {
+      "type": "decision",
+      "text": "האם נמצא חשבון לקוח מתאים?",
+      "tech": "Lookup Match / No Match",
+      "branches": [
+       {
+        "label": "כן",
+        "nodes": [
+         {
+          "type": "write",
+          "text": "הרשומה מקושרת לחשבון הלקוח ומסומנת בסטטוס 3 ('STATUS_FINISH'), בלי תלות בציון.",
+          "tech": "gen_meetthecustomer · Update: gen_gemelaccountnumber = EntityReference(gen_customeraccount), gen_status = 3 · SDK",
+          "evidence": "Update Meet The Customer main.cs:60-65"
+         }
+        ]
+       },
+       {
+        "label": "לא",
+        "nodes": [
+         {
+          "type": "decision",
+          "text": "האם הרשומה נוצרה לפני יותר מ-180 יום?",
+          "tech": "On > 180 Days Change Status: DATEADD(\"DD\",-180,GETDATE()) <= CreatedOn ? gen_status : 8; Pass > 180 To Update: gen_status == 8",
+          "branches": [
+           {
+            "label": "כן",
+            "nodes": [
+             {
+              "type": "write",
+              "text": "הרשומה מסומנת בסטטוס 8 ('STATUS_NO_ACCOUNT').",
+              "tech": "gen_status = 8 (main.cs:29, 55-56) · SDK"
+             }
+            ]
+           },
+           {
+            "label": "לא",
+            "nodes": [
+             {
+              "type": "step",
+              "text": "אין כתיבה."
+             }
+            ]
+           }
+          ]
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "type": "end",
+      "text": "רשומות עם התאמה מקושרות ונסגרות. רשומות ותיקות בלי התאמה מסומנות 'אין חשבון'."
+     }
+    ]
+   },
+   "detail_he": [
+    {
+     "h": "מקור ואוכלוסייה",
+     "t": "gen_meetthecustomer לפי DTSX:6008. הזרם רץ אחרון, ולכן רשומות שקושרו או קיבלו סטטוס 8 בזרמים הקודמים כבר לא עומדות בסינון (gen_gemelaccountnumber is null / gen_status in (1,2))."
+    },
+    {
+     "h": "התאמה לרשומות קיימות",
+     "t": "Lookup עם Full cache לפי שני מפתחות: gen_preaccountnumber = Account.accountnumber (החשבון שב-Gen_accountname של חשבון הלקוח, השערה: המעסיק/המעסיק-לקוח) ו-gen_pregemelaccountnumber = מספר בנק בלי אפסים מובילים (DTSX:6067). בצד 'הכר את הלקוח' לא מוסרים אפסים מובילים."
+    },
+    {
+     "h": "החלטות",
+     "t": "Match: קישור וסטטוס 3 תמיד. No Match: מעל 180 יום מקבל 8 (DTSX:6160, 6193), והשאר נזרקים."
+    },
+    {
+     "h": "כתיבה ל-CRM",
+     "t": "ExecuteMultipleExtension Update בקבוצות של 500 (main.cs:71-72, 82-105). חריגות בעיבוד שורה ותקלות ExecuteMultiple נכתבות ל-ErrorBuffer, שאינו מחובר."
+    },
+    {
+     "h": "תוצאה עסקית",
+     "t": "קישור רשומות 'הכר את הלקוח' לחשבון שנפתח בפועל לפי מספר חשבון מקדים, או סגירתן אחרי 180 יום."
+    }
+   ],
+   "decisions": [
+    {
+     "where": "Get All Meet The Customer with preaccountnumber (DTSX:6008)",
+     "condition": "gen_status in (1,2) and gen_preaccountnumber is not null and gen_producttype in (1, 4) and gen_gemelaccountnumber is null and gen_automatedjoining is null and gen_miniautomatedjoining is null",
+     "meaning_he": "רשומות פתוחות עם מספר חשבון מקדים.",
+     "outcome_he": "נכנסות להתאמה."
+    },
+    {
+     "where": "Get Customer Account Matches (DTSX:6067)",
+     "condition": "Gen_EstateTypeID = '0149' and ca.gen_fundcreationdate >= '2019-01-01'; accountnumber = gen_preaccountnumber and CAbankaccountnumberNoZeros = gen_pregemelaccountnumber",
+     "meaning_he": "חשבון לקוח תואם.",
+     "outcome_he": "Match מוביל לקישור וסטטוס 3."
+    },
+    {
+     "where": "On > 180 Days Change Status (DTSX:6160) + Pass > 180 To Update (DTSX:6193)",
+     "condition": "DATEADD(\"DD\",-180,GETDATE()) <= CreatedOn ? gen_status : 8 ; gen_status == 8",
+     "meaning_he": "בלי התאמה ומעל 180 יום.",
+     "outcome_he": "סטטוס 8."
+    }
+   ],
+   "crmEffects": [
+    {
+     "entity": "gen_meetthecustomer",
+     "verb": "Update gen_gemelaccountnumber, gen_status = 3",
+     "mechanism": "SDK",
+     "when_he": "כשנמצא חשבון לקוח."
+    },
+    {
+     "entity": "gen_meetthecustomer",
+     "verb": "Update gen_status = 8",
+     "mechanism": "SDK",
+     "when_he": "בלי התאמה ומעל 180 יום."
+    }
+   ],
+   "evidence": [
+    "DTSX:5998 Executable",
+    "DTSX:6003/6008 source; DTSX:6065-6103 Lookup (CacheType 0)",
+    "DTSX:6152/6160 On > 180 Days Change Status; DTSX:6180/6193 Pass > 180 To Update",
+    "DTSX:6309 Update Meet The Customer, main.cs (DTSX:6311, sha e49d33debb93) lines 29-30, 48-117"
+   ],
+   "openQuestions_he": [
+    "מה מייצג Account.accountnumber של Gen_accountname (מעסיק? לקוח?)? לא ידוע.",
+    "למה כאן אין סינון gen_precustomer = 1 כמו בזרמים האחרים? לא ידוע."
+   ]
+  }
+ ],
+ "findings_he": [
+  {
+   "severity": "high",
+   "text": "בזרמים 'Customer Program' ו-'By Automated Joining' כלל 180 הימים מסמן בזרם gen_status = 8, אבל הסקריפט בודק רק את הערך 4 (WRONG/STATUS_WRONG). לכן רשומה ותיקה בלי התאמה לא מקבלת 8. אם יש לה gen_calculatescore היא מסומנת 3 ('FINISH'), כלומר נסגרת כהסתיימה למרות שלא נמצאה התאמה. אם אין לה ציון, נשלח Update בלי שדות, והיא נשארת בסטטוס 1/2 ונבחרת שוב בכל ריצה. בשני הזרמים האחרים הקבוע הוא STATUS_NO_ACCOUNT = 8, והם עקביים.",
+   "evidence": "Program: DTSX:10002, 9850; main.cs:34,137,151 (DTSX:10133). AJ: DTSX:3154, 3126; main.cs:32,72,86 (DTSX:3398). Union All Input 2 includes gen_calculatescore"
+  },
+  {
+   "severity": "medium",
+   "text": "בכל ארבעת הסקריפטים הפעילים, תקלות פרטניות שמוחזרות מ-ExecuteMultiple נכתבות ל-ErrorBuffer, ולפלט Error אין Path. גם הפלט CastingError (בזרמים Program, Customer Account ו-Automated Joining) לא מחובר, ולכן תקלות אלה לא נשמרות ביעד כלשהו בחבילה. התנהגות טכנית נוספת: (א) השליחה האחרונה, ExcecuteBulk() ב-Input0_ProcessInput בסוף ה-rowset, נמצאת מחוץ ל-try/catch. אם שם מתקבלת תשובה ריקה (ApplicationException 'There was not response from the server...') או חריגה אחרת, הרכיב וזרימת הנתונים נכשלים, והמשימות שאחריהם בשרשרת ה-Success לא רצות. (ב) אם ExcecuteBulk נכשל באמצע הזרם, מתוך ה-try של שורה, myEntities.Clear() לא מתבצע והשורה מנותבת לפלט השגיאה. מאותו רגע התנאי Count == 500 לא מתקיים שוב, וכל השורות הבאות מצטברות יחד עם 500 הישויות שלא נוקו ונשלחות כ-ExecuteMultiple אחד בסוף ה-rowset. אם הבקשה הזו חורגת ממגבלת ExecuteMultiple של השרת (ידע CRM כללי; המימוש של ExecuteMultipleExtension לא סופק), הקריאה האחרונה נכשלת מחוץ ל-try/catch וזרימת הנתונים נכשלת. אם זה קורה בפועל תלוי בכמות השורות, ולא ניתן לקבוע זאת מהחבילה.",
+   "evidence": "Program writer DTSX:10414-10460; אותו דפוס: DTSX:3612-3660 (AJ), 6503-6550 (Pre Account Number), 8836-8880 (Pre Customer Account); survey paths (אין path יוצא מאף סקריפט כותב)"
+  },
+  {
+   "severity": "medium",
+   "text": "רשומות בלי התאמה שגילן עד 180 יום יוצאות ב-Default Output של ה-Conditional Split, שאינו מחובר. הן לא מתעדכנות ונבחרות שוב בכל ריצה. זו התנהגות 'המתנה' מכוונת לכאורה (השערה).",
+   "evidence": "DTSX:3126, 6193, 8156, 9850; survey paths"
+  },
+  {
+   "severity": "low",
+   "text": "ההתאמות נעשות ב-Lookup עם Full cache על מפתחות שאינם בהכרח ייחודיים: ת.ז. בתוכנית לקוח, ומספר בנק בהצטרפות אוטומטית. אם יש כמה התאמות, הבחירה לא דטרמיניסטית מבחינה עסקית.",
+   "evidence": "DTSX:9872, 3228, 8178, 6067"
+  },
+  {
+   "severity": "low",
+   "text": "ספי תאריך פתיחה שונים בין הזרמים: > '01/01/2018' ב-Pre Customer Account לעומת >= '2019-01-01' ב-Pre Account Number.",
+   "evidence": "DTSX:8178, 6067"
+  },
+  {
+   "severity": "info",
+   "text": "ב-Lookup של Pre Customer Account מחושב gen_productsubcustomeraccount עם החלפה 2↔4, והערך מועבר לסקריפט אבל לא נבדק בו ולא נכתב.",
+   "evidence": "DTSX:8178; main.cs (DTSX:8548) 128-184"
+  },
+  {
+   "severity": "info",
+   "text": "המשימה 'By Mini Automated Joining' מושבתת. ב-DTSX אין Package Configurations, ודריסת חיבורים או משתנים בזמן ריצה (C:\\Generix\\SSISConfigFile.dtsConfig, שלא סופק, או Job) אינה ידועה.",
+   "evidence": "DTSX:4642; evidence.configurations = []"
+  }
+ ]
+}

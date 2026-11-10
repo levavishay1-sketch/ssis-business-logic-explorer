@@ -1,0 +1,404 @@
+{
+  "package": "0025_Agents_Agencies",
+  "dataFlows": [
+    "Package\\Update agents balance",
+    "Package\\update agents commissionpostponed field",
+    "Package\\update agencies commissionpostponed field",
+    "Package\\Set Gen_commissionpostponed (control flow, disabled)"
+  ],
+  "analyst": "ssis-field-lineage",
+  "source": {
+    "file": "source/DailyProcess/0025_Agents_Agencies.dtsx",
+    "sha256": "829A8BDEFB30A1C25460DBA62A83427763EBF1EBEC1EE73F0CF1DE50E83D0B0B"
+  },
+  "scriptOutputs": [],
+  "crmWrites": [
+    {
+      "component": "Package\\Update agents balance\\Update Agents",
+      "identicalCopies": [],
+      "entity": "gen_agents",
+      "verb": "UPDATE",
+      "mechanism": "SQL (OLE DB Command: UPDATE Gen_agentsBase on [CRM] = Psql/ALTSHULER_MSCRM)",
+      "status": "Unsupported",
+      "recordKey": "WHERE gen_agentsid = ? ('?' #1 -> Param_1 = gen_agentsid from 'Get agent Data' = gen_agents.gen_agentsid found by LEFT JOIN on the contract's gen_agentname)",
+      "recordKeyColumns": [
+        "gen_agentsid"
+      ],
+      "declaredRowFilters": [],
+      "condition": "Rows of 'Get agent Data' (HAVING ABS(sum(isnull(gen_accountbalance,0)) - isnull(gen_agentvalue,0) + isnull(gen_agencyvalue,0)) > 1) routed by Conditional Split 'Agent Or Agency' to output 'Update Agent' (EvaluationOrder 0, !ISNULL(gen_agentsid)). An agent that appears in several (agent, agency) pairs gets one UPDATE per pair; the last processed row wins (row order not determined). Data flow 'Update agents balance' runs after 'Create ETL Process record' (Success, DTSX:7072).",
+      "attributes": [
+        {
+          "fixedValue": null,
+          "condition": null,
+          "excludeFromValue": [],
+          "declaredSources": [
+            {
+              "db": "gen_fundmain.gen_accountbalance",
+              "role": "value",
+              "why": "summed (NULL -> 0) per (agent, agency) pair into balance, which is written",
+              "evidence": "Get agent Data SQL DTSX:5066, 5071, 5078"
+            },
+            {
+              "db": "gen_agentcontract.gen_agentname / gen_agencyname (direct contract ac and parent contract acc)",
+              "role": "condition",
+              "why": "decide to which (agent, agency) pair each fund balance is added (each fund counts for its broker contract AND for the parent contract)",
+              "evidence": "DTSX:5068-5084"
+            }
+          ],
+          "attribute": "gen_agentvalue",
+          "from": [
+            {
+              "column": "balance",
+              "role": "value"
+            }
+          ],
+          "expression": "SET gen_agentvalue = ? ('?' #0 -> Param_0 = balance). balance = sum(isnull(gen_accountbalance,0)) (cy, written unchanged as gen_agentvalue) over the UNION ALL of (a) every gen_fundmain f JOIN gen_agentcontract ac ON ac.Gen_agentcontractId = f.gen_brokernumber, taking ac.gen_agentname / ac.gen_agencyname, and (b) the same funds JOIN the parent contract acc ON acc.Gen_agentcontractId = ac.gen_agencycontractnumber, taking acc.gen_agentname / acc.gen_agencyname; LEFT JOIN gen_agents ON gen_agentsid = agent_balance.gen_agentname, LEFT JOIN Gen_agencie ON gen_agencieid = agent_balance.gen_agencyname; GROUP BY gen_agentsid, gen_agencieid, gen_agentvalue, gen_agencyvalue; HAVING ABS(sum(isnull(gen_accountbalance,0)) - isnull(gen_agentvalue,0) + isnull(gen_agencyvalue,0)) > 1. The sum is per (agent, agency) PAIR, not per agent/agency alone. No fund-level filter (no state / existinfile filter on gen_fundmain).",
+          "evidence": "SqlCommand DTSX:5174-5176 ('?' #0 at 5175 -> Param_0, '?' #1 at 5176 -> Param_1; inputs balance -> Param_0 DTSX:5185, gen_agentsid -> Param_1 DTSX:5186); source SQL DTSX:5061-5090"
+        }
+      ],
+      "evidence": "Update Agents DTSX:5171-5223; Agent Or Agency DTSX:5014-5055; Get agent Data DTSX:5056-5126; connection Package.ConnectionManagers[CRM] (DTSID {D51CCED1-9F31-4C56-840C-E21FF6667EC7}, DTSX:4; Data Source=Psql; Initial Catalog=ALTSHULER_MSCRM, DTSX:6)"
+    },
+    {
+      "component": "Package\\Update agents balance\\Update Agencies",
+      "identicalCopies": [],
+      "entity": "gen_agencie",
+      "verb": "UPDATE",
+      "mechanism": "SQL (OLE DB Command: UPDATE Gen_agencieBase on [CRM] = Psql/ALTSHULER_MSCRM)",
+      "status": "Unsupported",
+      "recordKey": "WHERE gen_agencieid = ? ('?' #1 -> Param_1 = gen_agencieid from 'Get agent Data' = Gen_agencie.gen_agencieid found by LEFT JOIN on the contract's gen_agencyname)",
+      "recordKeyColumns": [
+        "gen_agencieid"
+      ],
+      "declaredRowFilters": [],
+      "condition": "Rows of 'Get agent Data' routed by Conditional Split 'Agent Or Agency' to output 'Update Agency' (EvaluationOrder 1, !ISNULL(gen_agencieid)). Conditional Split sends each row to the FIRST output whose condition is true: every row with a non-NULL gen_agentsid goes to 'Update Agent' (EvaluationOrder 0) even when gen_agencieid is also set, so an agency is updated ONLY from pairs whose agent is NULL (contract without agent, or agent id not found in gen_agents). All such rows have gen_agentsid NULL and therefore gen_agentvalue NULL, so GROUP BY (gen_agentsid, gen_agencieid, gen_agentvalue, gen_agencyvalue) yields exactly one group per agency: at most one UPDATE per agency per run. For these rows the HAVING reduces to ABS(sum + isnull(gen_agencyvalue,0)) > 1, so the agency is rewritten on every run whenever that holds, even if the stored value already equals the sum (DTSX:5061-5090).",
+      "attributes": [
+        {
+          "fixedValue": null,
+          "condition": null,
+          "excludeFromValue": [],
+          "declaredSources": [
+            {
+              "db": "gen_fundmain.gen_accountbalance",
+              "role": "value",
+              "why": "summed (NULL -> 0) per (agent, agency) pair into balance, which is written",
+              "evidence": "Get agent Data SQL DTSX:5066, 5071, 5078"
+            },
+            {
+              "db": "gen_agentcontract.gen_agentname / gen_agencyname (direct contract ac and parent contract acc)",
+              "role": "condition",
+              "why": "decide to which (agent, agency) pair each fund balance is added (each fund counts for its broker contract AND for the parent contract)",
+              "evidence": "DTSX:5068-5084"
+            }
+          ],
+          "attribute": "gen_agencyvalue",
+          "from": [
+            {
+              "column": "balance",
+              "role": "value"
+            }
+          ],
+          "expression": "SET gen_agencyvalue = ? ('?' #0 -> Param_0 = balance). balance = sum(isnull(gen_accountbalance,0)) (cy, written unchanged as gen_agencyvalue) over the UNION ALL of (a) every gen_fundmain f JOIN gen_agentcontract ac ON ac.Gen_agentcontractId = f.gen_brokernumber, taking ac.gen_agentname / ac.gen_agencyname, and (b) the same funds JOIN the parent contract acc ON acc.Gen_agentcontractId = ac.gen_agencycontractnumber, taking acc.gen_agentname / acc.gen_agencyname; LEFT JOIN gen_agents ON gen_agentsid = agent_balance.gen_agentname, LEFT JOIN Gen_agencie ON gen_agencieid = agent_balance.gen_agencyname; GROUP BY gen_agentsid, gen_agencieid, gen_agentvalue, gen_agencyvalue; HAVING ABS(sum(isnull(gen_accountbalance,0)) - isnull(gen_agentvalue,0) + isnull(gen_agencyvalue,0)) > 1. The sum is per (agent, agency) PAIR, not per agent/agency alone. No fund-level filter (no state / existinfile filter on gen_fundmain). Because of the Conditional Split order, only the sum of pairs with NULL agent reaches this command.",
+          "evidence": "SqlCommand DTSX:5130-5132 ('?' #0 at 5131 -> Param_0, '?' #1 at 5132 -> Param_1; inputs balance -> Param_0 DTSX:5141, gen_agencieid -> Param_1 DTSX:5142); split DTSX:5028 (EvaluationOrder 0), 5036 (EvaluationOrder 1); source SQL DTSX:5061-5090"
+        }
+      ],
+      "evidence": "Update Agencies DTSX:5127-5170; Agent Or Agency DTSX:5014-5055; Get agent Data DTSX:5056-5126; connection Package.ConnectionManagers[CRM] (DTSID {D51CCED1-9F31-4C56-840C-E21FF6667EC7}, DTSX:4; Data Source=Psql; Initial Catalog=ALTSHULER_MSCRM, DTSX:6)"
+    },
+    {
+      "component": "Package\\update agents commissionpostponed field\\update agetns commissionpostponed field",
+      "identicalCopies": [],
+      "entity": "gen_agents",
+      "verb": "UPDATE",
+      "mechanism": "SDK (ExecuteMultiple Update: ExecuteMultipleExtension(myEntities, RequestType.Update, service) from external CRM2015.Proxy, batches of 1000)",
+      "status": "Supported",
+      "recordKey": "entity.Id = Row.GenagentsId (Gen_agentsId read from Gen_agents by 'get Agents details')",
+      "recordKeyColumns": [
+        "Gen_agentsId"
+      ],
+      "declaredRowFilters": [],
+      "condition": "One Update per row of 'get Agents details' (SQL DTSX:6002-6012: SELECT Gen_agentsId, dateadd(HOUR,3,gen_licenseexpdate) gen_licenseexpdate, gen_pausereason FROM Gen_agents WHERE gen_commissionpostponed != 1 AND (gen_licenseexpdate is null OR dateadd(HOUR,3,gen_licenseexpdate) < CONVERT(DATE, GETDATE()) OR gen_bookkeepingexpdate is null OR dateadd(HOUR,3,gen_bookkeepingexpdate) < CONVERT(DATE, GETDATE()) OR gen_taxdeductionexpdate is null OR dateadd(HOUR,3,gen_taxdeductionexpdate) < CONVERT(DATE, GETDATE()))), i.e. not-yet-postponed records with an expired or missing licence, bookkeeping or tax-deduction date. Rows pass Derived Column 'set 'pausereason' field' and reach the script. Entities are collected and sent in ExecuteMultiple batches of 1000 (main.cs:79 (DTSX:6357)-6358) and a final batch at EndOfRowset (main.cs:126 (DTSX:6404)-6406); per-item faults go to the Error output (ETL warning, plumbing) and do not stop the run. Data flow runs after the DISABLED Execute SQL Task 'Set Gen_commissionpostponed' (DTSX:7074; per SSIS semantics a disabled task is skipped and its successors still run).",
+      "attributes": [
+        {
+          "fixedValue": true,
+          "condition": null,
+          "excludeFromValue": [],
+          "declaredSources": [
+            {
+              "db": "Gen_agents.gen_commissionpostponed",
+              "role": "condition",
+              "why": "source WHERE gen_commissionpostponed != 1: only records not yet postponed are read; NULL values fail the comparison, so records with NULL gen_commissionpostponed are never processed",
+              "evidence": "get Agents details SQL DTSX:6009"
+            },
+            {
+              "db": "Gen_agents.gen_licenseexpdate",
+              "role": "condition",
+              "why": "record is selected when gen_licenseexpdate is NULL or dateadd(HOUR,3,gen_licenseexpdate) < CONVERT(DATE, GETDATE())",
+              "evidence": "DTSX:6010"
+            },
+            {
+              "db": "Gen_agents.gen_bookkeepingexpdate",
+              "role": "condition",
+              "why": "record is selected when gen_bookkeepingexpdate is NULL or dateadd(HOUR,3,gen_bookkeepingexpdate) < CONVERT(DATE, GETDATE())",
+              "evidence": "DTSX:6011"
+            },
+            {
+              "db": "Gen_agents.gen_taxdeductionexpdate",
+              "role": "condition",
+              "why": "record is selected when gen_taxdeductionexpdate is NULL or dateadd(HOUR,3,gen_taxdeductionexpdate) < CONVERT(DATE, GETDATE())",
+              "evidence": "DTSX:6012"
+            }
+          ],
+          "attribute": "gen_commissionpostponed",
+          "from": [],
+          "expression": "entity[\"gen_commissionpostponed\"] = true (literal); set for every processed row.",
+          "evidence": "main.cs:73 (DTSX:6351)"
+        },
+        {
+          "fixedValue": null,
+          "condition": null,
+          "excludeFromValue": [
+            {
+              "field": null,
+              "why": "DB origin Gen_agents.gen_pausereason (read by the source SQL) is replaced for every row by Derived Column \"set 'pausereason' field\" (expression never NULL); the written value is the literal 5 or 4 selected by gen_licenseexpdate",
+              "evidence": "DTSX:6055"
+            }
+          ],
+          "declaredSources": [
+            {
+              "db": "Gen_agents.gen_commissionpostponed",
+              "role": "condition",
+              "why": "source WHERE gen_commissionpostponed != 1: only records not yet postponed are read; NULL values fail the comparison, so records with NULL gen_commissionpostponed are never processed",
+              "evidence": "get Agents details SQL DTSX:6009"
+            },
+            {
+              "db": "Gen_agents.gen_bookkeepingexpdate",
+              "role": "condition",
+              "why": "record is selected when gen_bookkeepingexpdate is NULL or dateadd(HOUR,3,gen_bookkeepingexpdate) < CONVERT(DATE, GETDATE())",
+              "evidence": "DTSX:6011"
+            },
+            {
+              "db": "Gen_agents.gen_taxdeductionexpdate",
+              "role": "condition",
+              "why": "record is selected when gen_taxdeductionexpdate is NULL or dateadd(HOUR,3,gen_taxdeductionexpdate) < CONVERT(DATE, GETDATE())",
+              "evidence": "DTSX:6012"
+            }
+          ],
+          "attribute": "gen_pausereason",
+          "from": [
+            {
+              "column": "gen_pausereason",
+              "role": "value"
+            }
+          ],
+          "expression": "entity[\"gen_pausereason\"] = new OptionSetValue(Row.genpausereason) when !Row.genpausereason_IsNull. The input column gen_pausereason is REPLACED upstream by Derived Column 'set 'pausereason' field' (DTSX:6055): ISNULL(gen_licenseexpdate) || DATEDIFF(\"dd\",GETDATE(),gen_licenseexpdate) < 0 ? 5 : 4, where gen_licenseexpdate = dateadd(HOUR,3,Gen_agents.gen_licenseexpdate) from the source SQL and GETDATE() is the SSIS host clock. Result: 5 when the licence date is missing or its day is before today; otherwise 4 (record selected because of bookkeeping / tax-deduction expiry only). The expression never yields NULL, so the IsNull guard is always passed and the ORIGINAL Gen_agents.gen_pausereason read by the source is never written (it is overwritten for every row). Option set labels of 4/5 are not in the package (unknown).",
+          "evidence": "main.cs:74 (DTSX:6352)-6353; Derived Column FriendlyExpression DTSX:6055; source SQL DTSX:6002-6012"
+        }
+      ],
+      "evidence": "Script 'update agetns commissionpostponed field' main.cs:67-130 (component DTSX:6123; main.cs line N = DTSX 6278+N); Derived Column DTSX:6055; source DTSX:6002-6012; user code identical to the agencies script except new Entity(\"gen_agents\") / Row.GenagentsId (main.cs:71-72; not in dupes.json because of that difference)"
+    },
+    {
+      "component": "Package\\update agencies commissionpostponed field\\update agencies commissionpostponed field",
+      "identicalCopies": [],
+      "entity": "gen_agencie",
+      "verb": "UPDATE",
+      "mechanism": "SDK (ExecuteMultiple Update: ExecuteMultipleExtension(myEntities, RequestType.Update, service) from external CRM2015.Proxy, batches of 1000)",
+      "status": "Supported",
+      "recordKey": "entity.Id = Row.GenagencieId (Gen_agencieId read from Gen_agencie by 'get Agencies details')",
+      "recordKeyColumns": [
+        "Gen_agencieId"
+      ],
+      "declaredRowFilters": [],
+      "condition": "One Update per row of 'get Agencies details' (SQL DTSX:3941-3951: SELECT Gen_agencieId, dateadd(HOUR,3,gen_licenseexpdate) gen_licenseexpdate, gen_pausereason FROM Gen_agencie WHERE gen_commissionpostponed != 1 AND (gen_licenseexpdate is null OR dateadd(HOUR,3,gen_licenseexpdate) < CONVERT(DATE, GETDATE()) OR gen_bookkeepingexp is null OR dateadd(HOUR,3,gen_bookkeepingexp) < CONVERT(DATE, GETDATE()) OR gen_taxdeductionexp is null OR dateadd(HOUR,3,gen_taxdeductionexp) < CONVERT(DATE, GETDATE()))), i.e. not-yet-postponed records with an expired or missing licence, bookkeeping or tax-deduction date. Rows pass Derived Column 'set 'pausereason' field' and reach the script. Entities are collected and sent in ExecuteMultiple batches of 1000 (main.cs:79 (DTSX:4278)-4279) and a final batch at EndOfRowset (main.cs:126 (DTSX:4325)-4327); per-item faults go to the Error output (ETL warning, plumbing) and do not stop the run. Data flow runs after 'update agents commissionpostponed field' (Success, DTSX:7075).",
+      "attributes": [
+        {
+          "fixedValue": true,
+          "condition": null,
+          "excludeFromValue": [],
+          "declaredSources": [
+            {
+              "db": "Gen_agencie.gen_commissionpostponed",
+              "role": "condition",
+              "why": "source WHERE gen_commissionpostponed != 1: only records not yet postponed are read; NULL values fail the comparison, so records with NULL gen_commissionpostponed are never processed",
+              "evidence": "get Agencies details SQL DTSX:3948"
+            },
+            {
+              "db": "Gen_agencie.gen_licenseexpdate",
+              "role": "condition",
+              "why": "record is selected when gen_licenseexpdate is NULL or dateadd(HOUR,3,gen_licenseexpdate) < CONVERT(DATE, GETDATE())",
+              "evidence": "DTSX:3949"
+            },
+            {
+              "db": "Gen_agencie.gen_bookkeepingexp",
+              "role": "condition",
+              "why": "record is selected when gen_bookkeepingexp is NULL or dateadd(HOUR,3,gen_bookkeepingexp) < CONVERT(DATE, GETDATE())",
+              "evidence": "DTSX:3950"
+            },
+            {
+              "db": "Gen_agencie.gen_taxdeductionexp",
+              "role": "condition",
+              "why": "record is selected when gen_taxdeductionexp is NULL or dateadd(HOUR,3,gen_taxdeductionexp) < CONVERT(DATE, GETDATE())",
+              "evidence": "DTSX:3951"
+            }
+          ],
+          "attribute": "gen_commissionpostponed",
+          "from": [],
+          "expression": "entity[\"gen_commissionpostponed\"] = true (literal); set for every processed row.",
+          "evidence": "main.cs:73 (DTSX:4272)"
+        },
+        {
+          "fixedValue": null,
+          "condition": null,
+          "excludeFromValue": [
+            {
+              "field": null,
+              "why": "DB origin Gen_agencie.gen_pausereason (read by the source SQL) is replaced for every row by Derived Column \"set 'pausereason' field\" (expression never NULL); the written value is the literal 5 or 4 selected by gen_licenseexpdate",
+              "evidence": "DTSX:3994"
+            }
+          ],
+          "declaredSources": [
+            {
+              "db": "Gen_agencie.gen_commissionpostponed",
+              "role": "condition",
+              "why": "source WHERE gen_commissionpostponed != 1: only records not yet postponed are read; NULL values fail the comparison, so records with NULL gen_commissionpostponed are never processed",
+              "evidence": "get Agencies details SQL DTSX:3948"
+            },
+            {
+              "db": "Gen_agencie.gen_bookkeepingexp",
+              "role": "condition",
+              "why": "record is selected when gen_bookkeepingexp is NULL or dateadd(HOUR,3,gen_bookkeepingexp) < CONVERT(DATE, GETDATE())",
+              "evidence": "DTSX:3950"
+            },
+            {
+              "db": "Gen_agencie.gen_taxdeductionexp",
+              "role": "condition",
+              "why": "record is selected when gen_taxdeductionexp is NULL or dateadd(HOUR,3,gen_taxdeductionexp) < CONVERT(DATE, GETDATE())",
+              "evidence": "DTSX:3951"
+            }
+          ],
+          "attribute": "gen_pausereason",
+          "from": [
+            {
+              "column": "gen_pausereason",
+              "role": "value"
+            }
+          ],
+          "expression": "entity[\"gen_pausereason\"] = new OptionSetValue(Row.genpausereason) when !Row.genpausereason_IsNull. The input column gen_pausereason is REPLACED upstream by Derived Column 'set 'pausereason' field' (DTSX:3994): ISNULL(gen_licenseexpdate) || DATEDIFF(\"dd\",GETDATE(),gen_licenseexpdate) < 0 ? 5 : 4, where gen_licenseexpdate = dateadd(HOUR,3,Gen_agencie.gen_licenseexpdate) from the source SQL and GETDATE() is the SSIS host clock. Result: 5 when the licence date is missing or its day is before today; otherwise 4 (record selected because of bookkeeping / tax-deduction expiry only). The expression never yields NULL, so the IsNull guard is always passed and the ORIGINAL Gen_agencie.gen_pausereason read by the source is never written (it is overwritten for every row). Option set labels of 4/5 are not in the package (unknown).",
+          "evidence": "main.cs:74 (DTSX:4273)-4274; Derived Column FriendlyExpression DTSX:3994; source SQL DTSX:3941-3951"
+        }
+      ],
+      "evidence": "Script 'update agencies commissionpostponed field' main.cs:67-130 (component DTSX:4062; main.cs line N = DTSX 4199+N); Derived Column DTSX:3994; source DTSX:3941-3951; user code identical to the agents script except new Entity(\"gen_agencie\") / Row.GenagencieId (main.cs:71-72)"
+    },
+    {
+      "component": "Package\\Set Gen_commissionpostponed",
+      "disabled": true,
+      "identicalCopies": [],
+      "entity": "gen_agents",
+      "verb": "UPDATE",
+      "mechanism": "SQL (Execute SQL Task statement 1: UPDATE Gen_agentsBase; SQLTask:Connection {D51CCED1-9F31-4C56-840C-E21FF6667EC7} = DTSID of Package.ConnectionManagers[CRM] = Psql/ALTSHULER_MSCRM) - DISABLED",
+      "status": "Unsupported",
+      "recordKey": "Set-based: every Gen_agentsBase row WHERE ((Gen_bookkeepingexpdate is not null and Gen_bookkeepingexpdate < getutcdate()) or (Gen_LicenseExpDate is not null and Gen_LicenseExpDate < getutcdate())) AND (Gen_commissionpostponed IS NULL OR Gen_commissionpostponed = 0)",
+      "recordKeyColumns": [],
+      "declaredRowFilters": [],
+      "condition": "Executable 'Set Gen_commissionpostponed' is DISABLED (DTS:Disabled=\"True\", DTSX:3156): it does not run, so this statement is not an active write. Documented only (CLAUDE.md rule 8).",
+      "attributes": [
+        {
+          "fixedValue": 1,
+          "condition": "DISABLED - never executed",
+          "excludeFromValue": [],
+          "declaredSources": [
+            {
+              "db": "Gen_agentsBase.Gen_bookkeepingexpdate",
+              "role": "condition",
+              "why": "row updated only when Gen_bookkeepingexpdate not null and < getutcdate()",
+              "evidence": "DTSX:3160"
+            },
+            {
+              "db": "Gen_agentsBase.Gen_LicenseExpDate",
+              "role": "condition",
+              "why": "row updated only when Gen_LicenseExpDate not null and < getutcdate()",
+              "evidence": "DTSX:3160"
+            },
+            {
+              "db": "Gen_agentsBase.Gen_commissionpostponed",
+              "role": "condition",
+              "why": "row updated only when Gen_commissionpostponed IS NULL OR = 0",
+              "evidence": "DTSX:3160"
+            }
+          ],
+          "attribute": "gen_commissionpostponed",
+          "from": [],
+          "expression": "set Gen_commissionpostponed = 1 (literal) for agents whose bookkeeping or licence expiry date is before getutcdate() and that are not yet postponed (NULL or 0).",
+          "evidence": "SqlStatementSource DTSX:3160 (statement 1)"
+        }
+      ],
+      "evidence": "Set Gen_commissionpostponed DTSX:3156-3162 (Disabled=True at 3156, SQL at 3160); connection DTSX:4-6"
+    },
+    {
+      "component": "Package\\Set Gen_commissionpostponed",
+      "disabled": true,
+      "identicalCopies": [],
+      "entity": "gen_agencie",
+      "verb": "UPDATE",
+      "mechanism": "SQL (Execute SQL Task statement 2: UPDATE Gen_agencieBase; same connection [CRM] = Psql/ALTSHULER_MSCRM) - DISABLED",
+      "status": "Unsupported",
+      "recordKey": "Set-based: every Gen_agencieBase row WHERE ((gen_bookkeepingexp is not null and gen_bookkeepingexp < getutcdate()) or (Gen_LicenseExpDate is not null and Gen_LicenseExpDate < getutcdate())) AND (Gen_commissionpostponed IS NULL OR Gen_commissionpostponed = 0)",
+      "recordKeyColumns": [],
+      "declaredRowFilters": [],
+      "condition": "Executable 'Set Gen_commissionpostponed' is DISABLED (DTS:Disabled=\"True\", DTSX:3156): it does not run, so this statement is not an active write. Documented only (CLAUDE.md rule 8).",
+      "attributes": [
+        {
+          "fixedValue": 1,
+          "condition": "DISABLED - never executed",
+          "excludeFromValue": [],
+          "declaredSources": [
+            {
+              "db": "Gen_agencieBase.gen_bookkeepingexp",
+              "role": "condition",
+              "why": "row updated only when gen_bookkeepingexp not null and < getutcdate()",
+              "evidence": "DTSX:3160"
+            },
+            {
+              "db": "Gen_agencieBase.Gen_LicenseExpDate",
+              "role": "condition",
+              "why": "row updated only when Gen_LicenseExpDate not null and < getutcdate()",
+              "evidence": "DTSX:3160"
+            },
+            {
+              "db": "Gen_agencieBase.Gen_commissionpostponed",
+              "role": "condition",
+              "why": "row updated only when Gen_commissionpostponed IS NULL OR = 0",
+              "evidence": "DTSX:3160"
+            }
+          ],
+          "attribute": "gen_commissionpostponed",
+          "from": [],
+          "expression": "set Gen_commissionpostponed = 1 (literal) for agencies whose bookkeeping or licence expiry date is before getutcdate() and that are not yet postponed (NULL or 0).",
+          "evidence": "SqlStatementSource DTSX:3160 (statement 2)"
+        }
+      ],
+      "evidence": "Set Gen_commissionpostponed DTSX:3156-3162 (Disabled=True at 3156, SQL at 3160); connection DTSX:4-6"
+    }
+  ],
+  "readWriteModifications": [],
+  "lookupBridges": [],
+  "unresolved": [
+    {
+      "where": "update agetns / update agencies commissionpostponed field (SDK mechanism)",
+      "reason": "ExecuteMultipleExtension / RequestType come from the external assembly CRM2015.Proxy (HintPath D:\\CRM2015.Proxy.dll), not supplied: that it issues one UpdateRequest per entity (and its ContinueOnError / ReturnResponses settings) is inferred from RequestType.Update and the response handling (main.cs:97-115), not proven (blocked_external_dependency)."
+    },
+    {
+      "where": "gen_pausereason values 4 / 5",
+      "reason": "Option set labels are not defined in the package; meaning of 4 and 5 is unknown."
+    }
+  ],
+  "notes": [
+    "CRM DB proof: all writes use Package.ConnectionManagers[CRM] (DTSID {D51CCED1-9F31-4C56-840C-E21FF6667EC7}, DTSX:4; Data Source=Psql; Initial Catalog=ALTSHULER_MSCRM, DTSX:6). OLE DB Commands and the (disabled) Execute SQL Task write the Base tables directly (Unsupported); the two script components use the CRM SDK (Supported). ETL plumbing not mapped: Create ETL Process record, End ETL Process record\\ETL Record Finish, both 'ETL Warning 1' scripts (gen_etlprocesswarning), OnError\\Error ETL Process record.",
+    "Execution order (precedence, all Success, DTSX:7071-7076): Get Variables From SystemConfigurarion -> Create ETL Process record -> Update agents balance -> Set Gen_commissionpostponed (DISABLED) -> update agents commissionpostponed field -> update agencies commissionpostponed field -> End ETL Process record.",
+    "Suspicious HAVING in 'Get agent Data' (DTSX:5090): ABS(sum(balance) - isnull(gen_agentvalue,0) + isnull(gen_agencyvalue,0)) > 1 - by operator precedence this is (sum - agentvalue) + agencyvalue, so the change detection mixes the agent and the agency value of the pair; a pair can be skipped although the stored value differs, or re-written although it is equal. gen_agentvalueDB / gen_agencyvalueDB are selected but not exposed as output columns (external metadata only, DTSX:5108-5112).",
+    "Balance granularity: the sum is grouped per (agent, agency) pair. gen_agentvalue / gen_agencyvalue therefore receive a PAIR sum; an agent with several pairs is updated several times and the last row wins (order not determined). Each fund balance is counted twice when the broker contract has a parent contract (once for ac, once for acc).",
+    "Conditional Split 'Agent Or Agency' (DTSX:5014): rows with both agent and agency non-NULL go only to 'Update Agent' (first true condition, EvaluationOrder 0); agencies are updated only from pairs with NULL agent. Rows with both NULL go to the Default output, which has no path (discarded).",
+    "Commission-postponed flows: the source WHERE 'gen_commissionpostponed != 1' excludes records with NULL gen_commissionpostponed (SQL three-valued logic), although the disabled SQL version explicitly handled NULL. Date checks use dateadd(HOUR,3,...) (fixed +3h, no DST) against SQL Server CONVERT(DATE, GETDATE()), while the Derived Column compares against SSIS host GETDATE().",
+    "Script exception path: an exception thrown by ExcecuteBulk() inside Input0_ProcessInputRow (main.cs:79-80, e.g. 'no response') is caught per row (main.cs:83-92); myEntities.Clear() (main.cs:117) is then skipped: the list keeps growing past 1000, the check myEntities.Count == 1000 (main.cs:79) never fires again, and all remaining entities are sent in one final ExecuteMultiple at EndOfRowset (main.cs:126-128); the outcome of a batch larger than 1000 depends on the external proxy / CRM server (not provable here). Rows sent to CastingError have no downstream path.",
+    "Script source analysed (C# main.cs embedded in the DTSX); compiled binaries and CRM2015.Proxy are not decompiled.",
+    "The original source column gen_pausereason (Gen_agents / Gen_agencie) appears in the lineage as the origin of the writer input gen_pausereason, but Derived Column 'set 'pausereason' field' replaces it for every row (expression never NULL); its value never reaches CRM. excludeFromValue with field null is used on gen_pausereason to demote that DB origin to influence (compose matches excludeFromValue by field; DB origins have field null and the only value-role DB chain of that attribute is the replaced original column). The written value is the literal 5 or 4 chosen by gen_licenseexpdate."
+  ]
+}

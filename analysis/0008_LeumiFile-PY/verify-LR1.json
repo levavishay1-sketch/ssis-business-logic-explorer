@@ -1,0 +1,254 @@
+{
+ "verifier": "ssis-verifier",
+ "package": "0008_LeumiFile-PY",
+ "scope": "logic-claims re-check after fixes",
+ "checkedAt": "2026-11-07T16:44:30.263Z",
+ "checked": 19,
+ "results": [
+  {
+   "id": "L|summary",
+   "hash": "63bd52be9f45",
+   "verdict": "CONFIRMED",
+   "detail": "Verified: 17 PrecedenceConstraints, all LogicalAnd, all Success, one with EvalOp=3 and expression @[User::isFileExist]==TRUE; linear chain; 0 Disabled=\"True\"; OnError handler -> Error ETL Process record (DTSX:89172/89179). Business order FT -> Create fundmain -> Create transferin -> Courses is correct. Courses data flow: no action-type filter; get tranferin matches Gen_transferin joined to the dest customer account by bank account = Target_Fund_AccountNumber_47 and gen_requestidentifier = Request_ID_74, with no state filter. Note (not blocking): the \"action 57, same account, same fund type\" wording simplifies two different filters (fundmain: Transfer_Type_2 == \"1\"; transferin: == \"2\", Action_Operation_Type_57 != \"04\"; both need Age_Dependent_Model_112 != \"1\"). The detailed claims carry these filters.",
+   "evidence": "DTSX:89153-89169, 89172-89179; DTSX:34026, 40871, 5916",
+   "wrongUnits": []
+  },
+  {
+   "id": "L|ignored",
+   "hash": "d8a0d2bfb754",
+   "verdict": "CONFIRMED",
+   "detail": "All listed items are ETL plumbing per CLAUDE.md (organization variables, ETL process/counter records, truncate/archive, OnError record, task-name/counter/warning decoration). Trim All Input Columns is no longer listed, which is correct. No business write is hidden in these items.",
+   "evidence": "DTSX:82685 (Get Etl Variables), 85603 (Truncate), Move File To Archive; per-data-flow plumbing components",
+   "wrongUnits": []
+  },
+  {
+   "id": "L|Package\\Get Sytem User Id|title",
+   "hash": "6299d2f5bfde",
+   "verdict": "WRONG",
+   "detail": "Units [2] and [4]-[6] are correct: the user is matched by lower(domainname) = User::UserDomainName, loaded from gen_etlvariable; UserId/BU go only to Gen_ftCurrentYearBase (Create System Columns main.cs:118-124); the currency goes to FT and to gen_transferin (ReadOnlyVariables ×5); fundmain/accountcourses/coursepartition scripts do not read these variables. Unit [3] is minor but inaccurate.",
+   "evidence": "DTSX:85587-85591; 84654/84661; 57723-57731; 43947",
+   "wrongUnits": [
+    {
+     "unit": 3,
+     "problem": "\"מטבע ראשון בטבלה\": the SQL is \"select top 1 TransactionCurrencyId from TransactionCurrency\" with no ORDER BY, so the row returned is arbitrary, not \"the first\". (The value is overwritten anyway by Set Variables PostExecute.)",
+     "correct": "Get Transaction Currency ID: מטבע אחד כלשהו (TOP 1 ללא ORDER BY) → TransactionCurrencyId (נדרס בהמשך)",
+     "evidence": "DTSX:85591"
+    }
+   ]
+  },
+  {
+   "id": "L|Package\\Get Sytem User Id|short",
+   "hash": "566d95859641",
+   "verdict": "CONFIRMED",
+   "detail": "Re-derived: the user is found by the domain name configured in gen_etlvariable (key UserDomainName, Set Organization Variables main.cs:103-126), the BU comes from the same row, the currency from lookup CurrencyName = \"שקל חדש\", and the organization from LOWER(Name). Usage: FT insert only for user/BU/currency; gen_transferin gets transactioncurrencyid only; the other SDK creates use none (their only use of UserId/OrganizationId is in the plumbing \"Add Column for etl process warning\").",
+   "evidence": "DTSX:84654, 85543 (System User Domain Name 1), 84594, 84482; 57723-57731; 43947; 931-944, 21924-21936",
+   "wrongUnits": []
+  },
+  {
+   "id": "L|Package\\Get Sytem User Id|detailed",
+   "hash": "15f1c38be462",
+   "verdict": "WRONG",
+   "detail": "Units [2]-[7] are correct, including the no-user case: Set Variables PostExecute assigns Guid.Empty unconditionally (main.cs:49-56) and with several users the last row wins (main.cs:68-77). Unit [1] is inaccurate, and the failure behaviour of the three lookups is missing.",
+   "evidence": "DTSX:85591; Get Organization Id DTSX:84482 (NoMatchBehavior=0 line 84491), Get Owner Type DTSX:84539 (84546), Get Transaction Currency Id DTSX:84594 (84601); lookup outputs errorRowDisposition=FailComponent",
+   "wrongUnits": [
+    {
+     "unit": 1,
+     "problem": "The SQL \"select top 1 ... from TransactionCurrency\" has no ORDER BY, so it returns an arbitrary row, not \"the first currency in the table\".",
+     "correct": "משימת SQL קוראת מטבע אחד כלשהו (TOP 1 ללא ORDER BY); הערך נדרס בסוף השלב הבא.",
+     "evidence": "DTSX:85591"
+    },
+    {
+     "unit": 3,
+     "problem": "Missing behaviour: the currency, organization and Get Owner Type (OwnerBase by systemuserid) lookups have NoMatchBehavior=0 with errorRowDisposition=FailComponent. If a user is found but \"שקל חדש\", the organization name, or the owner row is not found, the data flow fails, and the Success chain stops the rest of the package (staging, FT and all CRM writes). Get Owner Type acts only as this gate: OwnerIdType is not used by Set Variables.",
+     "correct": "Add: if a user is found but the currency, organization or owner lookup has no match, the step fails (FailComponent) and the remaining package steps do not run.",
+     "evidence": "DTSX:84482-84601; Set Variables inputs DTSX:84688"
+    }
+   ]
+  },
+  {
+   "id": "L|Package\\Get Sytem User Id|detail",
+   "hash": "b35a2b189477",
+   "verdict": "CONFIRMED",
+   "detail": "Sources (systemuser, TransactionCurrency, OrganizationBase, OwnerBase), matching keys, no decisions, no CRM write, and the usage and Guid.Empty outcome are all correct. Note: the OwnerBase match by systemuserid is listed in [1] but not in [2]. It only acts as a fail gate (see the detailed claim).",
+   "evidence": "DTSX:84476-85591",
+   "wrongUnits": []
+  },
+  {
+   "id": "L|Package\\Write PY File To Staging|detailed",
+   "hash": "b1f0528902a0",
+   "verdict": "INCOMPLETE",
+   "detail": "Units [1]-[3], [5] and [6] are correct. The CM is RaggedRight, CodePage 1255, 174 FlatFileColumns (DTSX:9-180). The REPLACE(LTRIM(REPLACE(x,\"0\",\" \")),\" \",\"0\") analysis is correct for FILLER1_29_BankTransactionId -> BankTransaction_ID_91 and Filler_83_RelatedActionId -> Related_Action_ID_98. Rows go straight to the destination with no filter. Unit [4] names the target as a certain runtime catalog.",
+   "evidence": "DTSX:9-180, 87203, 85616-85619, 192-196, 199-200",
+   "wrongUnits": [
+    {
+     "unit": 4,
+     "problem": "The tech \"→ GENERIX_STAGING.dbo.PY_FileData\" is the design-time catalog of CM SRS.GENERIX_STAGING (Psrs/GENERIX_STAGING). The package loads an unsupplied configuration C:\\Generix\\SSISConfigFileSrs.dtsConfig (SRS_STAGING, DTSX:200) that may override it, and the text does not say so.",
+     "correct": "→ [dbo].[PY_FileData] בחיבור SRS.GENERIX_STAGING (זמן-תכנון: Psrs/GENERIX_STAGING; עשוי להידרס מקובץ התצורה SSISConfigFileSrs.dtsConfig שלא סופק)",
+     "evidence": "DTSX:192-196, 199-200, 85619"
+    }
+   ]
+  },
+  {
+   "id": "L|Package\\FT|short",
+   "hash": "cb867ef453e4",
+   "verdict": "CONFIRMED",
+   "detail": "Flow re-derived from the paths: Trim -> Check for last row (Last row output unconnected) -> Split by trans group type (\"יתר\" unconnected) -> Check if trans exists (Full cache; Match unconnected) -> ... -> Get Bank Id -> direction split -> product lookup (NoMatch -> warning) -> fund lookup (NoMatch unconnected, no warning) -> group/provision type, overpayment, salary, tax -> insert ×5 (RedirectRow) -> on success, ContactBase update; parallel Multicast 3 branch -> demislikamonthsalary update. The duplicate-in-file statement is correct for the Full-cache lookup and is worded as \"sent to insertion\".",
+   "evidence": "DTSX:55200, 69975, 57313, 61790, 69934, 62873, 62760, 63118, 82566, 57393, 61917, 82519; path list of Package\\FT",
+   "wrongUnits": []
+  },
+  {
+   "id": "L|Package\\FT|detailed",
+   "hash": "89980b228bd1",
+   "verdict": "WRONG",
+   "detail": "Most units were re-derived and are correct: Trim (47 inputs, main.cs:51-58), the end-row and type filters, the existence key with Target_Fund_FinanceID_INT and Full cache, money /100 and the derived fields (DTSX:61683, 68823), Get Bank Id with BankNumber \"10\", NoMatchBehavior=0 and FailComponent, Param_40 = gen_banksid, the product/competitor/fund lookups, Append Zeros (12/4/4, dots removed), the group-type map (main.vb:17-31), provision 1-7, overpayment, salary, tax, FinancialModuleWay, the round-robin split, RedirectRow -> contact update, and the Multicast 3 salary-month branch. Problems are listed below.",
+   "evidence": "DTSX:70133, 66121, 60676 (Format Dates main.cs:51-77), 59787 (Dates ToUniveral main.cs:34-58), paths Format money fields -> Format Dates -> Dates ToUniveral -> Set trans additional fields",
+   "wrongUnits": [
+    {
+     "unit": 26,
+     "problem": "\"ואם מספר הקופה 0 – מחשבון העו״ש\": the code compares the trimmed string to the literal \"0\" (Source_Fund_AccountNumber_20 != \"0\"). A zero-padded value such as \"000000000000\" is numerically 0 but does NOT fall back to the current account.",
+     "correct": "ואם מספר חשבון הקופה הוא המחרוזת \"0\" בדיוק – מחשבון העו״ש (ערך מרופד באפסים אינו נחשב 0)",
+     "evidence": "DTSX:70133 (transfer: gen_bankaccountnumber = Source_Fund_AccountNumber_20 != \"0\" ? ... : Source_gen_CurrentAccountNumber); DTSX:66121 (recived, mirror)"
+    },
+    {
+     "unit": 18,
+     "problem": "Missing step: date processing of the values written to Gen_ftCurrentYearBase is not described. Format Dates (main.cs:51-77) turns 8-character values into yyyy/MM/dd, 6-character values (YYYYMM) into yyyy/MM/01, and anything else, unparseable values or dates before 1900 into NULL. Dates ToUniveral (main.cs:34-58) then converts each date from server local time to UTC (ToUniversalTime) unless it equals CrmMinimumDate. This affects gen_EntryDate, gen_ValueDate, gen_SalaryMonthId, Escrow, Creation_Deposit_Source_File_Date, Appendix GH and Action_Expected_Date (refund/payment dates), and is the reason Set SalaryMonthDate adds 3 hours.",
+     "correct": "Add a step after the amount conversion: dates YYYYMMDD / YYYYMM (→ 1st of month); invalid → NULL; converted local → UTC (Format Dates, Dates ToUniveral).",
+     "evidence": "DTSX:60676, 59787"
+    }
+   ]
+  },
+  {
+   "id": "L|Package\\FT|detail",
+   "hash": "5670c20fb5d8",
+   "verdict": "WRONG",
+   "detail": "Units [1]-[4] are correct: the population filter; the matching list including Get Bank Id, FailComponent, the 12-digit padding and the Full cache; the decisions list; and the writes (80 columns, owner/creator = UserId, StateCode 0, StatusCode 1, ContactBase after a successful insert, gen_demislikamonthsalary). Unit [5] states an unproven meaning.",
+   "evidence": "DTSX:63118, 57472 (Create System Columns main.cs:117-153), 82566, 82519; DTSX:68823; DTSX:224, 508-528",
+   "wrongUnits": [
+    {
+     "unit": 5,
+     "problem": "\"תנועות היום של קופות בנק לאומי\" (\"today's transactions\"): nothing in the package checks transaction dates against today. The package takes the newest file matching FileName in DailyFilePath and inserts all new qualifying rows; the code only flags them gen_isdailytrans = TRUE.",
+     "correct": "תנועות חדשות מקובץ ה-PY שנקלט (קופות בנק 10; מסומנות gen_isdailytrans = כן) מופיעות ב-CRM; ...",
+     "evidence": "Check File Existence ScriptMain DTSX:508-528; Set trans additional fields DTSX:68823 (gen_isdailytrans = TRUE)"
+    }
+   ]
+  },
+  {
+   "id": "L|Package\\Create fundmain for transferin|detailed",
+   "hash": "a688134b0e04",
+   "verdict": "WRONG",
+   "detail": "Units [1]-[26] and [28]-[33] were re-derived and are correct: Trim of 12 columns; the filter with Transfer_Type_2 == \"1\"; Merge Join JoinType=2, NumKeyColumns=1 on Request_ID_74, with Sort EliminateDuplicates=false; gen_fundtypenumber <- Target_Fund_course_44; Append Zeros; dest product and dest fund lookups (Partial cache); fund number expression plus remove duplicate; get source fund (existinfile = 1, Full cache); Set Fields; copy 3 Error -> Union All Created. Unit [27] misstates the dates, and a step is missing.",
+   "evidence": "Dates To Local DTSX:32977 main.cs:40-71; path Multicast 1 Output 3 -> Dates To Local -> Add Row Number; get source fund DTSX:34192 (getutcdate() as gen_fundcreationdate, CacheType 0); Create gen_fundmain main.cs:50-58",
+   "wrongUnits": [
+    {
+     "unit": 27,
+     "problem": "\"תאריך פתיחה = זמן השאילתה (UTC)\" omits the step \"Dates To Local\" that runs before the SDK create. It applies ToLocalTime() to gen_fundcreationdate (getutcdate() taken when the Full cache was loaded) and to every copied source-fund date: brokerstartdate, commission dates, customer birth/death/verified dates, deposit commission dates. Values equal to CrmMinimumDate are left as is. The value sent to CrmProxy is therefore server local time, not UTC. How CRM then stores it depends on the unsupplied CrmProxy and its DateTime handling.",
+     "correct": "תאריך פתיחה = זמן השאילתה (getutcdate בטעינת המטמון) אחרי המרה לשעון המקומי של השרת (Dates To Local); גם תאריכי קופת המקור המועתקים מומרים ל-ToLocalTime לפני היצירה. השמירה הסופית תלויה ב-CrmProxy (לא סופק).",
+     "evidence": "DTSX:32977 main.cs:52-71; DTSX:34192"
+    }
+   ]
+  },
+  {
+   "id": "L|Package\\Create transferin Maslulim|title",
+   "hash": "5385416c9634",
+   "verdict": "CONFIRMED",
+   "detail": "Re-derived: Handle Gemel To Invest Case (5006->1025, main.cs:120-124) runs before Trim and the end-row check; filter DTSX:40871 verbatim; get tranferin Full cache by gen_requestidentifier with no state filter; Inner Merge Join on 3 keys; Filter Last Two Month is a lower bound only (date > UtcNow.AddMonths(-2)); Get source customer account by account + gen_customeraccounttype.gen_id; Set Additional fields 5/1; ExecuteMultiple batches of 10, ×5. Title-level omissions (fund-type equality, age model) appear in flow[2].",
+   "evidence": "DTSX:42542, 50487, 39380, 40871, 42492, 43485, 40911, 42407, 49608, 43738",
+   "wrongUnits": []
+  },
+  {
+   "id": "L|Package\\Create transferin Maslulim|short",
+   "hash": "8e313531b856",
+   "verdict": "CONFIRMED",
+   "detail": "Order and branches match the paths: filter -> existing-request check -> pairing -> Format Dates (an empty date throws a NullReferenceException at main.cs:56-58 -> data flow fails) -> date lower bound -> customer account -> SDK Create of type 5, state 1, with src = dest = the customer account. The meaning of state 1 is marked as not in the files.",
+   "evidence": "DTSX:41626 main.cs:53-72; 40911 main.cs:31-37; 42407; 43738 main.cs:36-88",
+   "wrongUnits": []
+  },
+  {
+   "id": "L|Package\\Create transferin Maslulim|detailed",
+   "hash": "5ec91235d36b",
+   "verdict": "WRONG",
+   "detail": "Units [1]-[14], [16]-[33] are largely correct: 5006->1025, Trim of 12 columns, filter verbatim, Full-cache existence check, Format Dates rules (8 = YYYYMMDD, 6 = 20+YYMMDD) and the NullReferenceException on an empty date, the date lower bound, customer account lookup, and the SDK fields per main.cs:36-88. Errors and omissions are listed below.",
+   "evidence": "Sort DTSX:50313 (EliminateDuplicates=true DTSX:50315, keys requestid/Source account/Source fund type/deliverydate), Sort 1 DTSX:50377 (EliminateDuplicates=true DTSX:50379, keys requestid/Target account/Target fund type); Merge Join DTSX:43485 (JoinType 2, NumKeyColumns 3); Dates To Local DTSX:39491 main.cs:41-71",
+   "wrongUnits": [
+    {
+     "unit": 34,
+     "problem": "\"אם אותה בקשה מופיעה בקובץ ביותר מזוג שורות אחד, נוצרת בקשה לכל שורה מצורפת – אין סינון כפילויות בתוך הקובץ\" is wrong. Both Sorts before the Merge Join have EliminateDuplicates=true. Identical source-side rows (request, account, fund type, expected date) and identical target-side rows (request, account, fund type) are collapsed, so repeated identical pairs produce one request. Several requests are created only when the same request has source-side rows with different expected dates. The Full-cache existence check still does not see requests created in the same run.",
+     "correct": "כפילויות זהות בתוך הקובץ מסוננות במיון (EliminateDuplicates); נוצרת יותר מבקשה אחת לאותו מזהה רק אם לצד המקור יש שורות עם תאריכי ביצוע צפויים שונים.",
+     "evidence": "DTSX:50315, 50379, 43485"
+    },
+    {
+     "unit": 15,
+     "problem": "The pairing step omits the duplicate elimination done by Sort and Sort 1 (EliminateDuplicates=true).",
+     "correct": "Add: before the join, identical rows on each side are removed (Sort EliminateDuplicates=true).",
+     "evidence": "DTSX:50315, 50379"
+    },
+    {
+     "unit": 16,
+     "problem": "\"התאריך מומר ל-UTC\" is true only for the filter stage. Before the write, Dates To Local converts gen_deliverydate back with ToLocalTime (Multicast 1 -> Dates To Local -> Add Row Number). The SDK receives DateTime.Parse of the local-time string. Unit [33] (\"תאריך מסירה\") does not mention this.",
+     "correct": "Add: לפני היצירה התאריך מומר חזרה לשעון המקומי (Dates To Local) ונשלח כ-DateTime.Parse.",
+     "evidence": "DTSX:39491 main.cs:53-57; SDK main.cs:46-48"
+    }
+   ]
+  },
+  {
+   "id": "L|Package\\Create transferin Maslulim|detail",
+   "hash": "591cf9deb347",
+   "verdict": "CONFIRMED",
+   "detail": "Population (including the 5006->1025 mapping, Age_Dependent_Model_112 != 1, lower-bound date and empty-date failure), matching, decisions and the written attribute list (gen_transfertype 5, gen_currentstate 1, gen_deliverydate, gen_requestidentifier, gen_identitynumber, gen_transferid = account number, gen_accountnumbersrc = gen_customeraccountdest, gen_contactname, transactioncurrencyid) all match SDK Create gen_TransferIn main.cs:36-88. The meaning of state 1 is marked as unknown.",
+   "evidence": "DTSX:40871, 42492, 42407, 49608, 43738 main.cs:36-88",
+   "wrongUnits": []
+  },
+  {
+   "id": "L|Package\\Create transferin Maslulim|decisions",
+   "hash": "82ba54b83a1b",
+   "verdict": "INCOMPLETE",
+   "detail": "Decisions [1]-[6] are correct as written (conditions verbatim; [5] correctly a lower bound with the NULL/empty-date notes). One row-filtering rule is missing.",
+   "evidence": "DTSX:50313/50315, 50377/50379",
+   "wrongUnits": [
+    {
+     "unit": 4,
+     "problem": "The Merge Join decision omits that both inputs are first deduplicated by Sort with EliminateDuplicates=true: left on gen_requestidentifier, Source_Fund_AccountNumber_20, Source_Fund_FundType_16, gen_deliverydate; right on gen_requestidentifier, Target_Fund_AccountNumber_47, Target_Fund_FundType_43. This decides how many requests are created when the file repeats a request.",
+     "correct": "Add decision: Sort/Sort 1 EliminateDuplicates=true → identical rows per side collapsed before the inner join.",
+     "evidence": "DTSX:50315, 50379"
+    }
+   ]
+  },
+  {
+   "id": "L|Package\\Create transferin Maslulim|crm",
+   "hash": "85c9991c415d",
+   "verdict": "CONFIRMED",
+   "detail": "gen_transferin Create via SDK (ExecuteMultiple RequestType.Create). The conditions (no existing request id in the Full cache, date > UtcNow-2 months with no upper bound, customer account found) match.",
+   "evidence": "DTSX:42492, 40911, 42407, 43738 main.cs:118-145",
+   "wrongUnits": []
+  },
+  {
+   "id": "L|Package\\Create Acount Courses and course partition for transferin|short",
+   "hash": "c03d062174a5",
+   "verdict": "CONFIRMED",
+   "detail": "Re-derived: all staging rows (no action-type filter) after Trim, end-row check and Append Zeros; get tranferin (Partial cache) by dest customer-account bank account = Target_Fund_AccountNumber_47 and request id; Format Dates fails on an empty date for every matched row; Split Direction \"2\" = destination. Source branch: fund of target account + source course (Partial), existing course check with No cache, SDK create with balance and flags. Destination branch: dest fund inner-joined to Contact and Gen_agentcontract (Full), partition check (Full), SDK create. The end statement on possible duplicates within a run matches the No-cache/Full-cache lookups and the batching.",
+   "evidence": "DTSX:6158, 19996, 2437, 5916, 4854, 19849, 5782, 3282, 5635, 3375, 6338, 12673",
+   "wrongUnits": []
+  },
+  {
+   "id": "L|Package\\Create Acount Courses and course partition for transferin|detailed",
+   "hash": "8d48fdb78175",
+   "verdict": "WRONG",
+   "detail": "Units [1]-[13] and [15]-[37] were re-derived and are correct: the cache types (get tranferin Partial, get source fund Partial, account-course check No cache, dest fund Full, partition check Full) and the SDK attribute lists per main.cs. Unit [14] misstates the empty case, and a date step is missing.",
+   "evidence": "set additional fields DTSX:19093 (errorRowDisposition FailComponent); Trim DTSX:19996; Dates To Local DTSX:3480 main.cs:41-71; path Multicast 1 -> Dates To Local -> Add Row Number 1; SDK Create gen_coursepartition main.cs:41-43",
+   "wrongUnits": [
+    {
+     "unit": 14,
+     "problem": "\"כשסוג הפעולה ריק או 2 – ערך 1\": the expression handles only NULL (ISNULL(Action_Operation_Type_57) ? 1 : (DT_I4)... == 2 ? 1 : 2). A blank value (spaces in the fixed-width file, which Trim turns into \"\") or a non-numeric value is not NULL. (DT_I4)\"\" then fails, and set additional fields has errorRowDisposition=FailComponent, so the data flow fails.",
+     "correct": "כשסוג הפעולה NULL או 2 – ערך 1 ו\"חישוב סכום\" = כן; ערך מספרי אחר – 2 ו\"לא\"; ערך ריק/לא מספרי (לא NULL) מכשיל את זרימת הנתונים.",
+     "evidence": "DTSX:19093"
+    },
+    {
+     "unit": 13,
+     "problem": "\"התאריך מומר ל-UTC\" omits that in the destination branch, Dates To Local converts Action_Expected_Date_54 back with ToLocalTime before SDK Create gen_coursepartition, which writes gen_creationdate = DateTime.Parse(local string).",
+     "correct": "Add: בענף היעד התאריך מומר חזרה לשעון המקומי (Dates To Local) לפני יצירת פיצול המסלול.",
+     "evidence": "DTSX:3480 main.cs:53-57"
+    }
+   ]
+  }
+ ]
+}

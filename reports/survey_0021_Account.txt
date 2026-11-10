@@ -1,0 +1,72 @@
+# 0021_Account.dtsx · BAD3B657F536C5FCCD90C47D9E503EC056323813F4E7577AC1ED5FA2D16213BE
+
+## Connection managers
+- [CRM] OLEDB Data Source=Psql;Initial Catalog=ALTSHULER_MSCRM;Integrated Security=SSPI;  
+- [SRS.SSIS_Logs] OLEDB  EXPR ConnectionString=@[User::ConnStringSrsSsis_Logs] 
+
+## Executables (disabled marked !)
+-   Create ETL Process record | Microsoft.ScriptTask  
+-   End ETL Process record | Microsoft.Pipeline  
+-   Get Variables From SystemConfigurarion | Microsoft.Pipeline  
+-   Update internal Agent account | Microsoft.Pipeline  
+-   Update no Agent account | Microsoft.Pipeline  
+-   Package.EventHandlers[OnError] | EventHandler  
+-   Package.EventHandlers[OnError]\Error ETL Process record | Microsoft.ScriptTask  
+
+## Precedence
+- Get Variables From SystemConfigurarion -> Create ETL Process record | Success Constraint   
+- Create ETL Process record -> Update internal Agent account | Success Constraint   
+- Update internal Agent account -> Update no Agent account | Success Constraint   
+- Update no Agent account -> End ETL Process record | Success Constraint   
+
+## DataFlow End ETL Process record
+  - Derived Column | DerivedColumn  | conn   | in 0 out 0
+  - ETL Record Finish | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 2 out 0
+  - Get gen_etlprocessid | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 0 out 1
+  - Lookup | Lookup  | conn [CRM]  | in 1 out 1
+     path Lookup.Outputs[Lookup Error Output] => Derived Column.Inputs[Derived Column Input]
+     path Lookup.Outputs[Lookup Match Output] => ETL Record Finish.Inputs[Input 0]
+     path Get gen_etlprocessid.Outputs[Output 0] => Lookup.Inputs[Lookup Input]
+
+## DataFlow Get Variables From SystemConfigurarion
+  - Get SystemConfigurations | OLEDBSource  | conn [CRM]  | in 0 out 2
+  - Set Variables | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 2 out 0
+     path Get SystemConfigurations.Outputs[OLE DB Source Output] => Set Variables.Inputs[Input 0]
+
+## DataFlow Update internal Agent account
+  - Get Account to update | OLEDBSource  | conn [CRM]  | in 0 out 2
+  - Sort | Sort  | conn   | in 2 out 2
+  - Update Account | OLEDBCommand  | conn [CRM]  | in 2 out 0
+     path Get Account to update.Outputs[OLE DB Source Output] => Sort.Inputs[Sort Input]
+     path Sort.Outputs[Sort Output] => Update Account.Inputs[OLE DB Command Input]
+
+## DataFlow Update no Agent account
+  - Get accounts to update | OLEDBSource  | conn [CRM]  | in 0 out 3
+  - Sort | Sort  | conn   | in 3 out 3
+  - Update accounts | OLEDBCommand  | conn [CRM]  | in 2 out 0
+     path Get accounts to update.Outputs[OLE DB Source Output] => Sort.Inputs[Sort Input]
+     path Sort.Outputs[Sort Output] => Update accounts.Inputs[OLE DB Command Input]
+
+## SQL statements
+- End ETL Process record\Lookup | Microsoft.Lookup.SqlCommand | [CRM] 
+    select p.gen_etlprocessid , case when pw.gen_etlprocessid is null then 0 else 1 end as isWarningExist from gen_etlprocess p left join (select distinct gen_etlprocessId from gen_etlprocesswarning ) as pw on p.gen_etlprocessId = pw.gen_etlprocessId
+- End ETL Process record\Lookup | Microsoft.Lookup.SqlCommandParam | [CRM] 
+    select * from (select p.gen_etlprocessid , case when pw.gen_etlprocessid is null then 0 else 1 end as isWarningExist from gen_etlprocess p left join (select distinct gen_etlprocessId from gen_etlprocesswarning ) as pw on p.gen_etlprocessId = pw.gen_etlprocessId) [refTable] where [refTable].[gen_etlprocessid] = ?
+- Get Variables From SystemConfigurarion\Get SystemConfigurations | Microsoft.OLEDBSource.SqlCommand | [CRM] 
+    SELECT gen_key ,gen_Value FROM gen_etlvariable where gen_scope ='global' or gen_scope = ?
+- Update internal Agent account\Get Account to update | Microsoft.OLEDBSource.SqlCommand | [CRM] 
+    select * from (SELECT accountid, case when funds.gen_accountname is null then 0 else 1 end as gen_isfundinternalagent, isnull(gen_isfundinternalagent,0) as gen_isfundinternalagentDB FROM account left join (select gen_fundmain.gen_accountname from gen_fundmain JOIN gen_agentcontract ON gen_fundmain.gen_brokernumber = gen_agentcontract.gen_agentcontractid JOIN gen_agents ON gen_agentcontract.gen_age
+- Update internal Agent account\Update Account | Microsoft.OLEDBCommand.SqlCommand | [CRM] 
+    Update accountbase set gen_isfundinternalagent = ? where accountid = ?
+- Update no Agent account\Get accounts to update | Microsoft.OLEDBSource.SqlCommand | [CRM] 
+    select * from (SELECT accountid, case when funds.gen_accountname is null then 0 else 1 end as gen_isfundwithoutagent, isnull(gen_fundwithoutagent,0) as gen_isfundwithoutagentDB FROM account left join (select gen_fundmain.gen_accountname from gen_fundmain join Gen_estatecodeid ON Gen_estatecodeid.Gen_estatecodeidId = Gen_fundmain.gen_estatetype WHERE gen_fundmain.gen_brokernumbername = '00000004000
+- Update no Agent account\Update accounts | Microsoft.OLEDBCommand.SqlCommand | [CRM] 
+    Update accountbase set gen_fundwithoutagent= ? where accountid = ?
+
+## Code write candidates (per owner)
+- Create ETL Process record {"crm-entity":1,"crm-sdk-create":1,"variables-write":1}
+- End ETL Process record\ETL Record Finish {"sql-command":2,"crm-entity":3,"output-buffer":1,"crm-sdk-update":1}
+- End ETL Process record\Get gen_etlprocessid {"sql-command":2,"output-buffer":2}
+- Package.EventHandlers[OnError]\Error ETL Process record {"crm-entity":4,"crm-sdk-update":1,"crm-sdk-create":1}
+
+## External refs (non-framework) CRM2015.Proxy

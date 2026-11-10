@@ -1,0 +1,131 @@
+{
+ "scriptOutputs": [
+  {
+   "component": "Package\\Create Fundenrolment\\Set gen_notes",
+   "output": "Output 0",
+   "column": "gen_notes",
+   "from": [
+    {
+     "column": "Regect_1",
+     "role": "value"
+    },
+    {
+     "column": "Regect_2",
+     "role": "value"
+    },
+    {
+     "column": "Regect_3",
+     "role": "value"
+    },
+    {
+     "column": "Regect_4",
+     "role": "value"
+    },
+    {
+     "column": "note",
+     "role": "value"
+    }
+   ],
+   "expression": "note = \"\"; if (!Regect1_IsNull) note = \"1: \" + Regect1 + \"; \"; if (!Regect2_IsNull) note += \"2: \" + Regect2 + \"; \"; same for 3 and 4; if (!note_IsNull) note += Row.note; Row.gennotes = note. Inputs Regect_1_new..4_new and gen_receivingdate are not used. Output column is wstr(4000) while the inputs can total ~4,220 chars (4×(300+5) + 3000) — an over-long value would fail the buffer assignment (no try/catch).",
+   "condition": null,
+   "evidence": "Set gen_notes main.cs:117-129",
+   "analystFile": "mapping-A.json"
+  },
+  {
+   "component": "Package\\Create Fundenrolment\\Create gen_fundEnrolment",
+   "output": "Result",
+   "column": "RejectTeamId",
+   "from": [],
+   "expression": "Guid.Parse(Variables.RejectTeamId) — package variable User::RejectTeamId, set at run time by framework data flow \"Get Organization Variables\" → script \"Set Organization Variables\" (DTSX 12958, main.cs:24-31,38) from [CRM] gen_etlvariable.gen_Value where gen_key = 'RejectTeamId' and gen_scope = 'global' or the package scope parameter (SQL DTSX 12922); the script throws if the key is missing. Design-time value \"From DB\" (DTSX 33). Not a row value; config files not supplied could in theory override it",
+   "condition": "only rows whose service.Create succeeded reach the Result output",
+   "evidence": "Create gen_fundEnrolment main.cs:136-137, 280",
+   "analystFile": "mapping-A.json"
+  },
+  {
+   "component": "Package\\Create Fundenrolment\\Create gen_fundEnrolment",
+   "output": "Result",
+   "column": "FundEnrollmentId",
+   "from": [],
+   "expression": "Row.FundEnrollmentId = service.Create(fundEnrolment) — GUID of the gen_fundenrolment record just created by this component (no input column value)",
+   "condition": "only on successful Create (DirectRowToResult); failures go to CastingError (unconnected)",
+   "evidence": "Create gen_fundEnrolment main.cs:279-280",
+   "analystFile": "mapping-A.json"
+  },
+  {
+   "component": "Package\\Create FundEnrolment For Pension\\Set gen_note",
+   "output": "Output 0",
+   "column": "gen_note",
+   "from": [
+    {
+     "column": "gen_rejectionreason1Name",
+     "role": "value"
+    },
+    {
+     "column": "gen_rejectionreason2Name",
+     "role": "value"
+    },
+    {
+     "column": "gen_rejectionreason3Name",
+     "role": "value"
+    },
+    {
+     "column": "gen_rejectionreason4Name",
+     "role": "value"
+    },
+    {
+     "column": "gen_rejectreasonsnotes",
+     "role": "value"
+    }
+   ],
+   "expression": "note = \"\"; if (!IsNullOrWhiteSpace(reason1Name)) note = \"1: \" + reason1Name + \"; \"; same for 2,3,4 (\"2: \", \"3: \", \"4: \"); if (!IsNullOrWhiteSpace(gen_rejectreasonsnotes)) note += gen_rejectreasonsnotes; Row.gennote = note. HYPOTHESIS (not tested): the code reads all five inputs via String.IsNullOrWhiteSpace(Row.<col>) WITHOUT checking <col>_IsNull and has no try/catch; in SSIS reading a NULL buffer column through the generated accessor throws, so a NULL reason name / note would fail the whole pension data flow rather than be skipped. Output column is wstr(1000) while inputs can total ~3,220 chars (4×(300+5)+2000) — an over-long value would fail the buffer assignment (no try/catch).",
+   "condition": null,
+   "evidence": "Set gen_note main.cs:117-130",
+   "analystFile": "mapping-A.json"
+  },
+  {
+   "component": "Package\\Create FundEnrolment For Pension\\Create Fund Enrolment",
+   "output": "Result",
+   "column": "FundEnrolmentId",
+   "from": [],
+   "expression": "Row.FundEnrolmentId = service.Create(fundEnrolment) — GUID of the gen_fundenrolment just created",
+   "condition": "only on successful Create (DirectRowToResult); exceptions go to CustingError (unconnected)",
+   "evidence": "Create Fund Enrolment main.cs:327-328",
+   "analystFile": "mapping-A.json"
+  },
+  {
+   "component": "Package\\Create FundEnrolment For Pension\\Create Fund Enrolment",
+   "output": "Result",
+   "column": "OwnerId",
+   "from": [
+    {
+     "column": "gen_updatedbyreferent",
+     "role": "value"
+    },
+    {
+     "column": "gen_passedandreject",
+     "role": "condition"
+    }
+   ],
+   "expression": "if (!genpassedandreject_IsNull && genpassedandreject == true) OwnerId = Row.genupdatedbyreferent (pj.gen_updatedbyreferent, a systemuser id); else OwnerId = Guid.Parse(Variables.RejectTeamId) — package variable User::RejectTeamId, set at run time by framework data flow \"Get Organization Variables\" → script \"Set Organization Variables\" (DTSX 12958, main.cs:24-31,38) from [CRM] gen_etlvariable.gen_Value where gen_key = 'RejectTeamId' and gen_scope = 'global' or the package scope parameter (SQL DTSX 12922); the script throws if the key is missing. Design-time value \"From DB\" (DTSX 33). Not a row value; config files not supplied could in theory override it",
+   "condition": "gen_passedandreject == true → referent; otherwise reject team",
+   "evidence": "Create Fund Enrolment main.cs:136-146",
+   "analystFile": "mapping-A.json"
+  },
+  {
+   "component": "Package\\Create FundEnrolment For Pension\\Create Fund Enrolment",
+   "output": "Result",
+   "column": "OwnerIdType",
+   "from": [
+    {
+     "column": "gen_passedandreject",
+     "role": "condition"
+    }
+   ],
+   "expression": "literal 8 (systemuser) when gen_passedandreject == true; literal 9 (team) otherwise",
+   "condition": "gen_passedandreject == true → 8; else 9",
+   "evidence": "Create Fund Enrolment main.cs:139, 146",
+   "analystFile": "mapping-A.json"
+  }
+ ],
+ "readWrite": []
+}

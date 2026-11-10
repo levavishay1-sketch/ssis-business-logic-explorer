@@ -1,0 +1,949 @@
+{
+  "changes": [
+    {
+      "claimId": "L|summary",
+      "field": "summary_he",
+      "before": "החבילה מנהלת בעלות (Owner) ב-CRM לפי השאלה אם הלקוח הוא עובד החברה (מספר זהות ב-Gen_companyworker). קופות (gen_fundmain) ובקשות FT (gen_ftrequest) של עובדי החברה עוברות למשתמש \"עובדי החברה\", וכל השאר למשתמש \"קופות רגילות\". רשומות gen_ftcurrentyear ו-MF (שנה נוכחית, שנה קודמת, ארכיון) מיושרות לבעלים של הקופה שלהן. כל העדכונים הם SQL ישיר לטבלאות Base (Unsupported).",
+      "after": "החבילה מנהלת בעלות (Owner) ב-CRM לפי השאלה אם הלקוח הוא עובד החברה (מספר זהות ב-Gen_companyworker). קופות (gen_fundmain) ובקשות FT (gen_ftrequest) שבבעלות משתמש מערכת עם שם דומיין מועברות: של עובדי החברה למשתמש \"עובדי החברה\", ושל שאר הלקוחות למשתמש \"קופות רגילות\". קופות ובקשות בבעלות צוות, או בבעלות משתמש ללא שם דומיין (NULL), נשארות עם הבעלים שלהן. רשומות gen_ftcurrentyear ו-MF (שנה נוכחית, שנה קודמת, ארכיון) מיושרות לבעלים של הקופה שלהן. כל העדכונים הם SQL ישיר לטבלאות Base (Unsupported).",
+      "why": "מקור הנתונים משתמש ב-INNER JOIN ל-SystemUser ובתנאי SystemUser.DomainName != ?. רשומה בבעלות צוות אינה עוברת את ה-JOIN, ועבור DomainName = NULL ההשוואה != אינה מתקיימת. לכן רק רשומות בבעלות משתמש מערכת עם שם דומיין (לא NULL) ששונה משם היעד מועברות.",
+      "evidence": "DTSX:4644-4653, DTSX:4352-4360 (join SystemUser on systemuserid = OwnerId where SystemUser.DomainName != ?)",
+      "verifierAccepted": true
+    },
+    {
+      "claimId": "L|finding#2",
+      "field": "findings_he[1].text",
+      "before": "Update Regular Funds ו-Update Regular FTRequest מעבירים בכל ריצה למשתמש אחד (RegularFundsDomainName) כל קופה או בקשה של לקוח שאינו עובד חברה ושבבעלות משתמש אחר. כל שיוך ידני למשתמש אחר נדרס בכל ריצה. רשומות בבעלות צוות (Team) לא מושפעות, בגלל ה-INNER JOIN ל-SystemUser.",
+      "after": "Update Regular Funds ו-Update Regular FTRequest מעבירים בכל ריצה למשתמש אחד (RegularFundsDomainName) כל קופה או בקשה של לקוח שאינו עובד חברה, אם היא בבעלות משתמש מערכת ששם הדומיין שלו אינו NULL ושונה משם היעד. אם רשומה כזו שויכה ידנית למשתמש כזה, השיוך מוחלף בריצה הבאה. רשומות בבעלות צוות (Team) אינן מועברות, בגלל ה-INNER JOIN ל-SystemUser. גם רשומות בבעלות משתמש ללא שם דומיין (NULL) אינן מועברות, כי התנאי SystemUser.DomainName != ? אינו מתקיים עבור NULL.",
+      "why": "חסר התנאי שה-DomainName של הבעלים אינו NULL. מקור הנתונים משתמש ב-INNER JOIN ל-SystemUser ובתנאי SystemUser.DomainName != ?. רשומה בבעלות צוות אינה עוברת את ה-JOIN, ועבור DomainName = NULL ההשוואה != אינה מתקיימת. לכן רק רשומות בבעלות משתמש מערכת עם שם דומיין (לא NULL) ששונה משם היעד מועברות.",
+      "evidence": "SQL DTSX:4644-4648, DTSX:4352-4356",
+      "verifierAccepted": true
+    },
+    {
+      "claimId": "L|finding#3",
+      "field": "findings_he[2].text",
+      "before": "ב-Lookup של משתמש היעד NoMatchBehavior=0, ו-Match Output מוגדר FailComponent. אם שם הדומיין שהוגדר לא קיים ב-SystemUser, הזרימה נכשלת וכל השלבים שאחריה בשרשרת ה-Success לא רצים.",
+      "after": "ב-Lookup של משתמש היעד NoMatchBehavior=0, CacheType=1 (Partial), ו-Match Output מוגדר FailComponent. אם שם הדומיין שהוגדר לא קיים ב-SystemUser, ואם מקור הנתונים של אותו שלב מחזיר לפחות שורה אחת, אז זרימת הנתונים נכשלת וכל השלבים שאחריה בשרשרת ה-Success אינם רצים. אם המקור אינו מחזיר שורות, ה-Lookup אינו מופעל על אף שורה והשלב מסתיים בהצלחה.",
+      "why": "הכישלון תלוי בנתונים: Lookup ב-Partial cache נבדק שורה-שורה, ולכן נכשל רק כשמגיעה אליו שורה. הממצא נוסח עכשיו בתנאי \"אם … אז …\".",
+      "evidence": "DTSX:3258/3284, 3551/3577, 4404/4430, 4697/4723 (NoMatchBehavior=0, CacheType=1, FailComponent); Lookup בין Set Columns ל-Sort DTSX:3772-3773; precedence DTSX:5115-5124",
+      "verifierAccepted": true
+    },
+    {
+      "claimId": "L|Package (control flow)|title",
+      "field": "short_he",
+      "before": "בכל ריצה החבילה קובעת את הבעלות על הקופות ועל בקשות ה-FT: מה ששייך לעובדי החברה עובר למשתמש ייעודי, וכל השאר למשתמש \"קופות רגילות\". רשומות FT לשנה הנוכחית (השערה: תנועות) ורשומות MF של כל קופה, שהבעלים שלהן שונה מהבעלים של הקופה, מיושרות אליו. רשומות בבעלות צוות, או שלבעלים שלהן אין שם דומיין, אינן נכללות.",
+      "after": "בכל ריצה החבילה קובעת את הבעלות על הקופות ועל בקשות ה-FT שבבעלות משתמש מערכת עם שם דומיין: מה ששייך לעובדי החברה עובר למשתמש ייעודי, וכל השאר למשתמש \"קופות רגילות\". קופות ובקשות בבעלות צוות, או בבעלות משתמש ללא שם דומיין, אינן מועברות. רשומות FT לשנה הנוכחית (בחבילה 0008 הן נוצרות מתנועות והחזרי דמי ניהול) ורשומות MF של כל קופה, שהבעלים שלהן שונה מהבעלים של הקופה, מקבלות את הבעלים של הקופה, בלי קשר לסוג הבעלים.",
+      "why": "ההחרגה של צוות ושל משתמש ללא שם דומיין חלה רק על שלבי הקופות ובקשות ה-FT; במקורות Trans/MF אין JOIN ל-SystemUser ואין תנאי DomainName. בנוסף, הכיתוב \"(השערה: תנועות)\" הוחלף בעובדה מחבילה 0008: Gen_ftCurrentYearBase מוכנס רק מפלט Split by trans group type בשם \"תנועות והחזר דמי ניהול\" (נבדק במעקב מסלולים במעלה הזרם של insert ftCurrentYearBase 1-5).",
+      "evidence": "DTSX:3791, 3978, 4165, 4937-4944 (where f.OwnerId != x.OwnerId); 0008_LeumiFile-PY DTSX:69986 (פלט הפיצול), 82678 (מסלול), 63118 (insert into Gen_ftCurrentYearBase)",
+      "verifierAccepted": true
+    },
+    {
+      "claimId": "L|Package (control flow)|short",
+      "field": "short.nodes[2].text",
+      "before": "רשומות FT לשנה הנוכחית (השערה: תנועות) ורשומות MF של כל קופה (שנה נוכחית, שנה קודמת וארכיון), שהבעלים שלהן שונה מהבעלים של הקופה, מקבלות את הבעלים של הקופה.",
+      "after": "רשומות FT לשנה הנוכחית (בחבילה 0008 רשומות אלה נוצרות מפלט בשם 'תנועות והחזר דמי ניהול') ורשומות MF של כל קופה (שנה נוכחית, שנה קודמת וארכיון), שהבעלים שלהן שונה מהבעלים של הקופה, מקבלות את הבעלים של הקופה.",
+      "why": "המשמעות מוכחת בקבצים שסופקו, בחבילה 0008: כל ארבעת רכיבי insert ftCurrentYearBase מקבלים שורות רק מפלט \"תנועות והחזר דמי ניהול\" (gen_TranstypeId != \"58\" && Transfer_Type_2 == \"2\"). נכתב כעובדה על חבילה 0008 בלבד.",
+      "evidence": "0008_LeumiFile-PY DTSX:69986, 82678, 63118",
+      "verifierAccepted": true
+    },
+    {
+      "claimId": "L|Package (control flow)|detailed",
+      "field": "detailed.nodes[0].text",
+      "before": "הגדרות הריצה נטענות מטבלת ההגדרות של ה-ETL, כולל שמות הדומיין של שני משתמשי היעד. ייתכן שקובץ תצורה חיצוני דורס אותן.",
+      "after": "הגדרות הריצה נטענות מטבלת ההגדרות של ה-ETL (gen_etlvariable), כולל שמות הדומיין של שני משתמשי היעד. אם אחד המפתחות חסר, השלב נכשל. ערך שקובץ התצורה החיצוני קובע למשתנים אלה נדרס בשלב זה, כי השלב רץ אחרי טעינת התצורה. הקובץ יכול להשפיע עליהם רק בעקיפין, למשל דרך מחרוזת החיבור [CRM] שממנה נקראת הטבלה.",
+      "why": "Set Variables קובע ב-PostExecute כל אחד מחמשת ה-ReadWriteVariables (כולל CompanyEmployeesDomainName ו-RegularFundsDomainName) מ-gen_etlvariable, או זורק חריגה אם המפתח חסר. תצורות חלות בטעינת החבילה, לפני כן. פרמטר השאילתה הוא System::PackageName.",
+      "evidence": "Set Variables main.cs:46-52 (DTSX:2432-2442); ReadWriteVariables DTSX:3165; Get SystemConfigurations ParameterMapping DTSX:2326 (System::PackageName); Configuration DTSX:17",
+      "verifierAccepted": true
+    },
+    {
+      "claimId": "L|Package (control flow)|detailed",
+      "field": "detailed.nodes[0].tech",
+      "before": "Get Variables From SystemConfigurarion DTSX:2306 (ReadWriteVariables DTSX:3165: CompanyEmployeesDomainName, RegularFundsDomainName, …); Configuration DTSX:17 (external_unknown)",
+      "after": "Get Variables From SystemConfigurarion DTSX:2306 (ReadWriteVariables DTSX:3165: CompanyEmployeesDomainName, RegularFundsDomainName, …); Set Variables main.cs:46-52 (PostExecute: ערך מ-gen_etlvariable או throw); Configuration DTSX:17 (external_unknown)",
+      "why": "ראיה לתיקון הטקסט.",
+      "evidence": "main.cs:46-52",
+      "verifierAccepted": true
+    },
+    {
+      "claimId": "L|Package (control flow)|detailed",
+      "field": "detailed.nodes[2].text",
+      "before": "קופות של עובדי החברה שאינן בבעלות משתמש עובדי החברה עוברות אליו.",
+      "after": "קופות של עובדי החברה שבבעלות משתמש מערכת אחר עם שם דומיין עוברות למשתמש עובדי החברה. קופות בבעלות צוות, או בבעלות משתמש ללא שם דומיין, אינן מועברות.",
+      "why": "מקור הנתונים משתמש ב-INNER JOIN ל-SystemUser ובתנאי SystemUser.DomainName != ?. רשומה בבעלות צוות אינה עוברת את ה-JOIN, ועבור DomainName = NULL ההשוואה != אינה מתקיימת. לכן רק רשומות בבעלות משתמש מערכת עם שם דומיין (לא NULL) ששונה משם היעד מועברות.",
+      "evidence": "DTSX:3498-3507",
+      "verifierAccepted": true
+    },
+    {
+      "claimId": "L|Package (control flow)|detailed",
+      "field": "detailed.nodes[3].text",
+      "before": "שאר הקופות שאינן בבעלות משתמש הקופות הרגילות עוברות אליו.",
+      "after": "שאר הקופות שבבעלות משתמש מערכת אחר עם שם דומיין עוברות למשתמש הקופות הרגילות, באותה הסתייגות.",
+      "why": "מקור הנתונים משתמש ב-INNER JOIN ל-SystemUser ובתנאי SystemUser.DomainName != ?. רשומה בבעלות צוות אינה עוברת את ה-JOIN, ועבור DomainName = NULL ההשוואה != אינה מתקיימת. לכן רק רשומות בבעלות משתמש מערכת עם שם דומיין (לא NULL) ששונה משם היעד מועברות.",
+      "evidence": "DTSX:4644-4653",
+      "verifierAccepted": true
+    },
+    {
+      "claimId": "L|Package (control flow)|detailed",
+      "field": "detailed.nodes[6].text",
+      "before": "בקשות FT של עובדי החברה עוברות למשתמש עובדי החברה, ושאר הבקשות למשתמש הקופות הרגילות.",
+      "after": "בקשות FT של עובדי החברה עוברות למשתמש עובדי החברה, ושאר הבקשות למשתמש הקופות הרגילות. גם כאן מועברות רק בקשות בבעלות משתמש מערכת עם שם דומיין.",
+      "why": "מקור הנתונים משתמש ב-INNER JOIN ל-SystemUser ובתנאי SystemUser.DomainName != ?. רשומה בבעלות צוות אינה עוברת את ה-JOIN, ועבור DomainName = NULL ההשוואה != אינה מתקיימת. לכן רק רשומות בבעלות משתמש מערכת עם שם דומיין (לא NULL) ששונה משם היעד מועברות.",
+      "evidence": "DTSX:3206-3214, DTSX:4352-4360",
+      "verifierAccepted": true
+    },
+    {
+      "claimId": "L|Package (control flow)|open",
+      "field": "openQuestions_he[0]",
+      "before": [
+        "האם קובץ התצורה C:\\Generix\\SSISConfigFile.dtsConfig דורס את מחרוזת החיבור או את המשתנים? הקובץ לא סופק."
+      ],
+      "after": [
+        "האם קובץ התצורה C:\\Generix\\SSISConfigFile.dtsConfig דורס את מחרוזת החיבור [CRM] או מאפיינים אחרים שאינם משתנים? הקובץ לא סופק. (המשתנים עצמם נקבעים מחדש מ-gen_etlvariable ב-Set Variables, אחרי טעינת התצורה.)"
+      ],
+      "why": "חלק המשתנים בשאלה נענה מה-DTSX: Set Variables (PostExecute) קובע את כל חמשת ה-ReadWriteVariables מ-gen_etlvariable או נכשל. נשאר פתוח רק חלק מחרוזת החיבור ומאפיינים אחרים.",
+      "evidence": "main.cs:46-52 (DTSX:2432-2442); DTSX:3165; DTSX:17",
+      "verifierAccepted": true
+    },
+    {
+      "claimId": "L|Package\\Update CW Funds|short",
+      "field": "short.nodes[end].text",
+      "before": "כל הקופות שהלקוח שלהן מופיע ברשימת עובדי החברה (לפי מספר זהות) נמצאות בבעלות המשתמש \"עובדי החברה\".",
+      "after": "קופות שהלקוח שלהן מופיע ברשימת עובדי החברה (לפי מספר זהות), ושבבעלות משתמש מערכת עם שם דומיין, עוברות לבעלות המשתמש \"עובדי החברה\". קופות בבעלות צוות, או בבעלות משתמש ללא שם דומיין (NULL), נשארות עם הבעלים שלהן.",
+      "why": "מצב הסיום היה כללי מדי. מקור הנתונים משתמש ב-INNER JOIN ל-SystemUser ובתנאי SystemUser.DomainName != ?. רשומה בבעלות צוות אינה עוברת את ה-JOIN, ועבור DomainName = NULL ההשוואה != אינה מתקיימת. לכן רק רשומות בבעלות משתמש מערכת עם שם דומיין (לא NULL) ששונה משם היעד מועברות.",
+      "evidence": "DTSX:3498-3507",
+      "verifierAccepted": true
+    },
+    {
+      "claimId": "L|Package\\Update CW Funds|detail",
+      "field": "detail_he[4].t",
+      "before": "בעלות אחידה על קופות: כל מה ששייך לעובדי החברה בבעלות משתמש ייעודי (השערה: לצורך הגבלת הרשאות צפייה).",
+      "after": "בעלות אחידה על קופות של עובדי החברה: קופות בבעלות משתמש מערכת עם שם דומיין עוברות למשתמש ייעודי (השערה: לצורך הגבלת הרשאות צפייה). קופות בבעלות צוות, או בבעלות משתמש ללא שם דומיין, אינן משתנות.",
+      "why": "התוצאה העסקית הייתה כללית מדי. מקור הנתונים משתמש ב-INNER JOIN ל-SystemUser ובתנאי SystemUser.DomainName != ?. רשומה בבעלות צוות אינה עוברת את ה-JOIN, ועבור DomainName = NULL ההשוואה != אינה מתקיימת. לכן רק רשומות בבעלות משתמש מערכת עם שם דומיין (לא NULL) ששונה משם היעד מועברות.",
+      "evidence": "DTSX:3498-3507",
+      "verifierAccepted": true
+    },
+    {
+      "claimId": "L|Package\\Update CW Funds|detailed",
+      "field": "detailed.nodes[0].text",
+      "before": "נשלפות קופות מ-CRM שהבעלים שלהן הוא משתמש מערכת ושם הדומיין שלו שונה משם המשתמש שהוגדר לעובדי החברה. רשומות בבעלות צוות אינן נכללות, כי החיבור ל-SystemUser הוא INNER JOIN.",
+      "after": "נשלפות קופות מ-CRM שהבעלים שלהן הוא משתמש מערכת ושם הדומיין שלו שונה משם המשתמש שהוגדר לעובדי החברה. רשומות בבעלות צוות אינן נכללות, כי החיבור ל-SystemUser הוא INNER JOIN. גם רשומות בבעלות משתמש ללא שם דומיין (NULL) אינן נכללות, כי ההשוואה != אינה מתקיימת עבור NULL.",
+      "why": "עקביות עם תיקון מצב הסיום: מקור הנתונים משתמש ב-INNER JOIN ל-SystemUser ובתנאי SystemUser.DomainName != ?. רשומה בבעלות צוות אינה עוברת את ה-JOIN, ועבור DomainName = NULL ההשוואה != אינה מתקיימת. לכן רק רשומות בבעלות משתמש מערכת עם שם דומיין (לא NULL) ששונה משם היעד מועברות.",
+      "evidence": "DTSX:3498-3507",
+      "verifierAccepted": true
+    },
+    {
+      "claimId": "L|Package\\Update CW Funds|title",
+      "field": "short_he",
+      "before": "קופות שהלקוח שלהן מופיע ברשימת עובדי החברה (לפי מספר זהות), שהבעלים שלהן אינו המשתמש \"עובדי החברה\", מועברות לבעלות המשתמש הזה. שם המשתמש מוגדר בטבלת ההגדרות.",
+      "after": "קופות שהלקוח שלהן מופיע ברשימת עובדי החברה (לפי מספר זהות), שהבעלים שלהן הוא משתמש מערכת עם שם דומיין שאינו המשתמש \"עובדי החברה\", מועברות לבעלות המשתמש הזה. שם המשתמש מוגדר בטבלת ההגדרות.",
+      "why": "עקביות עם תיקון מצב הסיום: מקור הנתונים משתמש ב-INNER JOIN ל-SystemUser ובתנאי SystemUser.DomainName != ?. רשומה בבעלות צוות אינה עוברת את ה-JOIN, ועבור DomainName = NULL ההשוואה != אינה מתקיימת. לכן רק רשומות בבעלות משתמש מערכת עם שם דומיין (לא NULL) ששונה משם היעד מועברות.",
+      "evidence": "DTSX:3498-3507",
+      "verifierAccepted": true
+    },
+    {
+      "claimId": "L|Package\\Update CW Funds|decisions",
+      "field": "decisions[0].meaning_he",
+      "before": "הבעלים הנוכחי אינו המשתמש היעד.",
+      "after": "הבעלים הנוכחי הוא משתמש מערכת עם שם דומיין שאינו המשתמש היעד. משתמש ללא שם דומיין (NULL) אינו עומד בתנאי.",
+      "why": "עקביות עם תיקון מצב הסיום: מקור הנתונים משתמש ב-INNER JOIN ל-SystemUser ובתנאי SystemUser.DomainName != ?. רשומה בבעלות צוות אינה עוברת את ה-JOIN, ועבור DomainName = NULL ההשוואה != אינה מתקיימת. לכן רק רשומות בבעלות משתמש מערכת עם שם דומיין (לא NULL) ששונה משם היעד מועברות.",
+      "evidence": "DTSX:3498-3507",
+      "verifierAccepted": true
+    },
+    {
+      "claimId": "L|Package\\Update Regular Funds|short",
+      "field": "short.nodes[end].text",
+      "before": "כל הקופות שהלקוח שלהן אינו מופיע ברשימת עובדי החברה (לפי מספר זהות) נמצאות בבעלות המשתמש \"הקופות הרגילות\".",
+      "after": "קופות שהלקוח שלהן אינו מופיע ברשימת עובדי החברה (לפי מספר זהות), ושבבעלות משתמש מערכת עם שם דומיין, עוברות לבעלות המשתמש \"הקופות הרגילות\". קופות בבעלות צוות, או בבעלות משתמש ללא שם דומיין (NULL), נשארות עם הבעלים שלהן.",
+      "why": "מצב הסיום היה כללי מדי. מקור הנתונים משתמש ב-INNER JOIN ל-SystemUser ובתנאי SystemUser.DomainName != ?. רשומה בבעלות צוות אינה עוברת את ה-JOIN, ועבור DomainName = NULL ההשוואה != אינה מתקיימת. לכן רק רשומות בבעלות משתמש מערכת עם שם דומיין (לא NULL) ששונה משם היעד מועברות.",
+      "evidence": "DTSX:4644-4653",
+      "verifierAccepted": true
+    },
+    {
+      "claimId": "L|Package\\Update Regular Funds|detail",
+      "field": "detail_he[4].t",
+      "before": "בעלות אחידה על קופות: כל השאר בבעלות משתמש \"קופות רגילות\" אחד. כל בעלות אחרת של משתמש נדרסת בכל ריצה.",
+      "after": "קופות של לקוחות שאינם עובדי חברה, בבעלות משתמש מערכת ששם הדומיין שלו אינו NULL ושונה משם היעד, עוברות בכל ריצה למשתמש \"קופות רגילות\" אחד. קופות בבעלות צוות, או בבעלות משתמש ללא שם דומיין, אינן משתנות.",
+      "why": "התוצאה העסקית הייתה כללית מדי. מקור הנתונים משתמש ב-INNER JOIN ל-SystemUser ובתנאי SystemUser.DomainName != ?. רשומה בבעלות צוות אינה עוברת את ה-JOIN, ועבור DomainName = NULL ההשוואה != אינה מתקיימת. לכן רק רשומות בבעלות משתמש מערכת עם שם דומיין (לא NULL) ששונה משם היעד מועברות.",
+      "evidence": "DTSX:4644-4653",
+      "verifierAccepted": true
+    },
+    {
+      "claimId": "L|Package\\Update Regular Funds|detailed",
+      "field": "detailed.nodes[0].text",
+      "before": "נשלפות קופות מ-CRM שהבעלים שלהן הוא משתמש מערכת ושם הדומיין שלו שונה משם המשתמש שהוגדר לקופות הרגילות. רשומות בבעלות צוות אינן נכללות, כי החיבור ל-SystemUser הוא INNER JOIN.",
+      "after": "נשלפות קופות מ-CRM שהבעלים שלהן הוא משתמש מערכת ושם הדומיין שלו שונה משם המשתמש שהוגדר לקופות הרגילות. רשומות בבעלות צוות אינן נכללות, כי החיבור ל-SystemUser הוא INNER JOIN. גם רשומות בבעלות משתמש ללא שם דומיין (NULL) אינן נכללות, כי ההשוואה != אינה מתקיימת עבור NULL.",
+      "why": "עקביות עם תיקון מצב הסיום: מקור הנתונים משתמש ב-INNER JOIN ל-SystemUser ובתנאי SystemUser.DomainName != ?. רשומה בבעלות צוות אינה עוברת את ה-JOIN, ועבור DomainName = NULL ההשוואה != אינה מתקיימת. לכן רק רשומות בבעלות משתמש מערכת עם שם דומיין (לא NULL) ששונה משם היעד מועברות.",
+      "evidence": "DTSX:4644-4653",
+      "verifierAccepted": true
+    },
+    {
+      "claimId": "L|Package\\Update Regular Funds|title",
+      "field": "short_he",
+      "before": "קופות שהלקוח שלהן אינו מופיע ברשימת עובדי החברה (לפי מספר זהות), שהבעלים שלהן אינו המשתמש \"הקופות הרגילות\", מועברות לבעלות המשתמש הזה. שם המשתמש מוגדר בטבלת ההגדרות.",
+      "after": "קופות שהלקוח שלהן אינו מופיע ברשימת עובדי החברה (לפי מספר זהות), שהבעלים שלהן הוא משתמש מערכת עם שם דומיין שאינו המשתמש \"הקופות הרגילות\", מועברות לבעלות המשתמש הזה. שם המשתמש מוגדר בטבלת ההגדרות.",
+      "why": "עקביות עם תיקון מצב הסיום: מקור הנתונים משתמש ב-INNER JOIN ל-SystemUser ובתנאי SystemUser.DomainName != ?. רשומה בבעלות צוות אינה עוברת את ה-JOIN, ועבור DomainName = NULL ההשוואה != אינה מתקיימת. לכן רק רשומות בבעלות משתמש מערכת עם שם דומיין (לא NULL) ששונה משם היעד מועברות.",
+      "evidence": "DTSX:4644-4653",
+      "verifierAccepted": true
+    },
+    {
+      "claimId": "L|Package\\Update Regular Funds|decisions",
+      "field": "decisions[0].meaning_he",
+      "before": "הבעלים הנוכחי אינו המשתמש היעד.",
+      "after": "הבעלים הנוכחי הוא משתמש מערכת עם שם דומיין שאינו המשתמש היעד. משתמש ללא שם דומיין (NULL) אינו עומד בתנאי.",
+      "why": "עקביות עם תיקון מצב הסיום: מקור הנתונים משתמש ב-INNER JOIN ל-SystemUser ובתנאי SystemUser.DomainName != ?. רשומה בבעלות צוות אינה עוברת את ה-JOIN, ועבור DomainName = NULL ההשוואה != אינה מתקיימת. לכן רק רשומות בבעלות משתמש מערכת עם שם דומיין (לא NULL) ששונה משם היעד מועברות.",
+      "evidence": "DTSX:4644-4653",
+      "verifierAccepted": true
+    },
+    {
+      "claimId": "L|Package\\Update CW FTRequests|short",
+      "field": "short.nodes[end].text",
+      "before": "כל בקשות ה-FT שהלקוח שלהן מופיע ברשימת עובדי החברה (לפי מספר זהות) נמצאות בבעלות המשתמש \"עובדי החברה\".",
+      "after": "בקשות FT שהלקוח שלהן מופיע ברשימת עובדי החברה (לפי מספר זהות), ושבבעלות משתמש מערכת עם שם דומיין, עוברות לבעלות המשתמש \"עובדי החברה\". בקשות FT בבעלות צוות, או בבעלות משתמש ללא שם דומיין (NULL), נשארות עם הבעלים שלהן.",
+      "why": "מצב הסיום היה כללי מדי. מקור הנתונים משתמש ב-INNER JOIN ל-SystemUser ובתנאי SystemUser.DomainName != ?. רשומה בבעלות צוות אינה עוברת את ה-JOIN, ועבור DomainName = NULL ההשוואה != אינה מתקיימת. לכן רק רשומות בבעלות משתמש מערכת עם שם דומיין (לא NULL) ששונה משם היעד מועברות.",
+      "evidence": "DTSX:3206-3214",
+      "verifierAccepted": true
+    },
+    {
+      "claimId": "L|Package\\Update CW FTRequests|detail",
+      "field": "detail_he[4].t",
+      "before": "בעלות אחידה על בקשות FT (gen_ftrequest): כל מה ששייך לעובדי החברה בבעלות משתמש ייעודי (השערה: לצורך הגבלת הרשאות צפייה).",
+      "after": "בעלות אחידה על בקשות FT (gen_ftrequest) של עובדי החברה: בקשות בבעלות משתמש מערכת עם שם דומיין עוברות למשתמש ייעודי (השערה: לצורך הגבלת הרשאות צפייה). בקשות בבעלות צוות, או בבעלות משתמש ללא שם דומיין, אינן משתנות.",
+      "why": "התוצאה העסקית הייתה כללית מדי. מקור הנתונים משתמש ב-INNER JOIN ל-SystemUser ובתנאי SystemUser.DomainName != ?. רשומה בבעלות צוות אינה עוברת את ה-JOIN, ועבור DomainName = NULL ההשוואה != אינה מתקיימת. לכן רק רשומות בבעלות משתמש מערכת עם שם דומיין (לא NULL) ששונה משם היעד מועברות.",
+      "evidence": "DTSX:3206-3214",
+      "verifierAccepted": true
+    },
+    {
+      "claimId": "L|Package\\Update CW FTRequests|detailed",
+      "field": "detailed.nodes[0].text",
+      "before": "נשלפות בקשות FT (gen_ftrequest) מ-CRM שהבעלים שלהן הוא משתמש מערכת ושם הדומיין שלו שונה משם המשתמש שהוגדר לעובדי החברה. רשומות בבעלות צוות אינן נכללות, כי החיבור ל-SystemUser הוא INNER JOIN.",
+      "after": "נשלפות בקשות FT (gen_ftrequest) מ-CRM שהבעלים שלהן הוא משתמש מערכת ושם הדומיין שלו שונה משם המשתמש שהוגדר לעובדי החברה. רשומות בבעלות צוות אינן נכללות, כי החיבור ל-SystemUser הוא INNER JOIN. גם רשומות בבעלות משתמש ללא שם דומיין (NULL) אינן נכללות, כי ההשוואה != אינה מתקיימת עבור NULL.",
+      "why": "עקביות עם תיקון מצב הסיום: מקור הנתונים משתמש ב-INNER JOIN ל-SystemUser ובתנאי SystemUser.DomainName != ?. רשומה בבעלות צוות אינה עוברת את ה-JOIN, ועבור DomainName = NULL ההשוואה != אינה מתקיימת. לכן רק רשומות בבעלות משתמש מערכת עם שם דומיין (לא NULL) ששונה משם היעד מועברות.",
+      "evidence": "DTSX:3206-3214",
+      "verifierAccepted": true
+    },
+    {
+      "claimId": "L|Package\\Update CW FTRequests|title",
+      "field": "short_he",
+      "before": "בקשות FT שהלקוח שלהן מופיע ברשימת עובדי החברה (לפי מספר זהות), שהבעלים שלהן אינו המשתמש \"עובדי החברה\", מועברות לבעלות המשתמש הזה. שם המשתמש מוגדר בטבלת ההגדרות.",
+      "after": "בקשות FT שהלקוח שלהן מופיע ברשימת עובדי החברה (לפי מספר זהות), שהבעלים שלהן הוא משתמש מערכת עם שם דומיין שאינו המשתמש \"עובדי החברה\", מועברות לבעלות המשתמש הזה. שם המשתמש מוגדר בטבלת ההגדרות.",
+      "why": "עקביות עם תיקון מצב הסיום: מקור הנתונים משתמש ב-INNER JOIN ל-SystemUser ובתנאי SystemUser.DomainName != ?. רשומה בבעלות צוות אינה עוברת את ה-JOIN, ועבור DomainName = NULL ההשוואה != אינה מתקיימת. לכן רק רשומות בבעלות משתמש מערכת עם שם דומיין (לא NULL) ששונה משם היעד מועברות.",
+      "evidence": "DTSX:3206-3214",
+      "verifierAccepted": true
+    },
+    {
+      "claimId": "L|Package\\Update CW FTRequests|decisions",
+      "field": "decisions[0].meaning_he",
+      "before": "הבעלים הנוכחי אינו המשתמש היעד.",
+      "after": "הבעלים הנוכחי הוא משתמש מערכת עם שם דומיין שאינו המשתמש היעד. משתמש ללא שם דומיין (NULL) אינו עומד בתנאי.",
+      "why": "עקביות עם תיקון מצב הסיום: מקור הנתונים משתמש ב-INNER JOIN ל-SystemUser ובתנאי SystemUser.DomainName != ?. רשומה בבעלות צוות אינה עוברת את ה-JOIN, ועבור DomainName = NULL ההשוואה != אינה מתקיימת. לכן רק רשומות בבעלות משתמש מערכת עם שם דומיין (לא NULL) ששונה משם היעד מועברות.",
+      "evidence": "DTSX:3206-3214",
+      "verifierAccepted": true
+    },
+    {
+      "claimId": "L|Package\\Update Regular FTRequest|short",
+      "field": "short.nodes[end].text",
+      "before": "כל בקשות ה-FT שהלקוח שלהן אינו מופיע ברשימת עובדי החברה (לפי מספר זהות) נמצאות בבעלות המשתמש \"הקופות הרגילות\".",
+      "after": "בקשות FT שהלקוח שלהן אינו מופיע ברשימת עובדי החברה (לפי מספר זהות), ושבבעלות משתמש מערכת עם שם דומיין, עוברות לבעלות המשתמש \"הקופות הרגילות\". בקשות FT בבעלות צוות, או בבעלות משתמש ללא שם דומיין (NULL), נשארות עם הבעלים שלהן.",
+      "why": "מצב הסיום היה כללי מדי. מקור הנתונים משתמש ב-INNER JOIN ל-SystemUser ובתנאי SystemUser.DomainName != ?. רשומה בבעלות צוות אינה עוברת את ה-JOIN, ועבור DomainName = NULL ההשוואה != אינה מתקיימת. לכן רק רשומות בבעלות משתמש מערכת עם שם דומיין (לא NULL) ששונה משם היעד מועברות.",
+      "evidence": "DTSX:4352-4360",
+      "verifierAccepted": true
+    },
+    {
+      "claimId": "L|Package\\Update Regular FTRequest|detail",
+      "field": "detail_he[4].t",
+      "before": "בעלות אחידה על בקשות FT (gen_ftrequest): כל השאר בבעלות משתמש \"קופות רגילות\" אחד. כל בעלות אחרת של משתמש נדרסת בכל ריצה.",
+      "after": "בקשות FT (gen_ftrequest) של לקוחות שאינם עובדי חברה, בבעלות משתמש מערכת ששם הדומיין שלו אינו NULL ושונה משם היעד, עוברות בכל ריצה למשתמש \"קופות רגילות\" אחד. בקשות בבעלות צוות, או בבעלות משתמש ללא שם דומיין, אינן משתנות. בקשה שאין בה מספר זהות (Gen_identitynumber = NULL) עומדת בתנאי not exists, ולכן נחשבת כבקשה של לקוח שאינו עובד חברה.",
+      "why": "התוצאה העסקית הייתה כללית מדי. מקור הנתונים משתמש ב-INNER JOIN ל-SystemUser ובתנאי SystemUser.DomainName != ?. רשומה בבעלות צוות אינה עוברת את ה-JOIN, ועבור DomainName = NULL ההשוואה != אינה מתקיימת. לכן רק רשומות בבעלות משתמש מערכת עם שם דומיין (לא NULL) ששונה משם היעד מועברות. בנוסף: cw.gen_identitynumber = NULL אינו מתאים לאף שורה, ולכן not exists מתקיים.",
+      "evidence": "DTSX:4352-4360",
+      "verifierAccepted": true
+    },
+    {
+      "claimId": "L|Package\\Update Regular FTRequest|detailed",
+      "field": "detailed.nodes[0].text",
+      "before": "נשלפות בקשות FT (gen_ftrequest) מ-CRM שהבעלים שלהן הוא משתמש מערכת ושם הדומיין שלו שונה משם המשתמש שהוגדר לקופות הרגילות. רשומות בבעלות צוות אינן נכללות, כי החיבור ל-SystemUser הוא INNER JOIN.",
+      "after": "נשלפות בקשות FT (gen_ftrequest) מ-CRM שהבעלים שלהן הוא משתמש מערכת ושם הדומיין שלו שונה משם המשתמש שהוגדר לקופות הרגילות. רשומות בבעלות צוות אינן נכללות, כי החיבור ל-SystemUser הוא INNER JOIN. גם רשומות בבעלות משתמש ללא שם דומיין (NULL) אינן נכללות, כי ההשוואה != אינה מתקיימת עבור NULL.",
+      "why": "עקביות עם תיקון מצב הסיום: מקור הנתונים משתמש ב-INNER JOIN ל-SystemUser ובתנאי SystemUser.DomainName != ?. רשומה בבעלות צוות אינה עוברת את ה-JOIN, ועבור DomainName = NULL ההשוואה != אינה מתקיימת. לכן רק רשומות בבעלות משתמש מערכת עם שם דומיין (לא NULL) ששונה משם היעד מועברות.",
+      "evidence": "DTSX:4352-4360",
+      "verifierAccepted": true
+    },
+    {
+      "claimId": "L|Package\\Update Regular FTRequest|title",
+      "field": "short_he",
+      "before": "בקשות FT שהלקוח שלהן אינו מופיע ברשימת עובדי החברה (לפי מספר זהות), שהבעלים שלהן אינו המשתמש \"הקופות הרגילות\", מועברות לבעלות המשתמש הזה. שם המשתמש מוגדר בטבלת ההגדרות.",
+      "after": "בקשות FT שהלקוח שלהן אינו מופיע ברשימת עובדי החברה (לפי מספר זהות), שהבעלים שלהן הוא משתמש מערכת עם שם דומיין שאינו המשתמש \"הקופות הרגילות\", מועברות לבעלות המשתמש הזה. שם המשתמש מוגדר בטבלת ההגדרות.",
+      "why": "עקביות עם תיקון מצב הסיום: מקור הנתונים משתמש ב-INNER JOIN ל-SystemUser ובתנאי SystemUser.DomainName != ?. רשומה בבעלות צוות אינה עוברת את ה-JOIN, ועבור DomainName = NULL ההשוואה != אינה מתקיימת. לכן רק רשומות בבעלות משתמש מערכת עם שם דומיין (לא NULL) ששונה משם היעד מועברות.",
+      "evidence": "DTSX:4352-4360",
+      "verifierAccepted": true
+    },
+    {
+      "claimId": "L|Package\\Update Regular FTRequest|decisions",
+      "field": "decisions[0].meaning_he",
+      "before": "הבעלים הנוכחי אינו המשתמש היעד.",
+      "after": "הבעלים הנוכחי הוא משתמש מערכת עם שם דומיין שאינו המשתמש היעד. משתמש ללא שם דומיין (NULL) אינו עומד בתנאי.",
+      "why": "עקביות עם תיקון מצב הסיום: מקור הנתונים משתמש ב-INNER JOIN ל-SystemUser ובתנאי SystemUser.DomainName != ?. רשומה בבעלות צוות אינה עוברת את ה-JOIN, ועבור DomainName = NULL ההשוואה != אינה מתקיימת. לכן רק רשומות בבעלות משתמש מערכת עם שם דומיין (לא NULL) ששונה משם היעד מועברות.",
+      "evidence": "DTSX:4352-4360",
+      "verifierAccepted": true
+    },
+    {
+      "claimId": "L|Package\\Update Trans|open",
+      "field": "detail_he[0].t",
+      "before": "Gen_ftCurrentYear שמקושרת ל-gen_fundmain (ft.gen_fundnumber), כשהבעלים שלה שונה מהבעלים של הקופה.",
+      "after": "Gen_ftCurrentYear שמקושרת ל-gen_fundmain (ft.gen_fundnumber), כשהבעלים שלה שונה מהבעלים של הקופה. בחבילה 0008 רשומות Gen_ftCurrentYear נוצרות (insert ftCurrentYearBase 1-5) רק משורות של פלט הפיצול 'תנועות והחזר דמי ניהול' בקובץ PY, כלומר רשומות תנועה בקופה.",
+      "why": "התשובה לשאלה הפתוחה הועברה לתיאור והשאלה נמחקה. מעקב מסלולים במעלה הזרם בחבילה 0008 מראה שכל ארבעת רכיבי ההכנסה ל-Gen_ftCurrentYearBase מקבלים שורות רק מפלט \"תנועות והחזר דמי ניהול\" של Split by trans group type. בחבילות שסופקו לא נמצא כותב INSERT אחר לטבלה. נכתב כעובדה על חבילה 0008.",
+      "evidence": "0008_LeumiFile-PY DTSX:69986, 82678, 63118",
+      "verifierAccepted": true
+    },
+    {
+      "claimId": "L|Package\\Update Trans|open",
+      "field": "openQuestions_he",
+      "before": [
+        "מה המשמעות העסקית של Gen_ftCurrentYear? שם ה-Data Flow \"Update Trans\" מרמז על תנועות שנה נוכחית (השערה).",
+        "האם ה-ParameterMapping (DTSX:4949) למשתנה {8C07AFF0-…}, שאינו קיים בחבילה, מכשיל את הוולידציה? אם כן, לפי התנהגות SSIS הרגילה (אין DelayValidation) החבילה כולה נכשלת לפני כל שלב. אם לא, השלב רץ כרגיל. ה-DTSX לא מכריע."
+      ],
+      "after": [
+        "האם ה-ParameterMapping (DTSX:4949) למשתנה {8C07AFF0-…}, שאינו קיים בחבילה, מכשיל את הוולידציה? אם כן, לפי התנהגות SSIS הרגילה (אין DelayValidation) החבילה כולה נכשלת לפני כל שלב. אם לא, השלב רץ כרגיל. ה-DTSX לא מכריע."
+      ],
+      "why": "שאלה 1 נענתה מהקבצים שסופקו (חבילה 0008) והועברה ל-detail_he[0]. שאלה 2 (ParameterMapping ל-{8C07AFF0-…}) נשארת פתוחה.",
+      "evidence": "0008_LeumiFile-PY DTSX:69986, 82678, 63118",
+      "verifierAccepted": true
+    },
+    {
+      "claimId": "L|Package\\Update CW FTRequests|open",
+      "field": "detail_he[0].t",
+      "before": "gen_ftrequest בבעלות SystemUser שה-DomainName שלו != @[User::CompanyEmployeesDomainName], ו-exists (select cw.Gen_identitynumber from Gen_companyworker cw where cw.gen_identitynumber = ft.Gen_identitynumber).",
+      "after": "gen_ftrequest בבעלות SystemUser שה-DomainName שלו != @[User::CompanyEmployeesDomainName], ו-exists (select cw.Gen_identitynumber from Gen_companyworker cw where cw.gen_identitynumber = ft.Gen_identitynumber). בחבילה 0009 זרימת הנתונים שיוצרת ומעדכנת רשומות gen_ftrequest נקראת 'Create or update  Fund Trunsaction Request', כלומר בקשה לתנועה בקופה.",
+      "why": "התשובה לשאלה הפתוחה הועברה לתיאור והשאלה נמחקה. בחבילה 0009 ה-Lookup \"Checl If Fund Transaction Request Exist\" קורא מ-gen_ftrequest, ופקודות \"Create Fund Transaction Request\" כותבות insert into gen_ftrequestbase. נכתב כעובדה על חבילה 0009.",
+      "evidence": "0009_LeumiFile-BY DTSX:48645, 48669, 48724, 54688",
+      "verifierAccepted": true
+    },
+    {
+      "claimId": "L|Package\\Update CW FTRequests|open",
+      "field": "openQuestions_he",
+      "before": [
+        "מה הערך של CompanyEmployeesDomainName ב-gen_etlvariable בסביבת הייצור? (ב-DTSX: \"FormDB\")",
+        "מה המשמעות העסקית של gen_ftrequest (\"FT request\")? היא לא מוגדרת בחבילה."
+      ],
+      "after": [
+        "מה הערך של CompanyEmployeesDomainName ב-gen_etlvariable בסביבת הייצור? (ב-DTSX: \"FormDB\")"
+      ],
+      "why": "שאלה 2 נענתה מחבילה 0009 והועברה ל-detail_he[0]. שאלה 1 (ערך CompanyEmployeesDomainName בייצור) נשארת פתוחה.",
+      "evidence": "0009_LeumiFile-BY DTSX:48645, 48724, 54688",
+      "verifierAccepted": true
+    },
+    {
+      "round": 2,
+      "claimId": "L|summary",
+      "field": "summary_he",
+      "before": "החבילה מנהלת בעלות (Owner) ב-CRM לפי השאלה אם הלקוח הוא עובד החברה (מספר זהות ב-Gen_companyworker). קופות (gen_fundmain) ובקשות FT (gen_ftrequest) שבבעלות משתמש מערכת עם שם דומיין מועברות: של עובדי החברה למשתמש \"עובדי החברה\", ושל שאר הלקוחות למשתמש \"קופות רגילות\". קופות ובקשות בבעלות צוות, או בבעלות משתמש ללא שם דומיין (NULL), נשארות עם הבעלים שלהן. רשומות gen_ftcurrentyear ו-MF (שנה נוכחית, שנה קודמת, ארכיון) מיושרות לבעלים של הקופה שלהן. כל העדכונים הם SQL ישיר לטבלאות Base (Unsupported).",
+      "after": "החבילה מנהלת בעלות (Owner) ב-CRM על קופות (gen_fundmain) ובקשות FT (gen_ftrequest) לפי הטבלה Gen_companyworker. בקשת FT עוברת למשתמש \"עובדי החברה\" כשמספר הזהות שבבקשה מופיע ב-Gen_companyworker (cw.gen_identitynumber = ft.Gen_identitynumber), ואחרת למשתמש \"קופות רגילות\". קופה עוברת למשתמש \"עובדי החברה\" כשמתקיים התנאי exists (select Gen_companyworker.Gen_identitynumber from Gen_companyworker where gen_customeridnumber = Gen_identitynumber) (השערה: התאמה לפי ת.ז. הלקוח; העמודה ללא קידומת טבלה; ראו ממצא 5), ואחרת (not exists) למשתמש \"קופות רגילות\". בשני המקרים מועברות רק רשומות שבבעלות משתמש מערכת ששם הדומיין שלו אינו NULL ושונה משם משתמש היעד של אותו שלב. קופות ובקשות בבעלות צוות, או בבעלות משתמש ללא שם דומיין (NULL), נשארות עם הבעלים שלהן. רשומות gen_ftcurrentyear ו-MF (שנה נוכחית, שנה קודמת, ארכיון) שהבעלים שלהן שונה מהבעלים של הקופה מיושרות לבעלים של הקופה. כל העדכונים הם SQL ישיר לטבלאות Base (Unsupported).",
+      "why": "הקישור קופה↔Gen_companyworker נשען על עמודה לא מסויגת (gen_customeridnumber) בתת-שאילתה; סכמת Gen_companyworker לא סופקה, וממצא 5 מסמן את הקישור כלא מאומת. הוצג כתנאי ה-SQL המדויק + השערה.",
+      "evidence": "0022 DTSX:3498-3507 (Get CW funds), DTSX:4644-4653 (Get regular  funds): subquery columns gen_customeridnumber / Gen_identitynumber unqualified; Gen_companyworker appears only in 0022 (no schema supplied); finding#5; FT: DTSX:3206-3214, 4352-4360 (cw.gen_identitynumber = ft.Gen_identitynumber, qualified)",
+      "verifierAccepted": null,
+      "hashBefore": "e3631e4fe1727f8a436732508b190c8c8e5257451465ee8479ffe3b8af6e7f35"
+    },
+    {
+      "round": 2,
+      "claimId": "L|finding#2",
+      "field": "findings_he[1].text",
+      "before": "Update Regular Funds ו-Update Regular FTRequest מעבירים בכל ריצה למשתמש אחד (RegularFundsDomainName) כל קופה או בקשה של לקוח שאינו עובד חברה, אם היא בבעלות משתמש מערכת ששם הדומיין שלו אינו NULL ושונה משם היעד. אם רשומה כזו שויכה ידנית למשתמש כזה, השיוך מוחלף בריצה הבאה. רשומות בבעלות צוות (Team) אינן מועברות, בגלל ה-INNER JOIN ל-SystemUser. גם רשומות בבעלות משתמש ללא שם דומיין (NULL) אינן מועברות, כי התנאי SystemUser.DomainName != ? אינו מתקיים עבור NULL.",
+      "after": "Update Regular Funds ו-Update Regular FTRequest מעבירים בכל ריצה למשתמש אחד (RegularFundsDomainName) כל קופה או בקשה שאינה עומדת בתנאי Gen_companyworker של אותו שלב, אם היא בבעלות משתמש מערכת ששם הדומיין שלו אינו NULL ושונה משם היעד. בבקשות FT התנאי הוא not exists (select cw.Gen_identitynumber from Gen_companyworker cw where cw.gen_identitynumber = ft.Gen_identitynumber), כלומר מספר הזהות שבבקשה אינו מופיע ב-Gen_companyworker. בקופות התנאי הוא not exists (select Gen_companyworker.Gen_identitynumber from Gen_companyworker where gen_customeridnumber = Gen_identitynumber) (השערה: התאמה לפי ת.ז. הלקוח; העמודה ללא קידומת טבלה; ראו ממצא 5). אם רשומה כזו שויכה ידנית למשתמש כזה, השיוך מוחלף בריצה הבאה. רשומות בבעלות צוות (Team) אינן מועברות, בגלל ה-INNER JOIN ל-SystemUser. גם רשומות בבעלות משתמש ללא שם דומיין (NULL) אינן מועברות, כי התנאי SystemUser.DomainName != ? אינו מתקיים עבור NULL.",
+      "why": "הקישור קופה↔Gen_companyworker נשען על עמודה לא מסויגת (gen_customeridnumber) בתת-שאילתה; סכמת Gen_companyworker לא סופקה, וממצא 5 מסמן את הקישור כלא מאומת. הוצג כתנאי ה-SQL המדויק + השערה.",
+      "evidence": "0022 DTSX:3498-3507 (Get CW funds), DTSX:4644-4653 (Get regular  funds): subquery columns gen_customeridnumber / Gen_identitynumber unqualified; Gen_companyworker appears only in 0022 (no schema supplied); finding#5; FT DTSX:4352-4360",
+      "verifierAccepted": null,
+      "hashBefore": "e3631e4fe1727f8a436732508b190c8c8e5257451465ee8479ffe3b8af6e7f35"
+    },
+    {
+      "round": 2,
+      "claimId": "L|exec",
+      "field": "executionOrder[2].title_he",
+      "before": "קופות עובדי החברה → משתמש עובדי החברה",
+      "after": "קופות שעומדות בתנאי Gen_companyworker (השערה: של עובדי החברה) → משתמש עובדי החברה",
+      "why": "הקישור קופה↔Gen_companyworker נשען על עמודה לא מסויגת (gen_customeridnumber) בתת-שאילתה; סכמת Gen_companyworker לא סופקה, וממצא 5 מסמן את הקישור כלא מאומת. הוצג כתנאי ה-SQL המדויק + השערה.",
+      "evidence": "0022 DTSX:3498-3507 (Get CW funds), DTSX:4644-4653 (Get regular  funds): subquery columns gen_customeridnumber / Gen_identitynumber unqualified; Gen_companyworker appears only in 0022 (no schema supplied); finding#5",
+      "verifierAccepted": null,
+      "hashBefore": "e3631e4fe1727f8a436732508b190c8c8e5257451465ee8479ffe3b8af6e7f35"
+    },
+    {
+      "round": 2,
+      "claimId": "L|exec",
+      "field": "executionOrder[3].title_he",
+      "before": "שאר הקופות → משתמש הקופות הרגילות",
+      "after": "קופות שאינן עומדות בתנאי Gen_companyworker → משתמש הקופות הרגילות",
+      "why": "הקישור קופה↔Gen_companyworker נשען על עמודה לא מסויגת (gen_customeridnumber) בתת-שאילתה; סכמת Gen_companyworker לא סופקה, וממצא 5 מסמן את הקישור כלא מאומת. הוצג כתנאי ה-SQL המדויק + השערה. בנוסף, \"שאר הקופות\" הוא הכללה: רק קופות בבעלות משתמש מערכת עם שם דומיין מועברות.",
+      "evidence": "0022 DTSX:3498-3507 (Get CW funds), DTSX:4644-4653 (Get regular  funds): subquery columns gen_customeridnumber / Gen_identitynumber unqualified; Gen_companyworker appears only in 0022 (no schema supplied); finding#5",
+      "verifierAccepted": null,
+      "hashBefore": "e3631e4fe1727f8a436732508b190c8c8e5257451465ee8479ffe3b8af6e7f35"
+    },
+    {
+      "round": 2,
+      "claimId": "L|Package (control flow)|title",
+      "field": "components[0].short_he",
+      "before": "בכל ריצה החבילה קובעת את הבעלות על הקופות ועל בקשות ה-FT שבבעלות משתמש מערכת עם שם דומיין: מה ששייך לעובדי החברה עובר למשתמש ייעודי, וכל השאר למשתמש \"קופות רגילות\". קופות ובקשות בבעלות צוות, או בבעלות משתמש ללא שם דומיין, אינן מועברות. רשומות FT לשנה הנוכחית (בחבילה 0008 הן נוצרות מתנועות והחזרי דמי ניהול) ורשומות MF של כל קופה, שהבעלים שלהן שונה מהבעלים של הקופה, מקבלות את הבעלים של הקופה, בלי קשר לסוג הבעלים.",
+      "after": "בכל ריצה החבילה קובעת את הבעלות על קופות ועל בקשות FT שבבעלות משתמש מערכת ששם הדומיין שלו אינו NULL ושונה משם משתמש היעד של השלב. רשומה שעומדת בתנאי Gen_companyworker עוברת למשתמש ייעודי לעובדי החברה, ורשומה שאינה עומדת בו עוברת למשתמש \"קופות רגילות\". בבקשות FT התנאי הוא שמספר הזהות שבבקשה מופיע ב-Gen_companyworker. בקופות התנאי הוא gen_customeridnumber = Gen_identitynumber בתת-שאילתה על Gen_companyworker (השערה: התאמה לפי ת.ז. הלקוח; העמודה ללא קידומת טבלה). קופות ובקשות בבעלות צוות, או בבעלות משתמש ללא שם דומיין, אינן מועברות. רשומות FT לשנה הנוכחית (בחבילה 0008 הן נוצרות רק משורות של פלט פיצול בשם 'תנועות והחזר דמי ניהול', gen_TranstypeId != \"58\" && Transfer_Type_2 == \"2\") ורשומות MF של כל קופה, שהבעלים שלהן שונה מהבעלים של הקופה, מקבלות את הבעלים של הקופה, בלי קשר לסוג הבעלים.",
+      "why": "הקישור קופה↔Gen_companyworker נשען על עמודה לא מסויגת (gen_customeridnumber) בתת-שאילתה; סכמת Gen_companyworker לא סופקה, וממצא 5 מסמן את הקישור כלא מאומת. הוצג כתנאי ה-SQL המדויק + השערה. שם פלט הפיצול ב-0008 הוא שם בלבד ולא משמעות מוכחת; צוטט כשם הפלט עם התנאי.",
+      "evidence": "0022 DTSX:3498-3507 (Get CW funds), DTSX:4644-4653 (Get regular  funds): subquery columns gen_customeridnumber / Gen_identitynumber unqualified; Gen_companyworker appears only in 0022 (no schema supplied); finding#5; 0008 DTSX:69986-69990",
+      "verifierAccepted": null,
+      "hashBefore": "e3631e4fe1727f8a436732508b190c8c8e5257451465ee8479ffe3b8af6e7f35"
+    },
+    {
+      "round": 2,
+      "claimId": "L|Package (control flow)|short",
+      "field": "components[0].short.nodes[1].text",
+      "before": "קופות של עובדי החברה עוברות לבעלות משתמש \"עובדי החברה\", וכל שאר הקופות לבעלות משתמש \"קופות רגילות\".",
+      "after": "קופות שבבעלות משתמש מערכת ששם הדומיין שלו אינו NULL ושונה משם משתמש היעד מועברות: קופות שעומדות בתנאי עובדי החברה (קיימת ב-Gen_companyworker שורה שבה gen_customeridnumber = Gen_identitynumber) (השערה: התאמה לפי ת.ז. הלקוח; העמודה ללא קידומת טבלה) עוברות לבעלות משתמש \"עובדי החברה\", וקופות שאינן עומדות בתנאי עוברות לבעלות משתמש \"קופות רגילות\". קופות בבעלות צוות, או בבעלות משתמש ללא שם דומיין, נשארות עם הבעלים שלהן.",
+      "why": "הקישור קופה↔Gen_companyworker נשען על עמודה לא מסויגת (gen_customeridnumber) בתת-שאילתה; סכמת Gen_companyworker לא סופקה, וממצא 5 מסמן את הקישור כלא מאומת. הוצג כתנאי ה-SQL המדויק + השערה. בנוסף תוקנה ההכללה \"וכל שאר הקופות\": רק קופות בבעלות משתמש מערכת עם שם דומיין שאינו NULL ושונה מהיעד מועברות.",
+      "evidence": "0022 DTSX:3498-3507 (Get CW funds), DTSX:4644-4653 (Get regular  funds): subquery columns gen_customeridnumber / Gen_identitynumber unqualified; Gen_companyworker appears only in 0022 (no schema supplied); finding#5; DTSX:3498-3502, 4644-4648",
+      "verifierAccepted": null,
+      "hashBefore": "e3631e4fe1727f8a436732508b190c8c8e5257451465ee8479ffe3b8af6e7f35"
+    },
+    {
+      "round": 2,
+      "claimId": "L|Package (control flow)|detailed",
+      "field": "components[0].detailed.nodes[2].text",
+      "before": "קופות של עובדי החברה שבבעלות משתמש מערכת אחר עם שם דומיין עוברות למשתמש עובדי החברה. קופות בבעלות צוות, או בבעלות משתמש ללא שם דומיין, אינן מועברות.",
+      "after": "קופות שעומדות בתנאי עובדי החברה (קיימת ב-Gen_companyworker שורה שבה gen_customeridnumber = Gen_identitynumber) (השערה: התאמה לפי ת.ז. הלקוח; העמודה ללא קידומת טבלה), ושבבעלות משתמש מערכת אחר עם שם דומיין, עוברות למשתמש עובדי החברה. קופות בבעלות צוות, או בבעלות משתמש ללא שם דומיין, אינן מועברות.",
+      "why": "הקישור קופה↔Gen_companyworker נשען על עמודה לא מסויגת (gen_customeridnumber) בתת-שאילתה; סכמת Gen_companyworker לא סופקה, וממצא 5 מסמן את הקישור כלא מאומת. הוצג כתנאי ה-SQL המדויק + השערה.",
+      "evidence": "0022 DTSX:3498-3507 (Get CW funds), DTSX:4644-4653 (Get regular  funds): subquery columns gen_customeridnumber / Gen_identitynumber unqualified; Gen_companyworker appears only in 0022 (no schema supplied); finding#5",
+      "verifierAccepted": null,
+      "hashBefore": "e3631e4fe1727f8a436732508b190c8c8e5257451465ee8479ffe3b8af6e7f35"
+    },
+    {
+      "round": 2,
+      "claimId": "L|Package (control flow)|detailed",
+      "field": "components[0].detailed.nodes[3].text",
+      "before": "שאר הקופות שבבעלות משתמש מערכת אחר עם שם דומיין עוברות למשתמש הקופות הרגילות, באותה הסתייגות.",
+      "after": "קופות שאינן עומדות בתנאי זה (not exists על אותה תת-שאילתה), ושבבעלות משתמש מערכת אחר עם שם דומיין, עוברות למשתמש הקופות הרגילות, באותה הסתייגות.",
+      "why": "הקישור קופה↔Gen_companyworker נשען על עמודה לא מסויגת (gen_customeridnumber) בתת-שאילתה; סכמת Gen_companyworker לא סופקה, וממצא 5 מסמן את הקישור כלא מאומת. הוצג כתנאי ה-SQL המדויק + השערה.",
+      "evidence": "0022 DTSX:3498-3507 (Get CW funds), DTSX:4644-4653 (Get regular  funds): subquery columns gen_customeridnumber / Gen_identitynumber unqualified; Gen_companyworker appears only in 0022 (no schema supplied); finding#5",
+      "verifierAccepted": null,
+      "hashBefore": "e3631e4fe1727f8a436732508b190c8c8e5257451465ee8479ffe3b8af6e7f35"
+    },
+    {
+      "round": 2,
+      "claimId": "L|Package (control flow)|detail",
+      "field": "components[0].detail_he[1].t",
+      "before": "עובד חברה = מספר זהות שקיים ב-Gen_companyworker. משתמש יעד = SystemUser.domainname לפי gen_etlvariable.",
+      "after": "עובד חברה: בבקשות FT, מספר הזהות שבבקשה קיים ב-Gen_companyworker (cw.gen_identitynumber = ft.Gen_identitynumber, מוכח). בקופות, התנאי exists (select Gen_companyworker.Gen_identitynumber from Gen_companyworker where gen_customeridnumber = Gen_identitynumber) (השערה: התאמה לפי ת.ז. הלקוח; העמודה ללא קידומת טבלה; ראו ממצא 5). משתמש יעד = SystemUser.domainname לפי gen_etlvariable.",
+      "why": "הקישור קופה↔Gen_companyworker נשען על עמודה לא מסויגת (gen_customeridnumber) בתת-שאילתה; סכמת Gen_companyworker לא סופקה, וממצא 5 מסמן את הקישור כלא מאומת. הוצג כתנאי ה-SQL המדויק + השערה.",
+      "evidence": "0022 DTSX:3498-3507 (Get CW funds), DTSX:4644-4653 (Get regular  funds): subquery columns gen_customeridnumber / Gen_identitynumber unqualified; Gen_companyworker appears only in 0022 (no schema supplied); finding#5; FT DTSX:3206-3214, 4352-4360",
+      "verifierAccepted": null,
+      "hashBefore": "e3631e4fe1727f8a436732508b190c8c8e5257451465ee8479ffe3b8af6e7f35"
+    },
+    {
+      "round": 2,
+      "claimId": "L|Package\\Update CW Funds|title",
+      "field": "components[1].title_he",
+      "before": "שיוך קופות של עובדי החברה למשתמש עובדי החברה",
+      "after": "שיוך קופות לפי תנאי Gen_companyworker למשתמש עובדי החברה",
+      "why": "הקישור קופה↔Gen_companyworker נשען על עמודה לא מסויגת (gen_customeridnumber) בתת-שאילתה; סכמת Gen_companyworker לא סופקה, וממצא 5 מסמן את הקישור כלא מאומת. הוצג כתנאי ה-SQL המדויק + השערה.",
+      "evidence": "0022 DTSX:3498-3507 (Get CW funds), DTSX:4644-4653 (Get regular  funds): subquery columns gen_customeridnumber / Gen_identitynumber unqualified; Gen_companyworker appears only in 0022 (no schema supplied); finding#5",
+      "verifierAccepted": null,
+      "hashBefore": "e3631e4fe1727f8a436732508b190c8c8e5257451465ee8479ffe3b8af6e7f35"
+    },
+    {
+      "round": 2,
+      "claimId": "L|Package\\Update CW Funds|title",
+      "field": "components[1].short_he",
+      "before": "קופות שהלקוח שלהן מופיע ברשימת עובדי החברה (לפי מספר זהות), שהבעלים שלהן הוא משתמש מערכת עם שם דומיין שאינו המשתמש \"עובדי החברה\", מועברות לבעלות המשתמש הזה. שם המשתמש מוגדר בטבלת ההגדרות.",
+      "after": "קופות שמתקיים עבורן התנאי exists (select Gen_companyworker.Gen_identitynumber from Gen_companyworker where gen_customeridnumber = Gen_identitynumber) (השערה: התאמה לפי ת.ז. הלקוח; העמודה ללא קידומת טבלה), ושהבעלים שלהן הוא משתמש מערכת עם שם דומיין שאינו המשתמש \"עובדי החברה\", מועברות לבעלות המשתמש הזה. שם המשתמש מוגדר בטבלת ההגדרות.",
+      "why": "הקישור קופה↔Gen_companyworker נשען על עמודה לא מסויגת (gen_customeridnumber) בתת-שאילתה; סכמת Gen_companyworker לא סופקה, וממצא 5 מסמן את הקישור כלא מאומת. הוצג כתנאי ה-SQL המדויק + השערה.",
+      "evidence": "0022 DTSX:3498-3507 (Get CW funds), DTSX:4644-4653 (Get regular  funds): subquery columns gen_customeridnumber / Gen_identitynumber unqualified; Gen_companyworker appears only in 0022 (no schema supplied); finding#5",
+      "verifierAccepted": null,
+      "hashBefore": "e3631e4fe1727f8a436732508b190c8c8e5257451465ee8479ffe3b8af6e7f35"
+    },
+    {
+      "round": 2,
+      "claimId": "L|Package\\Update CW Funds|short",
+      "field": "components[1].short.nodes[1].text",
+      "before": "האם הקופה שייכת לעובד החברה ונמצאת כרגע בבעלות משתמש אחר מהמשתמש \"עובדי החברה\"?",
+      "after": "האם הקופה עומדת בתנאי עובדי החברה (קיימת ב-Gen_companyworker שורה שבה gen_customeridnumber = Gen_identitynumber) (השערה: התאמה לפי ת.ז. הלקוח; העמודה ללא קידומת טבלה), והיא נמצאת כרגע בבעלות משתמש מערכת עם שם דומיין שאינו המשתמש \"עובדי החברה\"?",
+      "why": "הקישור קופה↔Gen_companyworker נשען על עמודה לא מסויגת (gen_customeridnumber) בתת-שאילתה; סכמת Gen_companyworker לא סופקה, וממצא 5 מסמן את הקישור כלא מאומת. הוצג כתנאי ה-SQL המדויק + השערה.",
+      "evidence": "0022 DTSX:3498-3507 (Get CW funds), DTSX:4644-4653 (Get regular  funds): subquery columns gen_customeridnumber / Gen_identitynumber unqualified; Gen_companyworker appears only in 0022 (no schema supplied); finding#5",
+      "verifierAccepted": null,
+      "hashBefore": "e3631e4fe1727f8a436732508b190c8c8e5257451465ee8479ffe3b8af6e7f35"
+    },
+    {
+      "round": 2,
+      "claimId": "L|Package\\Update CW Funds|short",
+      "field": "components[1].short.nodes[2].text",
+      "before": "קופות שהלקוח שלהן מופיע ברשימת עובדי החברה (לפי מספר זהות), ושבבעלות משתמש מערכת עם שם דומיין, עוברות לבעלות המשתמש \"עובדי החברה\". קופות בבעלות צוות, או בבעלות משתמש ללא שם דומיין (NULL), נשארות עם הבעלים שלהן.",
+      "after": "קופות שעומדות בתנאי ה-exists על Gen_companyworker (השערה: התאמה לפי ת.ז. הלקוח; העמודה ללא קידומת טבלה), ושבבעלות משתמש מערכת עם שם דומיין שאינו המשתמש \"עובדי החברה\", עוברות לבעלות המשתמש הזה. קופות בבעלות צוות, או בבעלות משתמש ללא שם דומיין (NULL), נשארות עם הבעלים שלהן.",
+      "why": "הקישור קופה↔Gen_companyworker נשען על עמודה לא מסויגת (gen_customeridnumber) בתת-שאילתה; סכמת Gen_companyworker לא סופקה, וממצא 5 מסמן את הקישור כלא מאומת. הוצג כתנאי ה-SQL המדויק + השערה.",
+      "evidence": "0022 DTSX:3498-3507 (Get CW funds), DTSX:4644-4653 (Get regular  funds): subquery columns gen_customeridnumber / Gen_identitynumber unqualified; Gen_companyworker appears only in 0022 (no schema supplied); finding#5",
+      "verifierAccepted": null,
+      "hashBefore": "e3631e4fe1727f8a436732508b190c8c8e5257451465ee8479ffe3b8af6e7f35"
+    },
+    {
+      "round": 2,
+      "claimId": "L|Package\\Update CW Funds|detailed",
+      "field": "components[1].detailed.nodes[1].text",
+      "before": "האם הלקוח של הקופה מופיע ברשימת עובדי החברה?",
+      "after": "האם קיימת ב-Gen_companyworker שורה שבה gen_customeridnumber = Gen_identitynumber? (השערה: התאמה לפי ת.ז. הלקוח; העמודה ללא קידומת טבלה). אם ל-Gen_companyworker יש עמודה בשם gen_customeridnumber, תת-השאילתה אינה תלויה בקופה, והתנאי מתקיים לכל הקופות או לאף אחת (ראו ממצא 5).",
+      "why": "הקישור קופה↔Gen_companyworker נשען על עמודה לא מסויגת (gen_customeridnumber) בתת-שאילתה; סכמת Gen_companyworker לא סופקה, וממצא 5 מסמן את הקישור כלא מאומת. הוצג כתנאי ה-SQL המדויק + השערה.",
+      "evidence": "0022 DTSX:3498-3507 (Get CW funds), DTSX:4644-4653 (Get regular  funds): subquery columns gen_customeridnumber / Gen_identitynumber unqualified; Gen_companyworker appears only in 0022 (no schema supplied); finding#5",
+      "verifierAccepted": null,
+      "hashBefore": "e3631e4fe1727f8a436732508b190c8c8e5257451465ee8479ffe3b8af6e7f35"
+    },
+    {
+      "round": 2,
+      "claimId": "L|Package\\Update CW Funds|detailed",
+      "field": "components[1].detailed.nodes[1].branches[1].nodes[0].text",
+      "before": "הקופה לא מטופלת בשלב זה. היא מטופלת בשלב הקופות/הבקשות הרגילות.",
+      "after": "הקופה לא מטופלת בשלב זה. היא נבחרת בשלב הקופות הרגילות (not exists על אותה תת-שאילתה) רק אם הבעלים שלה עומד גם בתנאי שם הדומיין של אותו שלב.",
+      "why": "דיוק: שלב הקופות הרגילות בוחר רק קופות שהבעלים שלהן משתמש מערכת עם DomainName != RegularFundsDomainName.",
+      "evidence": "DTSX:4644-4653",
+      "verifierAccepted": null,
+      "hashBefore": "e3631e4fe1727f8a436732508b190c8c8e5257451465ee8479ffe3b8af6e7f35"
+    },
+    {
+      "round": 2,
+      "claimId": "L|Package\\Update CW Funds|detailed",
+      "field": "components[1].detailed.nodes[6].text",
+      "before": "קופות שהלקוח שלהן מופיע ברשימת עובדי החברה (לפי מספר זהות) עוברות לבעלות המשתמש \"עובדי החברה\". העדכון עוקף את פעולת השיוך (Assign) של ה-CRM.",
+      "after": "קופות שעומדות בתנאי ה-exists על Gen_companyworker (השערה: התאמה לפי ת.ז. הלקוח; העמודה ללא קידומת טבלה), ושבבעלות משתמש מערכת עם שם דומיין שאינו המשתמש \"עובדי החברה\", עוברות לבעלות המשתמש הזה. העדכון עוקף את פעולת השיוך (Assign) של ה-CRM.",
+      "why": "הקישור קופה↔Gen_companyworker נשען על עמודה לא מסויגת (gen_customeridnumber) בתת-שאילתה; סכמת Gen_companyworker לא סופקה, וממצא 5 מסמן את הקישור כלא מאומת. הוצג כתנאי ה-SQL המדויק + השערה.",
+      "evidence": "0022 DTSX:3498-3507 (Get CW funds), DTSX:4644-4653 (Get regular  funds): subquery columns gen_customeridnumber / Gen_identitynumber unqualified; Gen_companyworker appears only in 0022 (no schema supplied); finding#5",
+      "verifierAccepted": null,
+      "hashBefore": "e3631e4fe1727f8a436732508b190c8c8e5257451465ee8479ffe3b8af6e7f35"
+    },
+    {
+      "round": 2,
+      "claimId": "L|Package\\Update CW Funds|detail",
+      "field": "components[1].detail_he[0].t",
+      "before": "gen_fundmain בבעלות SystemUser שה-DomainName שלו != @[User::CompanyEmployeesDomainName], ו-exists (select Gen_companyworker.Gen_identitynumber from Gen_companyworker where gen_customeridnumber = Gen_identitynumber).",
+      "after": "gen_fundmain בבעלות SystemUser שה-DomainName שלו != @[User::CompanyEmployeesDomainName], ו-exists (select Gen_companyworker.Gen_identitynumber from Gen_companyworker where gen_customeridnumber = Gen_identitynumber) (השערה: התאמה לפי ת.ז. הלקוח; העמודה ללא קידומת טבלה).",
+      "why": "הקישור קופה↔Gen_companyworker נשען על עמודה לא מסויגת (gen_customeridnumber) בתת-שאילתה; סכמת Gen_companyworker לא סופקה, וממצא 5 מסמן את הקישור כלא מאומת. הוצג כתנאי ה-SQL המדויק + השערה.",
+      "evidence": "0022 DTSX:3498-3507 (Get CW funds), DTSX:4644-4653 (Get regular  funds): subquery columns gen_customeridnumber / Gen_identitynumber unqualified; Gen_companyworker appears only in 0022 (no schema supplied); finding#5",
+      "verifierAccepted": null,
+      "hashBefore": "e3631e4fe1727f8a436732508b190c8c8e5257451465ee8479ffe3b8af6e7f35"
+    },
+    {
+      "round": 2,
+      "claimId": "L|Package\\Update CW Funds|detail",
+      "field": "components[1].detail_he[1].t",
+      "before": "הרשומות נשלפות מ-CRM ומתעדכנות לפי gen_fundmainid. עובד חברה מזוהה לפי מספר זהות (exists (select Gen_companyworker.Gen_identitynumber from Gen_companyworker where gen_customeridnumber = Gen_identitynumber)). המשתמש היעד מזוהה לפי SystemUser.domainname = הערך שהוגדר ב-gen_etlvariable.",
+      "after": "הרשומות נשלפות מ-CRM ומתעדכנות לפי gen_fundmainid. הקופה נחשבת של עובד חברה לפי התנאי exists (select Gen_companyworker.Gen_identitynumber from Gen_companyworker where gen_customeridnumber = Gen_identitynumber) (השערה: התאמה לפי ת.ז. הלקוח; העמודה ללא קידומת טבלה; ראו ממצא 5). המשתמש היעד מזוהה לפי SystemUser.domainname = הערך שהוגדר ב-gen_etlvariable.",
+      "why": "הקישור קופה↔Gen_companyworker נשען על עמודה לא מסויגת (gen_customeridnumber) בתת-שאילתה; סכמת Gen_companyworker לא סופקה, וממצא 5 מסמן את הקישור כלא מאומת. הוצג כתנאי ה-SQL המדויק + השערה.",
+      "evidence": "0022 DTSX:3498-3507 (Get CW funds), DTSX:4644-4653 (Get regular  funds): subquery columns gen_customeridnumber / Gen_identitynumber unqualified; Gen_companyworker appears only in 0022 (no schema supplied); finding#5",
+      "verifierAccepted": null,
+      "hashBefore": "e3631e4fe1727f8a436732508b190c8c8e5257451465ee8479ffe3b8af6e7f35"
+    },
+    {
+      "round": 2,
+      "claimId": "L|Package\\Update CW Funds|detail",
+      "field": "components[1].detail_he[2].t",
+      "before": "רק רשומות שהבעלים שלהן אינו כבר המשתמש היעד. רק לקוחות שהם עובדי חברה. אם המשתמש היעד לא נמצא, הרכיב נכשל.",
+      "after": "רק רשומות שהבעלים שלהן אינו כבר המשתמש היעד. רק קופות שעומדות בתנאי ה-exists על Gen_companyworker (השערה: התאמה לפי ת.ז. הלקוח; העמודה ללא קידומת טבלה). אם המשתמש היעד לא נמצא, הרכיב נכשל.",
+      "why": "הקישור קופה↔Gen_companyworker נשען על עמודה לא מסויגת (gen_customeridnumber) בתת-שאילתה; סכמת Gen_companyworker לא סופקה, וממצא 5 מסמן את הקישור כלא מאומת. הוצג כתנאי ה-SQL המדויק + השערה.",
+      "evidence": "0022 DTSX:3498-3507 (Get CW funds), DTSX:4644-4653 (Get regular  funds): subquery columns gen_customeridnumber / Gen_identitynumber unqualified; Gen_companyworker appears only in 0022 (no schema supplied); finding#5",
+      "verifierAccepted": null,
+      "hashBefore": "e3631e4fe1727f8a436732508b190c8c8e5257451465ee8479ffe3b8af6e7f35"
+    },
+    {
+      "round": 2,
+      "claimId": "L|Package\\Update CW Funds|detail",
+      "field": "components[1].detail_he[4].t",
+      "before": "בעלות אחידה על קופות של עובדי החברה: קופות בבעלות משתמש מערכת עם שם דומיין עוברות למשתמש ייעודי (השערה: לצורך הגבלת הרשאות צפייה). קופות בבעלות צוות, או בבעלות משתמש ללא שם דומיין, אינן משתנות.",
+      "after": "בעלות אחידה על הקופות שעומדות בתנאי Gen_companyworker (השערה: קופות של עובדי החברה, לפי ת.ז. הלקוח; העמודה ללא קידומת טבלה): קופות בבעלות משתמש מערכת עם שם דומיין עוברות למשתמש ייעודי (השערה: לצורך הגבלת הרשאות צפייה). קופות בבעלות צוות, או בבעלות משתמש ללא שם דומיין, אינן משתנות.",
+      "why": "הקישור קופה↔Gen_companyworker נשען על עמודה לא מסויגת (gen_customeridnumber) בתת-שאילתה; סכמת Gen_companyworker לא סופקה, וממצא 5 מסמן את הקישור כלא מאומת. הוצג כתנאי ה-SQL המדויק + השערה.",
+      "evidence": "0022 DTSX:3498-3507 (Get CW funds), DTSX:4644-4653 (Get regular  funds): subquery columns gen_customeridnumber / Gen_identitynumber unqualified; Gen_companyworker appears only in 0022 (no schema supplied); finding#5",
+      "verifierAccepted": null,
+      "hashBefore": "e3631e4fe1727f8a436732508b190c8c8e5257451465ee8479ffe3b8af6e7f35"
+    },
+    {
+      "round": 2,
+      "claimId": "L|Package\\Update CW Funds|decisions",
+      "field": "components[1].decisions[1].meaning_he",
+      "before": "הלקוח הוא עובד חברה.",
+      "after": "קיימת ב-Gen_companyworker שורה שבה gen_customeridnumber = Gen_identitynumber (השערה: התאמה לפי ת.ז. הלקוח; העמודה ללא קידומת טבלה).",
+      "why": "הקישור קופה↔Gen_companyworker נשען על עמודה לא מסויגת (gen_customeridnumber) בתת-שאילתה; סכמת Gen_companyworker לא סופקה, וממצא 5 מסמן את הקישור כלא מאומת. הוצג כתנאי ה-SQL המדויק + השערה.",
+      "evidence": "0022 DTSX:3498-3507 (Get CW funds), DTSX:4644-4653 (Get regular  funds): subquery columns gen_customeridnumber / Gen_identitynumber unqualified; Gen_companyworker appears only in 0022 (no schema supplied); finding#5",
+      "verifierAccepted": null,
+      "hashBefore": "e3631e4fe1727f8a436732508b190c8c8e5257451465ee8479ffe3b8af6e7f35"
+    },
+    {
+      "round": 2,
+      "claimId": "L|Package\\Update CW Funds|crm",
+      "field": "components[1].crmEffects[0].when_he",
+      "before": "gen_fundmain של עובד חברה שהבעלים שלה אינו המשתמש היעד. Unsupported.",
+      "after": "gen_fundmain שעומדת בתנאי ה-exists על Gen_companyworker (השערה: התאמה לפי ת.ז. הלקוח; העמודה ללא קידומת טבלה), ושהבעלים שלה הוא משתמש מערכת עם שם דומיין שאינו המשתמש היעד. Unsupported.",
+      "why": "הקישור קופה↔Gen_companyworker נשען על עמודה לא מסויגת (gen_customeridnumber) בתת-שאילתה; סכמת Gen_companyworker לא סופקה, וממצא 5 מסמן את הקישור כלא מאומת. הוצג כתנאי ה-SQL המדויק + השערה.",
+      "evidence": "0022 DTSX:3498-3507 (Get CW funds), DTSX:4644-4653 (Get regular  funds): subquery columns gen_customeridnumber / Gen_identitynumber unqualified; Gen_companyworker appears only in 0022 (no schema supplied); finding#5",
+      "verifierAccepted": null,
+      "hashBefore": "e3631e4fe1727f8a436732508b190c8c8e5257451465ee8479ffe3b8af6e7f35"
+    },
+    {
+      "round": 2,
+      "claimId": "L|Package\\Update Regular Funds|title",
+      "field": "components[2].title_he",
+      "before": "שיוך שאר הקופות למשתמש הקופות הרגילות",
+      "after": "שיוך קופות שאינן עומדות בתנאי Gen_companyworker למשתמש הקופות הרגילות",
+      "why": "הקישור קופה↔Gen_companyworker נשען על עמודה לא מסויגת (gen_customeridnumber) בתת-שאילתה; סכמת Gen_companyworker לא סופקה, וממצא 5 מסמן את הקישור כלא מאומת. הוצג כתנאי ה-SQL המדויק + השערה.",
+      "evidence": "0022 DTSX:3498-3507 (Get CW funds), DTSX:4644-4653 (Get regular  funds): subquery columns gen_customeridnumber / Gen_identitynumber unqualified; Gen_companyworker appears only in 0022 (no schema supplied); finding#5",
+      "verifierAccepted": null,
+      "hashBefore": "e3631e4fe1727f8a436732508b190c8c8e5257451465ee8479ffe3b8af6e7f35"
+    },
+    {
+      "round": 2,
+      "claimId": "L|Package\\Update Regular Funds|title",
+      "field": "components[2].short_he",
+      "before": "קופות שהלקוח שלהן אינו מופיע ברשימת עובדי החברה (לפי מספר זהות), שהבעלים שלהן הוא משתמש מערכת עם שם דומיין שאינו המשתמש \"הקופות הרגילות\", מועברות לבעלות המשתמש הזה. שם המשתמש מוגדר בטבלת ההגדרות.",
+      "after": "קופות שמתקיים עבורן התנאי not exists (select Gen_companyworker.Gen_identitynumber from Gen_companyworker where gen_customeridnumber = Gen_identitynumber) (השערה: התאמה לפי ת.ז. הלקוח; העמודה ללא קידומת טבלה), ושהבעלים שלהן הוא משתמש מערכת עם שם דומיין שאינו המשתמש \"הקופות הרגילות\", מועברות לבעלות המשתמש הזה. שם המשתמש מוגדר בטבלת ההגדרות.",
+      "why": "הקישור קופה↔Gen_companyworker נשען על עמודה לא מסויגת (gen_customeridnumber) בתת-שאילתה; סכמת Gen_companyworker לא סופקה, וממצא 5 מסמן את הקישור כלא מאומת. הוצג כתנאי ה-SQL המדויק + השערה.",
+      "evidence": "0022 DTSX:3498-3507 (Get CW funds), DTSX:4644-4653 (Get regular  funds): subquery columns gen_customeridnumber / Gen_identitynumber unqualified; Gen_companyworker appears only in 0022 (no schema supplied); finding#5",
+      "verifierAccepted": null,
+      "hashBefore": "e3631e4fe1727f8a436732508b190c8c8e5257451465ee8479ffe3b8af6e7f35"
+    },
+    {
+      "round": 2,
+      "claimId": "L|Package\\Update Regular Funds|short",
+      "field": "components[2].short.nodes[1].text",
+      "before": "האם הקופה שייכת ללקוח שאינו עובד החברה ונמצאת כרגע בבעלות משתמש אחר מהמשתמש \"הקופות הרגילות\"?",
+      "after": "האם הקופה אינה עומדת בתנאי עובדי החברה (אין ב-Gen_companyworker שורה שבה gen_customeridnumber = Gen_identitynumber) (השערה: התאמה לפי ת.ז. הלקוח; העמודה ללא קידומת טבלה), והיא נמצאת כרגע בבעלות משתמש מערכת עם שם דומיין שאינו המשתמש \"הקופות הרגילות\"?",
+      "why": "הקישור קופה↔Gen_companyworker נשען על עמודה לא מסויגת (gen_customeridnumber) בתת-שאילתה; סכמת Gen_companyworker לא סופקה, וממצא 5 מסמן את הקישור כלא מאומת. הוצג כתנאי ה-SQL המדויק + השערה.",
+      "evidence": "0022 DTSX:3498-3507 (Get CW funds), DTSX:4644-4653 (Get regular  funds): subquery columns gen_customeridnumber / Gen_identitynumber unqualified; Gen_companyworker appears only in 0022 (no schema supplied); finding#5",
+      "verifierAccepted": null,
+      "hashBefore": "e3631e4fe1727f8a436732508b190c8c8e5257451465ee8479ffe3b8af6e7f35"
+    },
+    {
+      "round": 2,
+      "claimId": "L|Package\\Update Regular Funds|short",
+      "field": "components[2].short.nodes[2].text",
+      "before": "קופות שהלקוח שלהן אינו מופיע ברשימת עובדי החברה (לפי מספר זהות), ושבבעלות משתמש מערכת עם שם דומיין, עוברות לבעלות המשתמש \"הקופות הרגילות\". קופות בבעלות צוות, או בבעלות משתמש ללא שם דומיין (NULL), נשארות עם הבעלים שלהן.",
+      "after": "קופות שאינן עומדות בתנאי ה-exists על Gen_companyworker (השערה: התאמה לפי ת.ז. הלקוח; העמודה ללא קידומת טבלה), ושבבעלות משתמש מערכת עם שם דומיין שאינו המשתמש \"הקופות הרגילות\", עוברות לבעלות המשתמש הזה. קופות בבעלות צוות, או בבעלות משתמש ללא שם דומיין (NULL), נשארות עם הבעלים שלהן.",
+      "why": "הקישור קופה↔Gen_companyworker נשען על עמודה לא מסויגת (gen_customeridnumber) בתת-שאילתה; סכמת Gen_companyworker לא סופקה, וממצא 5 מסמן את הקישור כלא מאומת. הוצג כתנאי ה-SQL המדויק + השערה.",
+      "evidence": "0022 DTSX:3498-3507 (Get CW funds), DTSX:4644-4653 (Get regular  funds): subquery columns gen_customeridnumber / Gen_identitynumber unqualified; Gen_companyworker appears only in 0022 (no schema supplied); finding#5",
+      "verifierAccepted": null,
+      "hashBefore": "e3631e4fe1727f8a436732508b190c8c8e5257451465ee8479ffe3b8af6e7f35"
+    },
+    {
+      "round": 2,
+      "claimId": "L|Package\\Update Regular Funds|detailed",
+      "field": "components[2].detailed.nodes[1].text",
+      "before": "האם הלקוח של הקופה מופיע ברשימת עובדי החברה?",
+      "after": "האם קיימת ב-Gen_companyworker שורה שבה gen_customeridnumber = Gen_identitynumber? (השערה: התאמה לפי ת.ז. הלקוח; העמודה ללא קידומת טבלה). אם ל-Gen_companyworker יש עמודה בשם gen_customeridnumber, תת-השאילתה אינה תלויה בקופה, והתנאי מתקיים לכל הקופות או לאף אחת (ראו ממצא 5). אם הקישור הוא ל-gen_fundmain.gen_customeridnumber (השערה), קופה שבה ערך זה ריק (NULL) אינה מוצאת שורה, ולכן נבחרת בשלב זה.",
+      "why": "הקישור קופה↔Gen_companyworker נשען על עמודה לא מסויגת (gen_customeridnumber) בתת-שאילתה; סכמת Gen_companyworker לא סופקה, וממצא 5 מסמן את הקישור כלא מאומת. הוצג כתנאי ה-SQL המדויק + השערה. בנוסף: בהנחת הקישור, NULL ב-gen_customeridnumber מקיים not exists.",
+      "evidence": "0022 DTSX:3498-3507 (Get CW funds), DTSX:4644-4653 (Get regular  funds): subquery columns gen_customeridnumber / Gen_identitynumber unqualified; Gen_companyworker appears only in 0022 (no schema supplied); finding#5",
+      "verifierAccepted": null,
+      "hashBefore": "e3631e4fe1727f8a436732508b190c8c8e5257451465ee8479ffe3b8af6e7f35"
+    },
+    {
+      "round": 2,
+      "claimId": "L|Package\\Update Regular Funds|detailed",
+      "field": "components[2].detailed.nodes[1].branches[1].nodes[0].text",
+      "before": "הקופה לא מטופלת בשלב זה. היא מטופלת בשלב עובדי החברה.",
+      "after": "הקופה לא מטופלת בשלב זה. היא נבחרת בשלב עובדי החברה (exists על אותה תת-שאילתה) רק אם הבעלים שלה עומד גם בתנאי שם הדומיין של אותו שלב.",
+      "why": "דיוק: שלב עובדי החברה בוחר רק קופות שהבעלים שלהן משתמש מערכת עם DomainName != CompanyEmployeesDomainName.",
+      "evidence": "DTSX:3498-3507",
+      "verifierAccepted": null,
+      "hashBefore": "e3631e4fe1727f8a436732508b190c8c8e5257451465ee8479ffe3b8af6e7f35"
+    },
+    {
+      "round": 2,
+      "claimId": "L|Package\\Update Regular Funds|detailed",
+      "field": "components[2].detailed.nodes[6].text",
+      "before": "קופות שהלקוח שלהן אינו מופיע ברשימת עובדי החברה (לפי מספר זהות) עוברות לבעלות המשתמש \"הקופות הרגילות\". העדכון עוקף את פעולת השיוך (Assign) של ה-CRM.",
+      "after": "קופות שאינן עומדות בתנאי ה-exists על Gen_companyworker (השערה: התאמה לפי ת.ז. הלקוח; העמודה ללא קידומת טבלה), ושבבעלות משתמש מערכת עם שם דומיין שאינו המשתמש \"הקופות הרגילות\", עוברות לבעלות המשתמש הזה. העדכון עוקף את פעולת השיוך (Assign) של ה-CRM.",
+      "why": "הקישור קופה↔Gen_companyworker נשען על עמודה לא מסויגת (gen_customeridnumber) בתת-שאילתה; סכמת Gen_companyworker לא סופקה, וממצא 5 מסמן את הקישור כלא מאומת. הוצג כתנאי ה-SQL המדויק + השערה.",
+      "evidence": "0022 DTSX:3498-3507 (Get CW funds), DTSX:4644-4653 (Get regular  funds): subquery columns gen_customeridnumber / Gen_identitynumber unqualified; Gen_companyworker appears only in 0022 (no schema supplied); finding#5",
+      "verifierAccepted": null,
+      "hashBefore": "e3631e4fe1727f8a436732508b190c8c8e5257451465ee8479ffe3b8af6e7f35"
+    },
+    {
+      "round": 2,
+      "claimId": "L|Package\\Update Regular Funds|detail",
+      "field": "components[2].detail_he[0].t",
+      "before": "gen_fundmain בבעלות SystemUser שה-DomainName שלו != @[User::RegularFundsDomainName], ו-not exists (select Gen_companyworker.Gen_identitynumber from Gen_companyworker where gen_customeridnumber = Gen_identitynumber).",
+      "after": "gen_fundmain בבעלות SystemUser שה-DomainName שלו != @[User::RegularFundsDomainName], ו-not exists (select Gen_companyworker.Gen_identitynumber from Gen_companyworker where gen_customeridnumber = Gen_identitynumber) (השערה: התאמה לפי ת.ז. הלקוח; העמודה ללא קידומת טבלה).",
+      "why": "הקישור קופה↔Gen_companyworker נשען על עמודה לא מסויגת (gen_customeridnumber) בתת-שאילתה; סכמת Gen_companyworker לא סופקה, וממצא 5 מסמן את הקישור כלא מאומת. הוצג כתנאי ה-SQL המדויק + השערה.",
+      "evidence": "0022 DTSX:3498-3507 (Get CW funds), DTSX:4644-4653 (Get regular  funds): subquery columns gen_customeridnumber / Gen_identitynumber unqualified; Gen_companyworker appears only in 0022 (no schema supplied); finding#5",
+      "verifierAccepted": null,
+      "hashBefore": "e3631e4fe1727f8a436732508b190c8c8e5257451465ee8479ffe3b8af6e7f35"
+    },
+    {
+      "round": 2,
+      "claimId": "L|Package\\Update Regular Funds|detail",
+      "field": "components[2].detail_he[1].t",
+      "before": "הרשומות נשלפות מ-CRM ומתעדכנות לפי gen_fundmainid. עובד חברה מזוהה לפי מספר זהות (not exists (select Gen_companyworker.Gen_identitynumber from Gen_companyworker where gen_customeridnumber = Gen_identitynumber)). המשתמש היעד מזוהה לפי SystemUser.domainname = הערך שהוגדר ב-gen_etlvariable.",
+      "after": "הרשומות נשלפות מ-CRM ומתעדכנות לפי gen_fundmainid. הקופה נחשבת שאינה של עובד חברה לפי התנאי not exists (select Gen_companyworker.Gen_identitynumber from Gen_companyworker where gen_customeridnumber = Gen_identitynumber) (השערה: התאמה לפי ת.ז. הלקוח; העמודה ללא קידומת טבלה; ראו ממצא 5). המשתמש היעד מזוהה לפי SystemUser.domainname = הערך שהוגדר ב-gen_etlvariable.",
+      "why": "הקישור קופה↔Gen_companyworker נשען על עמודה לא מסויגת (gen_customeridnumber) בתת-שאילתה; סכמת Gen_companyworker לא סופקה, וממצא 5 מסמן את הקישור כלא מאומת. הוצג כתנאי ה-SQL המדויק + השערה.",
+      "evidence": "0022 DTSX:3498-3507 (Get CW funds), DTSX:4644-4653 (Get regular  funds): subquery columns gen_customeridnumber / Gen_identitynumber unqualified; Gen_companyworker appears only in 0022 (no schema supplied); finding#5",
+      "verifierAccepted": null,
+      "hashBefore": "e3631e4fe1727f8a436732508b190c8c8e5257451465ee8479ffe3b8af6e7f35"
+    },
+    {
+      "round": 2,
+      "claimId": "L|Package\\Update Regular Funds|detail",
+      "field": "components[2].detail_he[2].t",
+      "before": "רק רשומות שהבעלים שלהן אינו כבר המשתמש היעד. רק לקוחות שאינם עובדי חברה. אם המשתמש היעד לא נמצא, הרכיב נכשל.",
+      "after": "רק רשומות שהבעלים שלהן אינו כבר המשתמש היעד. רק קופות שאינן עומדות בתנאי ה-exists על Gen_companyworker (השערה: התאמה לפי ת.ז. הלקוח; העמודה ללא קידומת טבלה). אם המשתמש היעד לא נמצא, הרכיב נכשל.",
+      "why": "הקישור קופה↔Gen_companyworker נשען על עמודה לא מסויגת (gen_customeridnumber) בתת-שאילתה; סכמת Gen_companyworker לא סופקה, וממצא 5 מסמן את הקישור כלא מאומת. הוצג כתנאי ה-SQL המדויק + השערה.",
+      "evidence": "0022 DTSX:3498-3507 (Get CW funds), DTSX:4644-4653 (Get regular  funds): subquery columns gen_customeridnumber / Gen_identitynumber unqualified; Gen_companyworker appears only in 0022 (no schema supplied); finding#5",
+      "verifierAccepted": null,
+      "hashBefore": "e3631e4fe1727f8a436732508b190c8c8e5257451465ee8479ffe3b8af6e7f35"
+    },
+    {
+      "round": 2,
+      "claimId": "L|Package\\Update Regular Funds|detail",
+      "field": "components[2].detail_he[4].t",
+      "before": "קופות של לקוחות שאינם עובדי חברה, בבעלות משתמש מערכת ששם הדומיין שלו אינו NULL ושונה משם היעד, עוברות בכל ריצה למשתמש \"קופות רגילות\" אחד. קופות בבעלות צוות, או בבעלות משתמש ללא שם דומיין, אינן משתנות.",
+      "after": "קופות שאינן עומדות בתנאי Gen_companyworker (השערה: קופות של לקוחות שאינם עובדי חברה, לפי ת.ז. הלקוח; העמודה ללא קידומת טבלה), בבעלות משתמש מערכת ששם הדומיין שלו אינו NULL ושונה משם היעד, עוברות בכל ריצה למשתמש \"קופות רגילות\" אחד. אם הקישור הוא ל-gen_fundmain.gen_customeridnumber (השערה), גם קופה שבה ערך זה ריק (NULL) עומדת בתנאי not exists ומועברת. קופות בבעלות צוות, או בבעלות משתמש ללא שם דומיין, אינן משתנות.",
+      "why": "הקישור קופה↔Gen_companyworker נשען על עמודה לא מסויגת (gen_customeridnumber) בתת-שאילתה; סכמת Gen_companyworker לא סופקה, וממצא 5 מסמן את הקישור כלא מאומת. הוצג כתנאי ה-SQL המדויק + השערה. בנוסף: בהנחת הקישור, NULL ב-gen_customeridnumber מקיים not exists.",
+      "evidence": "0022 DTSX:3498-3507 (Get CW funds), DTSX:4644-4653 (Get regular  funds): subquery columns gen_customeridnumber / Gen_identitynumber unqualified; Gen_companyworker appears only in 0022 (no schema supplied); finding#5",
+      "verifierAccepted": null,
+      "hashBefore": "e3631e4fe1727f8a436732508b190c8c8e5257451465ee8479ffe3b8af6e7f35"
+    },
+    {
+      "round": 2,
+      "claimId": "L|Package\\Update Regular Funds|decisions",
+      "field": "components[2].decisions[1].meaning_he",
+      "before": "הלקוח אינו עובד חברה.",
+      "after": "אין ב-Gen_companyworker שורה שבה gen_customeridnumber = Gen_identitynumber (השערה: התאמה לפי ת.ז. הלקוח; העמודה ללא קידומת טבלה).",
+      "why": "הקישור קופה↔Gen_companyworker נשען על עמודה לא מסויגת (gen_customeridnumber) בתת-שאילתה; סכמת Gen_companyworker לא סופקה, וממצא 5 מסמן את הקישור כלא מאומת. הוצג כתנאי ה-SQL המדויק + השערה.",
+      "evidence": "0022 DTSX:3498-3507 (Get CW funds), DTSX:4644-4653 (Get regular  funds): subquery columns gen_customeridnumber / Gen_identitynumber unqualified; Gen_companyworker appears only in 0022 (no schema supplied); finding#5",
+      "verifierAccepted": null,
+      "hashBefore": "e3631e4fe1727f8a436732508b190c8c8e5257451465ee8479ffe3b8af6e7f35"
+    },
+    {
+      "round": 2,
+      "claimId": "L|Package\\Update Regular Funds|crm",
+      "field": "components[2].crmEffects[0].when_he",
+      "before": "gen_fundmain של לקוח שאינו עובד חברה שהבעלים שלה אינו המשתמש היעד. Unsupported.",
+      "after": "gen_fundmain שאינה עומדת בתנאי ה-exists על Gen_companyworker (השערה: התאמה לפי ת.ז. הלקוח; העמודה ללא קידומת טבלה), ושהבעלים שלה הוא משתמש מערכת עם שם דומיין שאינו המשתמש היעד. Unsupported.",
+      "why": "הקישור קופה↔Gen_companyworker נשען על עמודה לא מסויגת (gen_customeridnumber) בתת-שאילתה; סכמת Gen_companyworker לא סופקה, וממצא 5 מסמן את הקישור כלא מאומת. הוצג כתנאי ה-SQL המדויק + השערה.",
+      "evidence": "0022 DTSX:3498-3507 (Get CW funds), DTSX:4644-4653 (Get regular  funds): subquery columns gen_customeridnumber / Gen_identitynumber unqualified; Gen_companyworker appears only in 0022 (no schema supplied); finding#5",
+      "verifierAccepted": null,
+      "hashBefore": "e3631e4fe1727f8a436732508b190c8c8e5257451465ee8479ffe3b8af6e7f35"
+    },
+    {
+      "round": 2,
+      "claimId": "L|Package\\Update Regular Funds|open",
+      "field": "components[2].openQuestions_he[1]",
+      "before": "האם זה מכוון שכל קופה של לקוח שאינו עובד חברה, ובבעלות משתמש כלשהו אחר, מועברת בכל ריצה למשתמש אחד (\"קופות רגילות\")?",
+      "after": "האם זה מכוון שכל קופה שאינה עומדת בתנאי Gen_companyworker, ובבעלות משתמש מערכת ששם הדומיין שלו אינו NULL ושונה מהיעד, מועברת בכל ריצה למשתמש אחד (\"קופות רגילות\")?",
+      "why": "הקישור קופה↔Gen_companyworker נשען על עמודה לא מסויגת (gen_customeridnumber) בתת-שאילתה; סכמת Gen_companyworker לא סופקה, וממצא 5 מסמן את הקישור כלא מאומת. הוצג כתנאי ה-SQL המדויק + השערה. \"בבעלות משתמש כלשהו אחר\" היה הכללה (צוות ו-NULL אינם מועברים).",
+      "evidence": "0022 DTSX:3498-3507 (Get CW funds), DTSX:4644-4653 (Get regular  funds): subquery columns gen_customeridnumber / Gen_identitynumber unqualified; Gen_companyworker appears only in 0022 (no schema supplied); finding#5; DTSX:4644-4648",
+      "verifierAccepted": null,
+      "hashBefore": "e3631e4fe1727f8a436732508b190c8c8e5257451465ee8479ffe3b8af6e7f35"
+    },
+    {
+      "round": 2,
+      "claimId": "L|Package\\Update Trans|detail",
+      "field": "components[3].detail_he[0].t",
+      "before": "Gen_ftCurrentYear שמקושרת ל-gen_fundmain (ft.gen_fundnumber), כשהבעלים שלה שונה מהבעלים של הקופה. בחבילה 0008 רשומות Gen_ftCurrentYear נוצרות (insert ftCurrentYearBase 1-5) רק משורות של פלט הפיצול 'תנועות והחזר דמי ניהול' בקובץ PY, כלומר רשומות תנועה בקופה.",
+      "after": "Gen_ftCurrentYear שמקושרת ל-gen_fundmain (ft.gen_fundnumber), כשהבעלים שלה שונה מהבעלים של הקופה. בחבילה 0008 רשומות Gen_ftCurrentYear נוצרות (insert ftCurrentYearBase 1-5) רק משורות של פלט הפיצול בשם 'תנועות והחזר דמי ניהול' (gen_TranstypeId != \"58\" && Transfer_Type_2 == \"2\").",
+      "why": "שם פלט הפיצול הוא שם בלבד; \"כלומר רשומות תנועה בקופה\" גזר ממנו משמעות וגם קיצר אותו. המשפט מסתיים בשם הפלט ובתנאי שלו.",
+      "evidence": "0008 DTSX:69986-69990",
+      "verifierAccepted": null,
+      "hashBefore": "e3631e4fe1727f8a436732508b190c8c8e5257451465ee8479ffe3b8af6e7f35"
+    },
+    {
+      "round": 2,
+      "claimId": "L|Package\\Update CW FTRequests|detail",
+      "field": "components[7].detail_he[0].t",
+      "before": "gen_ftrequest בבעלות SystemUser שה-DomainName שלו != @[User::CompanyEmployeesDomainName], ו-exists (select cw.Gen_identitynumber from Gen_companyworker cw where cw.gen_identitynumber = ft.Gen_identitynumber). בחבילה 0009 זרימת הנתונים שיוצרת ומעדכנת רשומות gen_ftrequest נקראת 'Create or update  Fund Trunsaction Request', כלומר בקשה לתנועה בקופה.",
+      "after": "gen_ftrequest בבעלות SystemUser שה-DomainName שלו != @[User::CompanyEmployeesDomainName], ו-exists (select cw.Gen_identitynumber from Gen_companyworker cw where cw.gen_identitynumber = ft.Gen_identitynumber). בחבילה 0009 זרימת הנתונים שיוצרת ומעדכנת רשומות gen_ftrequest נקראת 'Create or update  Fund Trunsaction Request'. הפירוש 'בקשה לתנועה בקופה' נגזר משם זרימת הנתונים בלבד (השערה).",
+      "why": "אותו דפוס כמו פלט הפיצול ב-0008: \"כלומר בקשה לתנועה בקופה\" גוזר משמעות משם זרימת נתונים ב-0009. סומן כהשערה.",
+      "evidence": "0009 data flow name 'Create or update  Fund Trunsaction Request' (name only)",
+      "verifierAccepted": null,
+      "hashBefore": "86413e8a4f4c81e41ea7985c223ced327d142431efdf742bba7ab57cafb7b74e"
+    },
+    {
+      "round": 3,
+      "claimId": "L|Package (control flow)|detailed",
+      "field": "components[0].detailed.nodes[7].branches[1].nodes[0].text",
+      "before": "כל השלבים שאחריו אינם רצים, ומטפל השגיאות מסמן את התהליך כשגוי (מסגרת). דוגמה: משתמש יעד שלא נמצא.",
+      "after": "כל השלבים שאחריו אינם רצים, כי כל המעברים בשרשרת הם Success. דוגמה: משתמש יעד שלא נמצא, כשמקור הנתונים של אותו שלב מחזיר לפחות שורה אחת (ראו ממצא 3). הטיפול בשגיאות ברמת החבילה (OnError) הוא מסגרת ETL ואינו מתואר כאן.",
+      "why": "הטענה שמטפל השגיאות מסמן את התהליך כשגוי אינה נכונה לכישלון ב-Get Variables או ב-Create ETL Process record: ETLProcessRecordGuid נקבע רק ב-Create ETL Process record (DTSX:278), וערך ברירת המחדל שלו הוא Object ריק (DTSX:33-41), ולכן אין רשומה לסמן. הטענה הוסרה; נשאר רק מה שמוכח מאילוצי ה-Success.",
+      "evidence": "Precedence DTSX:5115-5124 (Success); OnError handler DTSX:5127-5334 (entity.Id = (Guid)ETLProcessRecordGuid); ETLProcessRecordGuid set only DTSX:278; finding 3 DTSX:3258/3284",
+      "verifierAccepted": null,
+      "hashBefore": "b6d6e966e563b003e08f7a70ead0314c696d95a878485e4a7b05338f833b84e3"
+    },
+    {
+      "round": 3,
+      "claimId": "L|Package (control flow)|detailed",
+      "field": "components[0].detailed.nodes[7].branches[1].nodes[0].tech",
+      "before": "OnError → Error ETL Process record DTSX:5134",
+      "after": "כל האילוצים Success (DTSX:5115-5124). מטפל OnError (DTSX:5127) הוא מסגרת (ignoredAsFramework).",
+      "why": "הפניה למטפל השגיאות הוחלפה בהפניה לאילוצי ה-Success, שהם הבסיס המוכח לטענה.",
+      "evidence": "DTSX:5115-5124; DTSX:5127",
+      "verifierAccepted": null,
+      "hashBefore": "b6d6e966e563b003e08f7a70ead0314c696d95a878485e4a7b05338f833b84e3"
+    },
+    {
+      "round": 3,
+      "claimId": "L|Package (control flow)|detail",
+      "field": "components[0].detail_he[4].t",
+      "before": "הפרדת בעלות בין נתוני עובדי החברה לשאר הלקוחות (השערה לגבי המטרה: הגבלת הרשאות צפייה בנתוני עובדים).",
+      "after": "הפרדת בעלות בין רשומות שעומדות בתנאי Gen_companyworker של אותו שלב לשאר הרשומות (השערה: נתוני עובדי החברה מול שאר הרשומות; השערה לגבי המטרה: הגבלת הרשאות צפייה בנתוני עובדים). בקופות, הקישור של התנאי ל-gen_customeridnumber אינו מאומת (ראו ממצא 5).",
+      "why": "'נתוני עובדי החברה' ו'שאר הלקוחות' הוצגו כעובדה. בקופות הקישור לעמודה gen_customeridnumber ללא קידומת אינו מאומת, ו'לקוחות' אינו מוכח מאף קובץ. נוסח לפי התנאי הגולמי עם סימון השערה, כמו בשאר החבילה.",
+      "evidence": "SQL DTSX:3498-3507 (Update CW Funds), DTSX:4644-4653 (Update Regular Funds), DTSX:3206-3214, DTSX:4352-4360",
+      "verifierAccepted": null,
+      "hashBefore": "b6d6e966e563b003e08f7a70ead0314c696d95a878485e4a7b05338f833b84e3"
+    },
+    {
+      "round": 3,
+      "claimId": "L|Package\\Update CW FTRequests|detail",
+      "field": "components[7].detail_he[2].t",
+      "before": "רק רשומות שהבעלים שלהן אינו כבר המשתמש היעד. רק לקוחות שהם עובדי חברה. אם המשתמש היעד לא נמצא, הרכיב נכשל.",
+      "after": "רק רשומות שהבעלים שלהן אינו כבר המשתמש היעד. רק בקשות שמספר הזהות שבהן (ft.Gen_identitynumber) מופיע ב-Gen_companyworker (cw.gen_identitynumber = ft.Gen_identitynumber). אם המשתמש היעד לא נמצא, הרכיב נכשל.",
+      "why": "'לקוח' הוא פירוש שאינו מוכח מהקבצים. ה-SQL מוכיח רק ש-ft.Gen_identitynumber מופיע (או אינו מופיע) ב-Gen_companyworker.gen_identitynumber. התיקון מיושם בכל מקום בחבילה שבו הפירוש הזה הוצג כעובדה.",
+      "evidence": "SQL DTSX:3206-3214: exists (select cw.Gen_identitynumber from Gen_companyworker cw where cw.gen_identitynumber = ft.Gen_identitynumber)",
+      "verifierAccepted": null,
+      "hashBefore": "b6d6e966e563b003e08f7a70ead0314c696d95a878485e4a7b05338f833b84e3"
+    },
+    {
+      "round": 3,
+      "claimId": "L|Package\\Update CW FTRequests|title",
+      "field": "components[7].short_he",
+      "before": "בקשות FT שהלקוח שלהן מופיע ברשימת עובדי החברה (לפי מספר זהות), שהבעלים שלהן הוא משתמש מערכת עם שם דומיין שאינו המשתמש \"עובדי החברה\", מועברות לבעלות המשתמש הזה. שם המשתמש מוגדר בטבלת ההגדרות.",
+      "after": "בקשות FT שמספר הזהות שבהן (ft.Gen_identitynumber) מופיע ב-Gen_companyworker, שהבעלים שלהן הוא משתמש מערכת עם שם דומיין שאינו המשתמש \"עובדי החברה\", מועברות לבעלות המשתמש הזה. שם המשתמש מוגדר בטבלת ההגדרות.",
+      "why": "'לקוח' הוא פירוש שאינו מוכח מהקבצים. ה-SQL מוכיח רק ש-ft.Gen_identitynumber מופיע (או אינו מופיע) ב-Gen_companyworker.gen_identitynumber. התיקון מיושם בכל מקום בחבילה שבו הפירוש הזה הוצג כעובדה.",
+      "evidence": "SQL DTSX:3206-3214: exists (select cw.Gen_identitynumber from Gen_companyworker cw where cw.gen_identitynumber = ft.Gen_identitynumber)",
+      "verifierAccepted": null,
+      "hashBefore": "b6d6e966e563b003e08f7a70ead0314c696d95a878485e4a7b05338f833b84e3"
+    },
+    {
+      "round": 3,
+      "claimId": "L|Package\\Update CW FTRequests|short",
+      "field": "components[7].short.nodes[2].text",
+      "before": "בקשות FT שהלקוח שלהן מופיע ברשימת עובדי החברה (לפי מספר זהות), ושבבעלות משתמש מערכת עם שם דומיין, עוברות לבעלות המשתמש \"עובדי החברה\". בקשות FT בבעלות צוות, או בבעלות משתמש ללא שם דומיין (NULL), נשארות עם הבעלים שלהן.",
+      "after": "בקשות FT שמספר הזהות שבהן מופיע בטבלת עובדי החברה (Gen_companyworker), ושבבעלות משתמש מערכת עם שם דומיין, עוברות לבעלות המשתמש \"עובדי החברה\". בקשות FT בבעלות צוות, או בבעלות משתמש ללא שם דומיין (NULL), נשארות עם הבעלים שלהן.",
+      "why": "'לקוח' הוא פירוש שאינו מוכח מהקבצים. ה-SQL מוכיח רק ש-ft.Gen_identitynumber מופיע (או אינו מופיע) ב-Gen_companyworker.gen_identitynumber. התיקון מיושם בכל מקום בחבילה שבו הפירוש הזה הוצג כעובדה.",
+      "evidence": "SQL DTSX:3206-3214: exists (select cw.Gen_identitynumber from Gen_companyworker cw where cw.gen_identitynumber = ft.Gen_identitynumber)",
+      "verifierAccepted": null,
+      "hashBefore": "b6d6e966e563b003e08f7a70ead0314c696d95a878485e4a7b05338f833b84e3"
+    },
+    {
+      "round": 3,
+      "claimId": "L|Package\\Update CW FTRequests|detailed",
+      "field": "components[7].detailed.nodes[1].text",
+      "before": "האם הלקוח של הבקשה מופיע ברשימת עובדי החברה?",
+      "after": "האם מספר הזהות שבבקשה מופיע בטבלת עובדי החברה (Gen_companyworker)?",
+      "why": "'לקוח' הוא פירוש שאינו מוכח מהקבצים. ה-SQL מוכיח רק ש-ft.Gen_identitynumber מופיע (או אינו מופיע) ב-Gen_companyworker.gen_identitynumber. התיקון מיושם בכל מקום בחבילה שבו הפירוש הזה הוצג כעובדה.",
+      "evidence": "SQL DTSX:3206-3214: exists (select cw.Gen_identitynumber from Gen_companyworker cw where cw.gen_identitynumber = ft.Gen_identitynumber)",
+      "verifierAccepted": null,
+      "hashBefore": "b6d6e966e563b003e08f7a70ead0314c696d95a878485e4a7b05338f833b84e3"
+    },
+    {
+      "round": 3,
+      "claimId": "L|Package\\Update CW FTRequests|detailed",
+      "field": "components[7].detailed.nodes[6].text",
+      "before": "בקשות FT (gen_ftrequest) שהלקוח שלהן מופיע ברשימת עובדי החברה (לפי מספר זהות) עוברות לבעלות המשתמש \"עובדי החברה\". העדכון עוקף את פעולת השיוך (Assign) של ה-CRM.",
+      "after": "בקשות FT (gen_ftrequest) שמספר הזהות שבהן מופיע ב-Gen_companyworker עוברות לבעלות המשתמש \"עובדי החברה\". העדכון עוקף את פעולת השיוך (Assign) של ה-CRM.",
+      "why": "'לקוח' הוא פירוש שאינו מוכח מהקבצים. ה-SQL מוכיח רק ש-ft.Gen_identitynumber מופיע (או אינו מופיע) ב-Gen_companyworker.gen_identitynumber. התיקון מיושם בכל מקום בחבילה שבו הפירוש הזה הוצג כעובדה.",
+      "evidence": "SQL DTSX:3206-3214: exists (select cw.Gen_identitynumber from Gen_companyworker cw where cw.gen_identitynumber = ft.Gen_identitynumber)",
+      "verifierAccepted": null,
+      "hashBefore": "b6d6e966e563b003e08f7a70ead0314c696d95a878485e4a7b05338f833b84e3"
+    },
+    {
+      "round": 3,
+      "claimId": "L|Package\\Update CW FTRequests|decisions",
+      "field": "components[7].decisions[1].meaning_he",
+      "before": "הלקוח הוא עובד חברה.",
+      "after": "מספר הזהות שבבקשה (ft.Gen_identitynumber) מופיע ב-Gen_companyworker.",
+      "why": "'לקוח' הוא פירוש שאינו מוכח מהקבצים. ה-SQL מוכיח רק ש-ft.Gen_identitynumber מופיע (או אינו מופיע) ב-Gen_companyworker.gen_identitynumber. התיקון מיושם בכל מקום בחבילה שבו הפירוש הזה הוצג כעובדה.",
+      "evidence": "SQL DTSX:3206-3214: exists (select cw.Gen_identitynumber from Gen_companyworker cw where cw.gen_identitynumber = ft.Gen_identitynumber)",
+      "verifierAccepted": null,
+      "hashBefore": "b6d6e966e563b003e08f7a70ead0314c696d95a878485e4a7b05338f833b84e3"
+    },
+    {
+      "round": 3,
+      "claimId": "L|Package\\Update Regular FTRequest|detail",
+      "field": "components[8].detail_he[2].t",
+      "before": "רק רשומות שהבעלים שלהן אינו כבר המשתמש היעד. רק לקוחות שאינם עובדי חברה. אם המשתמש היעד לא נמצא, הרכיב נכשל.",
+      "after": "רק רשומות שהבעלים שלהן אינו כבר המשתמש היעד. רק בקשות שמספר הזהות שבהן (ft.Gen_identitynumber) אינו מופיע ב-Gen_companyworker (not exists על cw.gen_identitynumber = ft.Gen_identitynumber). אם המשתמש היעד לא נמצא, הרכיב נכשל.",
+      "why": "'לקוח' הוא פירוש שאינו מוכח מהקבצים. ה-SQL מוכיח רק ש-ft.Gen_identitynumber מופיע (או אינו מופיע) ב-Gen_companyworker.gen_identitynumber. התיקון מיושם בכל מקום בחבילה שבו הפירוש הזה הוצג כעובדה.",
+      "evidence": "SQL DTSX:4352-4360: not exists (select cw.Gen_identitynumber from Gen_companyworker cw where cw.gen_identitynumber = ft.Gen_identitynumber)",
+      "verifierAccepted": null,
+      "hashBefore": "b6d6e966e563b003e08f7a70ead0314c696d95a878485e4a7b05338f833b84e3"
+    },
+    {
+      "round": 3,
+      "claimId": "L|Package\\Update Regular FTRequest|detail",
+      "field": "components[8].detail_he[4].t",
+      "before": "בקשות FT (gen_ftrequest) של לקוחות שאינם עובדי חברה, בבעלות משתמש מערכת ששם הדומיין שלו אינו NULL ושונה משם היעד, עוברות בכל ריצה למשתמש \"קופות רגילות\" אחד. בקשות בבעלות צוות, או בבעלות משתמש ללא שם דומיין, אינן משתנות. בקשה שאין בה מספר זהות (Gen_identitynumber = NULL) עומדת בתנאי not exists, ולכן נחשבת כבקשה של לקוח שאינו עובד חברה.",
+      "after": "בקשות FT (gen_ftrequest) שמספר הזהות שבהן אינו מופיע ב-Gen_companyworker, בבעלות משתמש מערכת ששם הדומיין שלו אינו NULL ושונה משם היעד, עוברות בכל ריצה למשתמש \"קופות רגילות\" אחד. בקשות בבעלות צוות, או בבעלות משתמש ללא שם דומיין, אינן משתנות. בקשה שאין בה מספר זהות (Gen_identitynumber = NULL) עומדת בתנאי not exists, ולכן גם היא מועברת בשלב זה.",
+      "why": "'לקוח' הוא פירוש שאינו מוכח מהקבצים. ה-SQL מוכיח רק ש-ft.Gen_identitynumber מופיע (או אינו מופיע) ב-Gen_companyworker.gen_identitynumber. התיקון מיושם בכל מקום בחבילה שבו הפירוש הזה הוצג כעובדה.",
+      "evidence": "SQL DTSX:4352-4360: not exists (select cw.Gen_identitynumber from Gen_companyworker cw where cw.gen_identitynumber = ft.Gen_identitynumber)",
+      "verifierAccepted": null,
+      "hashBefore": "b6d6e966e563b003e08f7a70ead0314c696d95a878485e4a7b05338f833b84e3"
+    },
+    {
+      "round": 3,
+      "claimId": "L|Package\\Update Regular FTRequest|title",
+      "field": "components[8].short_he",
+      "before": "בקשות FT שהלקוח שלהן אינו מופיע ברשימת עובדי החברה (לפי מספר זהות), שהבעלים שלהן הוא משתמש מערכת עם שם דומיין שאינו המשתמש \"הקופות הרגילות\", מועברות לבעלות המשתמש הזה. שם המשתמש מוגדר בטבלת ההגדרות.",
+      "after": "בקשות FT שמספר הזהות שבהן (ft.Gen_identitynumber) אינו מופיע ב-Gen_companyworker, שהבעלים שלהן הוא משתמש מערכת עם שם דומיין שאינו המשתמש \"הקופות הרגילות\", מועברות לבעלות המשתמש הזה. שם המשתמש מוגדר בטבלת ההגדרות.",
+      "why": "'לקוח' הוא פירוש שאינו מוכח מהקבצים. ה-SQL מוכיח רק ש-ft.Gen_identitynumber מופיע (או אינו מופיע) ב-Gen_companyworker.gen_identitynumber. התיקון מיושם בכל מקום בחבילה שבו הפירוש הזה הוצג כעובדה.",
+      "evidence": "SQL DTSX:4352-4360: not exists (select cw.Gen_identitynumber from Gen_companyworker cw where cw.gen_identitynumber = ft.Gen_identitynumber)",
+      "verifierAccepted": null,
+      "hashBefore": "b6d6e966e563b003e08f7a70ead0314c696d95a878485e4a7b05338f833b84e3"
+    },
+    {
+      "round": 3,
+      "claimId": "L|Package\\Update Regular FTRequest|short",
+      "field": "components[8].short.nodes[1].text",
+      "before": "האם הבקשה שייכת ללקוח שאינו עובד החברה ונמצאת כרגע בבעלות משתמש אחר מהמשתמש \"הקופות הרגילות\"?",
+      "after": "האם מספר הזהות שבבקשה אינו מופיע בטבלת עובדי החברה (Gen_companyworker), והבקשה נמצאת כרגע בבעלות משתמש אחר מהמשתמש \"הקופות הרגילות\"?",
+      "why": "'לקוח' הוא פירוש שאינו מוכח מהקבצים. ה-SQL מוכיח רק ש-ft.Gen_identitynumber מופיע (או אינו מופיע) ב-Gen_companyworker.gen_identitynumber. התיקון מיושם בכל מקום בחבילה שבו הפירוש הזה הוצג כעובדה.",
+      "evidence": "SQL DTSX:4352-4360: not exists (select cw.Gen_identitynumber from Gen_companyworker cw where cw.gen_identitynumber = ft.Gen_identitynumber)",
+      "verifierAccepted": null,
+      "hashBefore": "b6d6e966e563b003e08f7a70ead0314c696d95a878485e4a7b05338f833b84e3"
+    },
+    {
+      "round": 3,
+      "claimId": "L|Package\\Update Regular FTRequest|short",
+      "field": "components[8].short.nodes[2].text",
+      "before": "בקשות FT שהלקוח שלהן אינו מופיע ברשימת עובדי החברה (לפי מספר זהות), ושבבעלות משתמש מערכת עם שם דומיין, עוברות לבעלות המשתמש \"הקופות הרגילות\". בקשות FT בבעלות צוות, או בבעלות משתמש ללא שם דומיין (NULL), נשארות עם הבעלים שלהן.",
+      "after": "בקשות FT שמספר הזהות שבהן אינו מופיע בטבלת עובדי החברה (Gen_companyworker), ושבבעלות משתמש מערכת עם שם דומיין, עוברות לבעלות המשתמש \"הקופות הרגילות\". בקשות FT בבעלות צוות, או בבעלות משתמש ללא שם דומיין (NULL), נשארות עם הבעלים שלהן.",
+      "why": "'לקוח' הוא פירוש שאינו מוכח מהקבצים. ה-SQL מוכיח רק ש-ft.Gen_identitynumber מופיע (או אינו מופיע) ב-Gen_companyworker.gen_identitynumber. התיקון מיושם בכל מקום בחבילה שבו הפירוש הזה הוצג כעובדה.",
+      "evidence": "SQL DTSX:4352-4360: not exists (select cw.Gen_identitynumber from Gen_companyworker cw where cw.gen_identitynumber = ft.Gen_identitynumber)",
+      "verifierAccepted": null,
+      "hashBefore": "b6d6e966e563b003e08f7a70ead0314c696d95a878485e4a7b05338f833b84e3"
+    },
+    {
+      "round": 3,
+      "claimId": "L|Package\\Update Regular FTRequest|detailed",
+      "field": "components[8].detailed.nodes[1].text",
+      "before": "האם הלקוח של הבקשה מופיע ברשימת עובדי החברה?",
+      "after": "האם מספר הזהות שבבקשה מופיע בטבלת עובדי החברה (Gen_companyworker)?",
+      "why": "'לקוח' הוא פירוש שאינו מוכח מהקבצים. ה-SQL מוכיח רק ש-ft.Gen_identitynumber מופיע (או אינו מופיע) ב-Gen_companyworker.gen_identitynumber. התיקון מיושם בכל מקום בחבילה שבו הפירוש הזה הוצג כעובדה.",
+      "evidence": "SQL DTSX:4352-4360: not exists (select cw.Gen_identitynumber from Gen_companyworker cw where cw.gen_identitynumber = ft.Gen_identitynumber)",
+      "verifierAccepted": null,
+      "hashBefore": "b6d6e966e563b003e08f7a70ead0314c696d95a878485e4a7b05338f833b84e3"
+    },
+    {
+      "round": 3,
+      "claimId": "L|Package\\Update Regular FTRequest|detailed",
+      "field": "components[8].detailed.nodes[6].text",
+      "before": "בקשות FT (gen_ftrequest) שהלקוח שלהן אינו מופיע ברשימת עובדי החברה (לפי מספר זהות) עוברות לבעלות המשתמש \"הקופות הרגילות\". העדכון עוקף את פעולת השיוך (Assign) של ה-CRM.",
+      "after": "בקשות FT (gen_ftrequest) שמספר הזהות שבהן אינו מופיע ב-Gen_companyworker עוברות לבעלות המשתמש \"הקופות הרגילות\". העדכון עוקף את פעולת השיוך (Assign) של ה-CRM.",
+      "why": "'לקוח' הוא פירוש שאינו מוכח מהקבצים. ה-SQL מוכיח רק ש-ft.Gen_identitynumber מופיע (או אינו מופיע) ב-Gen_companyworker.gen_identitynumber. התיקון מיושם בכל מקום בחבילה שבו הפירוש הזה הוצג כעובדה.",
+      "evidence": "SQL DTSX:4352-4360: not exists (select cw.Gen_identitynumber from Gen_companyworker cw where cw.gen_identitynumber = ft.Gen_identitynumber)",
+      "verifierAccepted": null,
+      "hashBefore": "b6d6e966e563b003e08f7a70ead0314c696d95a878485e4a7b05338f833b84e3"
+    },
+    {
+      "round": 3,
+      "claimId": "L|Package\\Update Regular FTRequest|decisions",
+      "field": "components[8].decisions[1].meaning_he",
+      "before": "הלקוח אינו עובד חברה.",
+      "after": "מספר הזהות שבבקשה (ft.Gen_identitynumber) אינו מופיע ב-Gen_companyworker, כולל בקשה שבה מספר הזהות ריק (NULL).",
+      "why": "'לקוח' הוא פירוש שאינו מוכח מהקבצים. ה-SQL מוכיח רק ש-ft.Gen_identitynumber מופיע (או אינו מופיע) ב-Gen_companyworker.gen_identitynumber. התיקון מיושם בכל מקום בחבילה שבו הפירוש הזה הוצג כעובדה.",
+      "evidence": "SQL DTSX:4352-4360: not exists (select cw.Gen_identitynumber from Gen_companyworker cw where cw.gen_identitynumber = ft.Gen_identitynumber)",
+      "verifierAccepted": null,
+      "hashBefore": "b6d6e966e563b003e08f7a70ead0314c696d95a878485e4a7b05338f833b84e3"
+    },
+    {
+      "round": 3,
+      "claimId": "L|Package\\Update Regular FTRequest|crm",
+      "field": "components[8].crmEffects[0].when_he",
+      "before": "gen_ftrequest של לקוח שאינו עובד חברה שהבעלים שלה אינו המשתמש היעד. Unsupported.",
+      "after": "gen_ftrequest שמספר הזהות שבה אינו מופיע ב-Gen_companyworker, ושהבעלים שלה הוא משתמש מערכת עם שם דומיין שאינו המשתמש היעד. Unsupported.",
+      "why": "'לקוח' הוא פירוש שאינו מוכח מהקבצים. ה-SQL מוכיח רק ש-ft.Gen_identitynumber מופיע (או אינו מופיע) ב-Gen_companyworker.gen_identitynumber. התיקון מיושם בכל מקום בחבילה שבו הפירוש הזה הוצג כעובדה.",
+      "evidence": "SQL DTSX:4352-4360: not exists (select cw.Gen_identitynumber from Gen_companyworker cw where cw.gen_identitynumber = ft.Gen_identitynumber)",
+      "verifierAccepted": null,
+      "hashBefore": "b6d6e966e563b003e08f7a70ead0314c696d95a878485e4a7b05338f833b84e3"
+    }
+  ]
+}

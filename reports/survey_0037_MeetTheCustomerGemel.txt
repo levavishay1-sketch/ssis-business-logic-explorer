@@ -1,0 +1,161 @@
+# 0037_MeetTheCustomerGemel.dtsx · 5E09225B4B61C58BB29A4ECC574D36B525C1AE13F33A0467CE297AFB2E55C214
+
+## Connection managers
+- [CRM] OLEDB Data Source=psql;Initial Catalog=ALTSHULER_MSCRM;Integrated Security=SSPI;  
+- [qsql] OLEDB Data Source=psql;Initial Catalog=ALTSHULER_MSCRM;Integrated Security=SSPI;  
+- [qsrs.SSIS_Logs] OLEDB Data Source=psrs;Initial Catalog=SSIS_Logs;Integrated Security=SSPI;  
+
+## Executables (disabled marked !)
+-   Create ETL Process record | Microsoft.ScriptTask  
+-   End ETL Proccess record | Microsoft.Pipeline  
+-   Get Organization Variables | Microsoft.Pipeline  
+-   Link Meet The Customer To Customer Account By Automated Joining | Microsoft.Pipeline  
+- ! Link Meet The Customer To Customer Account By Mini Automated Joining | Microsoft.Pipeline  
+-   Link Meet The Customer To Customer Account By Pre Account Number | Microsoft.Pipeline  
+-   Link Pre Meet The Customer To Customer Account | Microsoft.Pipeline  
+-   Link Pre Meet The Customer To Customer Program | Microsoft.Pipeline  
+
+## Precedence
+- Get Organization Variables -> Create ETL Process record | Success Constraint   
+- Create ETL Process record -> Link Pre Meet The Customer To Customer Program | Success Constraint   
+- Link Pre Meet The Customer To Customer Program -> Link Pre Meet The Customer To Customer Account | Success Constraint   
+- Link Pre Meet The Customer To Customer Account -> Link Meet The Customer To Customer Account By Automated Joining | Success Constraint   
+- Link Meet The Customer To Customer Account By Automated Joining -> Link Meet The Customer To Customer Account By Mini Automated Joining | Success Constraint   
+- Link Meet The Customer To Customer Account By Mini Automated Joining -> Link Meet The Customer To Customer Account By Pre Account Number | Success Constraint   
+- Link Meet The Customer To Customer Account By Pre Account Number -> End ETL Proccess record | Success Constraint   
+
+## DataFlow End ETL Proccess record
+  - Get gen_etlprocessid | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 0 out 1
+  - Lookup | Lookup  | conn [CRM]  | in 1 out 1
+  - Script Component | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 2 out 0
+     path Lookup.Outputs[Lookup Match Output] => Script Component.Inputs[Input 0]
+     path Get gen_etlprocessid.Outputs[Output 0] => Lookup.Inputs[Lookup Input]
+
+## DataFlow Get Organization Variables
+  - Get Etl Variables | OLEDBSource  | conn [qsql]  | in 0 out 2
+  - Set Variables | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 2 out 0
+     path Get Etl Variables.Outputs[OLE DB Source Output] => Set Variables.Inputs[Input 0]
+
+## DataFlow Link Meet The Customer To Customer Account By Automated Joining
+  - Conditional Split | ConditionalSplit  | conn   | in 1 out 0
+  - Derived Column | DerivedColumn  | conn   | in 2 out 0
+  - Get All Meet The Customer By Closed Automated Joining | OLEDBSource  | conn [qsql]  | in 0 out 5
+  - Get Automated Joining Details | Lookup  | conn [qsql]  | in 1 out 3
+  - Union All | UnionAll  | conn   | in 13 out 8
+  - Update MeetTheCustomers | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 8 out 3
+     path Derived Column.Outputs[Derived Column Output] => Conditional Split.Inputs[Conditional Split Input]
+     path Get Automated Joining Details.Outputs[Lookup Match Output] => Union All.Inputs[Union All Input 1]
+     path Get Automated Joining Details.Outputs[Lookup No Match Output] => Derived Column.Inputs[Derived Column Input]
+     path Get All Meet The Customer By Closed Automated Joining.Outputs[OLE DB Source Output] => Get Automated Joining Details.Inputs[Lookup Input]
+     path Union All.Outputs[Union All Output 1] => Update MeetTheCustomers.Inputs[Input 0]
+     path Conditional Split.Outputs[Wrong Records] => Union All.Inputs[Union All Input 2]
+
+## DataFlow Link Meet The Customer To Customer Account By Mini Automated Joining
+  - Conditional Split | ConditionalSplit  | conn   | in 1 out 0
+  - Derived Column | DerivedColumn  | conn   | in 2 out 0
+  - Get All Meet The Customer By Closed Mini Automated Joining | OLEDBSource  | conn [qsql]  | in 0 out 4
+  - Get Automated Joining Details | Lookup  | conn [qsql]  | in 1 out 2
+  - Union All | UnionAll  | conn   | in 10 out 6
+  - Update MeetTheCustomers | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 4 out 2
+     path Derived Column.Outputs[Derived Column Output] => Conditional Split.Inputs[Conditional Split Input]
+     path Get Automated Joining Details.Outputs[Lookup Match Output] => Union All.Inputs[Union All Input 1]
+     path Get Automated Joining Details.Outputs[Lookup No Match Output] => Derived Column.Inputs[Derived Column Input]
+     path Get All Meet The Customer By Closed Mini Automated Joining.Outputs[OLE DB Source Output] => Get Automated Joining Details.Inputs[Lookup Input]
+     path Union All.Outputs[Union All Output 1] => Update MeetTheCustomers.Inputs[Input 0]
+     path Conditional Split.Outputs[Wrong Records] => Union All.Inputs[Union All Input 2]
+
+## DataFlow Link Meet The Customer To Customer Account By Pre Account Number
+  - Get All Meet The Customer with preaccountnumber | OLEDBSource  | conn [qsql]  | in 0 out 6
+  - Get Customer Account Matches | Lookup  | conn [qsql]  | in 2 out 1
+  - On > 180 Days Change Status | DerivedColumn  | conn   | in 2 out 0
+  - Pass > 180 To Update | ConditionalSplit  | conn   | in 1 out 0
+  - Union All | UnionAll  | conn   | in 13 out 7
+  - Update Meet The Customer | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 7 out 1
+     path On > 180 Days Change Status.Outputs[Derived Column Output] => Pass > 180 To Update.Inputs[Conditional Split Input]
+     path Get Customer Account Matches.Outputs[Lookup Match Output] => Union All.Inputs[Union All Input 1]
+     path Get Customer Account Matches.Outputs[Lookup No Match Output] => On > 180 Days Change Status.Inputs[Derived Column Input]
+     path Get All Meet The Customer with preaccountnumber.Outputs[OLE DB Source Output] => Get Customer Account Matches.Inputs[Lookup Input]
+     path Union All.Outputs[Union All Output 1] => Update Meet The Customer.Inputs[Input 0]
+     path Pass > 180 To Update.Outputs[Wrong Records] => Union All.Inputs[Union All Input 2]
+
+## DataFlow Link Pre Meet The Customer To Customer Account
+  - Add Zeros To Customer Account | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 1 out 0
+  - Conditional Split | ConditionalSplit  | conn   | in 1 out 0
+  - Get Customer Account Details | Lookup  | conn [qsql]  | in 2 out 8
+  - get meet the customer detalis | OLEDBSource  | conn [qsql]  | in 0 out 7
+  - Set Status To No Account | DerivedColumn  | conn   | in 2 out 0
+  - Union All | UnionAll  | conn   | in 22 out 15
+  - update meet the customer by customer Account | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 14 out 2
+     path Set Status To No Account.Outputs[Derived Column Output] => Conditional Split.Inputs[Conditional Split Input]
+     path Get Customer Account Details.Outputs[Lookup Match Output] => Union All.Inputs[Union All Input 3]
+     path Get Customer Account Details.Outputs[Lookup No Match Output] => Set Status To No Account.Inputs[Derived Column Input]
+     path get meet the customer detalis.Outputs[OLE DB Source Output] => Add Zeros To Customer Account.Inputs[Input 0]
+     path Add Zeros To Customer Account.Outputs[Output 0] => Get Customer Account Details.Inputs[Lookup Input]
+     path Union All.Outputs[Union All Output 1] => update meet the customer by customer Account.Inputs[Input 0]
+     path Conditional Split.Outputs[Wrong Records] => Union All.Inputs[Union All Input 2]
+
+## DataFlow Link Pre Meet The Customer To Customer Program
+  - Conditional Split | ConditionalSplit  | conn   | in 1 out 0
+  - Get Customer Program Details | Lookup  | conn [qsql]  | in 1 out 3
+  - get meet the customer detalis | OLEDBSource  | conn [qsql]  | in 0 out 6
+  - Set Status To Wrong | DerivedColumn  | conn   | in 2 out 0
+  - Union All | UnionAll  | conn   | in 15 out 9
+  - update meet the customer by customer account | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 6 out 2
+     path Set Status To Wrong.Outputs[Derived Column Output] => Conditional Split.Inputs[Conditional Split Input]
+     path Get Customer Program Details.Outputs[Lookup Match Output] => Union All.Inputs[Union All Input 1]
+     path Get Customer Program Details.Outputs[Lookup No Match Output] => Set Status To Wrong.Inputs[Derived Column Input]
+     path get meet the customer detalis.Outputs[OLE DB Source Output] => Get Customer Program Details.Inputs[Lookup Input]
+     path Union All.Outputs[Union All Output 1] => update meet the customer by customer account.Inputs[Input 0]
+     path Conditional Split.Outputs[Wrong Records] => Union All.Inputs[Union All Input 2]
+
+## SQL statements
+- End ETL Proccess record\Lookup | Microsoft.Lookup.SqlCommand | [CRM] 
+    select p.gen_etlprocessid , case when pw.gen_etlprocessid is null then 0 else 1 end as isWarningExist from gen_etlprocess p left join (select distinct gen_etlprocessId from gen_etlprocesswarning ) as pw on p.gen_etlprocessId = pw.gen_etlprocessId
+- End ETL Proccess record\Lookup | Microsoft.Lookup.SqlCommandParam | [CRM] 
+    select * from (select p.gen_etlprocessid , case when pw.gen_etlprocessid is null then 0 else 1 end as isWarningExist from gen_etlprocess p left join (select distinct gen_etlprocessId from gen_etlprocesswarning ) as pw on p.gen_etlprocessId = pw.gen_etlprocessId) [refTable] where [refTable].[gen_etlprocessid] = ?
+- Get Organization Variables\Get Etl Variables | Microsoft.OLEDBSource.SqlCommand | [qsql] 
+    select gen_key, gen_value from gen_etlvariable where (gen_scope = 'global' OR gen_scope = ?)
+- Link Meet The Customer To Customer Account By Automated Joining\Get All Meet The Customer By Closed Automated Joining | Microsoft.OLEDBSource.SqlCommand | [qsql] 
+    select gen_meetthecustomerid,gen_automatedjoining as meetTheCustomerAutomatedJoiningId, CreatedOn, gen_status, gen_calculatescore from gen_meetthecustomer Where gen_meetthecustomer.gen_status in (1,2) AND gen_meetthecustomer.gen_producttype in (1,2,4) --> Gemel Or Traning Funds AND gen_precustomer = 1 --> Is Pre Customer AND gen_gemelaccountnumber Is Null AND gen_automatedjoining Is Not Null
+- Link Meet The Customer To Customer Account By Automated Joining\Get Automated Joining Details | Microsoft.Lookup.SqlCommand | [qsql] 
+    select gen_automatedjoiningid,Gen_customeraccount.Gen_customeraccountId as automatedJoiningcustomeraccountid, Gen_customeraccount.gen_contactname as automatedJoiningContactId, Gen_customeraccount.gen_customeridnumber from gen_automatedjoining join Gen_customeraccount on Gen_customeraccount.gen_bankaccountnumber = right (REPLICATE ('0',12) + LTRIM (gen_automatedjoining.gen_bankaccountnumberName),12
+- Link Meet The Customer To Customer Account By Automated Joining\Get Automated Joining Details | Microsoft.Lookup.SqlCommandParam | [qsql] 
+    select * from (select gen_automatedjoiningid,Gen_customeraccount.Gen_customeraccountId as automatedJoiningcustomeraccountid, Gen_customeraccount.gen_contactname as automatedJoiningContactId, Gen_customeraccount.gen_customeridnumber from gen_automatedjoining join Gen_customeraccount on Gen_customeraccount.gen_bankaccountnumber = right (REPLICATE ('0',12) + LTRIM (gen_automatedjoining.gen_bankaccoun
+- Link Meet The Customer To Customer Account By Mini Automated Joining\Get All Meet The Customer By Closed Mini Automated Joining | Microsoft.OLEDBSource.SqlCommand | [qsql] 
+    select gen_meetthecustomerid,gen_automatedjoining as meetTheCustomerAutomatedJoiningId, CreatedOn, gen_status from gen_meetthecustomer Where gen_meetthecustomer.gen_status in (1,2) AND gen_meetthecustomer.gen_producttype in (1,2,4) --> Gemel Or Traning Funds AND gen_precustomer = 1 --> Is Pre Customer AND gen_gemelaccountnumber Is Null AND gen_miniautomatedjoining Is Null
+- Link Meet The Customer To Customer Account By Mini Automated Joining\Get Automated Joining Details | Microsoft.Lookup.SqlCommand | [qsql] 
+    select gen_automatedjoiningid,gen_customeraccountid as automatedJoiningcustomeraccountid, gen_automatedincident_contactId as automatedJoiningContactId from gen_miniautomatedjoining join gen_automatedjoining on gen_miniautomatedjoining.gen_automatedjoining = gen_automatedjoining.gen_automatedjoiningid Where gen_automatedjoining.gen_joiningstatus = 8 --> Finish
+- Link Meet The Customer To Customer Account By Mini Automated Joining\Get Automated Joining Details | Microsoft.Lookup.SqlCommandParam | [qsql] 
+    select * from (select gen_automatedjoiningid,gen_customeraccountid as automatedJoiningcustomeraccountid, gen_automatedincident_contactId as automatedJoiningContactId from gen_miniautomatedjoining join gen_automatedjoining on gen_miniautomatedjoining.gen_automatedjoining = gen_automatedjoining.gen_automatedjoiningid Where gen_automatedjoining.gen_joiningstatus = 8 --> Finish) [refTable] where [refT
+- Link Meet The Customer To Customer Account By Pre Account Number\Get All Meet The Customer with preaccountnumber | Microsoft.OLEDBSource.SqlCommand | [qsql] 
+    select gen_meetthecustomerid, gen_preaccountnumber, gen_gemelaccountnumber, CreatedOn, gen_status, gen_pregemelaccountnumber from gen_meetthecustomer Where gen_meetthecustomer.gen_status in (1,2) --new, in proccess and gen_preaccountnumber is not null and gen_producttype in (1, 4) --gemel, gemel for investment and gen_gemelaccountnumber is null and gen_automatedjoining is null and gen_miniautomate
+- Link Meet The Customer To Customer Account By Pre Account Number\Get Customer Account Matches | Microsoft.Lookup.SqlCommand | [qsql] 
+    select ca.Gen_customeraccountId, Gen_EstateTypeID, ca.createdon, Account.accountnumber, COALESCE(CASE WHEN gen_bankaccountnumber = '' THEN '' ELSE SUBSTRING(gen_bankaccountnumber, PATINDEX('%[^0]%', gen_bankaccountnumber+'.'), LEN(gen_bankaccountnumber)) END , '') CAbankaccountnumberNoZeros from Gen_customeraccount ca join Gen_estatecodeid as estatecodeid on estatecodeid.Gen_estatecodeidId = ca.ge
+- Link Meet The Customer To Customer Account By Pre Account Number\Get Customer Account Matches | Microsoft.Lookup.SqlCommandParam | [qsql] 
+    select * from (select ca.Gen_customeraccountId, Gen_EstateTypeID, ca.createdon, Account.accountnumber, COALESCE(CASE WHEN gen_bankaccountnumber = '' THEN '' ELSE SUBSTRING(gen_bankaccountnumber, PATINDEX('%[^0]%', gen_bankaccountnumber+'.'), LEN(gen_bankaccountnumber)) END , '') CAbankaccountnumberNoZeros from Gen_customeraccount ca join Gen_estatecodeid as estatecodeid on estatecodeid.Gen_estatec
+- Link Pre Meet The Customer To Customer Account\Get Customer Account Details | Microsoft.Lookup.SqlCommand | [qsql] 
+    select customeraccount.Gen_customeraccountId, customeraccount.Gen_contactname, cast(REPLACE(STR(customeraccount.gen_customeridnumber, 9), SPACE(1), '0')as nvarchar(9) ) AS gen_customeridnumber, customeraccount.gen_bankaccountnumber, gen_estatetype, estatecodeid.gen_estatetypename, customeraccount.gen_fundcreationdate, case When customeraccount.gen_productsubcustomeraccount = 2 Then 4 When customer
+- Link Pre Meet The Customer To Customer Account\Get Customer Account Details | Microsoft.Lookup.SqlCommandParam | [qsql] 
+    select * from (select customeraccount.Gen_customeraccountId, customeraccount.Gen_contactname, cast(REPLACE(STR(customeraccount.gen_customeridnumber, 9), SPACE(1), '0')as nvarchar(9) ) AS gen_customeridnumber, customeraccount.gen_bankaccountnumber, gen_estatetype, estatecodeid.gen_estatetypename, customeraccount.gen_fundcreationdate, case When customeraccount.gen_productsubcustomeraccount = 2 Then 
+- Link Pre Meet The Customer To Customer Account\get meet the customer detalis | Microsoft.OLEDBSource.SqlCommand | [qsql] 
+    select cast(LTRIM(RTRIM(gen_pregemelaccountnumber)) as nvarchar (50)) AS gen_pregemelaccountnumber,gen_meetthecustomerId,gen_status,createdon,gen_calculatescore, cast(REPLACE(STR(gen_precustomeridnumber, 9), SPACE(1), '0')as nvarchar(9) ) AS gen_precustomeridnumber,gen_producttype from gen_meetthecustomer where gen_status in(1,2) --> New Or InProcess AND gen_producttype in (1,2,4) --> Gemel Or Tra
+- Link Pre Meet The Customer To Customer Program\Get Customer Program Details | Microsoft.Lookup.SqlCommand | [qsql] 
+    select cast(REPLACE(STR(Gen_programmain.gen_customeridnumber, 9), SPACE(1), '0')as nvarchar(9) ) AS gen_customeridnumber, Gen_programmain.Gen_programmainId,Gen_programmain.gen_customername from Gen_programmain inner join product on Gen_programmain.gen_productid = product.productid where producttypecode = 200004
+- Link Pre Meet The Customer To Customer Program\Get Customer Program Details | Microsoft.Lookup.SqlCommandParam | [qsql] 
+    select * from (select cast(REPLACE(STR(Gen_programmain.gen_customeridnumber, 9), SPACE(1), '0')as nvarchar(9) ) AS gen_customeridnumber, Gen_programmain.Gen_programmainId,Gen_programmain.gen_customername from Gen_programmain inner join product on Gen_programmain.gen_productid = product.productid where producttypecode = 200004) [refTable] where [refTable].[gen_customeridnumber] = ?
+- Link Pre Meet The Customer To Customer Program\get meet the customer detalis | Microsoft.OLEDBSource.SqlCommand | [qsql] 
+    select gen_meetthecustomerId,cast(REPLACE(STR(gen_precustomeridnumber, 9), SPACE(1), '0')as nvarchar(9) ) AS gen_precustomeridnumber,gen_producttype,gen_status ,gen_meetthecustomer.createdon, gen_calculatescore from gen_meetthecustomer where gen_status in(1,2) --> New Or InProcess AND gen_producttype = 3 --> Customer Program AND gen_precustomer = 1 --> Is Pre Customer AND gen_customerprogram Is Nu
+
+## Code write candidates (per owner)
+- Create ETL Process record {"crm-entity":1,"crm-sdk-create":1,"variables-write":1}
+- End ETL Proccess record\Get gen_etlprocessid {"sql-command":2,"output-buffer":2}
+- End ETL Proccess record\Script Component {"sql-command":2,"crm-entity":3,"output-buffer":1,"crm-sdk-update":1}
+- Get Organization Variables\Set Variables {"sql-command":2}
+- Link Meet The Customer To Customer Account By Automated Joining\Update MeetTheCustomers {"crm-service":1,"crm-entity":5,"output-buffer":4,"crm-sdk-execute":3}
+- Link Meet The Customer To Customer Account By Mini Automated Joining\Update MeetTheCustomers {"crm-service":1,"crm-entity":4,"output-buffer":4,"crm-sdk-execute":3}
+- Link Meet The Customer To Customer Account By Pre Account Number\Update Meet The Customer {"crm-service":1,"crm-entity":4,"output-buffer":3,"crm-sdk-execute":3}
+- Link Pre Meet The Customer To Customer Account\Add Zeros To Customer Account {"output-buffer":1}
+- Link Pre Meet The Customer To Customer Account\update meet the customer by customer Account {"crm-service":1,"sql-command":2,"crm-entity":7,"output-buffer":6,"crm-sdk-execute":3}
+- Link Pre Meet The Customer To Customer Program\update meet the customer by customer account {"crm-service":1,"sql-command":2,"crm-entity":5,"output-buffer":4,"crm-sdk-execute":3}
+
+## External refs (non-framework) CRM2015.Proxy

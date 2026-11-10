@@ -1,0 +1,49 @@
+{
+  "verifier": "ssis-verifier",
+  "package": "0006_LeumiFile-MY-Distributor",
+  "scope": "logic-claims re-check round 2",
+  "checkedAt": "2026-11-07T15:00:00Z",
+  "checked": 5,
+  "results": [
+    {
+      "id": "L|summary",
+      "hash": "bb7799e2bebc",
+      "verdict": "WRONG",
+      "detail": "Unit 1 ends with an unconditional 'בסוף הריצה הקבצים מועברים לארכיון יומי'. The archive loop is reached only by a Success constraint from the whole Foreach Loop Container (DTSX:13295). If processing of any file fails, no file is moved, and the package's own finding#6 says exactly this. The loop also runs only when isFileExist is true (DTSX:13297, EvalOp=3). The sentence must be conditional. Smaller point in the same unit: 'קובץ יומי במבנה Minhali (בנק 10)' attaches bank 10 to the file. The DTSX shows only that the product lookup is restricted to gen_banks.Gen_BankNumber = '10' (DTSX:7403). The file's bank is not stated; the connection description is 'Minhali Yomi Source', DTSX:4. The rest of unit 1 is correct against main.cs:131-201: lookup by bank account number + fund type; eligibility only set to 1; stop reason/date; end date; closing date; source account; gen_updateeligibilitydate = DateTime.Now with eligibility; gen_bankstoppaymentsreceivingdate = DateTime.Now when either flag is '1'; closing date and bank notice date written without comparison. Unit 2 verified: CRM.Proxy is external; Psql (DTSX:317-319) is used only by 4 Lookups and the Get Etl Variables OLE DB source, all SELECT, so the '(Lookups)' wording is slightly narrow but read-only is correct; the only business write is service.Update (DTSX:9826); no DTS:Configuration.",
+      "evidence": "source/DailyProcess/0006_LeumiFile-MY-Distributor.dtsx (sha256 7F06AF01...4CC2E): DTSX:13295, 13297, 11836; DTSX:4, 7403; Update main.cs:131-201 @DTSX:9501",
+      "wrongUnits": [1]
+    },
+    {
+      "id": "L|Package\\Foreach Loop Container\\Update Details from employer CustomerAccount|title",
+      "hash": "04cab2c376d7",
+      "verdict": "CONFIRMED",
+      "detail": "The title translates the data-flow name. short_he lists all 8 written attributes and separates the file-derived values from the run-time values (DateTime.Now at main.cs:135 and 181). flow[1]: 10 output columns from Read minhali data, no staging. flow[2]: product lookup restricted to bank '10', NoMatchBehavior=1, and the No Match Output has no path. flow[3]: Check CustomerAccount Exist on Bank_Account_Number_27 + gen_fundtypename over gen_customeraccount INNER JOIN gen_fundmain; No Match -> Set Warning columns 1 -> ETL Warning 1. flow[4]: Aggregate, Trim, Dates Format and the two Convert scripts, in that path order. flow[5]: Get Source Account against right('000000000000'+Gen_bankaccountnumber,12). flow[6]: change detection, with the closing date and bank notice date written without comparison, each alone enough to set isNeedToUpdate (main.cs:179-189).",
+      "evidence": "DTSX:7578, 7401-7439, 2959-3011, 2806, 7482-7519; Update main.cs:120-211; data-flow paths (component.mjs --list)",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Foreach Loop Container\\Update Details from employer CustomerAccount|short",
+      "hash": "4fba245ce207",
+      "verdict": "WRONG",
+      "detail": "Unit 6 states as fact 'נתוני הקובץ מושווים לנתוני החשבון'. The comparison values come from five unqualified columns in a gen_customeraccount INNER JOIN gen_fundmain query: gen_compensationeligibility, gen_stoppaymentsreportdate, gen_stoppaymentsreason, gen_endemploymentdate, gen_sourceaccount (DTSX:2961). The package's own open#1 for this component says it is not proven that the comparison is against the account fields being updated. The text contradicts another claim of the package. Fix one of the two. Option 1: qualify unit 6. Option 2: close open#1 with an explicit argument. The argument is that an ambiguous column would make the lookup query fail, and an SDK update of an attribute missing on gen_customeraccount would throw. So in any run where updates succeed, the columns are gen_customeraccount's; this is conditional reasoning, not a direct fact in the files. Units 1-5 and 7 verified. Unit 7 rules match main.cs:131-197, Convert main.cs:118-151, Dates Format main.cs:62-88, the full cache (CacheType=0) and the async Aggregate.",
+      "evidence": "Check CustomerAccount Exist SqlCommand DTSX:2961-2982; component open#1 (hash 21faf1d1f77f); Update main.cs:131-197",
+      "wrongUnits": [6]
+    },
+    {
+      "id": "L|Package\\Foreach Loop Container\\Update Details from employer CustomerAccount|detailed",
+      "hash": "d5bbcb2fb429",
+      "verdict": "WRONG",
+      "detail": "Two problems. (1) Unit 38 states a meaning the files do not prove: 'האם סומן בקובץ עדכון של תאריך הפסקת הפקדות או של סיום עבודה?'. The flag fields are Is_Provision_Date_Update_131 and Is_Finish_Work_Date_150 (FlatFileColumn DTSX). Nothing in the package ties field 131 to the stop-provision date. 'הפסקת' is added by inference, not from the field name, and the separate stop-date field is Stop_Provision_Date_236. Fix: name the fields neutrally, or label the meaning השערה. (2) Units 16 ('הערך בחשבון'), 24 ('וקיים ערך בחשבון'), 31 ('וקיים תאריך בחשבון') and 44 ('שונה מהמקושר כיום') state as fact that the compared values are the account's own fields. They are unqualified columns of a gen_customeraccount JOIN gen_fundmain query (DTSX:2961), and open#1 of the same component says this is not proven. This is the same contradiction as in |short. All other nodes were re-derived and are correct. Units 1-15: source columns, bank-10 lookup with silent drop, account lookup and warning texts 'רשומה לא עודכנה - חשבון לקוח לא קיים' with RecordKey = Bank_Account_Number_27, DATEADD(hour,3) on both DB dates, 14 group-by columns, trim on 3 string fields, date formats 8/6 chars and <1900 -> null, 15-code list, flags '1', source-account lookup with IgnoreFailure. Units 16-56: eligibility, stop reason, report date with whole-day truncation, end date, bank notice date, closing date, the all-zero source-account guard, isNeedToUpdate, and the Error branch text.",
+      "evidence": "FlatFileColumn Is_Provision_Date_Update_131 / Is_Finish_Work_Date_150 / Stop_Provision_Date_236 (DTSX:7-~315); Convert indication fields main.cs:118-128; Check CustomerAccount Exist DTSX:2961; Update main.cs:131-210; Set Warning columns / 1 DTSX:8604-8673",
+      "wrongUnits": [16, 24, 31, 38, 44]
+    },
+    {
+      "id": "L|Package\\Foreach Loop Container\\Update Details from employer CustomerAccount|detail",
+      "hash": "3421eb5aae60",
+      "verdict": "INCOMPLETE",
+      "detail": "Unit 3 (החלטות) gives the source-account rule as 'חשבון מקור שנמצא ושונה → קישור'. It omits the code's extra condition that the file value is not empty and not all zeros: !string.IsNullOrWhiteSpace(Row.SourceAccount160.Trim('0')) at main.cs:192. That guard matters for the business result. An all-zero Source_Account_160 can still match a CRM account whose bank number is an empty string, because right('000000000000'+'',12) = '000000000000' (DTSX:7484). The code then refuses to link it. The detailed claim (node 44) has this condition; the detail section should too. Units 1, 2, 4 and 5 verified. Flat file via @[User::FullFileName], RaggedRight, CodePage 1255, no header or row skip, 10 of 304 columns, no record-type filter. Three lookups with CacheType=0. Eight possible attributes, one service.Update per row only if isNeedToUpdate. No DML.",
+      "evidence": "Update main.cs:192-197 @DTSX:9501; Get Source Account SqlCommand DTSX:7484; DTSX:4-7; CacheType DTSX:3005, 7433, 7492",
+      "wrongUnits": [3]
+    }
+  ]
+}

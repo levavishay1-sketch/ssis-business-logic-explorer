@@ -1,0 +1,510 @@
+{
+  "verifier": "ssis-verifier",
+  "package": "0012_LeumiFile_CHN_Daily",
+  "scope": "logic-claims part 1/2",
+  "checkedAt": "2026-11-07T11:34:23.488Z",
+  "checked": 57,
+  "results": [
+    {
+      "id": "L|summary",
+      "hash": "63d373e878b2",
+      "verdict": "INCOMPLETE",
+      "detail": "Units 2-7 verified: 28 constraints, none has DTS:Value (all Success), all LogicalAnd, single serial chain; reset->process->disable/close pattern twice; delete (step 10) before create/update (12); no disabled executables, coverage block all match; OnError handler + SQL log provider SRS.SSIS_Logs (DTSX:112); no configurations; CRM CM = PSQL/ALTSHULER_MSCRM (DTSX:95-97), staging PSRS/GENERIX_STAGING (DTSX:100-102). Unit 1 omits a business CRM write: existing parent contacts are UPDATED by direct SQL (Update Contact 1-5 on Contact: LastName, FirstName, FullName, Gen_Identitynumber, Gen_bankcustomeridnumber, Gen_customerdateofbirth, child-saving phone/email, gen_identificationtype, Gen_inputsource=1, Gen_IsOperate=1, Gen_leumi=1). The summary only says parents are created. It also omits the ContactBase.gen_loaneligibilitycalculationrequired=1 flag and the creation of new gen_warningnotetype records.",
+      "evidence": "DTSX:108903-108930 (PCs); DTSX:50070 Update Contact 1 SQL; DTSX:78730/78768; DTSX:69907",
+      "wrongUnits": [
+        {
+          "unit": 0,
+          "problem": "Missing CRM writes in the summary",
+          "correct": "Also: direct-SQL update of existing parent contacts (Update Contact 1-5, DTSX:50070), ContactBase.gen_loaneligibilitycalculationrequired=1 after warning-note create/confirm (DTSX:78730/78768), INSERT of new gen_warningnotetype 'לא ידוע' (DTSX:69907).",
+          "evidence": "DTSX:50070, 78730, 78768, 69907"
+        }
+      ]
+    },
+    {
+      "id": "L|exec",
+      "hash": "4f40b1251df0",
+      "verdict": "CONFIRMED",
+      "detail": "Re-derived all 28 precedence constraints. None carries DTS:Value, so all are Success; all are LogicalAnd. Only 'Constraint 2 1' (Check File Existence -> Create ETL Process record With File Name) has EvalOp=3 with Expression @[User::isFileExist] == TRUE. The order and line numbers of all 29 steps match. Get Organization Variables has no incoming constraint, and OnError is the only event handler.",
+      "evidence": "DTSX:108903-108930; DTSX:108916 (EvalOp=3)"
+    },
+    {
+      "id": "L|ignored",
+      "hash": "be968d4ed604",
+      "verdict": "CONFIRMED",
+      "detail": "Checked every listed executable. Create ETL Process record and the 7 Write Errors to ETLProcessCounter scripts only Create gen_etlprocess / gen_etlprocesscounter. End ETL Process record only Updates gen_etlprocess. Error ETL Process record only touches gen_etlprocess and annotation. Get Organization Variables only loads gen_etlvariable key/values into variables. Get selected server only sets ServerName. Truncate is a staging truncate. Move File To Archive is a FileSystemTask MoveFile. None writes business CRM data or applies a business filter.",
+      "evidence": "code files of the listed owners (SDK LogicalName gen_etlprocess/gen_etlprocesscounter); DTSX:92735; FileSystemData MoveFile"
+    },
+    {
+      "id": "L|finding#1",
+      "hash": "38889ee95592",
+      "verdict": "CONFIRMED",
+      "detail": "Verified: Delete Beneficiaries Merge Join has JoinType=1 (left outer), NumKeyColumns=3, TreatNullsAsEqual=true. The <input> Right (DTSX:85213) appears before Left. Paths: Sort 2 -> Left Input and Sort 1 -> Right Input. Sort 2 is fed by file rows with derived ExistsInFile=1. 'If Exist in DB and Not Exists In File' = ISNULL(ExistsInFile) -> Delete (SDK service.Delete). Get Beneficiaries from DB filters only Gen_beneficiaries.statecode=0, with no bank filter. Across all supplied DTSX there are exactly 10 Merge Join components (0005:1, 0008:2, 0009:3, 0012:2, 0013:1, 0023:1), and only this one lists Right before Left. Whether the engine resolves 'left' by name or by position cannot be proven from the files, so it is correctly left open.",
+      "evidence": "DTSX:85205-85232; DTSX:84966; DTSX:85012; paths in Delete Beneficiaries"
+    },
+    {
+      "id": "L|finding#2",
+      "hash": "e5149982f941",
+      "verdict": "CONFIRMED",
+      "detail": "Source SQL of Create and update contactlink contains 'when cast(Child_Saving_Phone_75 as int) = 0'. The query has no WHERE, so the cast runs for every staging row. Flat file column width is 10 (DTSX:84). An overflowing or non-numeric value raises a SQL conversion error that fails the source and the data flow. All constraints are Success-only, and the existsinfile reset (step 14) has already run. The finding is worded conditionally.",
+      "evidence": "DTSX:40961; DTSX:84; DTSX:108929"
+    },
+    {
+      "id": "L|finding#3",
+      "hash": "1a864d85b16f",
+      "verdict": "WRONG",
+      "detail": "Mechanism is correct: direct SQL on the ALTSHULER_MSCRM connection, with SDK only for beneficiaries (ExecuteMultiple / service.Update / service.Delete) and Create Contact (service.Create). The count is wrong: there are FOUR bulk Execute SQL tasks on CRM, not three (Disabled contactlink, Set contactlink existinfile false, Set Warning Note existinfile false, Update close date where not exist in file). The analyst's own pointers list all four. Minor: the contact-link UPDATE targets the view gen_contactlink, not gen_contactlinkBase.",
+      "evidence": "DTSX:87344, 92723, 92729, 92741; DTSX:50700 (update gen_contactlink)",
+      "wrongUnits": [
+        {
+          "unit": 1,
+          "problem": "'שלוש פקודות Execute SQL גורפות'",
+          "correct": "Four bulk Execute SQL tasks write to CRM: DTSX:87344 (gen_Status=2), 92723 (existsinfile=0), 92729 (warningnote existinfile=0), 92741 (gen_closedate). Contact-link updates go to view gen_contactlink (DTSX:50700).",
+          "evidence": "DTSX:87344, 92723, 92729, 92741, 50700"
+        }
+      ]
+    },
+    {
+      "id": "L|finding#4",
+      "hash": "f846bf03a1a5",
+      "verdict": "CONFIRMED",
+      "detail": "is Parent Exist No Match -> Check If Contact Is Duplicate. A non-null parent id seen for the first time goes to NeedToCreate. A NULL parent id goes to NotNeedToCreate -> Multicast 3 -> Sort -> Merge Join Left. A repeated parent id is not directed to any output (main.cs:45-54), so it is dropped. Created contacts go to Union All Ok -> Sort 2 -> Merge Join Right. Merge Join JoinType=2 (inner), 1 key. The right side never has a NULL key, so nothing matches and new parents get no link in the same run.",
+      "evidence": "DTSX:40712-40716; DTSX:28942 main.cs:45-54; contactlink paths"
+    },
+    {
+      "id": "L|finding#5",
+      "hash": "28a450727897",
+      "verdict": "CONFIRMED",
+      "detail": "Update Contact 1 Param_11 gen_identificationtype comes from Is Child Exists (the child contact's gen_identificationtype), modified in place by compare befor update. Line 154 replaces it with Type_20 only when Type_20 is not null AND (the child type is null OR child type == 10 == Type_20). Create Contact sets gen_identificationtype = int.Parse(Type20) (main.cs:41). Minor: the exception also requires Type_20 to be non-null.",
+      "evidence": "compare befor update main.cs:154-158; Is Child Exists SQL DTSX:40336; Create Contact main.cs:41; Update Contact SQL DTSX:50070"
+    },
+    {
+      "id": "L|finding#6",
+      "hash": "fa2fdeb58a43",
+      "verdict": "CONFIRMED",
+      "detail": "Disabled contactlink: 'Update gen_contactlinkBase set gen_Status = 2 where gen_existsinfile = 0', with no other filter. Close: 'where gen_existinfile = 0 and gen_closedate is null', with no source or bank filter. A row fails to be confirmed when the child or account is not found or a write fails. Update Contact errors go to Union All Error 5 and get no link step.",
+      "evidence": "DTSX:87344, 92723, 92729, 92741; Update Contact n Error -> Union All Error 5"
+    },
+    {
+      "id": "L|finding#7",
+      "hash": "3ce1d2441b33",
+      "verdict": "CONFIRMED",
+      "detail": "Instruction provision Get Customer Account: StateCode=0, Gen_BankNumber=10, key gen_bankaccountnumber only. Warning notes Get customeraccountid: no filter, key = padded account number. At-risk Get Customer Account Details: no filter, key = padded account number. Phone Get CustomerAccount Guid: no filter, key = account number + gen_producttypeid. All four use full cache (CacheType=0).",
+      "evidence": "DTSX:60102, 70482, 93742, 100854"
+    },
+    {
+      "id": "L|finding#8",
+      "hash": "f62602289afe",
+      "verdict": "CONFIRMED",
+      "detail": "Convert PL has the else-if chain value==5945 -> 8 (Opening an account) followed by value==5945 -> 9 (Accountant). The second branch is unreachable.",
+      "evidence": "Convert PL main.cs:177-183 (DTSX:56260)"
+    },
+    {
+      "id": "L|finding#9",
+      "hash": "2c57f6734c2a",
+      "verdict": "WRONG",
+      "detail": "The stated consequence (re-creation every run) does not follow from the code. When Action_Allowed_Role_30 is empty or non-numeric, Convert PL never assigns genauthorizedroletoactMAP, so it stays NULL (main.cs:147). Is Instruction provision exist compares it with isnull(gen_authorizedroletoact,0), so there is never a match and the row goes to Add Fields. Add Fields line 70 reads 'if (Row.genauthorizedroletoactMAP == 0)' without an _IsNull check. The generated getter is Buffer.GetInt32(...) (BufferWrapper line 175), which per documented SSIS PipelineBuffer behaviour throws on a NULL column (ColumnIsNullException). So such a row would fail the Add Fields component and the whole 'Create and update Instruction provision' data flow, and, because the chain is Success-only, every later step (at-risk, warning notes, close, archive, End ETL). No insert happens. The data-dependent part (whether such rows exist) is unknown and should be worded conditionally.",
+      "evidence": "Convert PL main.cs:146-188; Is Instruction provision exist SQL DTSX:60285; Add Fields main.cs:70-71 (DTSX:51129); Add Fields BufferWrapper getter line 171-176",
+      "wrongUnits": [
+        {
+          "unit": 1,
+          "problem": "Predicts re-creation of the provision on every run",
+          "correct": "If a 03 row has an empty or non-numeric Action_Allowed_Role_30, the NULL role never matches the lookup and reaches Add Fields, which reads the NULL column unguarded (main.cs:70). Per SSIS buffer behaviour this throws, failing the data flow and all later package steps, so the provision is not created at all. This is conditional on such data existing.",
+          "evidence": "Add Fields main.cs:70; Convert PL main.cs:147; DTSX:60285; PCs DTSX:108907-108926"
+        }
+      ]
+    },
+    {
+      "id": "L|finding#10",
+      "hash": "18a75db76a92",
+      "verdict": "CONFIRMED",
+      "detail": "Error outputs of Delete Beneficiaries, 2, 3 and 4 have paths to Union All Error. 'Delete Beneficiaries 1.Outputs[Error]' has no path, so delete errors in that thread are not recorded.",
+      "evidence": "Delete Beneficiaries data-flow paths (component.mjs --list)"
+    },
+    {
+      "id": "L|finding#11",
+      "hash": "8016935dfdb4",
+      "verdict": "CONFIRMED",
+      "detail": "The at-risk flow processes only account numbers present in CHN_FileData (Set Updates For Accounts builds its dictionary from file rows). No step resets gen_accountatrisk for accounts that are absent from the file.",
+      "evidence": "Set Updates For Accounts main.cs:52-88; DTSX:93742; DML list (only UPDATE by gen_customeraccountid)"
+    },
+    {
+      "id": "L|finding#12",
+      "hash": "1520a6baffca",
+      "verdict": "CONFIRMED",
+      "detail": "Files are sorted by LastWriteTime descending. files[0] becomes FullFileName. files[1..n] are moved to <DailyFileArchive>\\yyyy.MM.dd\\NotProccessed\\, replacing any same-named file there.",
+      "evidence": "Check File Existence ScriptMain.cs:79-87"
+    },
+    {
+      "id": "L|Package\\Create and update Instruction provision|title",
+      "hash": "3283257c3e9d",
+      "verdict": "CONFIRMED",
+      "detail": "Checked every flow step. Is Valid: Subject_12=='03' and the identity number is not empty. Get Customer Account: StateCode=0, bank 10, key account number only. Padding is applied when Account_Owner_Identifiaction_Type_7=='1'. Check Duplicate drops a repeated id+customer account. Convert PL maps the codes. Is Instruction provision exist uses id + account + role + id type. Rows then go to Check if need to Update -> UPDATE ×5, or to Add Fields -> INSERT ×5. All writes are direct SQL on the CRM connection.",
+      "evidence": "DTSX:60424, 60100, 60511, 53944, 56260, 60283, 54735, 51129, 57385, 65437"
+    },
+    {
+      "id": "L|Package\\Create and update Instruction provision|short",
+      "hash": "83be024dab7d",
+      "verdict": "CONFIRMED",
+      "detail": "Matches the data flow. Unconnected No Match / Duplicate / invalid outputs drop the row. No other DML on gen_instructionprovision exists in the package, so provisions absent from the file are not closed.",
+      "evidence": "component paths; DML list (only 57385 ×5 and 65437 ×5 touch gen_instructionprovisionBase)"
+    },
+    {
+      "id": "L|Package\\Create and update Instruction provision|detailed",
+      "hash": "6b781a338ba9",
+      "verdict": "CONFIRMED",
+      "detail": "Re-derived every unit. Source columns: DTSX:60544. Is Valid conditions: DTSX:60424. Customer account lookup: full cache with joins to type, bank and Product. Format and UTC date conversion, then padding expression (DTSX:60511). Duplicate key: id + customer account (main.cs:58). Convert PL mappings match, including the unreachable 5945->9. Existence lookup on 4 keys with isnull(...,0). Add Fields: gen_name concatenation, dates, 0 -> NULL for role and id type, statecode 0 / statuscode 1. INSERT columns match the 20 parameters, with gen_accountownerid <- Entity_Id_19 (Param_17). Check if need to Update: expiry compared by day, death and start dates compared exactly. UPDATE sets the 10 listed columns. The 5 create commands and 5 update commands are identical (same SQL and mapping).",
+      "evidence": "DTSX:60544, 60424, 60102, 60511, 57385, 65437; Add Fields main.cs:45-78; Check if need to Update main.cs:29-127; Convert PL main.cs:118-228"
+    },
+    {
+      "id": "L|Package\\Create and update Instruction provision|detail",
+      "hash": "b065c7f33654",
+      "verdict": "CONFIRMED",
+      "detail": "Population: subject 03 + identity number, with no fund-type filter. The contactlink flow uses Subject_12=='03' && fundtype=='5015', so 'same subject population, without fund filter' is correct. Matching keys are correct. The INSERT column list contains no OwnerId or OwningBusinessUnit (it has OrganizationId).",
+      "evidence": "DTSX:60424, 40678, 57385"
+    },
+    {
+      "id": "L|Package\\Create and update Instruction provision|decisions",
+      "hash": "60d8b4ee0d4a",
+      "verdict": "CONFIRMED",
+      "detail": "All 7 conditions match the expressions and code. Is Valid: DTSX:60424. Get Customer Account: DTSX:60102. Padding: DTSX:60511. Check Duplicate: main.cs:58. Convert PL: main.cs:120-228. Existence lookup: DTSX:60285 plus join columns. Check if need to Update: main.cs:29-121.",
+      "evidence": "as listed"
+    },
+    {
+      "id": "L|Package\\Create and update Instruction provision|crm",
+      "hash": "9fbf1d53fc9e",
+      "verdict": "CONFIRMED",
+      "detail": "Create = INSERT gen_instructionprovisionBase on the No Match branch. Update = UPDATE on Match + ToUpdate. Both are OLE DB Commands on the CRM connection (direct SQL).",
+      "evidence": "DTSX:57385, 65437"
+    },
+    {
+      "id": "L|Package\\Create and update Instruction provision|open",
+      "hash": "01991a404284",
+      "verdict": "WRONG",
+      "detail": "Unit 1 is a genuine open question: full-cache lookup with duplicate keys, query without ORDER BY. Unit 2 hypothesis is refuted by the code. A NULL mapped role never reaches an INSERT, because Add Fields reads Row.genauthorizedroletoactMAP unguarded (main.cs:70). Per SSIS buffer behaviour that throws, failing the data flow and all later steps. There is no re-creation every run.",
+      "evidence": "Add Fields main.cs:70; Convert PL main.cs:147; DTSX:60285",
+      "wrongUnits": [
+        {
+          "unit": 2,
+          "problem": "Hypothesis: re-created every run",
+          "correct": "With an empty or non-numeric Action_Allowed_Role_30 the role stays NULL and the existence lookup gives No Match. Add Fields then reads the NULL column without _IsNull (main.cs:70), which throws and fails the data flow and every later package step. This depends on such data existing.",
+          "evidence": "Add Fields main.cs:70-71; BufferWrapper getter GetInt32"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Create And Update Warning Notes|title",
+      "hash": "8cc16fb1d1ce",
+      "verdict": "CONFIRMED",
+      "detail": "Flow is Read -> TRIM -> Add Leading Zeroes (9/12/4) -> Aggregate (group by all 6 columns) -> Get customeraccountid (padded key, no filter) -> Filter Warning Code 04/05/06/12 -> Set Warning Note Type Subject (0 -> subject) -> get warning note type (code + subject). No Match -> 'לא ידוע' type insert -> note insert. Match -> get existing open note -> UPDATE existinfile=1, or No Match -> INSERT. After a successful insert or update, ContactBase is flagged. All writes are direct SQL.",
+      "evidence": "DTSX:70813, 66107, 69294, 70482, 70447, 74011, 70631, 78998, 69907, 70554, 69423, 78806, 78730, 78768"
+    },
+    {
+      "id": "L|Package\\Create And Update Warning Notes|short",
+      "hash": "d260ee0b2532",
+      "verdict": "CONFIRMED",
+      "detail": "The branches match the paths. Type no match -> Warning Note Type Name -> set vanila fields 1 -> Create WarningNoteType -> Union All ok 1 -> Union All -> Create Warning Note. Match -> get existing warning notes -> Update WarningNote or Create. Successful create -> Update Loan... To Yes. Successful update -> Count Updates Rows -> Update Loan... To Yes 1.",
+      "evidence": "Warning Notes data-flow paths"
+    },
+    {
+      "id": "L|Package\\Create And Update Warning Notes|detailed",
+      "hash": "2e62514c488b",
+      "verdict": "WRONG",
+      "detail": "All decision and write units match the code and SQL. Unit 1 labels FinanceNumber_11 as 'גוף מנהל' (managing body). Nothing in the files supports that meaning, and the file has a separate column Manager_Entity_2 (DTSX:9 area, flat-file column 2). FinanceNumber_11 is read and used only as an Aggregate group-by key.",
+      "evidence": "DTSX:70813 (source SQL); flat file columns Manager_Entity_2 vs FinanceNumber_11 (CM Beneficiaries Source); Aggregate DTSX:69294",
+      "wrongUnits": [
+        {
+          "unit": 1,
+          "problem": "FinanceNumber_11 described as 'גוף מנהל'",
+          "correct": "The source reads Account_Owner_Id_8, Beneficiary_Note_35, FinanceNumber_11 (meaning not proven; not the Manager_Entity_2 column), Account_Number_3, Subject_12 and Warning_Notice_Type_36. FinanceNumber_11 serves only as a group-by key in Aggregate.",
+          "evidence": "DTSX:70813; DTSX:69294"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Create And Update Warning Notes|detail",
+      "hash": "4d52ef814a93",
+      "verdict": "CONFIRMED",
+      "detail": "Population, matching keys and writes are verified. Writes: INSERT gen_warningnotetypebase, INSERT gen_warningnotebase, UPDATE gen_warningnotebase, UPDATE ContactBase. All are OLE DB Commands on the CRM connection.",
+      "evidence": "DTSX:69907, 69423, 78806, 78730, 78768"
+    },
+    {
+      "id": "L|Package\\Create And Update Warning Notes|decisions",
+      "hash": "f04b1e1df453",
+      "verdict": "CONFIRMED",
+      "detail": "All 6 conditions match. Get customeraccountid uses RIGHT('000000000000'+ISNULL(...),12) against the padded input. Filter expression: DTSX:70447. Set Warning Note Type Subject: main.cs:119-125. Type lookup keys: DTSX:70631. NoteTypeAlreadyExists split: DTSX:75048. Existing-note lookup with gen_CloseDate IS NULL plus 4 keys: DTSX:70554.",
+      "evidence": "as listed"
+    },
+    {
+      "id": "L|Package\\Create And Update Warning Notes|crm",
+      "hash": "9d7fc16fc4ac",
+      "verdict": "CONFIRMED",
+      "detail": "The type is created once per code per run (dictionary keyed by warningNoticeType, set vanila fields 1 main.cs:64-74). A note is created on No Match or on a new type. Update sets gen_existinfile=1. ContactBase flag is set after a successful create (Union All ok) or update (Union All update).",
+      "evidence": "DTSX:69907, 69423, 78806, 78730, 78768"
+    },
+    {
+      "id": "L|Package\\Create And Update Warning Notes|open",
+      "hash": "c8b1eab546ec",
+      "verdict": "CONFIRMED",
+      "detail": "Both questions are open and cannot be settled from the files. The lookup has no bank or status filter, and a full cache with duplicate keys returns one row. The 'לא ידוע' type with gen_isloanalowed=1 is a business-intent question.",
+      "evidence": "DTSX:70482; DTSX:69907; DTSX:78998"
+    },
+    {
+      "id": "L|Package\\Update Customer Accounts At Rist|title",
+      "hash": "aa0f4a45a953",
+      "verdict": "WRONG",
+      "detail": "Flow steps match, but flow_he[3]/[4] say the account is matched 'לפי מספר חשבון מרופד ל-12'. Only the CRM side is padded: RIGHT('000000000000'+ISNULL(gen_bankaccountnumber,''),12). The file side (Account_Number_3) is only trimmed (TRIM DTSX:98569), never padded in this flow, unlike Warning Notes, which pads it with Add Leading Zeroes. A file account number shorter than 12 characters therefore never matches.",
+      "evidence": "DTSX:93742; TRIM main.cs (DTSX:98569); Set Updates For Accounts (no padding)",
+      "wrongUnits": [
+        {
+          "unit": 4,
+          "problem": "Implies the file account number is padded to 12",
+          "correct": "Lookup key: trimmed file Account_Number_3 (not padded) = RIGHT('000000000000'+ISNULL(CRM gen_bankaccountnumber,''),12). Only the CRM value is padded.",
+          "evidence": "DTSX:93742; DTSX:98569"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Update Customer Accounts At Rist|short",
+      "hash": "c6a1770013ed",
+      "verdict": "INCOMPLETE",
+      "detail": "The 'new / out of risk / no change' branches omit a written case. When CRM gen_accountatrisk is NULL and the file code is not 8217, the account is still UPDATED: gen_accountatrisk=false and both dates NULL (Update New Account -> Set Fields To Update branch 3 -> Need To Update always true). In the short this case falls under 'ללא שינוי -> אין עדכון', which is wrong.",
+      "evidence": "Check If To Update DTSX:93548 (ISNULL(gen_accountatriskDB)); Set Fields To Update main.cs:142-147; Need To Update main.cs:50",
+      "wrongUnits": [
+        {
+          "unit": 0,
+          "problem": "Missing branch",
+          "correct": "Third written case: no at-risk value in CRM (NULL) and file code not 8217 -> UPDATE gen_accountatrisk=false, update and removal dates NULL.",
+          "evidence": "DTSX:93548; Set Fields To Update main.cs:142-147"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Update Customer Accounts At Rist|detailed",
+      "hash": "17290911d7f9",
+      "verdict": "WRONG",
+      "detail": "Units 1, 2, 8-19, 22 and 25 match the code. Unit 3 says the account number is padded to 12, but only the CRM side is padded; the file Account_Number_3 is only trimmed in this flow. Units 20-24 describe a 'values differ?' decision whose 'no' branch cannot occur. For every row that reaches Need To Update, line 50 returns true: the at-risk value always changes (false->true or true->false) or the CRM value is NULL. So every row reaching Set Fields To Update is written.",
+      "evidence": "DTSX:93742; TRIM DTSX:98569; Need To Update main.cs:48-57; Set Fields To Update main.cs:120-147",
+      "wrongUnits": [
+        {
+          "unit": 3,
+          "problem": "'מספר החשבון (מרופד ל-12 ספרות)'",
+          "correct": "The trimmed, unpadded file Account_Number_3 is compared with the CRM gen_bankaccountnumber left-padded to 12. A file value shorter than 12 never matches.",
+          "evidence": "DTSX:93742; DTSX:98569"
+        },
+        {
+          "unit": 20,
+          "problem": "Presents a real 'no difference -> no update' outcome",
+          "correct": "Need To Update line 50 always returns true for the three routed cases (at-risk value changes, or CRM value is NULL), so the NoNeedToUpdate branch is unreachable and every routed account is updated.",
+          "evidence": "Need To Update main.cs:50; Check If To Update DTSX:93548"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Update Customer Accounts At Rist|detail",
+      "hash": "d9e3829d4a37",
+      "verdict": "WRONG",
+      "detail": "Unit 2 says 'לפי מספר חשבון מרופד ל-12 בלבד'. Only the CRM value is padded; the file value is only trimmed (no Add Leading Zeroes in this flow). The other units are correct: all subjects are used, one row per account, the UPDATE columns match DTSX:100193, and the 5 commands are identical.",
+      "evidence": "DTSX:93742; DTSX:98569; DTSX:100193",
+      "wrongUnits": [
+        {
+          "unit": 2,
+          "problem": "Padding attributed to the match key generally",
+          "correct": "The trimmed file account number is compared with RIGHT('000000000000'+CRM number,12). No bank or status filter applies.",
+          "evidence": "DTSX:93742; DTSX:98569"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Update Customer Accounts At Rist|decisions",
+      "hash": "2a5fb6648bce",
+      "verdict": "CONFIRMED",
+      "detail": "All 5 decision descriptions match the code and expressions: main.cs:54-77, DTSX:93740 key, DTSX:93548 conditions, main.cs:120-147, and Need To Update main.cs:50-56.",
+      "evidence": "as listed"
+    },
+    {
+      "id": "L|Package\\Update Customer Accounts At Rist|crm",
+      "hash": "9d7d936e8287",
+      "verdict": "CONFIRMED",
+      "detail": "UPDATE gen_customeraccountbase sets gen_accountatrisk, removal date, update date, ModifiedOn and ModifiedBy where gen_customeraccountid matches. It runs for accounts in the file whose CRM value is NULL or differs per 8217.",
+      "evidence": "DTSX:100193; DTSX:93548"
+    },
+    {
+      "id": "L|Package\\Update Customer Accounts At Rist|open",
+      "hash": "611b48a1cc82",
+      "verdict": "WRONG",
+      "detail": "Unit 1 is correct: full cache, no filter, one row per key. Unit 2 is labelled השערה, but the files settle it. Both scripts declare AT_RISK_WARNING = \"8217\" (Set Updates For Accounts main.cs:25, Set Fields To Update main.cs:78), and code 8217 is exactly what sets gen_accountatrisk = true (comment 'Update Customer Account At Risk', main.cs:119-122). By the project rule, code labels prove the meaning, so this is a fact, not a hypothesis.",
+      "evidence": "Set Updates For Accounts main.cs:25; Set Fields To Update main.cs:78,119-122",
+      "wrongUnits": [
+        {
+          "unit": 2,
+          "problem": "Labelled hypothesis although proven by code",
+          "correct": "8217 is the package's 'account at risk' warning code, proven by the AT_RISK_WARNING constant and its use to set gen_accountatrisk=true.",
+          "evidence": "main.cs:25 (DTSX:96722); main.cs:78,120-122 (DTSX:94967)"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Check File Existence|title",
+      "hash": "b9f1b26a1332",
+      "verdict": "WRONG",
+      "detail": "flow_he[1] 'קבצי *.gz -> פריסה' and the short_he imply that every gz file in the daily folder is extracted. The code first lists only files matching '*'+FileName+'*' (ScriptMain.cs:51). Only those whose extension contains .gz are extracted (line 55). gz files of other names are untouched. The other flow steps are correct.",
+      "evidence": "ScriptMain.cs:51-63 (DTSX:391)",
+      "wrongUnits": [
+        {
+          "unit": 3,
+          "problem": "'קבצי *.gz'",
+          "correct": "Files matching *<FileName>* whose extension contains '.gz' are decompressed into the same folder and moved to Archive GZ\\yyyy-MM-dd.",
+          "evidence": "ScriptMain.cs:51,55"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Check File Existence|short",
+      "hash": "deb0f1af0b8c",
+      "verdict": "CONFIRMED",
+      "detail": "High-level steps match ScriptMain.cs and PC DTSX:108916. isFileExist defaults to 0 (variable line 167), so with no file the expression constraint fails and nothing further runs.",
+      "evidence": "ScriptMain.cs:51-88; DTSX:108916; DTSX:167"
+    },
+    {
+      "id": "L|Package\\Check File Existence|detailed",
+      "hash": "b1c1b1d55132",
+      "verdict": "INCOMPLETE",
+      "detail": "Units 1, 3-12 are correct. Missing the failure branch of the GZ step. Parse_GZ rethrows decompression errors (lines 113-121), and MoveGZFileToArchive uses File.Copy without overwrite (line 97), which throws if a same-named file already sits in today's Archive GZ. Main() has no try/catch, so the Script Task fails, the Success constraint is not met, and the whole package stops before any CRM step. A partially decompressed file may remain in the folder.",
+      "evidence": "ScriptMain.cs:57-58, 93-98, 102-126; DTSX:108916",
+      "wrongUnits": [
+        {
+          "unit": 0,
+          "problem": "Failure branch omitted",
+          "correct": "If decompression fails, or the gz already exists in today's Archive GZ folder, an uncaught exception fails Check File Existence. No later step runs; the OnError handler marks the ETL process failed.",
+          "evidence": "ScriptMain.cs:97, 113-121; DTSX:108916"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Check File Existence|detail",
+      "hash": "8f69d7aa0d2c",
+      "verdict": "CONFIRMED",
+      "detail": "Population = *FileName* files in DailyFilePath, including extracted gz. No CRM write in this script.",
+      "evidence": "ScriptMain.cs:39-88"
+    },
+    {
+      "id": "L|Package\\Check File Existence|decisions",
+      "hash": "ac08da053492",
+      "verdict": "CONFIRMED",
+      "detail": "Line 55 file.Extension.ToLower().Contains(\".gz\"); line 65 files.Length > 0; PC Constraint 2 1 EvalOp=3 @[User::isFileExist] == TRUE.",
+      "evidence": "ScriptMain.cs:55,65; DTSX:108916"
+    },
+    {
+      "id": "L|Package\\Check File Existence|open",
+      "hash": "7b59d4494ff3",
+      "verdict": "CONFIRMED",
+      "detail": "DailyFilePath, FileName and DailyFileArchive have default 'FromDB' and are set at runtime by Set Organization Variables from gen_etlvariable rows (key/value). The values are not in the files.",
+      "evidence": "variables DTSX:125-158; Set Organization Variables main.cs:103-126"
+    },
+    {
+      "id": "L|Package\\Update close date where not exist in file|title",
+      "hash": "5a6bca9004f9",
+      "verdict": "CONFIRMED",
+      "detail": "SQL: 'update gen_warningnotebase set gen_closedate = ? where gen_existinfile = 0 and gen_closedate is null', with ? bound to User::LastBusinessDate. CRM connection.",
+      "evidence": "DTSX:92741-92742"
+    },
+    {
+      "id": "L|Package\\Update close date where not exist in file|short",
+      "hash": "05cbee829ca8",
+      "verdict": "CONFIRMED",
+      "detail": "Matches the SQL and the parameter.",
+      "evidence": "DTSX:92741"
+    },
+    {
+      "id": "L|Package\\Update close date where not exist in file|detailed",
+      "hash": "33cb0770c6fa",
+      "verdict": "CONFIRMED",
+      "detail": "Runs after Create And Update Warning Notes on Success (PC DTSX:108917). No bank or source filter. LastBusinessDate = yesterday stepped back over CalendarRule Friday/Saturday/Holiday dates, then .ToUniversalTime() (Get Last Business Date ScriptMain.cs:41-55), so UTC is correct. The existing-note lookup only sees gen_CloseDate IS NULL (DTSX:70554), so closed notes are never reopened and a new note is inserted instead.",
+      "evidence": "DTSX:92741; DTSX:89094; Get Last Business Date ScriptMain.cs:41-63; DTSX:70554"
+    },
+    {
+      "id": "L|Package\\Update close date where not exist in file|detail",
+      "hash": "266669b7effb",
+      "verdict": "CONFIRMED",
+      "detail": "Population and write are correct.",
+      "evidence": "DTSX:92741"
+    },
+    {
+      "id": "L|Package\\Update close date where not exist in file|decisions",
+      "hash": "19ded4422e56",
+      "verdict": "CONFIRMED",
+      "detail": "The WHERE clause matches exactly.",
+      "evidence": "DTSX:92741"
+    },
+    {
+      "id": "L|Package\\Update close date where not exist in file|crm",
+      "hash": "86abdf054a7e",
+      "verdict": "CONFIRMED",
+      "detail": "Direct SQL UPDATE of gen_closedate on the CRM connection.",
+      "evidence": "DTSX:92741"
+    },
+    {
+      "id": "L|Package\\Set contactlink existinfile false|title",
+      "hash": "335a20db0761",
+      "verdict": "CONFIRMED",
+      "detail": "SQL 'update gen_contactlinkBase set gen_existsinfile = 0', with no WHERE, on the CRM connection. Later steps: Update ContactLink sets gen_existsinfile=1 and gen_status=1, Create Contact link inserts with existsinfile=1, and Disabled contactlink sets gen_Status=2 where existsinfile=0.",
+      "evidence": "DTSX:92723; 50700; 37068; 87344"
+    },
+    {
+      "id": "L|Package\\Set contactlink existinfile false|short",
+      "hash": "9012f0ef2af8",
+      "verdict": "CONFIRMED",
+      "detail": "Matches.",
+      "evidence": "DTSX:92723"
+    },
+    {
+      "id": "L|Package\\Set contactlink existinfile false|detailed",
+      "hash": "f7eb512c161e",
+      "verdict": "CONFIRMED",
+      "detail": "Order is after Write Errors Step 2 (PC DTSX:108925) and before Create and update contactlink (PC DTSX:108927). The UPDATE has no filter. Re-marking happens through Update ContactLink (DTSX:50700) and Create Contact link (DTSX:37068, existsinfile=1). Disabling: DTSX:87344.",
+      "evidence": "DTSX:108925, 108927, 92723, 50700, 37068, 87344"
+    },
+    {
+      "id": "L|Package\\Set contactlink existinfile false|detail",
+      "hash": "6588e66886fa",
+      "verdict": "CONFIRMED",
+      "detail": "Correct.",
+      "evidence": "DTSX:92723"
+    },
+    {
+      "id": "L|Package\\Set contactlink existinfile false|crm",
+      "hash": "cccd9c025138",
+      "verdict": "CONFIRMED",
+      "detail": "Correct. The step runs only when a file exists (constraint chain from DTSX:108916).",
+      "evidence": "DTSX:92723; DTSX:108916"
+    },
+    {
+      "id": "L|Package\\Write CHN File To Staging|title",
+      "hash": "946d64274313",
+      "verdict": "CONFIRMED",
+      "detail": "Flat file CM 'Beneficiaries Source' is RaggedRight, CodePage 1255, 82 FlatFileColumns, with ConnectionString expression @[User::FullFileName]. The source feeds the OLE DB destination [dbo].[CHN_FileData] on GENERIX_STAGING directly. 80 of the 82 columns are mapped; the 2 unmapped are Filler and Filler_1.",
+      "evidence": "DTSX:4-12; DTSX:104559; DTSX:104754"
+    },
+    {
+      "id": "L|Package\\Write CHN File To Staging|short",
+      "hash": "36e73820aea7",
+      "verdict": "CONFIRMED",
+      "detail": "No transformation between source and destination. Error and truncation dispositions are FailComponent.",
+      "evidence": "Write CHN File To Staging paths; DTSX:104554-108000"
+    },
+    {
+      "id": "L|Package\\Write CHN File To Staging|detailed",
+      "hash": "2594c162cb44",
+      "verdict": "CONFIRMED",
+      "detail": "Truncate runs before the load (PC Constraint 25). Subject filters of later flows: Beneficiaries 01 (DTSX:13552, 85144), contactlink 03+5015 (40678), instruction provision 03 (60424), warning notes 04/05/06/12 (70447), phone 11 (102194). The at-risk flow reads all rows regardless of subject, which unit 5 does not list but does not contradict.",
+      "evidence": "DTSX:92735; 108922; splits listed"
+    },
+    {
+      "id": "L|Package\\Write CHN File To Staging|detail",
+      "hash": "e12706030b7c",
+      "verdict": "CONFIRMED",
+      "detail": "No CRM write; staging only.",
+      "evidence": "DTSX:104559"
+    }
+  ]
+}

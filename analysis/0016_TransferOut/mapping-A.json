@@ -1,0 +1,256 @@
+{
+  "package": "0016_TransferOut",
+  "dataFlows": [
+    "Package\\Close Transfer Out"
+  ],
+  "analyst": "ssis-field-lineage",
+  "source": {
+    "file": "source/DailyProcess/0016_TransferOut.dtsx",
+    "sha256": "FE7489856D80B9311DD7BC289CA21C6A1FF23FCBD2365BC9F421A40A74A91A37"
+  },
+  "scriptOutputs": [],
+  "crmWrites": [
+    {
+      "component": "Package\\Close Transfer Out\\Close Transfer Out",
+      "identicalCopies": [],
+      "entity": "gen_customercare",
+      "verb": "UPDATE",
+      "mechanism": "SDK (CRM.Proxy ExecuteMultipleExtension, RequestType.Update, batches of 1000 + final flush at EndOfRowset)",
+      "status": "Supported",
+      "recordKey": "customerCareEntity[\"gen_customercareid\"] = Row.GencustomercareId (main.cs:72) - the primary-key attribute is put in the attribute collection (entity.Id is not set); the record is the open transfer-out request Tout.Gen_customercareId (Gen_customercare with Gen_currentstate = 1, SQL DTSX 2120, 2137), grouped by 'Aggregate' (GROUP BY Gen_customercareId, Gen_deliverydate, gen_appendixghissuingdate)",
+      "recordKeyColumns": [
+        "Gen_customercareId"
+      ],
+      "declaredRowFilters": [],
+      "condition": "Data flow runs after 'Create ETL Process record' (Success). Source SQL (DTSX 2119-2145, conn [psql] = psql/altshuler_mscrm): Gen_customercare Tout with Gen_currentstate = 1, joined to its gen_accountcourses (ac.gen_customercare), to Gen_ftCurrentYear rows of the same fund (ac.gen_fundnumber = ft.gen_fundnumber) whose transaction type has gen_transgrouptype = 2 and whose Gen_EntryDate > Tout.CreatedOn; grouped per (customer care, isfulltransfer, deliverydate, account course, ft.gen_valuedate, ft.gen_appendixghissuingdate). Routing: 'Is full transfer out' (Gen_isfulltransfer == TRUE, DTSX 2094) -> IsFull -> 'Check number of transactions' Has Transactions (transferCount > 0, DTSX 164); else Not full -> 'Compare sums' Sums Are Equal (!ISNULL(actual) && !ISNULL(expected) && actualTransactionAmount == expectedTransactionAmount, DTSX 1289). Both pass via Union All to 'Aggregate' (DTSX 88), which emits one row per (Gen_customercareId, Gen_deliverydate, gen_appendixghissuingdate) with MIN(gen_valuedate). Every row reaching the script is added to the update batch (no in-script filter). A NOT-full transfer is closed as soon as ONE (account course, value date, appendix date) group has equal sums - other account courses of the same request are not required to match.",
+      "attributes": [
+        {
+          "attribute": "gen_fundreleasedate",
+          "from": [
+            {
+              "column": "gen_valuedate",
+              "role": "value"
+            }
+          ],
+          "expression": "customerCareEntity[\"gen_fundreleasedate\"] = Row.genvaluedate.ToLocalTime() (code comment: 'min entry date'). Row.genvaluedate = MIN(ft.gen_valuedate) per Aggregate group (AggregationType 6 = Minimum, DTSX 133) over the Gen_ftCurrentYear rows that passed the splits. ToLocalTime() treats the (Unspecified-kind) DB value as UTC and converts it to the SSIS server's local time before sending.",
+          "fixedValue": null,
+          "condition": "!Row.genvaluedate_IsNull (otherwise the attribute is not sent)",
+          "evidence": "main.cs:74-75 (DTSX 382-383); Aggregate gen_valuedate output DTSX 130-135 (AggregationType 6 at 133); SQL DTSX 2124",
+          "declaredSources": [
+            {
+              "db": "Gen_ftCurrentYear.gen_valuedate",
+              "role": "value",
+              "why": "SQL alias ft.gen_valuedate, ft = Gen_ftCurrentYear joined on ac.gen_fundnumber = ft.gen_fundnumber (financial transactions of the account course's fund, gen_transgrouptype = 2, Gen_EntryDate > request CreatedOn); minimum taken by Aggregate",
+              "evidence": "SQL DTSX 2124, 2132, 2135-2136; Aggregate DTSX 133"
+            },
+            {
+              "db": "Gen_customercare.Gen_isfulltransfer",
+              "role": "condition",
+              "why": "Gen_isfulltransfer of the request: 'Is full transfer out' (Gen_isfulltransfer == TRUE) chooses the gate - full: transferCount > 0; not full: actualTransactionAmount == expectedTransactionAmount",
+              "evidence": "Is full transfer out DTSX 2094; SQL DTSX 2121"
+            },
+            {
+              "db": "Close Transfer Out\\OLE DB Source: transferCount",
+              "role": "condition",
+              "why": "transferCount = count(ft.Gen_ftCurrentYearId): full transfers pass only when > 0 (always >= 1 because ft is inner-joined)",
+              "evidence": "Check number of transactions DTSX 164; SQL DTSX 2127"
+            },
+            {
+              "db": "Close Transfer Out\\OLE DB Source: actualTransactionAmount",
+              "role": "condition",
+              "why": "actualTransactionAmount = sum(ISNULL(ft.gen_transtotalamount,0)): not-full transfers pass only when non-NULL and equal to expectedTransactionAmount",
+              "evidence": "Compare sums DTSX 1289; SQL DTSX 2125"
+            },
+            {
+              "db": "Close Transfer Out\\OLE DB Source: expectedTransactionAmount",
+              "role": "condition",
+              "why": "expectedTransactionAmount = sum(ISNULL(ac.gen_transactionamount,0)) over the joined rows: not-full transfers pass only when non-NULL and equal to actualTransactionAmount",
+              "evidence": "Compare sums DTSX 1289; SQL DTSX 2126"
+            }
+          ]
+        },
+        {
+          "attribute": "gen_rejectreason",
+          "from": [],
+          "expression": "new OptionSetValue(REJECT_REASON_PROPER) with const int REJECT_REASON_PROPER = 34 (literal; meaning of option 34 by constant name only: 'proper')",
+          "fixedValue": 34,
+          "condition": null,
+          "evidence": "main.cs:33, 77 (DTSX 341, 385)",
+          "declaredSources": [
+            {
+              "db": "Gen_customercare.Gen_isfulltransfer",
+              "role": "condition",
+              "why": "Gen_isfulltransfer of the request: 'Is full transfer out' (Gen_isfulltransfer == TRUE) chooses the gate - full: transferCount > 0; not full: actualTransactionAmount == expectedTransactionAmount",
+              "evidence": "Is full transfer out DTSX 2094; SQL DTSX 2121"
+            },
+            {
+              "db": "Close Transfer Out\\OLE DB Source: transferCount",
+              "role": "condition",
+              "why": "transferCount = count(ft.Gen_ftCurrentYearId): full transfers pass only when > 0 (always >= 1 because ft is inner-joined)",
+              "evidence": "Check number of transactions DTSX 164; SQL DTSX 2127"
+            },
+            {
+              "db": "Close Transfer Out\\OLE DB Source: actualTransactionAmount",
+              "role": "condition",
+              "why": "actualTransactionAmount = sum(ISNULL(ft.gen_transtotalamount,0)): not-full transfers pass only when non-NULL and equal to expectedTransactionAmount",
+              "evidence": "Compare sums DTSX 1289; SQL DTSX 2125"
+            },
+            {
+              "db": "Close Transfer Out\\OLE DB Source: expectedTransactionAmount",
+              "role": "condition",
+              "why": "expectedTransactionAmount = sum(ISNULL(ac.gen_transactionamount,0)) over the joined rows: not-full transfers pass only when non-NULL and equal to actualTransactionAmount",
+              "evidence": "Compare sums DTSX 1289; SQL DTSX 2126"
+            }
+          ]
+        },
+        {
+          "attribute": "gen_currentstate",
+          "from": [],
+          "expression": "new OptionSetValue(CURRENT_STATE_FINISHED) with const int CURRENT_STATE_FINISHED = 3 (literal; closes the request)",
+          "fixedValue": 3,
+          "condition": null,
+          "evidence": "main.cs:34, 78 (DTSX 342, 386)",
+          "declaredSources": [
+            {
+              "db": "Gen_customercare.Gen_isfulltransfer",
+              "role": "condition",
+              "why": "Gen_isfulltransfer of the request: 'Is full transfer out' (Gen_isfulltransfer == TRUE) chooses the gate - full: transferCount > 0; not full: actualTransactionAmount == expectedTransactionAmount",
+              "evidence": "Is full transfer out DTSX 2094; SQL DTSX 2121"
+            },
+            {
+              "db": "Close Transfer Out\\OLE DB Source: transferCount",
+              "role": "condition",
+              "why": "transferCount = count(ft.Gen_ftCurrentYearId): full transfers pass only when > 0 (always >= 1 because ft is inner-joined)",
+              "evidence": "Check number of transactions DTSX 164; SQL DTSX 2127"
+            },
+            {
+              "db": "Close Transfer Out\\OLE DB Source: actualTransactionAmount",
+              "role": "condition",
+              "why": "actualTransactionAmount = sum(ISNULL(ft.gen_transtotalamount,0)): not-full transfers pass only when non-NULL and equal to expectedTransactionAmount",
+              "evidence": "Compare sums DTSX 1289; SQL DTSX 2125"
+            },
+            {
+              "db": "Close Transfer Out\\OLE DB Source: expectedTransactionAmount",
+              "role": "condition",
+              "why": "expectedTransactionAmount = sum(ISNULL(ac.gen_transactionamount,0)) over the joined rows: not-full transfers pass only when non-NULL and equal to actualTransactionAmount",
+              "evidence": "Compare sums DTSX 1289; SQL DTSX 2126"
+            }
+          ]
+        },
+        {
+          "attribute": "gen_appendixghissuingdate",
+          "from": [
+            {
+              "column": "gen_appendixghissuingdate",
+              "role": "value"
+            }
+          ],
+          "expression": "customerCareEntity[\"gen_appendixghissuingdate\"] = Row.genappendixghissuingdate.ToLocalTime(). Value = ft.gen_appendixghissuingdate of the Gen_ftCurrentYear rows (a GROUP BY key both in the SQL and in 'Aggregate', AggregationType 0, DTSX 141) - unchanged except ToLocalTime().",
+          "fixedValue": null,
+          "condition": "!Row.genappendixghissuingdate_IsNull (otherwise not sent)",
+          "evidence": "main.cs:80-81 (DTSX 388-389); Aggregate gen_appendixghissuingdate output DTSX 138-143 (AggregationType 0 at 141); SQL DTSX 2128, 2145",
+          "declaredSources": [
+            {
+              "db": "Gen_ftCurrentYear.gen_appendixghissuingdate",
+              "role": "value",
+              "why": "SQL alias ft.gen_appendixghissuingdate, ft = Gen_ftCurrentYear joined via ac.gen_fundnumber",
+              "evidence": "SQL DTSX 2128, 2132"
+            },
+            {
+              "db": "Gen_customercare.Gen_isfulltransfer",
+              "role": "condition",
+              "why": "Gen_isfulltransfer of the request: 'Is full transfer out' (Gen_isfulltransfer == TRUE) chooses the gate - full: transferCount > 0; not full: actualTransactionAmount == expectedTransactionAmount",
+              "evidence": "Is full transfer out DTSX 2094; SQL DTSX 2121"
+            },
+            {
+              "db": "Close Transfer Out\\OLE DB Source: transferCount",
+              "role": "condition",
+              "why": "transferCount = count(ft.Gen_ftCurrentYearId): full transfers pass only when > 0 (always >= 1 because ft is inner-joined)",
+              "evidence": "Check number of transactions DTSX 164; SQL DTSX 2127"
+            },
+            {
+              "db": "Close Transfer Out\\OLE DB Source: actualTransactionAmount",
+              "role": "condition",
+              "why": "actualTransactionAmount = sum(ISNULL(ft.gen_transtotalamount,0)): not-full transfers pass only when non-NULL and equal to expectedTransactionAmount",
+              "evidence": "Compare sums DTSX 1289; SQL DTSX 2125"
+            },
+            {
+              "db": "Close Transfer Out\\OLE DB Source: expectedTransactionAmount",
+              "role": "condition",
+              "why": "expectedTransactionAmount = sum(ISNULL(ac.gen_transactionamount,0)) over the joined rows: not-full transfers pass only when non-NULL and equal to actualTransactionAmount",
+              "evidence": "Compare sums DTSX 1289; SQL DTSX 2126"
+            }
+          ]
+        },
+        {
+          "attribute": "gen_deliverydelay",
+          "from": [
+            {
+              "column": "Gen_deliverydate",
+              "role": "value"
+            },
+            {
+              "column": "gen_valuedate",
+              "role": "value"
+            }
+          ],
+          "expression": "customerCareEntity[\"gen_deliverydelay\"] = IsDeliveryDelay(Row.Gendeliverydate, Row.genvaluedate) (bool): days = DateAndTime.DateDiff(DateInterval.Day, deliveryDate, entryDate); return days > 0. deliveryDate = Tout.Gen_deliverydate (the request's delivery date, Aggregate GROUP BY key); entryDate parameter = MIN(ft.gen_valuedate) (not an entry date despite the name). True when the earliest value date is later than the delivery date by at least one day per VB DateDiff(Day) semantics; compared on the raw DB values (no ToLocalTime here).",
+          "fixedValue": null,
+          "condition": "!Row.Gendeliverydate_IsNull && !Row.genvaluedate_IsNull (otherwise not sent)",
+          "evidence": "main.cs:83, 140-146 (DTSX 391, 448-454); Aggregate Gen_deliverydate output DTSX 122-127 (AggregationType 0 = group by at 125), gen_valuedate DTSX 130-135 (MIN at 133); SQL DTSX 2122, 2124",
+          "declaredSources": [
+            {
+              "db": "Gen_customercare.Gen_deliverydate",
+              "role": "value",
+              "why": "SQL alias Tout.Gen_deliverydate, compared with MIN(gen_valuedate) to compute the delay flag",
+              "evidence": "SQL DTSX 2122"
+            },
+            {
+              "db": "Gen_ftCurrentYear.gen_valuedate",
+              "role": "value",
+              "why": "MIN(ft.gen_valuedate) per Aggregate group, compared with the delivery date",
+              "evidence": "SQL DTSX 2124; Aggregate DTSX 133"
+            },
+            {
+              "db": "Gen_customercare.Gen_isfulltransfer",
+              "role": "condition",
+              "why": "Gen_isfulltransfer of the request: 'Is full transfer out' (Gen_isfulltransfer == TRUE) chooses the gate - full: transferCount > 0; not full: actualTransactionAmount == expectedTransactionAmount",
+              "evidence": "Is full transfer out DTSX 2094; SQL DTSX 2121"
+            },
+            {
+              "db": "Close Transfer Out\\OLE DB Source: transferCount",
+              "role": "condition",
+              "why": "transferCount = count(ft.Gen_ftCurrentYearId): full transfers pass only when > 0 (always >= 1 because ft is inner-joined)",
+              "evidence": "Check number of transactions DTSX 164; SQL DTSX 2127"
+            },
+            {
+              "db": "Close Transfer Out\\OLE DB Source: actualTransactionAmount",
+              "role": "condition",
+              "why": "actualTransactionAmount = sum(ISNULL(ft.gen_transtotalamount,0)): not-full transfers pass only when non-NULL and equal to expectedTransactionAmount",
+              "evidence": "Compare sums DTSX 1289; SQL DTSX 2125"
+            },
+            {
+              "db": "Close Transfer Out\\OLE DB Source: expectedTransactionAmount",
+              "role": "condition",
+              "why": "expectedTransactionAmount = sum(ISNULL(ac.gen_transactionamount,0)) over the joined rows: not-full transfers pass only when non-NULL and equal to actualTransactionAmount",
+              "evidence": "Compare sums DTSX 1289; SQL DTSX 2126"
+            }
+          ]
+        }
+      ],
+      "evidence": "Close Transfer Out script (DTSX 184) main.cs:33-34, 41-47, 67-146 (DTSX = 308 + main.cs line; sha c53e76b472c9); source SQL DTSX 2119-2145; splits DTSX 164, 1289, 2094; Aggregate DTSX 88-145"
+    }
+  ],
+  "readWriteModifications": [],
+  "lookupBridges": [],
+  "unresolved": [],
+  "notes": [
+    "Scope: the lineage lists 3 script write components. Only 'Close Transfer Out\\Close Transfer Out' is business logic (gen_customercare update: 5 attributes + the primary-key attribute gen_customercareid used as record identifier). 'Close Transfer Out\\ETL Warning' (Create gen_etlprocesswarning) and 'End ETL Process record\\ETL Record Finish' (Update gen_etlprocess) are ETL plumbing and not mapped; their open script outputs (Close Transfer Out.CastingError/Error.Description, Get gen_etlprocessid.gen_etlprocessid) are intentionally left unresolved. Control-flow 'Create ETL Process record' is plumbing.",
+    "Record identification: the code sets customerCareEntity[\"gen_customercareid\"] (main.cs:72) and never entity.Id. That the CRM Update resolves the record from the primary-key attribute is standard CRM SDK behaviour, but ExecuteMultipleExtension (CRM.Proxy / CRM2015.Proxy.dll, not supplied) could also handle it - external_unknown.",
+    "Multiple updates per request: 'Aggregate' groups by Gen_customercareId + Gen_deliverydate + gen_appendixghissuingdate (DTSX 117, 125, 141). A request whose matching transactions carry different gen_appendixghissuingdate values (incl. NULL) yields several rows -> several Update requests for the same gen_customercare, each with its own MIN(gen_valuedate), appendix date and delay flag; which one is applied last is not determined by the package.",
+    "expectedTransactionAmount = sum(ISNULL(ac.gen_transactionamount,0)) is summed over the joined ft rows of the SQL group (SQL DTSX 2126), i.e. the account-course amount multiplied by the number of transactions in that (account course, value date, appendix date) group; actualTransactionAmount sums those transactions' gen_transtotalamount. 'Sums Are Equal' therefore compares N x expected with the total of N transactions. Reported as observed SQL arithmetic; business intent not verified.",
+    "'Check number of transactions' (transferCount > 0) can never reject a row: count(ft.Gen_ftCurrentYearId) is over an inner join to Gen_ftCurrentYear, so every group has at least one ft row (SQL DTSX 2127, 2133). Full transfers are closed whenever at least one qualifying transaction exists.",
+    "Batch failure handling: ExcecuteBulk() runs inside the per-row try (main.cs:87-88); if it throws, only the current row goes to CastingError, myEntities.Clear() (main.cs:125) is skipped, the list then exceeds 1000 and the '== 1000' flush never fires again; everything left is sent in one request at EndOfRowset (main.cs:134-137) outside any try. ExecuteMultiple faults go to the Error output (main.cs:113-117) -> ETL Warning. No Fault -> the row is considered done; output 'Output 0' (sync) has no path.",
+    "Time handling: gen_fundreleasedate and gen_appendixghissuingdate are sent as value.ToLocalTime() (SSIS server time zone); gen_deliverydelay compares the raw DB values. Whether the source views return UTC (CRM non-filtered views) is not provable from the package; the net effect on the stored value depends on the CRM attribute behaviour (external_unknown)."
+  ]
+}

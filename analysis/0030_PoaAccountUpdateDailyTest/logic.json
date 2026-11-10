@@ -1,0 +1,598 @@
+{
+ "package": "0030_PoaAccountUpdateDailyTest",
+ "analyst": "ssis-business-logic",
+ "source": {
+  "file": "source/DailyProcess/0030_PoaAccountUpdateDailyTest.dtsx",
+  "sha256": "95908C42C72F0D604243BF30C049A07C0C21CE9F97F1AECCF350C2F83DB2EA1C",
+  "lines": 9662
+ },
+ "scopeNote_he": "הכתיבה העסקית היחידה ל-CRM היא עדכון SQL ישיר (OLE DB Command 'Update NeedToSendMailBit') על Gen_powerofattorneyBase דרך [CRM] = psql/ALTSHULER_MSCRM (DTSX:4). זו טבלת הבסיס של ה-CRM, ולכן זו כתיבה Unsupported. שאר הפלט העסקי נכתב לטבלה dbo.PowerOfAttorneySendEmails דרך [SQL.GENERIX_STAGING] = psql/GENERIX_STAGING (DTSX:9). זה לא ה-CRM, ומי שצורך את הטבלה לא ידוע (external_unknown). כתיבת ה-SDK היחידה בחבילה היא gen_etlprocesscounter ורשומות gen_etlprocess (מסגרת). בחבילה אין Package Configuration (רשימת configurations ריקה) ואין Event Handlers. יש log provider ל-[SRS.SSIS_Logs] (psrs/SSIS_Logs). את דריסת החיבורים מחוץ לחבילה (למשל ‎/SET או ‎/CONN ב-Job) אי אפשר לשלול מהקובץ.",
+ "summary_he": "החבילה מכינה נתוני מכתבים לסוכנים על שינויים בייפויי כוח ברמת חשבון או תוכנית (gen_powerofattorney). ייפוי כוח ממתין שהגיע מועדו מחליף ייפוי כוח פעיל של סוכן אחר. במקרה כזה החבילה מסמנת ב-SQL ישיר על ייפוי הכוח הפעיל הישן אם יידרש לו מייל ביטול, ורושמת ב-staging שורת מכתב 'ייפוי כוח חדש'. לייפויי כוח פעילים שפג תוקפם נרשמת ב-staging שורת מכתב ביטול. בחבילה הזו אין עדכון של סטטוס ייפוי הכוח עצמו ב-CRM.",
+ "executionOrder": [
+  {
+   "step": 1,
+   "refId": "Package\\Get Organization Variables",
+   "title_he": "טעינת משתני ארגון (מסגרת)",
+   "trigger": "start (no incoming constraint)"
+  },
+  {
+   "step": 2,
+   "refId": "Package\\Create ETL Process Record",
+   "title_he": "רשומת תהליך ETL (מסגרת)",
+   "trigger": "after Get Organization Variables · Success (DTSX:8218)"
+  },
+  {
+   "step": 3,
+   "refId": "Package\\Get Valid Optionsets Values",
+   "title_he": "ערכי OptionSet (לא בשימוש בהמשך)",
+   "trigger": "after Create ETL Process Record · Success (DTSX:8219)"
+  },
+  {
+   "step": 4,
+   "refId": "Package\\Set Queue Id Variable",
+   "title_he": "מזהה תור (לא בשימוש בהמשך)",
+   "trigger": "after Get Valid Optionsets Values · Success (DTSX:8221)"
+  },
+  {
+   "step": 5,
+   "refId": "Package\\Handle Wait Status - For Active",
+   "title_he": "ייפויי כוח ממתינים שהגיע מועדם",
+   "trigger": "after Set Queue Id Variable · Success (DTSX:8222)"
+  },
+  {
+   "step": 6,
+   "refId": "Package\\Handle Active Status - For Cancel",
+   "title_he": "ייפויי כוח פעילים שפג תוקפם",
+   "trigger": "after Handle Wait Status - For Active · Success (DTSX:8223)"
+  },
+  {
+   "step": 7,
+   "refId": "Package\\Write To ETLProcessCounter End",
+   "title_he": "מונים (מסגרת)",
+   "trigger": "after Handle Active Status - For Cancel · Success (DTSX:8224)"
+  },
+  {
+   "step": 8,
+   "refId": "Package\\End ETL Process Record",
+   "title_he": "סיום רשומת תהליך ETL (מסגרת)",
+   "trigger": "after Write To ETLProcessCounter End · Success (DTSX:8220)"
+  }
+ ],
+ "ignoredAsFramework": [
+  "Package\\Get Organization Variables",
+  "Package\\Create ETL Process Record",
+  "Package\\Get Valid Optionsets Values",
+  "Package\\Set Queue Id Variable",
+  "Package\\Write To ETLProcessCounter End",
+  "Package\\End ETL Process Record",
+  "LogProvider: SSIS log provider for SQL Server → [SRS.SSIS_Logs]"
+ ],
+ "components": [
+  {
+   "refId": "Package\\Handle Wait Status - For Active",
+   "title_he": "ייפויי כוח ממתינים שהגיע מועדם",
+   "techName": "Handle Wait Status - For Active",
+   "short_he": "לכל ייפוי כוח ממתין שהגיע מועדו בודקים אם הוא מחליף ייפוי כוח פעיל של סוכן אחר באותו חשבון או תוכנית. אם כן, ייפוי הכוח הישן מסומן ב-CRM לשליחת מייל ביטול (לפי סוג הנספח שלו), ונרשמת ב-staging שורת מכתב 'ייפוי כוח חדש'. בכל מקרה אחר נרשמת שורה 'ללא אימייל'.",
+   "flow_he": [
+    "שליפת ייפויי כוח ממתינים שהגיע מועדם (בלי סוכנויות החברה)",
+    "חיפוש ייפוי כוח פעיל באותו חשבון או תוכנית",
+    "סוכן אחר: סימון 'נדרש מייל ביטול' בייפוי הכוח הישן (SQL ישיר)",
+    "בחירת סוג המכתב לפי הנספח והמינוי",
+    "כתיבת השורה לטבלת staging"
+   ],
+   "short": {
+    "nodes": [
+     {
+      "type": "step",
+      "text": "נשלפים ייפויי כוח ממתינים שתאריך ההתחלה שלהם הגיע, בלי ייפויי כוח של סוכנויות החברה עצמה."
+     },
+     {
+      "type": "decision",
+      "text": "האם לחשבון או לתוכנית יש כבר ייפוי כוח פעיל של סוכן אחר?",
+      "branches": [
+       {
+        "label": "כן, סוכן אחר",
+        "nodes": [
+         {
+          "type": "write",
+          "text": "בייפוי הכוח הפעיל הישן נרשם ב-CRM אם יידרש לו מייל ביטול. זה נקבע לפי סוג הנספח שלו."
+         },
+         {
+          "type": "step",
+          "text": "אם הנספח של ייפוי הכוח החדש הוא 2, 3 או 5, נרשם מכתב 'ייפוי כוח חדש' (עם עמלה או בלי). אחרת נרשמת שורה 'ללא אימייל'."
+         }
+        ]
+       },
+       {
+        "label": "לא, או שזה אותו סוכן (חידוש)",
+        "nodes": [
+         {
+          "type": "step",
+          "text": "נרשמת שורה 'ללא אימייל'."
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "type": "step",
+      "text": "כל השורות נשמרות בטבלת מכתבים ב-staging. החבילה לא מפעילה את ייפוי הכוח הממתין ב-CRM."
+     },
+     {
+      "type": "end",
+      "text": "יש נתוני מכתבים לסוכנים, וייפויי הכוח הישנים מסומנים לקראת מייל ביטול."
+     }
+    ]
+   },
+   "detailed": {
+    "nodes": [
+     {
+      "type": "step",
+      "text": "האוכלוסייה היא ייפויי כוח בסטטוס 3 שתאריך ההתחלה שלהם עבר. ייפוי כוח שמספר הזהות של הסוכן או הסוכנות שלו ברשימה של שש ישויות מוחרג. לפי הערה בשאילתה אלה סוכנויות של אלטשולר.",
+      "tech": "Get Waiting Poa DTSX:5373-5419 · [CRM] · poa.Gen_startdate <= GETDATE() and poa.Gen_currentstate = 3 · agentcyIdNumber not in ('515092484','513334151','513173393','513173493','514979715','515462380') · agentcyIdNumber = isnull(Contact.Gen_Identitynumber, Account.AccountNumber)"
+     },
+     {
+      "type": "step",
+      "text": "בשאילתה מצורפים נתוני ייפוי הכוח הראשי (מינוי סוכן ותאריך קבלה), הלקוח, הסוכנות והסוכן. תאריכי ההתחלה והסיום מוזזים ב-3 שעות.",
+      "tech": "poamain.gen_agentappointment as gen_appointmentofagent · dateadd(HH,3,...)"
+     },
+     {
+      "type": "decision",
+      "text": "האם לאותו חשבון או לאותה תוכנית יש ייפוי כוח פעיל?",
+      "tech": "Lookup Match PowerOfAttorney By CustomerAccount Or CustomerProgram DTSX:5541 · ref: Gen_powerofattorney where Gen_currentstate = 1 · key isnull(Gen_CustomerAccount, gen_customerprogram) · Full cache · NoMatchBehavior=1",
+      "branches": [
+       {
+        "label": "לא נמצא ייפוי כוח פעיל",
+        "nodes": [
+         {
+          "type": "step",
+          "text": "נרשמת שורה 'ללא אימייל', מסומנת כמטופלת.",
+          "tech": "Lookup No Match → Union All → No Email DTSX:5722: NewStatus=1, EmailFormat=\" ללא אימייל\", IsProcessed=TRUE"
+         }
+        ]
+       },
+       {
+        "label": "נמצא ייפוי כוח פעיל",
+        "nodes": [
+         {
+          "type": "decision",
+          "text": "האם ייפוי הכוח הפעיל שייך לאותו סוכן או סוכנות (לפי מספר זהות)?",
+          "tech": "Is Renewal DTSX:5507 · Renewal: agentcyIdNumberPa == agentcyIdNumber · Renewal output errorRowDisposition=FailComponent (DTSX:5518)",
+          "branches": [
+           {
+            "label": "כן, חידוש",
+            "nodes": [
+             {
+              "type": "step",
+              "text": "נרשמת שורה 'ללא אימייל', מסומנת כמטופלת.",
+              "tech": "Renewal → Union All → No Email"
+             }
+            ]
+           },
+           {
+            "label": "לא, סוכן אחר",
+            "nodes": [
+             {
+              "type": "write",
+              "text": "בייפוי הכוח הפעיל הישן (של הסוכן הקודם) נקבע 'נדרש מייל ביטול'. הערך הוא כן אם סוג הנספח של ייפוי הכוח הישן הוא 2, 3 או 5, ולא בכל מקרה אחר.",
+              "tech": "Update NeedToSendMailBit DTSX:6658-6668 · [CRM] psql/ALTSHULER_MSCRM · update Gen_powerofattorneyBase set gen_iscancellationemailrequired = case when Gen_appendixtype in 2/3/5 then 1 else 0 end where Gen_powerofattorneyId = ? (? = PowerOfAttorneyIdPa) · SQL (Unsupported)"
+             },
+             {
+              "type": "decision",
+              "text": "האם סוג הנספח של ייפוי הכוח החדש מחייב מכתב?",
+              "tech": "AppendixType DTSX:5307 · gen_appendixtype == 2 || gen_appendixtype == 3 || gen_appendixtype == 5 (gen_appendixtype של ייפוי הכוח הממתין) · AppendixTypeNeedToSendMail errorRowDisposition=FailComponent (DTSX:5317)",
+              "branches": [
+               {
+                "label": "כן, נספח 2, 3 או 5",
+                "nodes": [
+                 {
+                  "type": "decision",
+                  "text": "האם בייפוי הכוח הראשי יש מינוי סוכן?",
+                  "tech": "Check Format By Appointment Of Agent DTSX:5340 · Without: ISNULL(gen_appointmentofagent) || gen_appointmentofagent == FALSE",
+                  "branches": [
+                   {
+                    "label": "אין מינוי",
+                    "nodes": [
+                     {
+                      "type": "step",
+                      "text": "נקבע מכתב 'עדכון ייפוי כוח חדש', גרסה 1, ממתין לטיפול.",
+                      "tech": "New Poa Without Commssion DTSX:5671: NewStatus=1, EmailFormat=\"עדכון ייפוי כוח חדש\", IsProcessed=FALSE, LetterVersion=1"
+                     }
+                    ]
+                   },
+                   {
+                    "label": "יש מינוי",
+                    "nodes": [
+                     {
+                      "type": "step",
+                      "text": "נקבע מכתב 'עדכון ייפוי כוח חדש כולל עמלה', גרסה 2, ממתין לטיפול.",
+                      "tech": "New Poa With Commission DTSX:5620: NewStatus=1, EmailFormat=\"עדכון ייפוי כוח חדש כולל עמלה\", IsProcessed=FALSE, LetterVersion=2"
+                     }
+                    ]
+                   }
+                  ]
+                 }
+                ]
+               },
+               {
+                "label": "לא",
+                "nodes": [
+                 {
+                  "type": "step",
+                  "text": "נרשמת שורה 'ללא אימייל', מסומנת כמטופלת.",
+                  "tech": "AppendixTypeNoMail → Union All → No Email"
+                 }
+                ]
+               },
+               {
+                "label": "סוג הנספח של ייפוי הכוח הממתין ריק (NULL)",
+                "nodes": [
+                 {
+                  "type": "step",
+                  "text": "השורה לא מגיעה ל'ללא אימייל'. התנאי מחזיר NULL, וזו שגיאה שמכשילה את הרכיב ואת זרימת הנתונים (התנהגות SSIS כללית, לא מתוך הקובץ). עדכון ה-SQL על ייפוי הכוח הפעיל הישן כבר בוצע לפני כן.",
+                  "tech": "Update NeedToSendMailBit (DTSX:6658) → AppendixType · FailComponent DTSX:5317"
+                 }
+                ]
+               }
+              ]
+             }
+            ]
+           },
+           {
+            "label": "מספר הזהות של ייפוי הכוח הפעיל ריק (NULL)",
+            "nodes": [
+             {
+              "type": "step",
+              "text": "השורה לא עוברת לאף ענף. התנאי מחזיר NULL, וזו שגיאה שמכשילה את הרכיב ואת זרימת הנתונים (התנהגות SSIS כללית, לא מתוך הקובץ).",
+              "tech": "agentcyIdNumber של ייפוי הכוח הממתין לא יכול להיות NULL (מסונן ב-NOT IN). agentcyIdNumberPa יכול להיות NULL · FailComponent DTSX:5518"
+             }
+            ]
+           }
+          ]
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "type": "step",
+      "text": "כל השורות נכתבות לטבלת המכתבים ב-staging, ולא ל-CRM. נשמרים פרטי הלקוח, הנספח, התאריכים, הסטטוס לפני ('3') ואחרי ('1'), שם המכתב, מזהה ייפוי הכוח, מזהה הסוכן ושם החשבון.",
+      "tech": "Write To PowerOfAttorneySendEmails Table DTSX:6701 · [SQL.GENERIX_STAGING] psql/GENERIX_STAGING · dbo.PowerOfAttorneySendEmails · 14 columns"
+     },
+     {
+      "type": "end",
+      "text": "יש נתוני מכתבים לסוכנים, וייפויי כוח פעילים של סוכנים שהוחלפו מסומנים אם נדרש להם מייל ביטול. ייפוי הכוח הממתין לא מופעל ב-CRM על ידי החבילה הזו."
+     }
+    ]
+   },
+   "detail_he": [
+    {
+     "h": "מקור ואוכלוסייה",
+     "t": "Gen_powerofattorney בסטטוס gen_currentstate=3 עם Gen_startdate <= GETDATE(), בלי מספרי הזהות של שש הסוכנויות שברשימה (לפי ההערה בשאילתה, הסוכנויות של אלטשולר). שורות שבהן agentcyIdNumber הוא NULL נופלות גם הן, בגלל אופן הפעולה של NOT IN."
+    },
+    {
+     "h": "התאמה לרשומות קיימות",
+     "t": "ייפוי כוח פעיל (gen_currentstate=1) מותאם לפי isnull(Gen_CustomerAccount, gen_customerprogram). חידוש מזוהה כשמספר הזהות של הסוכן או הסוכנות זהה (isnull(Contact.Gen_Identitynumber, Account.AccountNumber))."
+    },
+    {
+     "h": "החלטות",
+     "t": "יש ייפוי כוח פעיל או אין; חידוש או סוכן אחר; נספח 2, 3 או 5 או אחר; מינוי סוכן או אין. ראו decisions. בשני הפיצולים Is Renewal ו-AppendixType מוגדר FailComponent (DTSX:5518, 5317). ערך NULL בתנאי מכשיל את הזרימה, והשורה לא נשלחת ל'ללא אימייל': ב-Is Renewal – מספר זהות ריק בייפוי הכוח הפעיל שנמצא; ב-AppendixType – נספח ריק בייפוי כוח ממתין שנמצא לו ייפוי כוח פעיל של סוכן אחר. ייפוי כוח ממתין שלא נמצא לו ייפוי כוח פעיל אינו מגיע לפיצולים האלה. זו התנהגות SSIS כללית, לא מתוך הקובץ."
+    },
+    {
+     "h": "כתיבה ל-CRM",
+     "t": "רק עדכון SQL ישיר: Gen_powerofattorneyBase.gen_iscancellationemailrequired על ייפוי הכוח הפעיל הישן (Unsupported). לטבלת staging נכתבות שורות מכתב עם StatusAfterUpdate=1. החבילה הזו לא כותבת סטטוס חדש לייפוי הכוח ב-CRM."
+    },
+    {
+     "h": "תוצאה עסקית",
+     "t": "שורות מכתב לסוכן על ייפוי כוח חדש, וסימון ייפוי הכוח הישן לקראת מייל ביטול כשיגיע מועד סיומו."
+    }
+   ],
+   "decisions": [
+    {
+     "where": "Get Waiting Poa (SQL)",
+     "condition": "poa.Gen_startdate <= GETDATE() and poa.Gen_currentstate = 3 ... where agentcyIdNumber not in ('515092484','513334151','513173393','513173493','514979715','515462380')",
+     "meaning_he": "ייפוי כוח ממתין שהגיע מועדו, שאינו של הסוכנויות שברשימה.",
+     "outcome_he": "רק השורות האלה מטופלות."
+    },
+    {
+     "where": "Lookup Match PowerOfAttorney By CustomerAccount Or CustomerProgram",
+     "condition": "isnull(Gen_CustomerAccount,gen_customerprogram) = CustomerAccountProgramPa among Gen_currentstate = 1",
+     "meaning_he": "האם יש ייפוי כוח פעיל באותו חשבון או תוכנית.",
+     "outcome_he": "אין: נרשמת שורה 'ללא אימייל'. יש: עוברים לבדיקת החידוש."
+    },
+    {
+     "where": "Is Renewal",
+     "condition": "agentcyIdNumberPa == agentcyIdNumber",
+     "meaning_he": "אותו סוכן או אותה סוכנות, כלומר חידוש.",
+     "outcome_he": "חידוש: נרשמת שורה 'ללא אימייל'. אחרת: עדכון SQL ובחירת מכתב. אם agentcyIdNumberPa ריק (NULL), התנאי מחזיר NULL והזרימה נכשלת, כי בפלט Renewal מוגדר FailComponent (DTSX:5518). זו התנהגות SSIS כללית, לא מתוך הקובץ."
+    },
+    {
+     "where": "Update NeedToSendMailBit (SQL)",
+     "condition": "case when Gen_appendixtype = 2 then 1 when Gen_appendixtype = 3 then 1 when Gen_appendixtype = 5 then 1 else 0 end",
+     "meaning_he": "האם לייפוי הכוח הפעיל הישן יידרש מייל ביטול. ההחלטה לפי סוג הנספח של הרשומה המעודכנת עצמה.",
+     "outcome_he": "gen_iscancellationemailrequired מקבל 1 או 0."
+    },
+    {
+     "where": "AppendixType",
+     "condition": "gen_appendixtype == 2 || gen_appendixtype == 3 || gen_appendixtype == 5",
+     "meaning_he": "האם סוג הנספח של ייפוי הכוח החדש מחייב מכתב.",
+     "outcome_he": "כן: בוחרים סוג מכתב. לא: נרשמת שורה 'ללא אימייל'. אם gen_appendixtype ריק (NULL), הזרימה נכשלת (FailComponent, DTSX:5317), ועדכון ה-SQL כבר בוצע. זו התנהגות SSIS כללית, לא מתוך הקובץ."
+    },
+    {
+     "where": "Check Format By Appointment Of Agent",
+     "condition": "ISNULL(gen_appointmentofagent) || gen_appointmentofagent == FALSE",
+     "meaning_he": "אין מינוי סוכן בייפוי הכוח הראשי.",
+     "outcome_he": "בלי מינוי: מכתב גרסה 1. עם מינוי: מכתב גרסה 2 'כולל עמלה'."
+    }
+   ],
+   "crmEffects": [
+    {
+     "entity": "gen_powerofattorney (Gen_powerofattorneyBase)",
+     "verb": "Update gen_iscancellationemailrequired (1 לנספח 2/3/5, אחרת 0)",
+     "mechanism": "SQL",
+     "when_he": "על ייפוי הכוח הפעיל של סוכן אחר, כשייפוי כוח ממתין שהגיע מועדו נמצא באותו חשבון או תוכנית ואינו חידוש. ב-[CRM] = psql/ALTSHULER_MSCRM (DTSX:4), זו כתיבה Unsupported."
+    }
+   ],
+   "evidence": [
+    "DTSX:5302 Handle Wait Status - For Active",
+    "DTSX:5373-5419 Get Waiting Poa",
+    "DTSX:5541-5567 Lookup (NoMatchBehavior DTSX:5562, CacheType DTSX:5561)",
+    "DTSX:5507-5512 Is Renewal",
+    "DTSX:6658-6677 Update NeedToSendMailBit (Param_0 ← PowerOfAttorneyIdPa DTSX:6677)",
+    "DTSX:5307-5311 AppendixType (gen_appendixtype ← Get Waiting Poa)",
+    "DTSX:5340 Check Format By Appointment Of Agent",
+    "DTSX:5620 / 5671 / 5722 Derived Columns",
+    "DTSX:6170 Union All Data",
+    "DTSX:6701-6709 Write To PowerOfAttorneySendEmails Table",
+    "DTSX:4 [CRM]; DTSX:9 [SQL.GENERIX_STAGING]",
+    "DTSX:5518 Is Renewal.Outputs[Renewal] errorRowDisposition=FailComponent",
+    "DTSX:5317 AppendixType.Outputs[AppendixTypeNeedToSendMail] errorRowDisposition=FailComponent"
+   ],
+   "openQuestions_he": [
+    "מי צורך את dbo.PowerOfAttorneySendEmails ב-GENERIX_STAGING, ומי מפעיל בפועל את ייפוי הכוח הממתין (StatusAfterUpdate=1)? בחבילה הזו אין לכך ראיה (external_unknown).",
+    "נענה בחלקו מהקבצים: בשאילתות של חבילה זו gen_currentstate = 3 מסומן בהערה '--waiting' (DTSX:4338, 4350) ובכינוי WaitingPoas (DTSX:5406), ו-gen_currentstate = 1 מסומן בכינוי ActivePoas (DTSX:4222). בחבילה 0031 שסופקה מוגדרים לשדה gen_currentstate הקבועים ACTIVE = 1 ו-CANCELED = 2 (0031 DTSX:30447, 30470, 21822, 21869). פתוח: משמעות סוגי הנספח 2, 3 ו-5 לא מוכחת בקבצים.",
+    "ה-Lookup עובד ב-Full cache. אם יש כמה ייפויי כוח פעילים לאותו חשבון, נלקחת התאמה אחת בלבד, ולא נקבע איזו."
+   ]
+  },
+  {
+   "refId": "Package\\Handle Active Status - For Cancel",
+   "title_he": "ייפויי כוח פעילים שפג תוקפם",
+   "techName": "Handle Active Status - For Cancel",
+   "short_he": "לכל ייפוי כוח פעיל שתאריך הסיום שלו עבר נקבע אם צריך לשלוח מכתב ביטול, ואיזה. שורת המכתב נרשמת בטבלת staging. ב-CRM לא משתנה כלום בשלב הזה.",
+   "flow_he": [
+    "שליפת ייפויי כוח פעילים שפג תוקפם (בלי סוכנויות החברה)",
+    "האם סומן 'נדרש מייל ביטול'",
+    "בחירת סוג המכתב לפי המינוי ולפי ייפוי כוח ממתין של סוכנות בנק",
+    "כתיבת השורה לטבלת staging"
+   ],
+   "short": {
+    "nodes": [
+     {
+      "type": "step",
+      "text": "נשלפים ייפויי כוח פעילים שתאריך הסיום שלהם עבר, בלי ייפויי כוח של סוכנויות החברה עצמה."
+     },
+     {
+      "type": "decision",
+      "text": "האם ייפוי הכוח סומן כמחייב מייל ביטול?",
+      "branches": [
+       {
+        "label": "כן",
+        "nodes": [
+         {
+          "type": "step",
+          "text": "נבחר מכתב ביטול: 'כולל עמלה', או 'לביצוע פעולות' כשאין מינוי סוכן ואין ייפוי כוח ממתין מתאים של סוכנות בנק."
+         }
+        ]
+       },
+       {
+        "label": "לא",
+        "nodes": [
+         {
+          "type": "step",
+          "text": "נרשמת שורה 'ללא אימייל'."
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "type": "step",
+      "text": "השורות נשמרות בטבלת מכתבים ב-staging, וסומן בהן שהסטטוס אחרי העדכון הוא 2."
+     },
+     {
+      "type": "end",
+      "text": "יש נתוני מכתבי ביטול לסוכנים. ייפוי הכוח עצמו לא מבוטל ב-CRM על ידי החבילה הזו."
+     }
+    ]
+   },
+   "detailed": {
+    "nodes": [
+     {
+      "type": "step",
+      "text": "האוכלוסייה היא ייפויי כוח בסטטוס 1 שתאריך הסיום שלהם עבר. אותה רשימה של שש ישויות מוחרגת גם כאן.",
+      "tech": "Get Active Poa DTSX:4187-4235 · [CRM] · poa.Gen_enddate <= GETDATE() and poa.Gen_currentstate = 1 · agentcyIdNumber not in (...6 ids...)"
+     },
+     {
+      "type": "decision",
+      "text": "האם בייפוי הכוח מסומן 'נדרש מייל ביטול'?",
+      "tech": "Is Need To Send Cancellation Mail DTSX:4408 · !ISNULL(gen_iscancellationemailrequired) && gen_iscancellationemailrequired == TRUE",
+      "branches": [
+       {
+        "label": "לא, או שהשדה ריק",
+        "nodes": [
+         {
+          "type": "step",
+          "text": "נרשמת שורה 'ללא אימייל', מסומנת כמטופלת.",
+          "tech": "NoMail → No Email DTSX:4441: NewStatus=2, EmailFormat=\" ללא אימייל\", IsProcessed=TRUE"
+         }
+        ]
+       },
+       {
+        "label": "כן",
+        "nodes": [
+         {
+          "type": "decision",
+          "text": "האם בייפוי הכוח הראשי יש מינוי סוכן?",
+          "tech": "Check Format By Appointment Of Agent DTSX:4154 · Without: ISNULL(gen_appointmentofagent) || gen_appointmentofagent == FALSE",
+          "branches": [
+           {
+            "label": "יש מינוי",
+            "nodes": [
+             {
+              "type": "step",
+              "text": "נקבע מכתב 'ביטול ייפוי כוח כולל עמלה', גרסה 3.",
+              "tech": "With Commission → Union All 1 → Cancel Email With Commission 3 DTSX:4103: NewStatus=2, IsProcessed=FALSE, LetterVersion=3"
+             }
+            ]
+           },
+           {
+            "label": "אין מינוי",
+            "nodes": [
+             {
+              "type": "decision",
+              "text": "האם יש באותו חשבון ובאותה תוכנית ייפוי כוח ממתין של סוכנות מסוג 'בנק', עם אותו סוג נספח?",
+              "tech": "Get Agency DTSX:4326-4360 · Gen_currentstate = 3 --waiting and Gen_agencie.Gen_ContractType = 1 --bank · keys Gen_CustomerAccount, gen_customerprogram, Gen_appendixtype · NoMatchBehavior=1",
+              "branches": [
+               {
+                "label": "כן",
+                "nodes": [
+                 {
+                  "type": "step",
+                  "text": "נקבע מכתב 'ביטול ייפוי כוח כולל עמלה', גרסה 3.",
+                  "tech": "Lookup Match → Union All 1 → Cancel Email With Commission 3"
+                 }
+                ]
+               },
+               {
+                "label": "לא",
+                "nodes": [
+                 {
+                  "type": "step",
+                  "text": "נקבע מכתב 'ביטול ייפוי כוח לביצוע פעולות', גרסה 8.",
+                  "tech": "Lookup No Match → Cancel Email For Actions 8 DTSX:4052: NewStatus=2, IsProcessed=FALSE, LetterVersion=8"
+                 }
+                ]
+               }
+              ]
+             }
+            ]
+           }
+          ]
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "type": "step",
+      "text": "כל השורות נכתבות לטבלת המכתבים ב-staging, ולא ל-CRM. נשמרים פרטי הלקוח, הנספח, התאריכים, הסטטוס לפני ('1') ואחרי ('2'), שם המכתב ומזהה ייפוי הכוח.",
+      "tech": "Union All → Write To PowerOfAttorneySendEmails Table DTSX:5219 · [SQL.GENERIX_STAGING] · dbo.PowerOfAttorneySendEmails"
+     },
+     {
+      "type": "end",
+      "text": "יש נתוני מכתבי ביטול. ייפוי הכוח לא מבוטל ב-CRM ושום שדה בו לא מתעדכן בשלב הזה."
+     }
+    ]
+   },
+   "detail_he": [
+    {
+     "h": "מקור ואוכלוסייה",
+     "t": "Gen_powerofattorney בסטטוס gen_currentstate=1 עם Gen_enddate <= GETDATE(), בלי שש הסוכנויות שברשימה."
+    },
+    {
+     "h": "התאמה לרשומות קיימות",
+     "t": "Get Agency מחפש ייפוי כוח ממתין (סטטוס 3) של סוכנות עם Gen_ContractType=1 ('bank' לפי הערת SQL), לפי שלושה מפתחות: Gen_CustomerAccount, gen_customerprogram ו-Gen_appendixtype."
+    },
+    {
+     "h": "החלטות",
+     "t": "השדה gen_iscancellationemailrequired (שנקבע בשלב הקודם או קודם לכן) קובע אם יישלח מכתב. מינוי הסוכן וייפוי כוח ממתין של סוכנות בנק קובעים את סוג המכתב: 3 או 8."
+    },
+    {
+     "h": "כתיבה ל-CRM",
+     "t": "אין בשלב הזה. הכתיבה היא רק לטבלת staging, ב-GENERIX_STAGING."
+    },
+    {
+     "h": "תוצאה עסקית",
+     "t": "שורות מכתבי ביטול לסוכנים עם StatusAfterUpdate=2. מי מבצע את הביטול בפועל לא ידוע."
+    }
+   ],
+   "decisions": [
+    {
+     "where": "Get Active Poa (SQL)",
+     "condition": "poa.Gen_enddate <= GETDATE() and poa.Gen_currentstate = 1 ... agentcyIdNumber not in (6 ids)",
+     "meaning_he": "ייפוי כוח פעיל שפג תוקפו.",
+     "outcome_he": "רק השורות האלה מטופלות."
+    },
+    {
+     "where": "Is Need To Send Cancellation Mail",
+     "condition": "!ISNULL(gen_iscancellationemailrequired) && gen_iscancellationemailrequired == TRUE",
+     "meaning_he": "האם נדרש מייל ביטול.",
+     "outcome_he": "כן: בוחרים סוג מכתב. לא: נרשמת שורה 'ללא אימייל'."
+    },
+    {
+     "where": "Check Format By Appointment Of Agent",
+     "condition": "ISNULL(gen_appointmentofagent) || gen_appointmentofagent == FALSE",
+     "meaning_he": "אין מינוי סוכן.",
+     "outcome_he": "אין מינוי: בודקים ייפוי כוח ממתין של סוכנות בנק. יש מינוי: מכתב גרסה 3."
+    },
+    {
+     "where": "Get Agency (Lookup)",
+     "condition": "match on Gen_CustomerAccount, gen_customerprogram, Gen_appendixtype among Gen_currentstate = 3 and Gen_agencie.Gen_ContractType = 1",
+     "meaning_he": "יש ייפוי כוח ממתין של סוכנות בנק באותו חשבון ובאותה תוכנית, עם אותו נספח.",
+     "outcome_he": "יש: מכתב גרסה 3 'כולל עמלה'. אין: מכתב גרסה 8 'לביצוע פעולות'."
+    }
+   ],
+   "crmEffects": [],
+   "evidence": [
+    "DTSX:4047 Handle Active Status - For Cancel",
+    "DTSX:4187-4235 Get Active Poa",
+    "DTSX:4408 Is Need To Send Cancellation Mail",
+    "DTSX:4154 Check Format By Appointment Of Agent",
+    "DTSX:4326-4360 Get Agency",
+    "DTSX:4052 Cancel Email For Actions 8; DTSX:4103 Cancel Email With Commission 3; DTSX:4441 No Email",
+    "DTSX:5219-5227 Write To PowerOfAttorneySendEmails Table"
+   ],
+   "openQuestions_he": [
+    "ה-Lookup של Get Agency מתאים גם לפי Gen_CustomerAccount וגם לפי gen_customerprogram. אם אחד מהם NULL, לא ידוע אם ההתאמה תצליח: זה תלוי באופן שבו Full cache מטפל ב-NULL, וצריך לאמת על נתונים.",
+    "לא ידוע מי מבצע בפועל את ביטול ייפוי הכוח (StatusAfterUpdate=2). החבילה הזו לא עושה את זה."
+   ]
+  }
+ ],
+ "findings_he": [
+  {
+   "severity": "high",
+   "text": "עדכון SQL ישיר על טבלת הבסיס של ה-CRM (Unsupported): update Gen_powerofattorneyBase set gen_iscancellationemailrequired ... דרך [CRM] = psql/ALTSHULER_MSCRM. העדכון עוקף את ה-SDK, את התוספים ואת ה-audit.",
+   "evidence": "Update NeedToSendMailBit DTSX:6658-6668; [CRM] DTSX:4"
+  },
+  {
+   "severity": "medium",
+   "text": "החבילה לא משנה את gen_currentstate של ייפויי הכוח, לא מפעילה ממתינים ולא מבטלת פעילים. אם אין גורם חיצוני שעושה זאת (לא ידוע), אותם ייפויי כוח ייבחרו שוב בכל הרצה וייכתבו שוב לטבלת ה-staging (השערה).",
+   "evidence": "אין רכיבי סקריפט או CRM Destination בשתי הזרימות (survey_0030); Get Waiting Poa / Get Active Poa מסננים לפי gen_currentstate"
+  },
+  {
+   "severity": "medium",
+   "text": "ב-Handle Wait Status - For Active, בפיצולים Is Renewal ו-AppendixType מוגדר errorRowDisposition=FailComponent. Is Renewal מקבל רק ייפויי כוח ממתינים שה-Lookup מצא להם ייפוי כוח פעיל. אם לייפוי הכוח הפעיל שנמצא אין מספר זהות של סוכן או סוכנות (agentcyIdNumberPa NULL), ההשוואה מחזירה NULL וזרימת הנתונים נכשלת. לייפוי הכוח הממתין עצמו המספר הזה אינו ריק, כי שורה עם NULL אינה עוברת את סינון ה-NOT IN בשאילתה. AppendixType מקבל רק ייפויי כוח ממתינים שנמצא להם ייפוי כוח פעיל של סוכן אחר (Not Renewal). אם לייפוי כוח ממתין כזה אין סוג נספח (NULL), הזרימה נכשלת, אחרי שעדכון ה-SQL על ייפוי הכוח הישן כבר בוצע. ייפוי כוח ממתין בלי סוג נספח שלא נמצא לו ייפוי כוח פעיל עובר ל-No Email בלי שגיאה. אם הזרימה נכשלת, גם השלבים שאחריה אינם רצים, כי הם מחוברים ב-Success. (שגיאת תנאי NULL היא התנהגות SSIS כללית, לא מתוך הקובץ.)",
+   "evidence": "DTSX:5518; DTSX:5317; Update NeedToSendMailBit DTSX:6658; paths של Handle Wait Status - For Active (Lookup Match → Is Renewal; Lookup No Match → Union All; Not Renewal → Update NeedToSendMailBit → AppendixType); Get Waiting Poa NOT IN DTSX:5373-5419; precedence DTSX:8223"
+  },
+  {
+   "severity": "low",
+   "text": "ייפוי כוח שאין לו מספר זהות של סוכן או סוכנות (agentcyIdNumber IS NULL) לא נבחר אף פעם, כי NOT IN על ערך NULL לא מחזיר אמת.",
+   "evidence": "Get Waiting Poa DTSX:5378; Get Active Poa DTSX:4192"
+  },
+  {
+   "severity": "info",
+   "text": "הבדלים מול 0031_PoaAccountUpdateDaily שמוכחים בשני קובצי ה-DTSX: (1) ב-0030 יש 8 Executables וב-0031 יש 19. ב-0030 חסרים Send Poa Emails, Update Power Of Attorney Main, Create Power Of Attorney, Create Power Of Attorney - Pension, Set Destinations Paths ו-Get Base Fields Values. (2) ב-0031 בזרימות Handle Wait Status ו-Handle Active Status יש רכיבי SDK שמעדכנים את סטטוס ייפוי הכוח ('Update gen_powerofattorney ACTIVE' ו-'...CANCELED And Status Transfer To Bank'). ב-0030 אין בזרימות המקבילות שום רכיב סקריפט. (3) העדכון Update NeedToSendMailBit ב-0031 קובע gen_receivingdateofcancelpoa (CASE בלי ELSE), וב-0030 הוא קובע gen_iscancellationemailrequired (עם ELSE 0). (4) השדה gen_iscancellationemailrequired לא מופיע בכלל בקובץ של 0031.",
+   "evidence": "0030 DTSX:6661-6668 · 0031 DTSX:31302-31307 · executables בשני קובצי ה-evidence · survey_0031 Code write candidates"
+  },
+  {
+   "severity": "info",
+   "text": "Get Valid Optionsets Values ממלא את User::ValidOptionsetsValues, ו-Set Queue Id Variable ממלא את User::AgentDescQueueId. לשני המשתנים אין צרכן בחבילה, ולכן הם נרשמו כמסגרת.",
+   "evidence": "grep: ValidOptionsetsValues מופיע רק ב-DTSX:70, 3410-3545, 3978; AgentDescQueueId רק ב-DTSX:28, 7061, 7178-7186"
+  },
+  {
+   "severity": "info",
+   "text": "התאריכים שנכתבים ל-staging מוזזים ב-3 שעות קבועות (dateadd(HH,3,...)), בלי התחשבות בשעון קיץ.",
+   "evidence": "Get Waiting Poa DTSX:5378; Get Active Poa DTSX:4192"
+  }
+ ]
+}

@@ -1,0 +1,95 @@
+{
+  "verifier": "ssis-verifier",
+  "package": "0013_Heir_Daily",
+  "scope": "logic-claims re-check round 2",
+  "checkedAt": "2026-11-07",
+  "checked": 9,
+  "results": [
+    {
+      "id": "L|Package\\Foreach Loop Container\\Create And Update Heir|detailed",
+      "hash": "f567fd6e5ede",
+      "verdict": "WRONG",
+      "detail": "Verified correct: Heir source has 12 columns, all RedirectRow (error and truncation) -> Derived Column with no path (DTSX:6641-6750). Contact source has 5 columns, FailComponent, RetainNulls=false. Merge Join JoinType=2, NumKeyColumns=3, TreatNullsAsEqual=true, and both Sorts have EliminateDuplicates=false (DTSX:6752, 6930-7240). Set Heir Columns: status and name are RedirectRow -> Derived Column 1, region is FailComponent. Append Zeros strips '.' and left-pads with '0' to the input length 9, with no try/catch. Format Dates: input length 50 (so the fieldSize<10 guard does not fire); lengths 8 and 6 are handled, anything else becomes null; TryParse; no try/catch. Both Lookups are CacheType=0 and NoMatchBehavior=1, with the parameter maps as stated. 'change empty strings to null' covers the 11 string DB columns, and whitespace-only values also become NULL. Create Heir writes 16 attributes, only when non-NULL. Update Heir writes the 12 listed attributes. The IsEqual date rule is obj1.Date == obj2.AddHours(3).Date. The getter-on-NULL caveats are labelled. WRONG: units 17 and 20 state that every file field is compared with the existing value and that a changed country is updated. Update Heir main.cs:162 is `Row.gencountry_IsNull != Row.Gencountrydb_IsNull || (Row.gencity_IsNull == false && IsNeedToUpdate<String>(Row.gencountry, Row.Gencountrydb))`. So when the file city is empty, two different non-empty country values are not compared, and the country is NOT updated. When the file city is non-empty and both country values are empty, the code still reads the NULL country columns, which is the same unverified getter-on-NULL case. If that read throws, the whole heir row goes to CastingError without any update. The tech note on unit 20 gives the code fact, but the Hebrew text states the opposite as fact. It also conflicts with the package's own finding on line 162 (logic.json findings_he).",
+      "evidence": "Update Heir main.cs:131-218 (line 162) @DTSX:9182; change empty strings to null DTSX:3983-4060; Create Heir main.cs:125-248 @DTSX:4394",
+      "wrongUnits": [
+        {
+          "unit": 17,
+          "problem": "'כל שדה מהקובץ מושווה לערך הקיים' is not true for the country: its value comparison is gated by gencity_IsNull, not gencountry_IsNull.",
+          "correct": "'…וכל שדה מהקובץ מושווה לערך הקיים, חוץ מהארץ: הערך שלה מושווה רק כשהעיר בקובץ אינה ריקה (התנאי בשורה 162 בודק את העיר). כשהעיר ריקה, נבדק רק אם אחד מערכי הארץ ריק והשני לא.'",
+          "evidence": "Update Heir main.cs:162 @DTSX:9182"
+        },
+        {
+          "unit": 20,
+          "problem": "The text lists 'ארץ' among fields that are updated when changed. If the file city is empty and both country values are non-empty and different, the country is not updated. If the city is non-empty and both country values are empty, the NULL country is read (unverified outcome; a throw sends the whole row to CastingError).",
+          "correct": "Add: 'שינוי ארץ (בין שני ערכים לא ריקים) אינו מתעדכן כשהעיר בקובץ ריקה. כשהעיר מלאה ושני ערכי הארץ ריקים, הקוד קורא את הארץ הריקה. מה שקורה בקריאה כזו לא אומת; אם היא זורקת חריגה, השורה עוברת ל-CastingError בלי עדכון.'",
+          "evidence": "Update Heir main.cs:162, 233-242 @DTSX:9182"
+        }
+      ]
+    },
+    {
+      "id": "L|finding#4",
+      "hash": "f1f820c357eb",
+      "verdict": "CONFIRMED",
+      "detail": "Create Heir has no condition on gen_status (main.cs:125-193) and writes gen_status only when !Row.genstatus_IsNull (173-174). Set Heir Columns: gen_status = (SUG_PEULA == \"U\" || SUG_PEULA == \"C\") ? 1 : 2. The comparison is case-sensitive, so 'u'/'c' give 2; the text's 'כל ערך אחר שאינו ריק → 2' covers that. The Heir source has RetainNulls=false, so an empty value arrives as \"\". Trim All Input Columns 1 FormatField returns null for \"\" (main.cs:53-57) and assigns it via p.SetValue to the generated setter `this[8] = value`. That this makes the column NULL is labelled as documented SSIS behaviour not shown in the files. Creation only happens on the Lookup No Match path, so the contact must also exist; that is implicit and not contradicted. The hypothesis is labelled.",
+      "evidence": "Set Heir Columns DTSX:6885 (gen_status); DTSX:6643 RetainNulls=false; Trim All Input Columns 1 main.cs:45,53-57 @DTSX:8046; BufferWrapper SUGPEULA setter DTSX:8565-8575; Create Heir main.cs:125-193",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|finding#6",
+      "hash": "d7c1c73a333d",
+      "verdict": "CONFIRMED",
+      "detail": "Convert Zips Files To Folders: try (98-114) wraps the variable read and the whole foreach, and the catch (115-118) is empty. The only 'TaskResult' in the script is the template comment at line 93, so no path sets Dts.TaskResult. UnZipFromMTAThread runs UnZip on a new STA thread when the current thread is not STA (125-135); an exception there is outside this try. Move Folder To Archive: the variable reads, path building and date-folder creation (94-102) are outside try. Only Directory.Exists + Directory.Move are inside try (104-110). The catch sets TaskResult=Success (114) and nothing else, and the normal path sets no TaskResult. 'אינן מוצגות בקבצים' is correctly unverified.",
+      "evidence": "Convert Zips Files To Folders ScriptMain.cs:93-135 @DTSX:380; Move Folder To Archive ScriptMain.cs:92-116 @DTSX:11556",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|finding#8",
+      "hash": "81b21abd01c8",
+      "verdict": "CONFIRMED",
+      "detail": "DTSX:14521 (Constraint 2), 14522 (Constraint 3) and 14524 (Constraint 5) have no DTS:LogicalAnd. 14519, 14520 and 14523 and the container constraints 13081-13083 carry LogicalAnd=\"True\" explicitly, which shows that the omitted value is the non-persisted default (False = OR). The evidence shows logicalAnd=false. End ETL Process record has two inputs: Foreach Success (14521), and Get Heirs Folders Success + !@[User::isFileExist] (EvalOp=3, 14522). Get Heirs Folders sets TaskResult=Success and isFileExist=true only inside if (arr.Count > 0) (ScriptMain.cs:51-57). isFileExist defaults to 0 (DTSX:174). End ETL Process record has no successors, so the impact is limited to closing the ETL record.",
+      "evidence": "DTSX:14519-14524; DTSX:13081-13083; Get Heirs Folders ScriptMain.cs:46-59 @DTSX:13239; DTSX:174",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package (control flow)|short",
+      "hash": "12a0b5543e8e",
+      "verdict": "CONFIRMED",
+      "detail": "Order and branches match the precedence constraints. Get Variables -> Create ETL -> Convert Zips -> Get Heirs Folders (Success). Get Heirs Folders -> Foreach (Success AND isFileExist). Inside the loop: Get File From Folder -> Split File (expression-only, SelectedFilePath != \"\"), Split File -> Create And Update Heir -> Move Folder To Archive (Success). Zip handling, the Rasham* folder pattern with sort, the first sorted Rasham*.txt, and the same-name Directory.Exists check all match the scripts. Split File writes the two intermediate files with Overwrite=true, so each folder is processed alone. The no-file folder stays in the source and the loop continues (no failure). Notes, not verdict-relevant: (a) 'הלולאה נעצרת' after a failure relies on the default MaximumErrorCount (no attribute in the DTSX), which is the same kind of format default as LogicalAnd. (b) The list of remaining folders in [17] is non-exhaustive ('ובהן'). A swallowed Directory.Move exception also leaves the folder, but archive/move is plumbing per the standard. (c) 'בלי עדכון ב-CRM' in the no-folder branch ignores the ETL-record pipeline, which is out of scope.",
+      "evidence": "DTSX:14519-14524, 13081-13083; Get Heirs Folders ScriptMain.cs:48-57 @DTSX:13239; Get File From Folder ScriptMain.cs:48-58 @DTSX:11093; Move Folder To Archive ScriptMain.cs:94-115 @DTSX:11556; Split File destinations Overwrite=true (DTSX:12045-12200)",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package (control flow)|detailed",
+      "hash": "63c52682cd71",
+      "verdict": "CONFIRMED",
+      "detail": "[1] Get SystemConfigurations: SELECT gen_key, gen_Value FROM gen_etlvariable where gen_scope='global' or gen_scope=? with Parameter0=System::PackageName (DTSX:13606-13616). Set Variables ReadWriteVariables match the 7 listed. The config caveat is given (DTSX:138). [2] matches ScriptMain.cs:96-160, including try/catch and the STA thread. [3]-[6] Get Heirs Folders 48-57, isFileExist default 0, constraints 14522/14524; the unset TaskResult is stated in the tech. [8] ForEachFromVarEnumerator on User::DirectoriesArray -> SelectedDirctoryPath (DTSX:3144-3148). [9]-[12] Get File From Folder plus the expression-only constraint 13082. [14]-[19] Success constraints 13081/13083. The Move script path is HeirSourceFilesPath\\ArchiveFiles\\yyyyMMdd\\<folder>, with the exists check inside try and TaskResult set only in the catch. [19] relies on the default MaximumErrorCount (no attribute), stated explicitly from the absence; accepted as a format default. [20] OR on 14521/14522. [21] The list is non-exhaustive.",
+      "evidence": "DTSX:138, 13606-13616, 14487; ScriptMain.cs @DTSX:380, 13239, 11093, 11556; DTSX:3144-3148; DTSX:13081-13083, 14519-14524",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Foreach Loop Container\\Create And Update Heir|title",
+      "hash": "1d86aa3ce89d",
+      "verdict": "CONFIRMED",
+      "detail": "Inner Merge Join on region/portfolio/request (3 keys). Contact lookup on contact.gen_identitynumber = padded customer ID. Heir lookup on 4 keys. Create/Update through ExecuteMultipleExtension (RequestType.Create / RequestType.Update). The status rule is labelled for the empty case. ID padding to 9 and date conversion match. Note: 'יורש קיים מתעדכן בשדות שהשתנו' is a summary-level statement. The country exception (main.cs:162) is not reflected here; it is reported on the detailed claim.",
+      "evidence": "DTSX:6752; DTSX:4070-4118, 4254-4282; Create Heir main.cs:209 @DTSX:4394; Update Heir main.cs:247 @DTSX:9182",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Foreach Loop Container\\Create And Update Heir|detail",
+      "hash": "61a9753309df",
+      "verdict": "CONFIRMED",
+      "detail": "[1] Split File Check If Contact Or Heir: SUG_REC == \"1\" -> Contact Details, SUG_REC == \"2\" -> Heir Details; Inner Join. [2] The lookups are single-table queries (contact; gen_heir), so there is no ownership question. The 4-key heir match does not include the customer ID; CacheType=0 (Full) on both. [3] Status rule labelled. Update only when needToUpdate (main.cs:220-230). [4] SDK ExecuteMultiple Create/Update in batches of 1000 plus the EndOfRowset remainder. No SQL DML in this data flow. The [CRM] design-time string Psql/ALTSHULER_MSCRM (DTSX:44) carries the config caveat (DTSX:138). [5] The business result is phrased with entity/attribute names and introduces no unproven meaning.",
+      "evidence": "Split File Check If Contact Or Heir DTSX:12051; DTSX:4070-4118, 4254-4282; DTSX:44, 138; Create Heir main.cs:191-192, 244-246; Update Heir main.cs:220-230",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Foreach Loop Container\\Create And Update Heir|decisions",
+      "hash": "22699d044080",
+      "verdict": "CONFIRMED",
+      "detail": "[1] Merge Join JoinType=2, NumKeyColumns=3, TreatNullsAsEqual=true; sort keys gen_region_STR_INT/gen_portfolionumber/gen_requestnumber vs MACHOZ/MIS_TIK/MIS_BAKASHA. [2] The expression is exact and the NULL case is labelled; Create main.cs:173-174. [3] ParameterMap gen_customeridentitynumber, NoMatchBehavior=1, No Match -> Derived Column 2 (no path). [4] The 4-parameter SqlCommandParam and ParameterMap order (identitynumber, portfolionumber, requestnumber, Set Heir Columns gen_region) are exact; Match -> change empty strings to null -> Update Heir; No Match -> Create Heir. [5] The condition is copied exactly, including the line-162 gencity_IsNull exception. [6] Date: needToUpdate is set only if the parse succeeded (213-217).",
+      "evidence": "DTSX:6752-6754; DTSX:6885; DTSX:4091-4118, 4265-4282; Update Heir main.cs:131-218",
+      "wrongUnits": []
+    }
+  ],
+  "missingWrites": []
+}

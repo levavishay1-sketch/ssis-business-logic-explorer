@@ -1,0 +1,212 @@
+{
+  "verifier": "ssis-verifier",
+  "package": "0028_Fund Enrolment",
+  "scope": "logic-claims re-check round 2",
+  "checkedAt": "2026-11-07T00:00:00Z",
+  "checked": 15,
+  "results": [
+    {
+      "id": "L|finding#3",
+      "hash": "5d030a0c0a59",
+      "verdict": "INCOMPLETE",
+      "detail": "Correct: the CastingError output (Create gen_fundEnrolment) and the CustingError output (pension Create Fund Enrolment) have no paths. Update Reject Management's Failure output goes to an empty Derived Column (DTSX:14623) with no continuation. ErrorMessage there is wstr(200) (DTSX:15623), and that caveat is correctly marked as documented SSIS behaviour. Problems: (1) 'ההצטרפויות יישלפו שוב בריצה הבאה' is stated unconditionally, but the outcome depends on data. The automated-joining source has no Fund Enrolment condition. It re-selects a joining only while gen_joiningstatus = 2 and (gen_lastsyncdate is null or < ModifiedOn) (DTSX:3415-3417). A retry happens only if the full-cache Lookup finds no Fund Enrolment. When a joining has several transfer-request rows and one of them was created, later runs skip it, so the failed sibling is never retried. Pension joinings are re-selected only while they still meet the WHERE clause (status 2/4 or passedandreject, plus a reject indicator). (2) The finding applies the documented 'string longer than the buffer column throws' caveat to the 200-character column but not to the same pattern in the create catches. Description is wstr(2000) (DTSX:3346) and ErrorMessage is wstr(2000) (DTSX:6861). Also, catch(SoapException) reads se.Detail.InnerText (main.cs:284, DTSX:1913); if Detail is null, that line throws inside the catch. In those cases the row is not 'lost silently': the component and the data flow fail.",
+      "evidence": "DTSX:3415-3417; 3612-3638; 3346; 6861; 1913; 14623; 15623; paths list (no CastingError/CustingError path)",
+      "wrongUnits": [
+        {
+          "unit": 1,
+          "problem": "The re-fetch is stated unconditionally, and the same overflow caveat is not applied to the 2000-character error columns.",
+          "correct": "Failed creations are dropped without a log, as long as the error text fits the wstr(2000) error column (and, for SoapException, Detail is not null). A failed automated joining is retried in a later run only if it is still in status 2 and gen_lastsyncdate is null or earlier than ModifiedOn, and only if no other row of the same joining created a Fund Enrolment. A failed pension joining is retried only while it still meets the source filter.",
+          "evidence": "DTSX:3415-3417; 3346; 6861; 1913"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Create Fundenrolment|title",
+      "hash": "081a39b6b6cd",
+      "verdict": "INCOMPLETE",
+      "detail": "flow_he[1]-[6] match the DTSX: source filter (DTSX:3357-3418), Set gen_notes (main.cs:117-129), the full-cache Lookup (DTSX:3612-3638, only No Match connected), the dead 'No CreateRow' branch (JoiningStatus != 2 against a source with gen_joiningstatus = 2), the SDK Create (main.cs:279), Update Owner on [CRM] (DTSX:4696) and the staging insert (DTSX:3578). short_he [2] overgeneralises the population and the result. It says every automated joining in status 2 without a Fund Enrolment gets 'a new record'. The source also requires gen_lastsyncdate is null or < ModifiedOn (stated only in flow_he[1]). A joining with several transfer requests appears in several rows and, when the creations succeed, gets several records (left join gen_transferrequest, DTSX:3407).",
+      "evidence": "DTSX:3357-3418 (3407 left join, 3415-3417 where); 3612-3638; 1463; 4696; 3578",
+      "wrongUnits": [
+        {
+          "unit": 2,
+          "problem": "The summary omits the gen_lastsyncdate condition and the one-record-per-source-row behaviour.",
+          "correct": "When creation succeeds, each source row (an automated joining in status 2 whose gen_lastsyncdate is null or earlier than ModifiedOn, and that has no Fund Enrolment yet) gets a new Fund Enrolment. A joining with several transfer requests can get several. The record is assigned to the reject team and listed for the end-of-run marking. A failed creation is dropped without a log.",
+          "evidence": "DTSX:3407; 3415-3417"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Create Fundenrolment|short",
+      "hash": "64ffc59ee1e2",
+      "verdict": "INCOMPLETE",
+      "detail": "Units 2-9 are correct. Unit 4: the Match output is not connected. Unit 6: the No CreateRow condition needs JoiningStatus != 2, which cannot happen. Units 7-8: main.cs:134-279, and Update Owner OwnerIdType = 9. Unit 9 is now conditional on success and covers the 1:N transfer-request case. Unit 1 says 'שהשתנו מאז הסנכרון האחרון'. The condition is (gen_lastsyncdate is null or gen_lastsyncdate < aj.ModifiedOn) (DTSX:3415-3416). The NULL branch (never synced) is not covered by 'changed since the last sync'. It is not marginal: no supplied package writes gen_lastsyncdate (a grep of all 35 DTSX finds it only in this source query).",
+      "evidence": "DTSX:3415-3417; grep -i lastsyncdate source/DailyProcess/*.dtsx (0028 only)",
+      "wrongUnits": [
+        {
+          "unit": 1,
+          "problem": "The NULL branch of the sync condition is omitted.",
+          "correct": "Automated joinings in status 2 are fetched when their last-sync date is empty or earlier than their last modification date. Each comes with member, agent, product and reject-reason details.",
+          "evidence": "DTSX:3415-3416"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Create Fundenrolment|detailed",
+      "hash": "4f97e6bba357",
+      "verdict": "WRONG",
+      "detail": "Units 1-28 and 30-34 match the DTSX and main.cs. Source: DTSX:3357-3418. Notes: main.cs:117-129. Lookup: full cache (CacheType 0), Match not connected. Dead split: DTSX:1463. Field set: main.cs:140-237. gen_actiontype / gen_source / gen_enrolmentstatus: 241-247. ParseExact and Money: 251-260. Document type: 263-277 (GEMEL=1, STUDY_FUND=2, GEMEL_INVEST=4, CHILDSAVING=5). RejectTeamId: Guid.Parse at main.cs:136. Update Owner: DTSX:4696. Staging insert: DTSX:3578. Unit 29 is wrong: 'ההצטרפות תישלף שוב בריצה הבאה, כי אין לה Fund Enrolment'. The source query has no Fund Enrolment condition. A re-fetch depends only on gen_joiningstatus still being 2 and gen_lastsyncdate being null or < ModifiedOn (DTSX:3415-3417). Whether the creation is retried depends on the Lookup. If another row of the same joining (another transfer request, unit 2) was created, the joining now has a Fund Enrolment, and the failed row is skipped in every later run. Minor, non-blocking: unit 17 omits that the source shifts both dates by +3 hours and converts them to dd/mm/yyyy text (CONVERT(...,103) of DATEADD(hh,3,...), DTSX:3380-3381), so only the shifted calendar date is kept. The Set gen_notes output is wstr(4000) (DTSX:4687), while four 300-character names plus a 3000-character note can reach 4220 characters, which in theory could fail the data flow.",
+      "evidence": "DTSX:3357-3418; 3612-3638; 1463; 1505 (main.cs:130-292); 4687; 4696; 3578",
+      "wrongUnits": [
+        {
+          "unit": 29,
+          "problem": "The re-fetch is given an unconditional outcome and a wrong reason. The source has no Fund Enrolment condition, and a joining that already received a Fund Enrolment through a sibling row is never retried.",
+          "correct": "The error is written only to the unconnected CastingError column and is not kept. The joining is fetched again in later runs while it stays in status 2 and its gen_lastsyncdate is null or earlier than ModifiedOn. Creation is retried only if no Fund Enrolment exists for it by then. If another row of the same joining succeeded, the failed row is never retried.",
+          "evidence": "DTSX:3415-3417; 3612-3638; 3407"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Create Fundenrolment|detail",
+      "hash": "62849a72dc9d",
+      "verdict": "INCOMPLETE",
+      "detail": "Units 1-4 are correct. Unit 1: the source filter, and the package never updates gen_lastsyncdate. Unit 2: Lookup on gen_automatedjoining, full cache. Unit 3: the decisions, including the dead split. Unit 4: SDK Create, plus the Unsupported SQL update of Gen_fundenrolmentBase OwnerId/OwnerIdType = 9 on [CRM] (Psql/ALTSHULER_MSCRM), plus the staging insert. Problems: unit 6, sourceTables loadedBy_he, says that among the supplied packages only 0027_AutomatedJoining updates gen_automatedjoining. 0029_POA also updates it, through an enabled flow. 'Create POA Main For Automated Joining' (0029 DTSX:21361, no Disabled flag) contains 'Update Automated Joining', which calls an SDK Update with gen_testedtocreatepoa = true (0029 DTSX:29686-29690). Unit 5 says every exception in the creation goes to CastingError. That is true only when the catch itself does not throw: Description is wstr(2000) (DTSX:3346), and se.Detail.InnerText (DTSX:1913) throws if Detail is null. Minor.",
+      "evidence": "DTSX:3357-3418; 3612-3638; 4696; 3346; 1913; 0029_POA.dtsx:21361, 29686-29690",
+      "wrongUnits": [
+        {
+          "unit": 6,
+          "problem": "The list of supplied packages that write gen_automatedjoining is incomplete.",
+          "correct": "This is a CRM table, not staging. No supplied package creates it (hypothesis: it is created outside the supplied packages). 0027_AutomatedJoining and 0029_POA (Create POA Main For Automated Joining, gen_testedtocreatepoa) update it.",
+          "evidence": "0029_POA.dtsx:21361; 29686-29690"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Create FundEnrolment For Pension|title",
+      "hash": "0fe9b435b23b",
+      "verdict": "CONFIRMED",
+      "detail": "The population matches the WHERE clause (DTSX:6934-6937): gen_fundenrolmentid is null; status 2 or 4 or gen_passedandreject = 1; and reasons 1-4, notes or an rm row. Owner and status branch: main.cs:136-151 (referent type 8 / status 17, else RejectTeamId type 9 / status copied). Product: 166-173. Underwriting: 296-325. SDK Create: 327. Multicast to Update Fund Enrolment Owner (DTSX:8100), Upate Pension Joining (DTSX:8056) and the staging insert (DTSX:7098). short_he is conditional on success. Non-blocking: flow_he[2] 'מסיבות הרג'קט' does not mention that the reject notes are appended too (main.cs:127-128).",
+      "evidence": "DTSX:6872-6937; 4758 (main.cs:130-335); 7153; 8056; 8100; 7098",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Create FundEnrolment For Pension|short",
+      "hash": "6c8a5fce3ea7",
+      "verdict": "INCOMPLETE",
+      "detail": "Units 1-8 are correct (WHERE at DTSX:6934-6937; main.cs:136-151; field set 153-325; SQL updates DTSX:8100/8056). Unit 9 gives one failure mode of note building: an empty value, if a NULL read throws. It misses a second one that does not depend on NULL handling. Set gen_note writes the combined note to output column gen_note, which is wstr(1000) (DTSX:8047). It is built from four reason names of wstr(300) each plus gen_rejectreasonsnotes of wstr(2000) (cast(... as nvarchar(2000))). The assignment Row.gennote = note (DTSX:7407; setter this[5] = value, DTSX:7700) is outside any try, and the component has no error output. Per documented SSIS behaviour (not shown in the files), assigning a string longer than the column throws (DoesNotFitBufferException). So a joining whose reasons plus notes exceed 1000 characters fails the whole data flow, and the later Success-chained steps do not run.",
+      "evidence": "DTSX:8047; 7396-7407; 7700; 6872 (cast gen_rejectreasonsnotes nvarchar(2000)); Constraint 4 Success",
+      "wrongUnits": [
+        {
+          "unit": 9,
+          "problem": "The gen_note wstr(1000) overflow, a data-flow failure independent of NULLs, is omitted.",
+          "correct": "Add: the combined note is written to a 1000-character column. Per documented SSIS behaviour (not shown in the files), a note longer than that (reasons plus notes up to 2000 characters) throws in Set gen_note, which has no try and no error output. The data flow fails, and the later steps of the package do not run in that run.",
+          "evidence": "DTSX:8047; 7407; 7700"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Create FundEnrolment For Pension|detailed",
+      "hash": "77ceca2cef8f",
+      "verdict": "INCOMPLETE",
+      "detail": "Units 1-2 and 4-35 match the DTSX and main.cs. WHERE: DTSX:6934-6937. Products '200003' and '200004' (top(1) without ORDER BY). Branches: main.cs:136-151, 166-173, 281-294, 296-325. Constants: 17, 1, 100000000, '123456'. gen_counter = gen_count ?? 1 (271-274). try/catch: 132/330-334, with CustingError not connected. Unchecked reads: 138 and 169/171. SQL updates: DTSX:8100 and 8056. Staging insert: DTSX:7098. Units 3 and 36 describe the Set gen_note failure only as the NULL-read case. They omit the overflow: the output gen_note is wstr(1000) (DTSX:8047), the inputs are 4 x wstr(300) plus wstr(2000), and the assignment (DTSX:7407) has no try and no error output. Per documented SSIS behaviour, this fails the data flow whenever the combined note exceeds 1000 characters, regardless of NULL handling.",
+      "evidence": "DTSX:6872-6937; 7153 (main.cs:115-131, DTSX:7396-7407); 8047; 4758 (main.cs:130-335); 8056; 8100; 7098",
+      "wrongUnits": [
+        {
+          "unit": 3,
+          "problem": "The gen_note wstr(1000) overflow failure is omitted.",
+          "correct": "Add: the note is written to gen_note wstr(1000). Per documented SSIS behaviour (not shown in the files), a combined note longer than 1000 characters throws outside any try, and the data flow fails. Later Success-chained steps (closing pension records, reject-management linking, gen_ismailsend marking) do not run in that run.",
+          "evidence": "DTSX:8047; 7407"
+        },
+        {
+          "unit": 36,
+          "problem": "The outcome mentions only the NULL case of the note-building failure.",
+          "correct": "Add the overflow case: reasons plus reject notes longer than 1000 characters also fail the data flow at note building.",
+          "evidence": "DTSX:8047; 7407"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Create FundEnrolment For Pension|detail",
+      "hash": "663d70d0b934",
+      "verdict": "INCOMPLETE",
+      "detail": "Units 1-4 and 6 are correct. Unit 1: DTSX:6872-6937 with nolock; rm is the first by createdon, of any statecode. Unit 2: no Lookup, de-duplication through gen_fundenrolmentid is null plus the update at DTSX:8056. Unit 3: main.cs:136-151, 166-173, 287-325. Unit 4: Unsupported SQL on [CRM]. Unit 6: no supplied package creates gen_pensionjoining; 0029_POA only updates it (0029 DTSX:31614-31617, 36944), and the claim is labelled as a hypothesis. Unit 5 lists the note-building failure only for empty values. It omits the overflow of gen_note wstr(1000) (DTSX:8047), with inputs of 4 x 300 plus 2000 characters and no try or error output (DTSX:7407). Per documented SSIS behaviour, this also fails the whole data flow.",
+      "evidence": "DTSX:6872-6937; 8047; 7407; 8056; 8100; 0029_POA.dtsx:31614-31617",
+      "wrongUnits": [
+        {
+          "unit": 5,
+          "problem": "The gen_note wstr(1000) overflow is missing from the business-outcome failure modes.",
+          "correct": "Add: per documented SSIS behaviour (not shown in the files), a combined note (reason names plus reject notes) longer than 1000 characters also fails the data flow in Set gen_note, and the later steps of the package do not run in that run.",
+          "evidence": "DTSX:8047; 7407"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Create FundEnrolment For Pension|decisions",
+      "hash": "202c9c3218fb",
+      "verdict": "INCOMPLETE",
+      "detail": "Rows 1-6 are correct as stated. WHERE: DTSX:6934-6937. Passed-and-reject: main.cs:136-151. Product 1/2: 166-173. Joining source 3/4: 287-294. Underwriting: 296-325. catch: 330-334. Two conditional rules in the same component are missing. (a) main.cs:284-285 (DTSX:5167): if gen_newsletterapproval is not null (yes or no), gen_ispension = true. (b) main.cs:271-274 (DTSX:5154-5156): gen_counter = gen_count, or 1 when gen_count is NULL. Both are in |detailed unit 17-18 but not in this decision table.",
+      "evidence": "DTSX:4758 (main.cs:271-274, 281-285); DTSX:5154-5156; 5167",
+      "wrongUnits": [
+        {
+          "unit": 0,
+          "problem": "The decision rows for gen_ispension and the gen_counter default are missing.",
+          "correct": "Add: main.cs:284 | !gennewsletterapproval_IsNull | newsletter approval present | gen_ispension = true. Add: main.cs:271 | gencount_IsNull | no count | gen_counter = 1 (otherwise gen_count).",
+          "evidence": "DTSX:5154-5156; 5167"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Create FundEnrolment For Transfer Request|detailed",
+      "hash": "7e0d9cf9166d",
+      "verdict": "INCOMPLETE",
+      "detail": "Units 1-11 check out. Disabled at DTSX:8160, and skipping it is correctly attributed to SSIS behaviour. Unit 2: the WHERE clause (DTSX:10039-10042) and the NULL/UNKNOWN handling are correct. Unit 3: CASE requestsource = 2 -> top 1 contract with broker number '00000004000' (DTSX:10020). Units 4-8: main.cs:145-223, with the contact city commented out. Units 9-10: constants and SQL updates (DTSX:11069, 11114). Unit 11: the ## insert on [CRM] (DTSX:10191, FailComponent); a grep finds ##TblFundEnrolments in no other supplied DTSX. Unit 12 describes the hypothetical note-building failure only for an empty description. It omits the overflow: Set gen_note 1 writes gen_note wstr(500) (DTSX:11060), built from four reason names of wstr(300) each plus gen_rejectdescription wstr(1000) (DTSX:10061). There is no try and no error output (DTSX:10501-10504). Per documented SSIS behaviour, a note longer than 500 characters would fail the data flow. The flow is disabled, so this has no runtime effect.",
+      "evidence": "DTSX:8160; 10020; 10039-10042; 10061; 10501-10504; 11060; 11069; 11114; 10191",
+      "wrongUnits": [
+        {
+          "unit": 12,
+          "problem": "The hypothetical failure list omits the gen_note wstr(500) overflow.",
+          "correct": "Add: (if enabled) the note is written to a 500-character column. Per documented SSIS behaviour (not shown in the files), reason names plus a description longer than that would throw outside any try and fail the data flow.",
+          "evidence": "DTSX:11060; 10061; 10504"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Create FundEnrolment For Transfer Request|detail",
+      "hash": "321495b2f75f",
+      "verdict": "CONFIRMED",
+      "detail": "Unit 1: matches DTSX:10039-10042, including the NULL to UNKNOWN exclusion. Unit 2: tr.gen_fundenrolmentid is null. Unit 3: main.cs:145/183 contact vs account (an empty account name implies no account row, so 'otherwise' is equivalent); CASE at DTSX:10020. Unit 4: disabled, and the SQL updates are Unsupported. Unit 5: no outcome. Unit 6: 0036_TransferRequest (SDK update gen_tanferinstatus, 0036 DTSX:3886) and 0005 (SQL 'update gen_transferrequest', 0005 DTSX:73757ff) update it. 0029's 'UPDATE gen_transferrequest' is inside the disabled 'Create POA MAIN For Transfer Request' (0029 DTSX:37781). No creator is found, and this is labelled as a hypothesis.",
+      "evidence": "DTSX:8160; 10020; 10039-10042; 0036_TransferRequest.dtsx:3886; 0005_Customer Account.dtsx:73757; 0029_POA.dtsx:37781, 40559",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Create FundEnrolment For Transfer Request|decisions",
+      "hash": "65b7eef1ff6f",
+      "verdict": "INCOMPLETE",
+      "detail": "Rows 1-3 are correct: Disabled at DTSX:8160; the WHERE clause with NULL handling (DTSX:10039-10042); contact/account at main.cs:145/183. The table omits the source-side decision on the agent contract. CASE WHEN TR.gen_requestsource = 2 picks the top-1 gen_agentcontract with Gen_brokernumber = '00000004000' (no ORDER BY); otherwise it uses tr.gen_agentcontractid (DTSX:10020-10026). That value feeds gen_brokernumber, agency, agent and supervisor. It appears in |detail unit 3 but not here. The flow is disabled, so there is no runtime effect.",
+      "evidence": "DTSX:10020-10026; 8160",
+      "wrongUnits": [
+        {
+          "unit": 0,
+          "problem": "The agent-contract CASE decision is missing.",
+          "correct": "Add: Get Failed Transfer Request (DTSX:10020) | TR.gen_requestsource = 2 | request from source 2 | contract = top 1 gen_agentcontract with Gen_brokernumber '00000004000'; otherwise tr.gen_agentcontractid (if enabled).",
+          "evidence": "DTSX:10020-10026"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Update Reject Management With Fund Enrolment|detailed",
+      "hash": "a0fa54562ad0",
+      "verdict": "CONFIRMED",
+      "detail": "Units 1-3 match the three-part UNION (DTSX:14666-14686): aj through fe.Gen_automatedjoining, pj through pj.gen_fundenrolmentid, tr through tr.gen_fundenrolmentid, each with rm.gen_fundenrolmentid is null and rm.statecode = 0. Units 4-8: (gen_isoldrejectmethod != 1 or is null) in all three parts. Unit 9: main.cs:120-127, SDK Update gen_rejectmanagement.gen_fundenrolmentid. Unit 10: Failure goes to an empty Derived Column (DTSX:14623) and Success to an empty Derived Column 1. ErrorMessage is wstr(200) (DTSX:15623). The overflow caveat is marked as documented SSIS behaviour, and Constraint 7 (Success) leads to Update FundEnrolment, which sets gen_ismailsend = 0. Unit 11: the multi-Fund-Enrolment case is correct. UNION removes only identical pairs, there is no ORDER BY, and updates run in row order.",
+      "evidence": "DTSX:14666-14686; 14715 (main.cs:116-136); 14623; 14642; 15623; Constraint 7",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Update Reject Management With Fund Enrolment|decisions",
+      "hash": "bdb40b89ed66",
+      "verdict": "CONFIRMED",
+      "detail": "Row 1 matches the filters in each UNION part (DTSX:14666-14686). Row 2 matches main.cs:120 (!genrejectmanagementid_IsNull && !GenfundenrolmentId_IsNull), the Update, and the catch to Failure (dead end). Both ids are primary keys from inner joins, so the 'else' (row not directed) cannot occur. The wstr(200) caveat is correctly marked as documented SSIS behaviour.",
+      "evidence": "DTSX:14666-14686; 14715 (main.cs:116-136); 15623",
+      "wrongUnits": []
+    }
+  ]
+}

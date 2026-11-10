@@ -1,0 +1,148 @@
+{
+ "package": "0034_SetMaxRevaluationDate",
+ "source": {
+  "file": "0034_SetMaxRevaluationDate.dtsx",
+  "relativePath": "DailyProcess/0034_SetMaxRevaluationDate.dtsx",
+  "sha256": "C43194323EA136DC52C0467058A8C11A0AC4498DB47E6A82585A7043A82C15C3",
+  "bytes": 3465,
+  "lines": 39
+ },
+ "stats": {
+  "fileFields": 0,
+  "crmValue": 0,
+  "crmInfluenceOnly": 0,
+  "crmRowFilter": 0,
+  "logicOnly": 0,
+  "writerInputUnmapped": 0,
+  "readNoUse": 0,
+  "stagingOnly": 0,
+  "notUsed": 0,
+  "notExposed": 0,
+  "crmAttributesWritten": 1,
+  "crmAttributesDisabled": 0,
+  "targetsFromFile": 0,
+  "targetsFromDb": 1,
+  "targetsWithOpenSources": 0,
+  "targetsMissingInputs": 0,
+  "scriptResolutions": 0,
+  "readWriteResolutions": 0,
+  "readWriteUnstructured": 0,
+  "crossCheckMismatches": 0,
+  "openItemsRemaining": 0
+ },
+ "stepDict": [
+  {
+   "text": "הוצהר ע\"י האנליסט: MAX(dateadd(hh,3,gen_revaluationdate)) converted to varchar(10) style 103 (dd/mm/yyyy) becomes gen_Value (DTSX 15 (select @PrmMaxRevaluationDate = CONVERT(varchar(10), Max(dateadd(hh,3,gen_revaluationdate)),103)))",
+   "t": "declared",
+   "manip": true,
+   "open": false
+  },
+  {
+   "text": "הוצהר ע\"י האנליסט: only fund mains with gen_existinfile = 1 take part in the MAX (DTSX 15 (where gen_existinfile = 1))",
+   "t": "declared",
+   "manip": false,
+   "open": false
+  },
+  {
+   "text": "הוצהר ע\"י האנליסט: only revaluation dates < first day of the current month (string 'YYYY/M/1' built from GETDATE(), implicitly converted for the comparison) take part in the MAX; the filter uses the raw column, the +3h shift is applied only in the SELECT (DTSX 15 (and gen_revaluationdate < cast(YEAR(GETDATE()) as nvarchar) +'/'+ CAST(MONTH(GETDATE()) as nvarchar) +'/'+ '1'))",
+   "t": "declared",
+   "manip": false,
+   "open": false
+  }
+ ],
+ "targets": [
+  {
+   "disabled": false,
+   "entity": "gen_systemconfiguration",
+   "attribute": "gen_value",
+   "verb": "UPDATE",
+   "mechanism": "SQL (Execute SQL Task: UPDATE [gen_SystemConfigurationBase], conn [PCRM] = PSQL/ALTSHULER_MSCRM, SQLTask:Connection {BED24F94-9937-47AB-B7A7-59C068103945})",
+   "status": "Unsupported",
+   "component": "Package\\Execute SQL Task",
+   "dataFlow": "Package",
+   "identicalCopies": [],
+   "rowFilters": [],
+   "recordKey": "WHERE gen_name = 'MaxRevaluationDate' (literal key; every gen_SystemConfigurationBase row with that name is updated)",
+   "writeCondition": "Single executable of the package (no precedence constraints, not disabled, DTSX 12). Runs once per execution; the UPDATE always runs (no IF), also when the SELECT finds no row.",
+   "expression": "SET [gen_Value] = @PrmMaxRevaluationDate, where @PrmMaxRevaluationDate varchar(30) = CONVERT(varchar(10), MAX(dateadd(hh,3,gen_revaluationdate)), 103) FROM Gen_fundmain WHERE gen_existinfile = 1 AND gen_revaluationdate < cast(YEAR(GETDATE()) as nvarchar) + '/' + CAST(MONTH(GETDATE()) as nvarchar) + '/' + '1'. I.e. the latest revaluation date (+3 hours fixed shift, no DST handling) of fund mains present in the file, strictly before the first day of the current month (server date), formatted as style 103 'dd/mm/yyyy' text. If no fund main qualifies, MAX is NULL and gen_Value is set to NULL.",
+   "fixedValue": null,
+   "attrCondition": "Only the row(s) with gen_name = 'MaxRevaluationDate'",
+   "evidence": "SqlStatementSource DTSX 15 (Declare @PrmMaxRevaluationDate / select ... from Gen_fundmain where ... / Update [gen_SystemConfigurationBase] set [gen_Value] = @PrmMaxRevaluationDate where gen_name = 'MaxRevaluationDate'); SQLTask:Connection {BED24F94-...} = DTSID of Package.ConnectionManagers[PCRM] (DTSX 4), ConnectionString 'Data Source=PSQL;Initial Catalog=ALTSHULER_MSCRM' (DTSX 6)",
+   "valueSources": [],
+   "influenceSources": [],
+   "dbSources": [
+    {
+     "field": null,
+     "db": "Gen_fundmain.gen_revaluationdate",
+     "role": "value",
+     "declared": true,
+     "viaColumn": null,
+     "declaredRole": "value",
+     "steps": [
+      0
+     ]
+    },
+    {
+     "field": null,
+     "db": "Gen_fundmain.gen_existinfile",
+     "role": "influence",
+     "declared": true,
+     "viaColumn": null,
+     "declaredRole": "condition",
+     "steps": [
+      1
+     ]
+    },
+    {
+     "field": null,
+     "db": "Gen_fundmain.gen_revaluationdate (filter)",
+     "role": "influence",
+     "declared": true,
+     "viaColumn": null,
+     "declaredRole": "condition",
+     "steps": [
+      2
+     ]
+    }
+   ],
+   "openSources": [],
+   "nonFile": [],
+   "missingInputs": [],
+   "analystFile": "mapping-A.json",
+   "crossCheck": {
+    "agentAdditional": [],
+    "missingInTool": []
+   }
+  }
+ ],
+ "sources": [],
+ "openItems": [],
+ "unresolved": [],
+ "notes": [
+  {
+   "file": "mapping-A.json",
+   "note": "Target DB proven from the connection manager: SQLTask:Connection=\"{BED24F94-9937-47AB-B7A7-59C068103945}\" (DTSX 15) equals DTS:DTSID of Package.ConnectionManagers[PCRM] (DTSX 4), ConnectionString Data Source=PSQL; Initial Catalog=ALTSHULER_MSCRM (DTSX 6). The package has no configurations or property expressions; run-time overrides are external_unknown."
+  },
+  {
+   "file": "mapping-A.json",
+   "note": "Unsupported write: direct UPDATE on the CRM Base table gen_SystemConfigurationBase (bypasses CRM plugins/audit; ModifiedOn not set by the statement - general CRM behaviour, not provable from the package). The value is read from the CRM view Gen_fundmain (non-Base) in the same DB."
+  },
+  {
+   "file": "mapping-A.json",
+   "note": "Date-string comparison (hypothesis, depends on session settings not in the package): the bound 'YYYY/M/1' is a string implicitly converted to the type of gen_revaluationdate. For datetime, SQL Server interprets slash-separated year-first strings according to the session DATEFORMAT (e.g. under dmy it may be read as year/day/month). With the default us_english (mdy) it is read as year/month/day. The login language of the SSIS account is external_unknown."
+  },
+  {
+   "file": "mapping-A.json",
+   "note": "Time zone: gen_revaluationdate in the Gen_fundmain view is compared without the +3h shift but returned with dateadd(hh,3,...) (fixed +3, no DST). Whether the stored values are UTC is not provable from the package."
+  },
+  {
+   "file": "mapping-A.json",
+   "note": "gen_Value receives text in style 103 'dd/mm/yyyy' (varchar(10)); @PrmMaxRevaluationDate is declared varchar(30). The consumer of gen_systemconfiguration 'MaxRevaluationDate' is outside this package (external_unknown)."
+  },
+  {
+   "file": "mapping-A.json",
+   "note": "Attributes: 1 (gen_value on gen_systemconfiguration). The SQL text contains no other SET clause."
+  }
+ ],
+ "lookupBridges": []
+}

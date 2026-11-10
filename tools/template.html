@@ -1,0 +1,397 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>חוקר לוגיקה עסקית SSIS</title>
+<script>try{var _t=localStorage.getItem("ssis-theme");if(_t)document.documentElement.setAttribute("data-theme",_t)}catch(e){}</script>
+<style>__THEME__</style>
+</head>
+<body>
+<div id="app">
+  <aside id="nav" aria-label="ניווט"></aside>
+  <div id="wrap">
+    <header id="top">
+      <div class="search"><span class="ico-wrap"></span><input id="gq" type="search" placeholder="חיפוש ממשקים / ישויות / שדות CRM / שדות קובץ — Enter לחיפוש" aria-label="חיפוש"></div>
+      <div class="chips" id="dom" role="group" aria-label="סינון תחום"></div>
+      <button id="adv" class="pri" title="Ctrl+K">חיפוש מתקדם</button>
+      <button id="theme" type="button" aria-pressed="false" aria-label="מצב כהה / בהיר" title="מצב כהה / בהיר"></button>
+    </header>
+    <main id="main"></main>
+  </div>
+</div>
+<aside id="drawer" role="dialog" aria-label="חיפוש מתקדם"></aside>
+<div id="modal" role="dialog" aria-modal="true"><div class="m"><div class="mh"><b id="mt"></b><button id="mx" aria-label="סגור">✕</button></div><div class="mb" id="mbody"></div></div></div>
+<div id="toast" role="status"></div>
+<script type="application/json" id="data">__DATA__</script>
+<script>
+'use strict';
+const DATA=JSON.parse(document.getElementById('data').textContent);
+const PK=DATA.packages;
+/* ---------------- utils ---------------- */
+const SV=(p,sz)=>'<svg class="ico" viewBox="0 0 24 24" width="'+(sz||16)+'" height="'+(sz||16)+'" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'+p+'</svg>';
+const IC={search:SV('<circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/>'),home:SV('<path d="M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/>'),folder:SV('<path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>'),
+ db:SV('<ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v6c0 1.7 3.6 3 8 3s8-1.3 8-3V5M4 11v6c0 1.7 3.6 3 8 3s8-1.3 8-3v-6"/>'),map:SV('<path d="M9 4 3 6v14l6-2 6 2 6-2V4l-6 2z"/><path d="M9 4v14M15 6v14"/>'),check:SV('<path d="M20 6 9 17l-5-5"/>'),
+ warn:SV('<path d="M12 3 2 21h20z"/><path d="M12 10v5M12 18h.01"/>'),list:SV('<path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/>'),copy:SV('<rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/>'),
+ down:SV('<path d="M12 3v12M6 11l6 6 6-6M4 21h16"/>'),grid:SV('<rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M3 15h18M9 3v18"/>'),flow:SV('<circle cx="6" cy="6" r="3"/><circle cx="18" cy="18" r="3"/><path d="M6 9v3a3 3 0 0 0 3 3h6"/>'),
+ file:SV('<path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6"/>')};
+const LOGO='<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="5" cy="6" r="2.5"/><circle cx="19" cy="6" r="2.5"/><circle cx="12" cy="18" r="2.5"/><path d="M7.2 7.5 10.5 16M16.8 7.5 13.5 16M7.5 6h9"/></svg>';
+const esc=s=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const ltr=s=>`<span class="ltr" dir="ltr">${esc(s)}</span>`;
+const $=s=>document.querySelector(s);
+const tail=s=>String(s||'').split('\\').pop();
+const stTag=s=>s?`<span class="tag st-${s==='N/A'?'NA':esc(s)}">${esc(s)}</span>`:'';
+// One relation only: a file field enters a CRM field (its value, possibly transformed on the way) — or it does not.
+// For "does not", the reason is shown as secondary text.
+const DISP={crm_value:'נכנס ל-CRM',crm_influence_only:'לא נכנס ל-CRM · משמש רק לזיהוי רשומה או כתנאי',crm_row_filter:'לא נכנס ל-CRM · קובע רק אילו שורות נכתבות',logic_only_no_crm:'לא נכנס ל-CRM · משמש בלוגיקה בלבד',writer_input_unmapped:'לא נכנס ל-CRM · מגיע לרכיב הכותב אך לא נכתב',read_no_use:'לא נכנס ל-CRM · נקרא מטבלה זמנית ולא בשימוש',staging_only:'לא נכנס ל-CRM · נטען לטבלה זמנית בלבד',not_used:'לא נכנס ל-CRM · לא בשימוש',not_exposed:'לא נכנס ל-CRM · לא נקרא מהקובץ'};
+const dTag=d=>{const t=DISP[d]||d,i=t.indexOf(' · ');return i<0?`<span class="tag d-${d}">${esc(t)}</span>`:`<span class="tag d-${d}">${esc(t.slice(0,i))}</span> <span class="small muted">${esc(t.slice(i+3))}</span>`;};
+// verdicts of several writers of one CRM field → one tag (no repetition)
+const vAgg=list=>{const v=list.filter(Boolean);if(!v.length||v.length<list.length)return vTag(null);const bad=v.find(x=>!['CONFIRMED','FIXED'].includes(x.verdict));return vTag(bad||v.find(x=>x.verdict==='FIXED')||v[0]);};
+// "אומת ב-100%" = re-derived independently from the raw DTSX and confirmed (or corrected and re-confirmed) for the exact text shown
+const V100='✓ אומת ב-100%',V100T='נבדק באופן עצמאי מול קובץ ה-DTSX המקורי';
+const VT={CONFIRMED:V100,WRONG:'שגוי',INCOMPLETE:'חלקי',UNVERIFIABLE:'לא ניתן לאמת',FIXED:V100};
+const vTag=v=>v?`<span class="tag v-${v.verdict}" title="${esc(v.verdict==='FIXED'?'תוקן בעקבות הבדיקה ונבדק שוב. '+(v.detail||''):(v.detail||V100T))}">${esc(VT[v.verdict]||v.verdict)}</span>`:'<span class="tag">טרם נבדק</span>';
+// business-logic claims (tools/logic-claims.mjs → verify-L*.json, state computed at build time)
+const LVS={not_checked:'טרם נבדק',stale:'הטקסט שונה אחרי הבדיקה',wrong:'נמצאה אי-התאמה',incomplete:'חסר פרט',unverifiable:'לא ניתן לאמת מהקבצים'};
+const lvState=(p,ids)=>{const m=p.logicVer||{};const st=ids.filter(id=>id in m).map(id=>m[id]);if(!st.length)return null;return st.every(x=>x===1)?{ok:1}:{ok:0,bad:st.filter(x=>x!==1)};};
+const lvTag=(p,ids)=>{const s=lvState(p,ids);if(!s)return '';if(s.ok)return `<span class="tag v100" title="${V100T}">${V100}</span>`;const k=s.bad[0].s;return `<span class="tag vno" title="${esc(s.bad.map(x=>x.d).filter(Boolean).join(' | ').slice(0,600))}">${esc(LVS[k]||k)}</span>`;};
+const cIds=(c,secs)=>secs.map(s=>'L|'+c.lkey+'|'+s);
+const C_ALL=['title','short','detailed','detail','decisions','crm','open'];
+// whole package: every description claim + every CRM field mapping verified
+const pkgVerified=p=>{const m=p.logicVer||{};const ids=Object.keys(m);const lOk=ids.length&&ids.every(k=>m[k]===1);const t=((p.fieldmap||{}).targets)||[];const mOk=t.every(x=>x.verify&&['CONFIRMED','FIXED'].includes(x.verify.verdict));return lOk&&mOk;};
+const pkgTag=p=>pkgVerified(p)?`<span class="tag v100" title="כל התיאורים, סדר הריצה, הממצאים ומיפוי השדות של הממשק נבדקו באופן עצמאי מול ה-DTSX">${V100}</span>`:'<span class="tag vno">לא אומת במלואו</span>';
+const domTag=d=>`<span class="tag">${esc(d||'לא סווג')}</span>`;
+const pkOf=id=>PK.find(p=>p.id===id);
+function toast(m){const t=$('#toast');t.textContent=m;t.style.display='block';clearTimeout(toast.t);toast.t=setTimeout(()=>t.style.display='none',2600);}
+const vis=()=>PK.filter(p=>S.domain==='הכל'||(p.domain||'לא סווג')===S.domain);
+
+/* ---------------- derived model ---------------- */
+PK.forEach(p=>{
+  const fm=p.fieldmap||{targets:[],sources:[]};
+  const g={};
+  fm.targets.forEach(t=>{const k=t.component+'|'+t.entity+'|'+t.verb;(g[k]=g[k]||{disabled:!!t.disabled,verb:t.verb,status:t.status,entity:t.entity,mechanism:t.mechanism,component:t.component,dataFlow:t.dataFlow,identicalCopies:t.identicalCopies||[],condition:t.writeCondition,recordKey:t.recordKey,evidence:t.evidence,fields:[]}).fields.push(t);});
+  p.ops=Object.values(g);p.ops.forEach((o,i)=>{o.oid=p.id+'-op'+i;});
+  const comps=(p.logic&&p.logic.components)||[];
+  comps.forEach((c,i)=>{c.cid='c'+i;c.ops=p.ops.filter(o=>o.component.startsWith(c.refId+'\\')||o.component===c.refId);});
+  const assigned=new Set(comps.flatMap(c=>c.ops.map(o=>o.oid)));
+  p.unassignedOps=p.ops.filter(o=>!assigned.has(o.oid));
+  const ents={};p.ops.forEach(o=>{const e=ents[o.entity]=ents[o.entity]||{entity:o.entity,verbs:new Set(),comps:new Set(),attrs:new Set(),statuses:new Set()};e.verbs.add(o.verb);e.comps.add(o.component);o.fields.forEach(f=>e.attrs.add(f.attribute));e.statuses.add(o.status);});
+  comps.forEach(c=>(c.crmEffects||[]).forEach(x=>{if(!x.entity)return;const e=ents[x.entity]=ents[x.entity]||{entity:x.entity,verbs:new Set(),comps:new Set(),attrs:new Set(),statuses:new Set()};e.verbs.add(String(x.verb||'?').toUpperCase());e.comps.add(c.refId);}));
+  p.entities=Object.values(ents);
+});
+
+/* ---------------- state & routing ---------------- */
+const S={view:'dashboard',domain:'הכל',pid:null,folder:'',drill:null,ptab:'flow',ctab:{},copen:{},pexp:{},fopen:{},mtab:{},crit:null,restab:'all',back:null,hl:null,pin:false};
+function route(){const h=decodeURIComponent(location.hash.slice(1));
+  if(!h||h==='dashboard')S.view='dashboard';else if(h.startsWith('folder=')){S.view='folder';S.folder=h.slice(7);}
+  else if(h.startsWith('drill=')){S.view='drill';S.drill=h.slice(6);}else if(h==='results'&&S.crit)S.view='results';
+  else if(pkOf(h)){if(S.pid!==h)S.ptab='flow';S.view='pkg';S.pid=h;}else S.view='dashboard';render();}
+function go(h){const cur=decodeURIComponent(location.hash.slice(1));if(cur===h||(!cur&&h==='dashboard'))route();else location.hash='#'+encodeURIComponent(h);}
+window.addEventListener('hashchange',route);
+
+/* ---------------- nav ---------------- */
+function tree(P){const root={name:'',path:'',kids:{},pk:[]};P.forEach(p=>{let n=root,path='';p.folder.split('/').forEach(seg=>{path=path?path+'/'+seg:seg;n=n.kids[seg]=n.kids[seg]||{name:seg,path,kids:{},pk:[]};});n.pk.push(p);});return root;}
+const cnt=n=>n.pk.length+Object.values(n.kids).reduce((a,k)=>a+cnt(k),0);
+function renderNav(){const P=vis(),root=tree(P);
+  const nodes=n=>Object.values(n.kids).map(k=>`<div class="nf"><div class="nfh ${S.view==='folder'&&S.folder===k.path?'on':''}" data-act="go" data-h="folder=${esc(k.path)}"><span>${IC.folder} ${esc(k.name)}</span><span class="cnt">${cnt(k)}</span></div><div class="kids">${nodes(k)}${k.pk.map(p=>`<a class="np ${S.view==='pkg'&&S.pid===p.id?'on':''}" data-act="go" data-h="${esc(p.id)}">${esc(p.name)}</a>`).join('')}</div></div>`).join('');
+  $('#nav').innerHTML=`<div class="brandbox"><div class="logo">${LOGO}</div><div><div class="brand">חוקר לוגיקה עסקית SSIS</div><div class="ver">${esc(DATA.version)} · נבנה ${esc(DATA.generatedAt)}</div></div></div>
+   <button class="nb ${S.view==='dashboard'?'on':''}" data-act="go" data-h="dashboard">${IC.home} דשבורד</button>
+   <button class="nb ${S.view==='folder'&&!S.folder?'on':''}" data-act="go" data-h="folder=">${IC.grid} כל התיקיות (${P.length})</button>
+   <button class="nb" data-act="mod1">${IC.map} מיפוי ישויות ושדות</button><div class="navsec">תיקיות</div>${nodes(root)}`;
+  document.querySelectorAll('#dom button').forEach(b=>b.classList.toggle('on',b.dataset.d===S.domain));}
+
+/* ---------------- tables: copy / CSV / XLSX ---------------- */
+const tb=(tid,title)=>`<div class="tool noexp"><button data-act="tcopy" data-t="${tid}">${IC.copy} העתק טבלה</button><button data-act="tcsv" data-t="${tid}" data-n="${esc(title||'table')}">${IC.down} ייצוא CSV</button><button data-act="txlsx" data-t="${tid}" data-n="${esc(title||'table')}">${IC.grid} ייצוא Excel</button></div>`;
+function matrix(tbl){const rows=[...tbl.rows].filter(r=>!r.hidden&&!r.classList.contains('noexp'));const grid=[];
+  rows.forEach((r,ri)=>{grid[ri]=grid[ri]||[];let ci=0;[...r.cells].forEach(c=>{while(grid[ri][ci]!==undefined)ci++;const cl=c.cloneNode(true);cl.querySelectorAll('button,.noexp').forEach(x=>x.remove());cl.querySelectorAll('br').forEach(b=>b.replaceWith('\n'));cl.querySelectorAll('li').forEach(li=>li.append('\n'));
+    const txt=cl.textContent.replace(/[ \t]+/g,' ').replace(/ *\n */g,'\n').trim();const rs=c.rowSpan||1,cs=c.colSpan||1;for(let a=0;a<rs;a++)for(let b=0;b<cs;b++){grid[ri+a]=grid[ri+a]||[];grid[ri+a][ci+b]=txt;}ci+=cs;});});
+  return grid.filter(Boolean).map(r=>Array.from(r,v=>v==null?'':v));}
+function getM(tid){const t=document.getElementById(tid);if(!t)return null;const m=matrix(t);if(m.length<2){toast('אין שורות להעתקה או לייצוא');return null;}return m;}
+async function copyText(t){try{if(navigator.clipboard&&navigator.clipboard.writeText){await navigator.clipboard.writeText(t);return true;}}catch(e){}try{const a=document.createElement('textarea');a.value=t;a.style.position='fixed';a.style.opacity=0;document.body.appendChild(a);a.select();const ok=document.execCommand('copy');a.remove();return ok;}catch(e){return false;}}
+function manualCopy(t){openModal('העתקה ידנית (הדפדפן חסם גישה ל-Clipboard)',`<p class="small">סמן הכל (Ctrl+A) והעתק (Ctrl+C):</p><textarea style="width:100%;height:300px;direction:ltr" readonly>${esc(t)}</textarea>`);}
+async function copyTable(tid){const m=getM(tid);if(!m)return;const tsv=m.map(r=>r.map(v=>v.replace(/[\t\r\n]+/g,' ')).join('\t')).join('\r\n');
+  const html='<table>'+m.map((r,i)=>'<tr>'+r.map(v=>`<${i?'td':'th'}>${esc(v).replace(/\n/g,'<br>')}</${i?'td':'th'}>`).join('')+'</tr>').join('')+'</table>';
+  try{if(navigator.clipboard&&window.ClipboardItem){await navigator.clipboard.write([new ClipboardItem({'text/plain':new Blob([tsv],{type:'text/plain'}),'text/html':new Blob([html],{type:'text/html'})})]);toast('הטבלה הועתקה');return;}throw 0;}catch(e){if(await copyText(tsv))toast('הטבלה הועתקה (טקסט)');else manualCopy(tsv);}}
+const fname=n=>String(n).replace(/[^\w֐-׿.-]+/g,'_')+'_'+new Date().toISOString().slice(0,10);
+function dl(blob,name){const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove();},500);}
+function exportCsv(tid,n){const m=getM(tid);if(!m)return;const q=v=>{v=String(v);if(/^[=+\-@\t\r]/.test(v))v="'"+v;return '"'+v.replace(/"/g,'""')+'"';};dl(new Blob(['﻿'+m.map(r=>r.map(q).join(',')).join('\r\n')],{type:'text/csv;charset=utf-8'}),fname(n)+'.csv');toast('CSV יוצא ('+(m.length-1)+' שורות)');}
+function exportXlsx(tid,n){const m=getM(tid);if(!m)return;try{dl(xlsx(m),fname(n)+'.xlsx');toast('Excel יוצא ('+(m.length-1)+' שורות)');}catch(e){toast('הייצוא נכשל: '+e.message);}}
+const CT=(()=>{const t=[];for(let n=0;n<256;n++){let c=n;for(let k=0;k<8;k++)c=c&1?0xEDB88320^(c>>>1):c>>>1;t[n]=c>>>0;}return t;})();
+const crc=b=>{let c=~0;for(let i=0;i<b.length;i++)c=CT[(c^b[i])&255]^(c>>>8);return ~c>>>0;};
+function zip(files){const enc=new TextEncoder();let off=0;const parts=[],cd=[];files.forEach(f=>{const nb=enc.encode(f.n),d=enc.encode(f.d),cr=crc(d);
+  const l=new DataView(new ArrayBuffer(30));l.setUint32(0,0x04034b50,true);l.setUint16(4,20,true);l.setUint16(6,0x0800,true);l.setUint16(12,0x21,true);l.setUint32(14,cr,true);l.setUint32(18,d.length,true);l.setUint32(22,d.length,true);l.setUint16(26,nb.length,true);parts.push(new Uint8Array(l.buffer),nb,d);
+  const h=new DataView(new ArrayBuffer(46));h.setUint32(0,0x02014b50,true);h.setUint16(4,20,true);h.setUint16(6,20,true);h.setUint16(8,0x0800,true);h.setUint16(14,0x21,true);h.setUint32(16,cr,true);h.setUint32(20,d.length,true);h.setUint32(24,d.length,true);h.setUint16(28,nb.length,true);h.setUint32(42,off,true);cd.push(new Uint8Array(h.buffer),nb);off+=30+nb.length+d.length;});
+  const sz=cd.reduce((a,b)=>a+b.length,0),e=new DataView(new ArrayBuffer(22));e.setUint32(0,0x06054b50,true);e.setUint16(8,files.length,true);e.setUint16(10,files.length,true);e.setUint32(12,sz,true);e.setUint32(16,off,true);
+  return new Blob([...parts,...cd,new Uint8Array(e.buffer)],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});}
+function xlsx(m){const col=i=>{let s='';i++;while(i){const k=(i-1)%26;s=String.fromCharCode(65+k)+s;i=Math.floor((i-1)/26);}return s;};const clean=v=>String(v).replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g,'');
+  m=m.map(r=>{const o=[],x=[];r.forEach(v=>{v=clean(v);if(v.length>32000){o.push(v.slice(0,32000));let rest=v.slice(32000);while(rest.length){x.push(rest.slice(0,32000));rest=rest.slice(32000);}}else o.push(v);});return o.concat(x);});
+  const w=Math.max(...m.map(r=>r.length));
+  const sd=m.map((r,ri)=>`<row r="${ri+1}">`+Array.from({length:w},(_,ci)=>`<c r="${col(ci)}${ri+1}" t="inlineStr" s="${ri?2:1}"><is><t xml:space="preserve">${esc(r[ci]==null?'':r[ci])}</t></is></c>`).join('')+'</row>').join('');
+  const cols='<cols>'+Array.from({length:w},(_,i)=>`<col min="${i+1}" max="${i+1}" width="24" customWidth="1"/>`).join('')+'</cols>';const X='<?xml version="1.0" encoding="UTF-8" standalone="yes"?>';
+  const sheet=`${X}<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetViews><sheetView rightToLeft="1" workbookViewId="0"><pane ySplit="1" topLeftCell="A2" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews><sheetFormatPr defaultRowHeight="15"/>${cols}<sheetData>${sd}</sheetData><autoFilter ref="A1:${col(w-1)}${m.length}"/></worksheet>`;
+  return zip([{n:'[Content_Types].xml',d:X+'<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/></Types>'},
+   {n:'_rels/.rels',d:X+'<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>'},
+   {n:'xl/workbook.xml',d:X+'<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="Sheet1" sheetId="1" r:id="rId1"/></sheets></workbook>'},
+   {n:'xl/_rels/workbook.xml.rels',d:X+'<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>'},
+   {n:'xl/styles.xml',d:X+'<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><fonts count="2"><font><sz val="11"/><name val="Arial"/></font><font><b/><sz val="11"/><name val="Arial"/></font></fonts><fills count="3"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FFE8EEFB"/></patternFill></fill></fills><borders count="1"><border/></borders><cellStyleXfs count="1"><xf/></cellStyleXfs><cellXfs count="3"><xf/><xf fontId="1" fillId="2" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="right" vertical="top" wrapText="1" readingOrder="2"/></xf><xf applyAlignment="1" numFmtId="49" applyNumberFormat="1"><alignment horizontal="right" vertical="top" wrapText="1" readingOrder="2"/></xf></cellXfs></styleSheet>'},
+   {n:'xl/worksheets/sheet1.xml',d:sheet}]);}
+function openModal(t,h){$('#mt').textContent=t;$('#mbody').innerHTML=h;$('#modal').classList.add('open');document.body.classList.add('lock');}
+function closeModal(){$('#modal').classList.remove('open');document.body.classList.remove('lock');}
+
+/* ---------------- render ---------------- */
+function render(keep){renderNav();const v=S.view;const h=v==='dashboard'?viewDash():v==='folder'?viewFolders():v==='drill'?viewDrill():v==='results'?viewResults():viewPkg();
+  const y=window.scrollY;$('#main').innerHTML=h;after();if(keep)window.scrollTo(0,y);else window.scrollTo(0,0);}
+function after(){document.querySelectorAll('.topscroll').forEach(ts=>{const w=ts.nextElementSibling,inner=ts.firstElementChild;if(!w)return;inner.style.width=w.scrollWidth+'px';let lock=0;ts.onscroll=()=>{if(lock){lock=0;return;}lock=1;w.scrollLeft=ts.scrollLeft;};w.onscroll=()=>{if(lock){lock=0;return;}lock=1;ts.scrollLeft=w.scrollLeft;};});
+  if(S.hl){const id=S.hl;S.hl=null;setTimeout(()=>{const el=document.getElementById(id);if(el){el.scrollIntoView({block:'center'});el.classList.add('hl');}},60);}}
+
+/* ---------------- dashboard ---------------- */
+function dash(){const P=vis(),ent={},mech={Supported:[],Unsupported:[]},inT={},fields={total:0,crm_value:0,crm_influence_only:0,other:0};
+  P.forEach(p=>{p.entities.forEach(e=>{const x=ent[e.entity]=ent[e.entity]||{entity:e.entity,pk:new Set(),comps:0,attrs:new Set(),write:false};x.pk.add(p.id);x.comps+=e.comps.size;e.attrs.forEach(a=>x.attrs.add(a));});
+    p.ops.filter(o=>!o.disabled).forEach(o=>{(mech[o.status]=mech[o.status]||[]).push({p,o});});
+    (p.inputs||[]).forEach(i=>{(inT[i.type]=inT[i.type]||[]).push({p,i});});
+    ((p.fieldmap||{}).sources||[]).forEach(s=>{fields.total++;if(s.disposition in fields)fields[s.disposition]++;else fields.other++;});});
+  return {P,ent:Object.values(ent),mech,inT,fields};}
+function viewDash(){const d=dash();if(!d.P.length)return `<h1>דשבורד ממשקים</h1><div class="empty">אין ממשקים בתחום "${esc(S.domain)}".</div>`;
+  return `<h1>דשבורד ממשקים</h1><div class="muted small">כל המדדים נגזרים מאותה אוכלוסיית ממשקים (${esc(S.domain)}). הנתונים חולצו מקובצי DTSX אמיתיים; ראו "מקורות והיקף" בכל ממשק.</div>
+  <div class="kpis"><div class="kpi" data-act="go" data-h="folder="><div class="kico">${IC.folder}</div><span>ממשקים</span><b>${d.P.length}</b></div>
+   <div class="kpi k-vio" data-act="go" data-h="drill=ents|"><div class="kico">${IC.db}</div><span>ישויות CRM ייחודיות</span><b>${d.ent.length}</b></div>
+   <div class="kpi k-sup" data-act="go" data-h="drill=mech|Supported"><div class="kico">${IC.check}</div><span>פעולות Supported</span><b>${d.mech.Supported.length}</b></div>
+   <div class="kpi k-uns" data-act="go" data-h="drill=mech|Unsupported"><div class="kico">${IC.warn}</div><span>פעולות Unsupported (SQL ישיר)</span><b>${d.mech.Unsupported.length}</b></div>
+   <div class="kpi k-info" data-act="go" data-h="drill=fields|crm_value"><div class="kico">${IC.list}</div><span>שדות קובץ שנכנסים ל-CRM</span><b>${d.fields.crm_value}</b><span class="small muted">מתוך ${d.fields.total}</span></div></div>
+  <h2>פירוט שימושי CRM (כתיבה)</h2>${tb('t-ent','crm-usage')}<div class="tbw"><table class="t" id="t-ent"><thead><tr><th>ישות</th><th>ממשקים</th><th>קומפוננטות</th><th>שדות נכתבים</th></tr></thead><tbody>
+  ${d.ent.sort((a,b)=>b.attrs.size-a.attrs.size).map(e=>`<tr><td>${ltr(e.entity)}</td><td><a data-act="go" data-h="drill=ent-pk|${esc(e.entity)}">${e.pk.size}</a></td><td><a data-act="go" data-h="drill=ent-cp|${esc(e.entity)}">${e.comps}</a></td><td><a data-act="go" data-h="drill=ent-at|${esc(e.entity)}">${e.attrs.size}</a></td></tr>`).join('')}</tbody></table></div>
+  <div class="grid2" style="margin-top:14px">
+   <div class="box"><h3>מנגנון כתיבה</h3>${['Supported','Unsupported'].map(k=>`<div class="bar" data-act="go" data-h="drill=mech|${k}">${stTag(k)}<b>${d.mech[k].length}</b> פעולות</div>`).join('')}<div class="small muted">Supported = CRM SDK · Unsupported = SQL ישיר על טבלאות CRM</div></div>
+   <div class="box"><h3>הכרעת שדות הקובץ</h3>${Object.entries(DISP).map(([k,v])=>{const n=d.P.reduce((a,p)=>a+((p.fieldmap||{}).sources||[]).filter(s=>s.disposition===k).length,0);return `<div class="bar" data-act="go" data-h="drill=fields|${k}">${dTag(k)}<b>${n}</b></div>`;}).join('')}</div>
+   <div class="box"><h3>קליטת קבצים</h3>${Object.entries(d.inT).map(([k,v])=>`<div class="bar" data-act="go" data-h="drill=in|${esc(k)}"><span>${esc(k)}</span><b>${v.length}</b></div>`).join('')||'<div class="empty">לא נמצאו</div>'}</div></div>`;}
+function drillData(key){const [k,v]=key.split('|'),d=dash();const pl=p=>`<a data-act="go" data-h="${p.id}">${ltr(p.name)}</a>`;
+  if(k==='ents')return {title:'ישויות CRM',cols:['ישות','ממשקים','שדות'],rows:d.ent.map(e=>[ltr(e.entity),e.pk.size,e.attrs.size])};
+  if(k==='ent-pk')return {title:'ממשקים שכותבים ל-'+v,cols:['ממשק','פעולות'],rows:d.P.filter(p=>p.entities.some(e=>e.entity===v)).map(p=>[pl(p),p.ops.filter(o=>o.entity===v).map(o=>esc(o.verb)).join(', ')])};
+  if(k==='ent-cp')return {title:'קומפוננטות שכותבות ל-'+v,cols:['ממשק','Data Flow','קומפוננטה','פעולה','סיווג'],rows:d.P.flatMap(p=>p.ops.filter(o=>o.entity===v).map(o=>[pl(p),esc(o.dataFlow),ltr(tail(o.component)),esc(o.verb),stTag(o.status)]))};
+  if(k==='ent-at')return {title:'שדות שנכתבים ל-'+v,cols:['ממשק','שדה CRM','פעולה','שדות מקור (ערך)'],rows:d.P.flatMap(p=>p.ops.filter(o=>o.entity===v).flatMap(o=>o.fields.map(f=>[pl(p),ltr(f.attribute),esc(o.verb),[...new Set(f.valueSources.map(s=>s.field))].map(ltr).join(' ')||'—'])))};
+  if(k==='mech')return {title:'פעולות כתיבה — '+v,cols:['ממשק','Data Flow','קומפוננטה','פעולה','ישות','מנגנון','שדות'],rows:(d.mech[v]||[]).map(({p,o})=>[pl(p),esc(o.dataFlow),ltr(tail(o.component)),esc(o.verb),ltr(o.entity),esc(o.mechanism),o.fields.length])};
+  if(k==='fields')return {title:'שדות קובץ — '+(DISP[v]||v),cols:['ממשק','קובץ','#','שדה','מיקום','יעדי CRM'],rows:d.P.flatMap(p=>((p.fieldmap||{}).sources||[]).filter(s=>s.disposition===v).map(s=>[pl(p),esc(s.file),s.ordinal,ltr(s.field),(s.start||'?')+'–'+(s.end||'?'),[...new Set(s.crm.map(c=>c.entity+'.'+c.attribute))].map(ltr).join(' ')||'—']))};
+  if(k==='in')return {title:'קליטה: '+v,cols:['ממשק','חיבור','פורמט','שדות'],rows:(d.inT[v]||[]).map(({p,i})=>[pl(p),ltr(i.connection),esc(i.format),i.fields])};
+  return {title:'',cols:[],rows:[]};}
+function viewDrill(){const x=drillData(S.drill);return `<button data-act="go" data-h="dashboard">← חזרה לדשבורד</button><h1 style="margin-top:10px">${esc(x.title)}</h1>${tb('t-drill','drill')}${x.rows.length?`<div class="tbw"><table class="t" id="t-drill"><thead><tr>${x.cols.map(c=>`<th>${c}</th>`).join('')}</tr></thead><tbody>${x.rows.map(r=>`<tr>${r.map(c=>`<td>${c}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`:'<div class="empty">אין נתונים בתחום הנבחר.</div>'}`;}
+
+/* ---------------- folders ---------------- */
+function viewFolders(){const P=vis();if(!P.length)return `<h1>תיקיות</h1><div class="empty">אין ממשקים בתחום "${esc(S.domain)}".</div>`;
+  let n=tree(P);if(S.folder){S.folder.split('/').forEach(s=>{n=n&&n.kids[s];});if(!n)return `<h1>תיקיות</h1><div class="empty">התיקייה "${esc(S.folder)}" ריקה בתחום "${esc(S.domain)}".</div>`;}
+  const fl=f=>{const open=S.fopen[f.path]!==false;return `<div class="nf"><div class="fh" data-act="ftog" data-p="${esc(f.path)}" role="button" aria-expanded="${open}"><span>📁 <b>${esc(f.name)}</b></span><span>${cnt(f)} ממשקים ${open?'▾':'▸'}</span></div>${open?`<div class="fbody">${Object.values(f.kids).map(fl).join('')}${f.pk.length?pkTable(f.pk):''}</div>`:''}</div>`;};
+  return `<h1>${esc(S.folder||'כל התיקיות')}</h1>${Object.values(n.kids).map(fl).join('')}${n.pk.length?pkTable(n.pk):''}`;}
+function pkTable(list){return `<div class="tbw" style="max-height:none;margin:6px 0"><table class="t"><tr><th>שם</th><th>תיאור קצר</th><th>תחום</th><th>פעולה</th></tr>${list.map(p=>{const ex=S.pexp[p.id];
+  return `<tr><td>${ltr(p.name)}</td><td>${esc(p.summary)}</td><td>${domTag(p.domain)}</td><td style="white-space:nowrap"><button data-act="pexp" data-p="${p.id}" aria-expanded="${!!ex}">${ex?'סגור פירוט':'הרחב פירוט'}</button> <button class="pri" data-act="go" data-h="${p.id}">פתח ממשק</button> <a href="#${encodeURIComponent(p.id)}" target="_blank" title="פתח בחלון חדש">↗</a></td></tr>${ex?`<tr><td colspan="4">${summaryList(p)}</td></tr>`:''}`;}).join('')}</table></div>`;}
+function summaryList(p){const c=(p.logic&&p.logic.components)||[];const sh=c.slice(0,8);return `<ol>${sh.map(x=>`<li><b>${esc(x.title_he)}</b> — ${esc(x.short_he)}${x.ops.length?'<ul>'+x.ops.map(o=>`<li>${esc(o.verb)} → ${ltr(o.entity)} ${stTag(o.status)} (${o.fields.length} שדות)</li>`).join('')+'</ul>':''}</li>`).join('')}</ol>${c.length>8?`<div class="muted small">ועוד ${c.length-8} רכיבים — פתח ממשק לתצוגה מלאה.</div>`:''}`;}
+
+/* ---------------- package ---------------- */
+function viewPkg(){const p=pkOf(S.pid);if(!p)return '<div class="empty">ממשק לא נמצא.</div>';const fm=p.fieldmap;
+  const tabs=[['flow','תצוגת תרשים זרימה'],['table','תצוגת טבלה'],['crm','ישויות CRM']].concat(fm&&fm.sources&&fm.sources.length?[['map','מיפוי שדות מקובץ']]:[]);
+  const bn=S.back?`<div class="banner">הגעת מתוצאות חיפוש. <button data-act="backres">← חזרה לתוצאות</button><button data-act="backflow">חזרה לתהליך</button><span class="muted small">התהליך המוצג מלא ובלתי מסונן.</span></div>`:'';
+  const st=fm?fm.stats:null;
+  return `${bn}<div class="crumbs">${IC.folder} ${esc(p.folder.split('/').join(' › '))} › <span>${esc(p.name)}</span></div><h1>${esc(p.name)} ${domTag(p.domain)} ${pkgTag(p)}</h1><p class="lead">${esc(p.summary)}</p>
+  ${p.reviewStatus?`<div class="warn small">${esc(p.reviewStatus)}</div>`:''}
+  <details class="prov"><summary>מקורות, היקף ומשמעות הסיווג</summary><table>${[['קובץ DTSX',ltr(p.file)],['נתיב',ltr(p.relativePath)],['SHA256',ltr(p.sha256)],['גודל',esc(p.bytes+' bytes')],['גבולות הבדיקה',esc(p.scope)],['שיטה',esc(p.method)],['סיווג תחום',esc(p.domain||'לא סווג — ממתין לכלל סיווג מהמשתמש')],['תלויות חיצוניות',esc((p.externals||[]).join(', ')||'—')],['רכיבי תשתית שהוחרגו',esc(((p.logic||{}).ignoredAsFramework||[]).map(tail).join(', ')||'—')+' '+lvTag(p,['L|ignored'])],['סטטוס אימות',esc(p.verification||'—')]].map(([k,v])=>`<tr><td><b>${k}</b></td><td>${v}</td></tr>`).join('')}</table></details>
+  ${st?`<div class="statsrow"><span class="stat"><b>${st.fileFields}</b> שדות קובץ</span><span class="stat"><b>${st.crmValue}</b> נכתבים ל-CRM כערך</span><span class="stat"><b>${(st.crmInfluenceOnly||0)+(st.crmRowFilter||0)}</b> משפיעים / מסננים</span><span class="stat"><b>${st.logicOnly+(st.writerInputUnmapped||0)}</b> לוגיקה בלבד</span><span class="stat"><b>${st.stagingOnly}</b> Staging בלבד</span><span class="stat"><b>${st.notUsed+(st.notExposed||0)}</b> לא בשימוש</span><span class="stat"><b>${st.crmAttributesWritten}</b> שדות CRM נכתבים</span>${st.targetsWithOpenSources?`<span class="stat bad"><b>${st.targetsWithOpenSources}</b> מקור לא פתור</span>`:''}</div>`:''}
+  <div class="tabs" role="tablist">${tabs.map(([k,l])=>`<button role="tab" aria-selected="${S.ptab===k}" class="${S.ptab===k?'on':''}" data-act="ptab" data-k="${k}">${l}</button>`).join('')}</div>
+  <div role="tabpanel">${S.ptab==='flow'?tabFlow(p):S.ptab==='table'?tabTable(p):S.ptab==='crm'?tabCrm(p):tabMap(p)}</div>`;}
+const toneOf=c=>{const s=new Set(c.ops.map(o=>o.status));return !s.size?'neutral':s.size>1?'mixed':s.has('Supported')?'supported':'unsupported';};
+const toneLabel={supported:'Supported',unsupported:'Unsupported',mixed:'Mixed',neutral:'ללא כתיבה ל-CRM'};
+function tabFlow(p){const comps=(p.logic&&p.logic.components)||[];if(!comps.length)return '<div class="empty">לא נמצא ניתוח לוגיקה עסקית לממשק זה.</div>';
+  const ex=(p.logic.executionOrder||[]);
+  return `${p.logic.summary_he?`<p>${esc(p.logic.summary_he)} ${lvTag(p,['L|summary'])}</p>`:''}${ex.length?`<details class="prov"><summary>סדר ריצה (Precedence Constraints) ${lvTag(p,['L|exec'])}</summary><ol>${ex.map(e=>`<li>${esc(e.title_he||tail(e.refId))} <span class="muted small">${esc(e.trigger||'')}</span></li>`).join('')}</ol></details>`:''}
+  ${comps.map((c,i)=>`<div class="step" id="cmp-${p.id}-${c.cid}"><div class="rail"><span class="num">${i+1}</span></div>${compCard(p,c)}</div>`).join('')}
+  ${p.unassignedOps.length?`<div class="warn">פעולות כתיבה שלא שויכו לרכיב לוגי: ${p.unassignedOps.map(o=>ltr(tail(o.component))).join(', ')}</div>`:''}
+  ${(p.logic.findings_he||[]).length?`<h2>ממצאים</h2>${p.logic.findings_he.map((f,fi)=>`<div class="sec"><b>${esc(f.severity||'')}</b> ${esc(f.text)} ${lvTag(p,['L|finding#'+(fi+1)])} <div class="small muted">${esc(f.evidence||'')}</div></div>`).join('')}`:''}`;}
+function compCard(p,c){const t=toneOf(c),k=p.id+':'+c.cid,open=S.copen[k];
+  return `<div class="card tone-${t}" id="card-${p.id}-${c.cid}"><div class="chead"><div><b>${esc(c.title_he)}</b><div>${ltr(c.techName||tail(c.refId))}</div></div><div><span class="tag st-${t==='supported'?'Supported':t==='unsupported'?'Unsupported':t==='mixed'?'Mixed':'NA'}">${toneLabel[t]}</span> ${lvTag(p,cIds(c,C_ALL))}</div></div>
+  <p style="margin:6px 0">${esc(c.short_he)}</p>
+  <div class="opr">${c.ops.length?c.ops.map(o=>`<button data-act="opjump" data-p="${p.id}" data-c="${c.cid}" data-o="${o.oid}">${esc(o.verb)} ${esc(o.entity)} · ${esc(o.status)} · ${o.fields.length} שדות</button>`).join(''):'<span class="muted small">אין פעולת כתיבה ל-CRM מתועדת בשלב זה</span>'}</div>
+  <button data-act="ctog" data-k="${k}" aria-expanded="${!!open}">${open?'סגור פירוט':'פתח פירוט'}</button>${open?compBody(p,c):''}</div>`;}
+const CTABS=[['desc','תיאור'],['flow','FLOW'],['det','תיאור מפורט'],['dflow','FLOW מפורט'],['ops','פעולות נתונים'],['map','מיפוי שדות']];
+// ---- one node list → two views (prose / diagram). Pair equality is by construction. ----
+function nodesProse(nodes,detailed){
+  if(!detailed){ // short: flowing paragraph(s), decisions inline
+    const sent=n=>n.type==='decision'?esc(n.text)+' '+(n.branches||[]).map(b=>'<b>'+esc(b.label)+':</b> '+(b.nodes||[]).map(sent).join(' ')).join(' · '):esc(n.text);
+    return '<p class="lead">'+nodes.map(sent).join(' ')+'</p>';}
+  const li=n=>{const tech=n.tech?' <span class="tech">'+esc(n.tech)+'</span>':'';
+    if(n.type==='decision')return '<li class="pd"><span class="q">'+esc(n.text)+'</span>'+tech+'<ul>'+(n.branches||[]).map(b=>'<li><span class="bl">'+esc(b.label)+'</span><ol>'+(b.nodes||[]).map(li).join('')+'</ol></li>').join('')+'</ul></li>';
+    return '<li class="p-'+esc(n.type||'step')+'">'+esc(n.text)+tech+'</li>';};
+  return '<ol class="pl">'+nodes.map(li).join('')+'</ol>';}
+function nodesDiagram(nodes,detailed){
+  const box=n=>{const tech=detailed&&n.tech?'<div class="fc-tech">'+esc(n.tech)+'</div>':'';
+    if(n.type==='decision')return '<div class="fc-node fc-dec"><span class="fc-q">◇</span>'+esc(n.text)+tech+'</div><div class="fc-branches">'+(n.branches||[]).map(b=>'<div class="fc-branch"><span class="fc-label">'+esc(b.label)+'</span>'+col(b.nodes||[])+'</div>').join('')+'</div>';
+    return '<div class="fc-node fc-'+esc(n.type||'step')+'">'+esc(n.text)+tech+'</div>';};
+  const col=list=>'<div class="fc-col">'+list.map((n,i)=>(i?'<div class="fc-arrow"></div>':'')+box(n)).join('')+'</div>';
+  return '<div class="fc'+(detailed?' fc-detailed':'')+'">'+col(nodes)+'</div>';}
+function compBody(p,c){const k=p.id+':'+c.cid;const tabs=CTABS.filter(t=>t[0]!=='map'||c.ops.some(o=>o.fields.some(f=>f.valueSources.length)));let cur=S.ctab[k]||'desc';if(!tabs.some(t=>t[0]===cur))cur='desc';
+  return `<div class="cbody"><div class="tabs sm" role="tablist">${tabs.map(([a,l])=>`<button role="tab" class="${cur===a?'on':''}" data-act="ctab" data-k="${k}" data-t="${a}">${l}</button>`).join('')}</div><div role="tabpanel">${compTab(p,c,cur)}</div></div>`;}
+// each tab carries the badge of exactly the claims whose text it shows
+const CT_SECS={desc:['title','short'],flow:['title','short'],det:['detailed','detail','open'],dflow:['detailed','decisions'],ops:['crm']};
+function compTab(p,c,t){const b=CT_SECS[t]?lvTag(p,cIds(c,CT_SECS[t])):'';return (b?`<div class="small" style="margin:4px 0">${b}</div>`:'')+compTab0(p,c,t);}
+function compTab0(p,c,t){
+  if(t==='desc')return c.short&&c.short.nodes&&c.short.nodes.length?`<div class="prose">${nodesProse(c.short.nodes,false)}</div>`:`<p>${esc(c.short_he)}</p>`;
+  if(t==='flow')return c.short&&c.short.nodes&&c.short.nodes.length?nodesDiagram(c.short.nodes,false):((c.flow_he||[]).length?`<div class="chips2">${c.flow_he.map((s,i)=>(i?'<span class="arrow">←</span>':'')+`<span class="chip2">${esc(s)}</span>`).join('')}</div>`:'<div class="empty">לא תועד FLOW.</div>');
+  if(t==='det')return (c.detailed&&c.detailed.nodes&&c.detailed.nodes.length?`<div class="prose">${nodesProse(c.detailed.nodes,true)}</div>`:((c.detail_he||[]).map(d=>`<div class="sec"><h4>${esc(d.h)}</h4>${esc(d.t)}</div>`).join('')||'<div class="empty">לא תועד תיאור מפורט.</div>'))+((c.evidence||[]).length?`<details class="prov"><summary>ראיות</summary>${c.evidence.map(e=>`<div>${ltr(e)}</div>`).join('')}</details>`:'')+((c.openQuestions_he||[]).length?`<div class="warn"><b>שאלות פתוחות:</b><ul>${c.openQuestions_he.map(q=>`<li>${esc(q)}</li>`).join('')}</ul></div>`:'');
+  if(t==='dflow')return c.detailed&&c.detailed.nodes&&c.detailed.nodes.length?nodesDiagram(c.detailed.nodes,true):((c.decisions||[]).length?c.decisions.map(d=>`<div class="dnode dec"><b>${esc(d.meaning_he||'החלטה')}</b><div class="small">${ltr(d.where||'')}</div><div>${ltr(d.condition||'')}</div><div>← ${esc(d.outcome_he||'')}</div></div>`).join(''):'<div class="empty">לא תועדו תנאי החלטה לרכיב זה.</div>');
+  if(t==='ops')return c.ops.length?c.ops.map(o=>opHtml(o)).join(''):'<div class="empty">אין פעולת כתיבה ל-CRM מתועדת בשלב זה.</div>';
+  if(t==='map')return mapCompact(c);return '';}
+function opHtml(o){const id='fb-'+o.oid;
+  return `<div class="opc" id="op-${o.oid}"><div class="chips2"><b>${esc(o.verb)}</b> ${stTag(o.status)} ${o.disabled?'<span class="tag">רכיב לא פעיל (Disabled)</span>':''} ${ltr(o.entity)} <span class="small muted">${esc(o.mechanism)}</span></div>
+  <div class="small">רכיב: ${ltr(tail(o.component))}${o.identicalCopies.length?` (+${o.identicalCopies.length} עותקים זהים: ${o.identicalCopies.map(x=>ltr(tail(x))).join(' ')})`:''}</div>
+  ${o.recordKey?`<div class="small">זיהוי רשומה: ${esc(o.recordKey)}</div>`:''}<div class="small">תנאי: ${esc(o.condition||'לא תועד')}</div><div class="small">ראיה: ${ltr(o.evidence||'')}</div>
+  ${(()=>{const rf=[];const ks=new Set();o.fields.forEach(f=>(f.rowFilters||[]).forEach(x=>{const k=x.component+x.expression;if(!ks.has(k)){ks.add(k);rf.push(x);}}));return rf.length?`<details class="prov"><summary>שדות קובץ שקובעים אילו שורות נכתבות (${rf.length} תנאים)</summary>${rf.map(x=>`<div class="small">${ltr(x.component)} · ${esc(x.output||'')}${x.leads===true?' <span class="tag st-Supported">ענף שמגיע לכתיבה</span>':x.leads===false?' <span class="tag">ענף שלא מגיע לכתיבה</span>':''}: ${ltr(x.expression)} ← ${x.fileFields.map(ltr).join(' ')}</div>`).join('')}</details>`:'';})()}${(()=>{const sp=[];const ks=new Set();o.fields.forEach(f=>(f.rowFiltersSuppressed||[]).forEach(x=>{const k=x.component+(x.output||'');if(!ks.has(k)){ks.add(k);sp.push(x);}}));return sp.length?`<details class="prov"><summary>מסננים שזוהו אוטומטית והוסרו בהוכחה (${sp.length})</summary>${sp.map(x=>`<div class="small">${ltr(x.component)}${x.output?' · '+esc(x.output):''}: ${esc(x.why)} ${ltr(x.evidence||'')}</div>`).join('')}</details>`:'';})()}
+  <div class="tool noexp"><b>שדות (${o.fields.length})</b><button data-act="cpf" data-o="${o.oid}" data-k="sc">העתק Schema</button><button data-act="cpf" data-o="${o.oid}" data-k="all">העתק הכל</button></div>
+  <table class="t" id="${id}"><tr><th>#</th><th>עברית</th><th>Schema Name</th><th>סוג שדה</th><th>ערך קבוע</th><th>מקור (שדות קובץ)</th><th>מניפולציה</th><th>אימות</th></tr>${o.fields.map((f,i)=>`<tr><td>${i+1}</td><td class="muted">—</td><td>${ltr(f.attribute)}</td><td class="muted">—</td><td>${esc(f.fixedValue??'')}</td><td>${srcList(f)}</td><td class="small">${esc(f.expression||'')}</td><td>${vTag(f.verify)}</td></tr>`).join('')}</table>
+  <div class="small muted">עברית וסוג שדה יוצגו כשיסופק Metadata של CRM (אפיון 1).</div></div>`;}
+// a field name alone is ambiguous when a package reads several files with the same column names (e.g. 0013): prefix the file there
+let MULTI=null;const fLab=s=>{if(!MULTI){MULTI=new Set();PK.forEach(p=>{const c=new Set(((p.fieldmap||{}).sources||[]).map(x=>x.connection));if(c.size>1)c.forEach(x=>MULTI.add(x));});}
+  return MULTI.has(s.conn)?String(s.conn).replace(/^.*\[(.*)\]$/,'$1')+' · '+s.field:s.field;};
+function srcList(f){const v=[...new Set(f.valueSources.map(fLab))];const dbv=[...new Set((f.dbSources||[]).filter(s=>s.role==='value').map(s=>s.db))];
+  if(v.length)return v.map(ltr).join(' ')+(f.openSources.length?'<div class="small" style="color:var(--uns)">מקור לא פתור</div>':'');
+  if(f.openSources.length)return '<span class="small" style="color:var(--uns)">מקור לא פתור</span>';
+  return '<span class="muted">לא מהקובץ</span>'+(dbv.length?'<div class="small muted">מ-DB: '+dbv.map(ltr).join(' ')+'</div>':'');}
+// one row per CRM field of this component; file fields whose value enters it
+function mapCompact(c){const g={};c.ops.forEach(o=>o.fields.forEach(f=>{const k=o.entity+'.'+f.attribute;const x=g[k]=g[k]||new Set();f.valueSources.forEach(s=>x.add(fLab(s)));}));
+  return `<table class="t"><tr><th>שדה CRM</th><th>שדות בקובץ שנכנסים אליו</th></tr>${Object.entries(g).map(([k,s])=>`<tr><td>${ltr(k)}</td><td>${[...s].map(ltr).join(' ')||'<span class="muted">לא מהקובץ</span>'}</td></tr>`).join('')}</table>`;}
+/* table tab */
+function tabTable(p){const comps=(p.logic&&p.logic.components)||[];const id='t-ops-'+p.id;const H=['#','שם ממשק','כותרת קומפוננטה','רכיב (EN)','סטטוס קומפוננטה','תיאור קצר','תיאור מפורט','סוג פעולה','שם פעולה','יעד','סיווג','תנאי ביצוע','שדות (עברית)','שדות (Schema)','סוג שדה','ערך קבוע'];
+  const rows=[];comps.forEach((c,ci)=>c.ops.forEach(o=>{const col=fn=>o.fields.map((f,i)=>`${i+1}. ${esc(fn(f)??'')}`).join('<br>');
+    rows.push(`<tr id="row-${o.oid}"><td>${ci+1}</td><td>${esc(p.name)}</td><td>${esc(c.title_he)}</td><td>${ltr(tail(o.component))}</td><td>${esc(toneLabel[toneOf(c)])}</td><td>${esc(c.short_he)}</td><td>${esc((c.detail_he||[]).map(d=>d.h+': '+d.t).join(' | ').slice(0,1500))}</td><td>${esc(o.verb)}</td><td>${esc(o.mechanism)}</td><td>${ltr(o.entity)}</td><td>${stTag(o.status)}</td><td>${esc(o.condition||'')}</td><td>${col(()=>'')}</td><td dir="ltr">${col(f=>f.attribute)}</td><td>${col(()=>'')}</td><td>${col(f=>f.fixedValue)}</td></tr>`);}));
+  p.unassignedOps.forEach(o=>{const col=fn=>o.fields.map((f,i)=>`${i+1}. ${esc(fn(f)??'')}`).join('<br>');rows.push(`<tr><td>—</td><td>${esc(p.name)}</td><td>(לא שויך)</td><td>${ltr(tail(o.component))}</td><td></td><td></td><td></td><td>${esc(o.verb)}</td><td>${esc(o.mechanism)}</td><td>${ltr(o.entity)}</td><td>${stTag(o.status)}</td><td>${esc(o.condition||'')}</td><td>${col(()=>'')}</td><td dir="ltr">${col(f=>f.attribute)}</td><td>${col(()=>'')}</td><td>${col(f=>f.fixedValue)}</td></tr>`);});
+  if(!rows.length)return '<div class="empty">אין פעולות כתיבה ל-CRM מתועדות בממשק זה.</div>';
+  return `<div class="muted small">שורה לכל פעולה. המספור בארבע עמודות השדות מתייחס לאותו שדה. עברית וסוג שדה ריקים עד שיסופק Metadata של CRM.</div>${tb(id,p.name+'_operations')}
+  <div class="noexp"><button data-act="hscroll" data-d="1">גלול ימינה ▶</button> <button data-act="hscroll" data-d="-1">◀ גלול שמאלה</button></div>
+  <div class="topscroll noexp"><div></div></div><div class="tbw" id="tw-${p.id}"><table class="t" id="${id}"><thead><tr>${H.map(h=>`<th>${h}</th>`).join('')}</tr></thead><tbody>${rows.join('')}</tbody></table></div>`;}
+/* crm tab */
+function tabCrm(p){if(!p.entities.length)return '<div class="empty">לא נמצאו ישויות CRM מוכחות בממשק זה.</div>';
+  return `<h2>שימוש בישויות CRM</h2><div class="muted small">נגזר מהפעולות בפועל בממשק, לא מקטלוג Metadata.</div>${p.entities.map(e=>`<div class="crmrow" data-act="ent" data-p="${p.id}" data-e="${esc(e.entity)}"><div><b>${ltr(e.entity)}</b></div><div>${[...e.verbs].join(' / ')} · ${e.comps.size} רכיבים · ${e.attrs.size} שדות</div></div>`).join('')}`;}
+function entModal(pid,ent){const p=pkOf(pid);const ops=p.ops.filter(o=>o.entity===ent);
+  openModal(ent,ops.map(o=>`<div class="sec"><h4>${esc(o.verb)} · ${ltr(tail(o.component))} ${stTag(o.status)}</h4><div class="small">תנאי: ${esc(o.condition||'—')}</div><div class="small">שדות: ${o.fields.map(f=>ltr(f.attribute)).join(' ')}</div></div>`).join('')||'<div class="empty">אין פעולות כתיבה; שימוש בקריאה בלבד.</div>');}
+/* field-mapping tab — ONE relation only: a file field enters a CRM field (its value, possibly transformed on the way).
+   Keys / conditions / row filters are not a relation; a field used only that way is "לא נכנס ל-CRM" with the reason. */
+const MT=[['src','כל השדות מהקובץ'],['crm','כל שדות ה-CRM'],['fromsrc','מיפוי ממקור'],['fromdst','מיפוי מיעד'],['audit','FLOW מלא · הכרעת שדות']];
+// strip component names / evidence so identical manipulations in different data flows compare equal
+const normStep=t=>String(t||'').replace(/"[^"]*"/g,'"…"').replace(/\([^()]*(main\.cs|DTSX)[^()]*\)/g,'').replace(/\s+/g,' ').trim();
+// value links of one file field: one per CRM field (entity.attribute); every writer of that field is merged into the link
+function links(s,fm){const g={};(s.crm||[]).forEach((c,ci)=>{if(c.role!=='value')return;const k=c.entity+'|'+c.attribute;
+  const x=g[k]=g[k]||{key:k,entity:c.entity,attribute:c.attribute,verbs:new Set(),st:new Set(),cis:[],vk:new Set(),variants:[]};
+  x.verbs.add(c.verb);x.st.add(c.status);x.cis.push(ci);
+  const man=(c.steps||[]).map(i=>fm.stepDict[i]).filter(z=>z&&z.manip).map(z=>normStep(z.text));const vk=man.join(' > ');if(!x.vk.has(vk)){x.vk.add(vk);x.variants.push(man);}});
+  return Object.values(g);}
+const opsCell=(verbs,st)=>`<span class="nowrap">${[...verbs].map(esc).join(' / ')}</span> ${[...st].map(stTag).join(' ')}`;
+const manCell=g=>g.variants.length>1?`<b>${g.variants.length}</b> דרכים שונות`:(g.variants[0]||[]).length+' מניפולציות';
+function groupTargets(T){const g={};T.forEach(t=>{const k=t.entity+'|'+t.attribute;
+  const x=g[k]=g[k]||{entity:t.entity,attribute:t.attribute,ts:[],v:new Set(),db:new Set(),fx:new Set(),expr:new Set(),verbs:new Set(),st:new Set(),open:0};
+  x.ts.push(t);x.verbs.add(t.verb);x.st.add(t.status);(t.dbSources||[]).filter(s=>s.role==='value').forEach(s=>x.db.add(s.db));t.valueSources.forEach(s=>x.v.add(fLab(s)));
+  if(t.fixedValue!=null&&t.fixedValue!=='')x.fx.add(String(t.fixedValue));if(t.expression)x.expr.add(t.expression);x.open+=t.openSources.length;});
+  return Object.values(g).map(x=>({...x,v:[...x.v],db:[...x.db],fx:[...x.fx],expr:[...x.expr]}));}
+const fileCell=x=>x.v.length?x.v.map(ltr).join('<br>')+(x.open?'<div class="small" style="color:var(--uns)">מקור לא פתור</div>':''):(x.open?'<span style="color:var(--uns)">מקור לא פתור</span>':'<span class="muted">לא מהקובץ</span>'+(x.db.length?'<div class="small muted">מ-DB: '+x.db.map(ltr).join(' ')+'</div>':''));
+const offCell=x=>x.ts.every(t=>t.disabled)?' <span class="tag">רכיב לא פעיל</span>':x.ts.some(t=>t.disabled)?' <span class="tag">חלק מהרכיבים לא פעילים</span>':'';
+// distinct chains (by normalised text) with the operations each applies to
+function distinctChains(list,p){const d=p.fieldmap.stepDict;const m=new Map();list.forEach(({steps:st,op})=>{const k=(st||[]).map(i=>normStep((d[i]||{}).text)).join(' > ');const x=m.get(k)||{steps:st,ops:new Set()};x.ops.add(op);m.set(k,x);});return [...m.values()];}
+function tabMap(p){const fm=p.fieldmap;const noFile=!fm.sources.length;const TL=noFile?[['fromdst','שדות CRM שנכתבים']]:MT;let cur=S.mtab[p.id]||TL[0][0];if(!TL.some(t=>t[0]===cur))cur=TL[0][0];
+  return (noFile?'<div class="warn small">ממשק זה לא קורא קובץ. הנתונים שנכתבים ל-CRM נקראים מ-CRM או ממסד נתונים, ולכן אין בו מיפוי קובץ → CRM. מוצגים שדות ה-CRM שנכתבים ומקורם.</div>':'')
+    +`<div class="tabs sm">${TL.map(([k,l])=>`<button class="${cur===k?'on':''}" data-act="mtab" data-p="${p.id}" data-k="${k}">${l}</button>`).join('')}</div>${mapBody(p,fm,cur)}`;}
+let SD=[];function steps(st,p){const d=(p&&p.fieldmap&&p.fieldmap.stepDict)||SD;return `<ol class="chain">${(st||[]).map(i=>typeof i==='number'?d[i]:i).map(s=>`<li class="k-${esc(s.t||'x')}${s.manip?' m':''}${s.open?' o':''}">${esc(s.text)}</li>`).join('')}</ol>`;}
+const LEGEND='<div class="legend"><span><i style="--c:var(--pri-2)"></i>שדה בקובץ</span><span><i style="--c:#94a3b8"></i>טבלה זמנית</span><span><i style="--c:var(--mix)"></i>מניפולציה בערך</span><span><i style="--c:var(--vio)"></i>Lookup</span><span><i style="--c:var(--info)"></i>תנאי / מפתח</span><span><i style="--c:var(--sup)"></i>כתיבה ל-CRM</span></div>';
+function mapBody(p,fm,cur){const id='tmap-'+cur+'-'+p.id;const filter=`<div class="tool noexp"><input type="search" placeholder="חיפוש בתוך הטבלה" data-filter="${id}"></div>`;
+  const wrap=(head,rows,note)=>`${tb(id,p.name+'_'+cur)}${filter}<div class="tbw"><table class="t" id="${id}"><thead><tr>${head.map(h=>`<th>${h}</th>`).join('')}</tr></thead><tbody>${rows}</tbody></table></div>${note||''}`;
+  const T=fm.targets,S2=fm.sources;
+  if(cur==='src')return wrap(['קובץ','#','שדה','מיקום','רוחב','נכנס ל-CRM?','שדות CRM'],S2.map(s=>`<tr><td>${esc(s.file)}</td><td>${s.ordinal}</td><td>${ltr(s.field)}</td><td>${s.start??'?'}–${s.end??'?'}</td><td>${s.width??''}</td><td>${dTag(s.disposition)}</td><td>${links(s,fm).map(l=>ltr(l.entity+'.'+l.attribute)).join('<br>')||'—'}</td></tr>`).join(''),'<div class="small muted">מיקום = עמודות פיזיות בקובץ לפי מנהל החיבור (RaggedRight; העמודה האחרונה באורך משתנה).</div>');
+  if(cur==='crm'){const g=groupTargets(T);return wrap(['ישות','שדה CRM','פעולה','שדות בקובץ שנכנסים אליו','ערך קבוע'],g.map(x=>`<tr><td>${ltr(x.entity)}</td><td>${ltr(x.attribute)}</td><td>${opsCell(x.verbs,x.st)}${offCell(x)}</td><td>${fileCell(x)}</td><td>${x.fx.map(esc).join(', ')}</td></tr>`).join(''));}
+  if(cur==='fromsrc'){const rows=[];S2.forEach((s,si)=>{const L=links(s,fm);if(!L.length){rows.push(`<tr><td>${esc(s.file)}</td><td>${ltr(s.field)}</td><td>${s.ordinal}</td><td colspan="5">${dTag(s.disposition)}</td></tr>`);return;}
+    L.forEach(g=>rows.push(`<tr style="cursor:pointer" data-act="chainG" data-p="${p.id}" data-s="${si}" data-g="${esc(g.key)}"><td>${esc(s.file)}</td><td>${ltr(s.field)}</td><td>${s.ordinal}</td><td>${dTag('crm_value')}</td><td>${ltr(g.entity)}</td><td>${ltr(g.attribute)}</td><td>${opsCell(g.verbs,g.st)}</td><td>${manCell(g)}</td></tr>`));});
+    return wrap(['קובץ','שדה בקובץ','#','נכנס ל-CRM?','ישות CRM','שדה CRM','פעולה','מניפולציות בדרך'],rows.join(''),'<div class="small muted">שורה אחת לכל זוג: שדה בקובץ → שדה ב-CRM. שדה בקובץ יכול להיכנס לכמה שדות CRM, וכמה שדות בקובץ יכולים להיכנס לשדה CRM אחד. לחיצה על שורה פותחת את כל הדרך מהקובץ ל-CRM: טבלאות זמניות, מניפולציות וראיות.</div>');}
+  if(cur==='fromdst'){const g=groupTargets(T);if(!g.length)return '<div class="empty">אין כתיבה ל-CRM בממשק זה.</div>';
+    return wrap(['ישות','שדה CRM','שדות בקובץ שנכנסים אליו','פעולה','מניפולציה ברכיב הכותב','ערך קבוע','אימות'],g.map((x,gi)=>`<tr style="cursor:pointer" data-act="tchainG" data-p="${p.id}" data-g="${gi}"><td>${ltr(x.entity)}</td><td>${ltr(x.attribute)}</td><td>${fileCell(x)}</td><td>${opsCell(x.verbs,x.st)}${offCell(x)}</td><td class="small">${x.expr.map(esc).join('<hr style="border:0;border-top:1px dashed var(--line-2)">')}</td><td>${x.fx.map(esc).join(', ')}</td><td>${vAgg(x.ts.map(t=>t.verify))}</td></tr>`).join(''),'<div class="small muted">שורה אחת לכל שדה CRM. כל הרכיבים שכותבים אליו מרוכזים בשורה. לחיצה פותחת את הדרך מכל שדה בקובץ.</div>');}
+  return `<div class="muted small">לכל שדה בקובץ: האם הוא נכנס ל-CRM, ואם כן, הדרך המלאה לכל שדה CRM (קובץ → טבלה זמנית → קריאה → מניפולציות → כתיבה). אימות טכני ≠ אישור משתמש: כל השורות ממתינות לאישורך.</div>`+wrap(['קובץ','#','שדה','נכנס ל-CRM?','שדות CRM','FLOW'],S2.map((s,si)=>`<tr><td>${esc(s.file)}</td><td>${s.ordinal}</td><td>${ltr(s.field)}</td><td>${dTag(s.disposition)}</td><td>${links(s,fm).length}</td><td class="noexp"><button data-act="fflow" data-p="${p.id}" data-s="${si}">הצג FLOW וראיות</button></td></tr>`).join(''));}
+function linkChains(s,g,p){return distinctChains(g.cis.map(ci=>({steps:s.crm[ci].steps,op:s.crm[ci].verb+' · '+tail(s.crm[ci].component)})),p);}
+function fieldFlow(p,si){const fm=p.fieldmap,s=fm.sources[si];
+  const hdr=`<div class="sec"><h4>1. המקור הפיזי</h4>${ltr(s.field)} · קובץ ${esc(s.file)} · ordinal ${s.ordinal} · מיקום ${s.start??'?'}–${s.end??'?'} · רוחב ${s.width??'?'} · ${s.exposed?'נחשף ל-Data Flow':'לא נחשף ל-Data Flow'}${s.readBackFromStaging?' · נקרא חזרה מהטבלה הזמנית':''}</div>`;
+  const uses=Object.entries(s.uses||{}).map(([k,v])=>`<li>${esc(k)}: ${v.map(ltr).join(' ')}</li>`).join('');
+  const L=links(s,fm);
+  const body=L.length?L.map((g,i)=>{const ch=linkChains(s,g,p);return `<div class="sec"><h4>${i+2}. נכנס ל-${ltr(g.entity+'.'+g.attribute)} · ${opsCell(g.verbs,g.st)}</h4>${ch.map((c,j)=>(ch.length>1?`<div class="small muted">דרך ${j+1} · חלה על: ${[...c.ops].map(ltr).join(' , ')}</div>`:'')+steps(c.steps,p)).join('')}</div>`;}).join('')
+    :`<div class="sec"><h4>2. נכנס ל-CRM?</h4>${dTag(s.disposition)}<ul>${uses||'<li>אין שימוש אחרי הטעינה</li>'}</ul></div>`;
+  return hdr+body;}
+
+/* ---------------- search ---------------- */
+function runSearch(cr){const q=(cr.q||'').trim().toLowerCase();const P=vis().filter(p=>!cr.pkgs||cr.pkgs.includes(p.id));const m=s=>{s=String(s||'').toLowerCase();return cr.exact?s===q:s.includes(q);};
+  const ops=[],fields=[];P.forEach(p=>{p.ops.forEach(o=>{if(cr.verbs&&cr.verbs.length&&!cr.verbs.includes(o.verb))return;if(cr.statuses&&cr.statuses.length&&!cr.statuses.includes(o.status))return;
+    const mf=o.fields.filter(f=>m(f.attribute)||f.valueSources.some(s=>m(s.field)));const okT=m(o.entity)||m(o.entity.replace(/base$/,''));if(!q||okT||mf.length)ops.push({p,o,mf});});
+    if(q)((p.fieldmap||{}).sources||[]).forEach((s,si)=>{if(m(s.field))fields.push({p,s,si});});});
+  const pk=q?vis().filter(p=>p.name.toLowerCase().includes(q)):vis();return {ops,fields,pk};}
+function viewResults(){const r=runSearch(S.crit),id='t-res';
+  const tabs=`<div class="tabs"><button class="${S.restab==='all'?'on':''}" data-act="restab" data-k="all">כל התוצאות (${r.ops.length+r.fields.length})</button><button class="${S.restab==='pk'?'on':''}" data-act="restab" data-k="pk">תוצאות ממשקים (${r.pk.length})</button></div>`;
+  let body;if(S.restab==='pk')body=r.pk.length?`<table class="t"><tr><th>תיקייה</th><th>שם</th><th>תקציר</th><th></th></tr>${r.pk.map(p=>`<tr><td>${esc(p.folder)}</td><td>${ltr(p.name)}</td><td>${esc(p.summary)}</td><td><button class="pri" data-act="go" data-h="${p.id}">פתח ממשק</button></td></tr>`).join('')}</table>`:'<div class="empty">אין ממשקים ששמם תואם (החיפוש כאן לפי שם הממשק בלבד).</div>';
+  else body=(r.ops.length?`<h3>פעולות כתיבה תואמות</h3>${tb(id,'search-results')}<div class="tbw"><table class="t" id="${id}"><thead><tr><th>ממשק</th><th>רכיב</th><th>פעולה</th><th>סיווג</th><th>ישות</th><th>תנאי</th><th>שדות תואמים</th><th class="noexp"></th></tr></thead><tbody>${r.ops.map(({p,o,mf})=>`<tr><td>${ltr(p.name)}</td><td>${ltr(tail(o.component))}</td><td>${esc(o.verb)}</td><td>${stTag(o.status)}</td><td>${ltr(o.entity)}</td><td>${esc(o.condition||'')}</td><td>${mf.map(f=>ltr(f.attribute)).join(' ')}</td><td class="noexp"><button data-act="opensrc" data-p="${p.id}" data-o="${o.oid}">פתח מקור</button></td></tr>`).join('')}</tbody></table></div>`:'<div class="empty">לא נמצאו פעולות כתיבה תואמות.</div>')
+   +(r.fields.length?`<h3>שדות קובץ תואמים</h3><table class="t"><tr><th>ממשק</th><th>שדה</th><th>הכרעה</th><th></th></tr>${r.fields.map(({p,s,si})=>`<tr><td>${ltr(p.name)}</td><td>${ltr(s.field)}</td><td>${dTag(s.disposition)}</td><td><button data-act="fopen" data-p="${p.id}" data-s="${si}">הצג FLOW</button></td></tr>`).join('')}</table>`:'');
+  return `<h1>תוצאות חיפוש</h1><div class="muted">טקסט: "${esc(S.crit.q)}" · תחום: ${esc(S.domain)}</div><div class="tool"><button data-act="editsearch">עריכת חיפוש</button><button data-act="clearsearch">ניקוי</button></div>${tabs}${body}`;}
+function openDrawer(){const cr=S.crit||{q:'',pkgs:null,verbs:[],statuses:[],exact:false};S.draft={...cr};
+  $('#drawer').innerHTML=`<div class="dh"><b>חיפוש מתקדם</b><span><button data-act="pin">${S.pin?'בטל נעיצה':'נעץ'}</button> <button data-act="dclose">✕</button></span></div>
+  <div class="db"><div class="fl">חיפוש טקסט</div><input id="d-q" style="width:100%" value="${esc(cr.q)}">
+  <div class="fl">ממשקים</div><div class="ms">${PK.map(p=>`<label><input type="checkbox" class="dpk" value="${p.id}" ${!cr.pkgs||cr.pkgs.includes(p.id)?'checked':''}> ${esc(p.name)}</label>`).join('')}</div>
+  <div class="fl">Verb</div><div class="ms">${['CREATE','UPDATE','DELETE','INSERT','UPSERT'].map(v=>`<label><input type="checkbox" class="dv" value="${v}" ${cr.verbs.includes(v)?'checked':''}> ${v}</label>`).join('')}</div>
+  <div class="fl">סיווג</div><div class="ms">${['Supported','Unsupported'].map(v=>`<label><input type="checkbox" class="ds" value="${v}" ${cr.statuses.includes(v)?'checked':''}> ${v}</label>`).join('')}</div>
+  <label style="display:block;margin:6px 0"><input type="checkbox" id="d-ex" ${cr.exact?'checked':''}> התאמה מדויקת</label><div class="small muted">AND בין משפחות סינון · OR בתוך בחירה מרובה.</div></div>
+  <div class="df"><span id="d-prev" class="muted"></span><span style="flex:1"></span><button data-act="dclear">נקה סינון</button><button class="pri" data-act="dgo">הצג תוצאות</button></div>`;
+  $('#drawer').classList.add('open');document.body.classList.toggle('pinned',S.pin);readDraft();}
+function readDraft(){const pk=[...document.querySelectorAll('.dpk:checked')].map(x=>x.value);const d={q:$('#d-q').value,pkgs:pk.length===PK.length?null:pk,verbs:[...document.querySelectorAll('.dv:checked')].map(x=>x.value),statuses:[...document.querySelectorAll('.ds:checked')].map(x=>x.value),exact:$('#d-ex').checked};
+  const r=runSearch(d);$('#d-prev').textContent=`${r.ops.length} פעולות · ${r.fields.length} שדות קובץ`;return d;}
+function closeDrawer(){$('#drawer').classList.remove('open');document.body.classList.remove('pinned');}
+
+/* ---------------- events ---------------- */
+const A={go:b=>go(b.dataset.h),mod1:()=>toast('מודול "מיפוי ישויות ושדות" (אפיון 1) אינו חלק מגרסה זו'),
+ ftog:b=>{const k=b.dataset.p;S.fopen[k]=S.fopen[k]===false;render(true);},pexp:b=>{S.pexp[b.dataset.p]=!S.pexp[b.dataset.p];render(true);},
+ ptab:b=>{S.ptab=b.dataset.k;render(true);},ctog:b=>{S.copen[b.dataset.k]=!S.copen[b.dataset.k];render(true);},ctab:b=>{S.ctab[b.dataset.k]=b.dataset.t;render(true);},
+ opjump:b=>{const k=b.dataset.p+':'+b.dataset.c;S.copen[k]=true;S.ctab[k]='ops';S.hl='op-'+b.dataset.o;render(true);},
+ cpf:b=>{const p=PK.find(x=>x.ops.some(o=>o.oid===b.dataset.o)),o=p.ops.find(x=>x.oid===b.dataset.o);const t=b.dataset.k==='sc'?o.fields.map(f=>f.attribute).join('\n'):o.fields.map(f=>[f.attribute,f.fixedValue??'',[...new Set(f.valueSources.map(s=>s.field))].join(',')].join('\t')).join('\n');copyText(t).then(ok=>ok?toast('הועתק'):manualCopy(t));},
+ tcopy:b=>copyTable(b.dataset.t),tcsv:b=>exportCsv(b.dataset.t,b.dataset.n),txlsx:b=>exportXlsx(b.dataset.t,b.dataset.n),
+ hscroll:b=>{const w=document.querySelector('.tbw[id^=tw-]');if(w)w.scrollBy({left:-b.dataset.d*400,behavior:'smooth'});},
+ ent:b=>entModal(b.dataset.p,b.dataset.e),mtab:b=>{S.mtab[b.dataset.p]=b.dataset.k;render(true);},
+ chain:b=>{const p=pkOf(b.dataset.p),s=p.fieldmap.sources[+b.dataset.s],c=s.crm[+b.dataset.c];openModal(`${s.field} → ${c.entity}.${c.attribute}`,`<div class="small">${esc(c.verb)} · ${ltr(tail(c.component))}</div>${steps(c.steps,p)}`);},
+ chainG:b=>{const p=pkOf(b.dataset.p),s=p.fieldmap.sources[+b.dataset.s];const g=links(s,p.fieldmap).find(x=>x.key===b.dataset.g);const ch=linkChains(s,g,p);
+   openModal(`${s.field} → ${g.entity}.${g.attribute}`,`${LEGEND}<div class="small">נכנס ל-CRM · ${opsCell(g.verbs,g.st)} · ${ch.length>1?ch.length+' דרכים שונות':'דרך אחת'}</div>`+ch.map((c,i)=>`<div class="sec"><h4>${ch.length>1?'דרך '+(i+1)+' · ':''}חלה על: ${[...c.ops].map(ltr).join(' , ')}</h4>${steps(c.steps,p)}</div>`).join(''));},
+ tchainG:b=>{const p=pkOf(b.dataset.p);const x=groupTargets(p.fieldmap.targets)[+b.dataset.g];const d=p.fieldmap.stepDict;
+   // writers that do the same thing (same action, classification, manipulation, fixed value and same paths from the file) are shown once
+   const G=new Map();x.ts.forEach(t=>{const ch=distinctChains([...t.valueSources.map(s=>({steps:s.steps,op:'מהקובץ: '+fLab(s)})),...(t.dbSources||[]).filter(s=>s.role==='value').map(s=>({steps:s.steps,op:'מ-DB: '+s.db}))],p);
+     const sig=[t.verb,t.status,t.expression||'',t.fixedValue??'',!!t.disabled,ch.map(c=>[...c.ops].sort().join(',')+'>'+(c.steps||[]).map(i=>normStep((d[i]||{}).text)).join('>')).sort().join('||')].join('#');
+     const g=G.get(sig)||{t,ch,ts:[]};g.ts.push(t);G.set(sig,g);});
+   openModal(`${x.entity}.${x.attribute}`,[...G.values()].map(({t,ch,ts})=>`<div class="sec"><h4>${esc(t.verb)} ${stTag(t.status)}${t.disabled?' <span class="tag">רכיב לא פעיל</span>':''} · אימות: ${vAgg(ts.map(z=>z.verify))}</h4>`
+     +`<div class="small">${ts.length>1?ts.length+' רכיבים כותבים כך: ':'רכיב: '}${ts.map(z=>ltr(tail(z.component))+(z.dataFlow?' <span class="muted">(Data Flow: '+esc(tail(z.dataFlow))+')</span>':'')).join(' , ')}</div>`
+     +(t.expression?`<div class="small"><b>מניפולציה ברכיב הכותב:</b> ${esc(t.expression)}</div>`:'')+(t.fixedValue!=null&&t.fixedValue!==''?`<div class="small"><b>ערך קבוע:</b> ${esc(t.fixedValue)}</div>`:'')
+     +(ts.some(z=>z.verify&&z.verify.verdict!=='CONFIRMED')?`<details class="prov"><summary>פרטי האימות (תוקן בעקבות הבדיקה)</summary>${ts.filter(z=>z.verify&&z.verify.verdict!=='CONFIRMED').map(z=>`<div class="small">${esc(z.verify.detail)}</div>`).join('')}</details>`:'')
+     +(ch.map(c=>`<details><summary>${[...c.ops].map(esc).join(' , ')}</summary>${steps(c.steps,p)}</details>`).join('')||'<div class="small muted">אין מקור מהקובץ</div>')
+     +`<details class="prov"><summary>ראיות</summary>${ts.map(z=>`<div class="small">${ltr(tail(z.component))} · ${esc(z.mechanism)} · ${ltr(z.evidence||'')}</div>`).join('')}</details></div>`).join(''));},
+ tchain:b=>{const p=pkOf(b.dataset.p),t=p.fieldmap.targets[+b.dataset.t];openModal(`${t.entity}.${t.attribute}`,`<div class="sec"><h4>אימות עצמאי: ${vTag(t.verify)}</h4>${t.verify?esc(t.verify.detail)+' '+ltr(t.verify.evidence):''}</div><div class="small">${esc(t.verb)} · ${esc(t.mechanism)} · ${ltr(tail(t.component))} · ${ltr(t.evidence||'')}</div>${t.expression?`<div class="sec"><h4>מניפולציה ברכיב הכותב</h4>${esc(t.expression)}</div>`:''}${t.fixedValue!=null&&t.fixedValue!==''?`<div class="sec"><h4>ערך קבוע</h4>${esc(t.fixedValue)}</div>`:''}`+[...t.valueSources.map(s=>({s,r:'מהקובץ'})),...t.openSources.map(s=>({s,r:'לא פתור'})),...t.nonFile.map(s=>({s,r:'לא מהקובץ'}))].map(({s,r})=>`<div class="sec"><h4>${r}: ${ltr(s.field?fLab(s):'—')}</h4>${steps(s.steps,p)}</div>`).join('')||'<div class="empty">אין מקור מהקובץ.</div>');},
+ fflow:b=>{const tr=b.closest('tr'),nx=tr.nextElementSibling;if(nx&&nx.classList.contains('flowrow')){nx.remove();b.textContent='הצג FLOW וראיות';return;}const p=pkOf(b.dataset.p);const r=document.createElement('tr');r.className='flowrow noexp';r.innerHTML=`<td colspan="6">${fieldFlow(p,+b.dataset.s)}</td>`;tr.after(r);b.textContent='סגור FLOW';},
+ fopen:b=>{const p=pkOf(b.dataset.p);openModal(p.fieldmap.sources[+b.dataset.s].field,fieldFlow(p,+b.dataset.s));},
+ restab:b=>{S.restab=b.dataset.k;render(true);},
+ opensrc:b=>{const p=pkOf(b.dataset.p),o=p.ops.find(x=>x.oid===b.dataset.o);const c=(p.logic.components||[]).find(x=>x.ops.includes(o));S.back={y:window.scrollY};S.ptab=c?'flow':'table';if(c){const k=p.id+':'+c.cid;S.copen[k]=true;S.ctab[k]='ops';S.hl='op-'+o.oid;}go(p.id);},
+ backres:()=>{const y=S.back&&S.back.y;S.back=null;go('results');setTimeout(()=>window.scrollTo(0,y||0),50);},backflow:()=>{S.back=null;render(true);},
+ editsearch:()=>openDrawer(),clearsearch:()=>{S.crit=null;go('dashboard');},
+ pin:b=>{S.pin=!S.pin;b.textContent=S.pin?'בטל נעיצה':'נעץ';document.body.classList.toggle('pinned',S.pin);},dclose:()=>closeDrawer(),
+ dclear:()=>{S.crit=null;openDrawer();},dgo:()=>{S.crit=readDraft();S.restab='all';S.back=null;if(!S.pin)closeDrawer();go('results');}};
+document.addEventListener('click',e=>{const b=e.target.closest('[data-act]');if(!b)return;if(b.tagName==='A'&&b.getAttribute('target')==='_blank')return;e.preventDefault();const f=A[b.dataset.act];if(f)f(b,e);});
+document.addEventListener('input',e=>{if(e.target.matches('[data-filter]')){const t=document.getElementById(e.target.dataset.filter),q=e.target.value.toLowerCase();[...t.tBodies[0].rows].forEach(r=>{if(r.classList.contains('flowrow'))return;r.hidden=!!q&&!r.textContent.toLowerCase().includes(q);});}else if(e.target.closest('#drawer'))readDraft();});
+document.addEventListener('change',e=>{if(e.target.closest('#drawer'))readDraft();});
+document.addEventListener('keydown',e=>{if(e.key==='Escape'){if($('#modal').classList.contains('open'))closeModal();else if($('#drawer').classList.contains('open')&&!S.pin)closeDrawer();}if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='k'){e.preventDefault();openDrawer();}});
+$('#modal').addEventListener('click',e=>{if(e.target.id==='modal')closeModal();});$('#mx').onclick=closeModal;
+$('#gq').addEventListener('keydown',e=>{if(e.key==='Enter'){const q=e.target.value.trim();if(q){S.crit={q,pkgs:null,verbs:[],statuses:[],exact:false};S.restab='all';S.back=null;go('results');}else openDrawer();}});
+$('#adv').onclick=openDrawer;
+document.querySelector('.search .ico-wrap').outerHTML=IC.search;
+$('#adv').innerHTML=IC.search+' חיפוש מתקדם';
+const DOMS=['הכל',...new Set(PK.map(p=>p.domain||'לא סווג'))];$('#dom').innerHTML=DOMS.map(d=>`<button data-d="${esc(d)}">${esc(d)}</button>`).join('');
+$('#dom').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;e.stopPropagation();S.domain=b.dataset.d;render(true);});
+route();
+
+/* theme toggle (presentation only) */
+(function(){const b=document.getElementById('theme'),r=document.documentElement,mq=window.matchMedia('(prefers-color-scheme:dark)');
+const moon='<svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 14.5A8 8 0 0 1 9.5 4 8 8 0 1 0 20 14.5z"/></svg>',sun='<svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>';
+const dark=()=>r.getAttribute('data-theme')?r.getAttribute('data-theme')==='dark':mq.matches;
+const paint=()=>{b.innerHTML=dark()?sun:moon;b.setAttribute('aria-pressed',String(dark()))};
+b.addEventListener('click',()=>{const n=dark()?'light':'dark';r.setAttribute('data-theme',n);try{localStorage.setItem('ssis-theme',n)}catch(e){}paint()});
+if(mq.addEventListener)mq.addEventListener('change',paint);paint()})();
+</script>
+</body>
+</html>

@@ -1,0 +1,99 @@
+{
+  "package": "0039_UpdateAgentAppointmentDate",
+  "dataFlows": [
+    "Package\\Get All Funds"
+  ],
+  "analyst": "ssis-field-lineage",
+  "source": {
+    "file": "source/DailyProcess/0039_UpdateAgentAppointmentDate.dtsx",
+    "sha256": "40CB7193EE5D3EDC1B31F9A6471941A2C00FC0CB367E054EAE8011313DA815A0"
+  },
+  "scriptOutputs": [
+    {
+      "component": "Package\\Get All Funds\\Create System Variables",
+      "output": "Output 0",
+      "column": "ModifiedOn",
+      "from": [],
+      "expression": "Row.ModifiedOn = DateTime.UtcNow; - current UTC time of the SSIS host at the moment the row is processed. No input column contributes.",
+      "condition": null,
+      "evidence": "Create System Variables main.cs:127 (DTSX:2621)"
+    },
+    {
+      "component": "Package\\Get All Funds\\Create System Variables",
+      "output": "Output 0",
+      "column": "ModifiedBy",
+      "from": [],
+      "expression": "Row.ModifiedBy = new Guid(Convert.ToString(ReadOnlyVariables[\"User::CrmAdminId\"].Value)); - package variable User::CrmAdminId (set at run time by the ETL framework flow 'Get Organization Variables' from gen_etlvariable.gen_Value where gen_key = 'CrmAdminId', scope 'global' or the package scope variable - DTSX:4180, Set Organization Variables main.cs:47-49, 68). Same value for every row; no input column contributes.",
+      "condition": null,
+      "evidence": "Create System Variables main.cs:128 (DTSX:2622); ReadOnlyVariables DTSX:3213"
+    }
+  ],
+  "crmWrites": [
+    {
+      "component": "Package\\Get All Funds\\Update agent appointment date",
+      "identicalCopies": [],
+      "entity": "gen_fundmain",
+      "verb": "UPDATE",
+      "mechanism": "SQL (OLE DB Command UPDATE Gen_fundmainBase on connection psql, catalog ALTSHULER_MSCRM)",
+      "status": "Unsupported",
+      "recordKey": "WHERE Gen_fundmainId = ? (Param_3 = Gen_fundmainId of the fund read by 'GEt Relvante Funds To Update' from Gen_fundmain targetdate)",
+      "recordKeyColumns": [
+        "Gen_fundmainId"
+      ],
+      "declaredRowFilters": [],
+      "condition": "Every row of the source query 'GEt Relvante Funds To Update' (DTSX:3246-3256): select distinct ... from Gen_fundmain targetdate where gen_agentappointmentdate is null and targetdate.Gen_customeraccountname in (select Gen_customeraccountname from Gen_fundmain where gen_agentappointmentdate is not null). i.e. funds without an agent appointment date that belong to a customer account (same Gen_customeraccountname guid) in which at least one fund has a date. Gen_customeraccountname is the guid lookup to the customer account (dataType guid in 0005_Customer Account.dtsx:2644; joined as fm.Gen_customeraccountname = ca.Gen_customeraccountId in 0015_TransferIn.dtsx:75552). No Conditional Split / script filter between source and writer (paths DTSX: Source -> Create System Variables (sync) -> Update agent appointment date). Input errorRowDisposition=FailComponent (DTSX:3303): a failing UPDATE fails the data flow.",
+      "attributes": [
+        {
+          "attribute": "gen_agentappointmentdate",
+          "from": [
+            {
+              "column": "AgentAppointmentDateToInsert",
+              "role": "value"
+            }
+          ],
+          "expression": "SET gen_agentappointmentdate = ? (Param_0 = AgentAppointmentDateToInsert). Source SQL: (select top 1 gen_agentappointmentdate from Gen_fundmain sourcedate where sourcedate.gen_agentappointmentdate is not null and sourcedate.Gen_customeraccountname is not null and sourcedate.Gen_customeraccountname = targetdate.Gen_customeraccountname order by sourcedate.gen_agentappointmentdate desc) - the LATEST non-null agent appointment date among all funds (Gen_fundmain) linked to the same customer account as the target fund (sourcedate.Gen_customeraccountname = targetdate.Gen_customeraccountname). Gen_customeraccountname is the guid lookup to the customer account (dataType guid in 0005_Customer Account.dtsx:2644; joined as fm.Gen_customeraccountname = ca.Gen_customeraccountId in 0015_TransferIn.dtsx:75552), so funds are matched by the same customer-account id. Value is passed unchanged (dbTimeStamp) through 'Create System Variables' (column is ReadOnly input there) into the Base table.",
+          "fixedValue": null,
+          "condition": null,
+          "evidence": "SqlCommand DTSX:3294-3296 ('?' #0 in 'set gen_agentappointmentdate=?' -> Param_0 = AgentAppointmentDateToInsert, input column DTSX:3308 / ExternalColumns[Param_0] DTSX:3311); source SQL DTSX:3246-3256; Gen_customeraccountname type/meaning: 0005_Customer Account.dtsx:2644, 0015_TransferIn.dtsx:75552"
+        },
+        {
+          "attribute": "modifiedby",
+          "from": [
+            {
+              "column": "ModifiedBy",
+              "role": "value"
+            }
+          ],
+          "expression": "SET ModifiedBy = ? (Param_1 = ModifiedBy) = new Guid(User::CrmAdminId) set in script 'Create System Variables' (see scriptOutputs). Package variable, not a literal; same for all rows.",
+          "fixedValue": null,
+          "condition": null,
+          "evidence": "SqlCommand DTSX:3295 ('?' #1 -> Param_1 = ModifiedBy, DTSX:3305); Create System Variables main.cs:128"
+        },
+        {
+          "attribute": "modifiedon",
+          "from": [
+            {
+              "column": "ModifiedOn",
+              "role": "value"
+            }
+          ],
+          "expression": "SET ModifiedOn = ? (Param_2 = ModifiedOn) = DateTime.UtcNow from script 'Create System Variables' (column type 'date' in the pipeline, DTSX:3307 cachedDataType=\"date\"; Param_2 dbTimeStamp).",
+          "fixedValue": null,
+          "condition": null,
+          "evidence": "SqlCommand DTSX:3295 ('?' #2 -> Param_2 = ModifiedOn, DTSX:3307); Create System Variables main.cs:127"
+        }
+      ],
+      "evidence": "Update agent appointment date SqlCommand DTSX:3294-3296; input columns DTSX:3305-3308; external params DTSX:3311-3330; connection psql -> Initial Catalog=ALTSHULER_MSCRM"
+    }
+  ],
+  "readWriteModifications": [],
+  "lookupBridges": [],
+  "unresolved": [],
+  "notes": [
+    "Writers in lineage: 2. Mapped: 1 (Get All Funds\\Update agent appointment date, Unsupported direct SQL on Gen_fundmainBase, 3 attributes). Excluded as ETL plumbing: End ETL Process record\\ETL Record Finish (gen_etlprocess update) and the Script Task 'Create ETL Process record'; 'Get Organization Variables' flow only fills package variables.",
+    "The UPDATE goes straight to Gen_fundmainBase (bypasses CRM platform: no plugins/workflows/audit, VersionNumber handled by SQL only). It also sets ModifiedBy/ModifiedOn explicitly.",
+    "Candidate funds and the copied date are matched by Gen_customeraccountname, which is the guid lookup from the fund to its customer account (Gen_customeraccountname is the guid lookup to the customer account (dataType guid in 0005_Customer Account.dtsx:2644; joined as fm.Gen_customeraccountname = ca.Gen_customeraccountId in 0015_TransferIn.dtsx:75552)): the date is copied from the most recent dated fund of the same customer account.",
+    "Source reads gen_agentappointmentdate as a column, but by its WHERE it is always NULL and it is not mapped into the UPDATE (only a ReadOnly input of 'Create System Variables', unused in code).",
+    "The source query uses 'select distinct' over (gen_agentappointmentdate, Gen_fundmainId, AgentAppointmentDateToInsert); Gen_fundmainId is unique per row of Gen_fundmain so each fund is updated once per run."
+  ]
+}

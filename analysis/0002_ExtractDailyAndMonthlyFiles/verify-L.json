@@ -1,0 +1,107 @@
+{
+  "verifier": "ssis-verifier",
+  "package": "0002_ExtractDailyAndMonthlyFiles",
+  "scope": "logic-claims all",
+  "checkedAt": "2026-11-07T11:36:21.614Z",
+  "checked": 14,
+  "results": [
+    {
+      "id": "L|summary",
+      "hash": "47cc6a8931cc",
+      "verdict": "CONFIRMED",
+      "detail": "VersionComments='Bank Leumi Import Daily' (package header). Extract GZ Fiels decompresses files in DailyFilePath whose extension contains '.gz' into the same folder (GZFilesHelper.cs:19-26). It then copies them to <path>\\Archive GZ\\yyyy-MM-dd and deletes the original (main.cs:130,143-144; GZFilesHelper.cs:49-54). The MonthlyFilePath line is commented out (main.cs:124 = DTSX:3660). The only SDK writes are framework: Create ETL Process record (gen_etlprocess), ETL Record Finish (gen_etlprocess), ETL_Warning (gen_etlprocesswarning), Error ETL Process record (gen_etlprocess, annotation). The only SQL statements are reads (gen_etlvariable, gen_etlprocess lookup). DailyFilePath is empty at DTSX:35-37 and is loaded from gen_etlvariable where gen_scope='global' OR 'LeumiFile-IC' (DTSX:4478-4480). Configurations are empty. No other supplied package uses scope LeumiFile-IC and the folder value is runtime data, so 'consumer = LeumiFile packages' is correctly labelled השערה.",
+      "evidence": "DTSX:3412-3700 (main.cs, GZFilesHelper.cs); DTSX:35-37; DTSX:4478-4480; code-file SDK scan"
+    },
+    {
+      "id": "L|exec",
+      "hash": "e91718a9c222",
+      "verdict": "CONFIRMED",
+      "detail": "There are 3 precedence constraints, none with DTS:Value, so all are Success, all LogicalAnd and none has an expression. The chain is Get Organization Variables -> Create ETL Process record (5413) -> Extract GZ  Fiels (5414) -> End ETL Process record (5415). The OnError event handler (DTSX:5418) contains Error ETL Process record. No disabled executables.",
+      "evidence": "DTSX:5413-5418"
+    },
+    {
+      "id": "L|ignored",
+      "hash": "87daed1ee5b2",
+      "verdict": "CONFIRMED",
+      "detail": "Checked each item. Get Etl Variables / Set Variables only load gen_etlvariable into variables. Create/End/Error ETL Process record only touch gen_etlprocess and annotation. The End ETL Lookup reads gen_etlprocess. Set Warning columns + ETL_Warning only write gen_etlprocesswarning from Extract errors. The log provider is SQL Server -> qsrs.SSIS_Logs. None does business work.",
+      "evidence": "code-file scan (LogicalName gen_etlprocess / gen_etlprocesswarning / annotation); DTSX:2461, 4478; log provider DTSX:16"
+    },
+    {
+      "id": "L|finding#1",
+      "hash": "6e4d231cee6c",
+      "verdict": "CONFIRMED",
+      "detail": "main.cs:124 '//Pathlist.Add(ReadOnlyVariables[\"User::MonthlyFilePath\"]...)' is at DTSX:3660; only DailyFilePath is added (main.cs:123). The consequence is worded conditionally.",
+      "evidence": "DTSX:3659-3660"
+    },
+    {
+      "id": "L|finding#2",
+      "hash": "ffd9719278eb",
+      "verdict": "CONFIRMED",
+      "detail": "MoveGZFileToArchive: File.Copy(file, archive\\name) without overwrite and then File.Delete (GZFilesHelper.cs:53-54). An IOException is caught in main.cs:146-150 -> addError -> warning, and the gz stays. Parse_GZ has already created the decompressed file. A same-day rerun recreates the decompressed file (File.Create overwrites) and the copy fails again.",
+      "evidence": "GZFilesHelper.cs:19-20,53-54 (DTSX:3850-3885); main.cs:141-150"
+    },
+    {
+      "id": "L|finding#3",
+      "hash": "8351b358032b",
+      "verdict": "CONFIRMED",
+      "detail": "File.Create(decompressedFileName) runs before CopyTo (GZFilesHelper.cs:20-26). On an exception the catch rethrows (line 31) after the partial stream is disposed, so a partial file remains. The consumer impact is worded as unknown.",
+      "evidence": "GZFilesHelper.cs:19-32"
+    },
+    {
+      "id": "L|finding#4",
+      "hash": "e496e0957f6a",
+      "verdict": "CONFIRMED",
+      "detail": "The only File.* calls are File.Create, File.Copy and File.Delete on file-system paths (GZFilesHelper.cs:20,53,54). The Extract component has no CRM service.",
+      "evidence": "GZFilesHelper.cs:20,53,54"
+    },
+    {
+      "id": "L|finding#5",
+      "hash": "fb27e9a698fe",
+      "verdict": "CONFIRMED",
+      "detail": "Get_GZ_FilesName: 'where f.Extension.Contains(\".gz\")'. Contains matches '.gzip', '.gz2' and so on. (The match is also case-sensitive, so '.GZ' is excluded; the finding does not contradict this.)",
+      "evidence": "GZFilesHelper.cs:44-46"
+    },
+    {
+      "id": "L|Package\\Extract GZ  Fiels|title",
+      "hash": "7d8724fb2949",
+      "verdict": "CONFIRMED",
+      "detail": "Every flow step matches the code: read DailyFilePath (main.cs:123), filter by extension (GZFilesHelper.cs:44-46), decompress to the name without the last extension in the same folder (line 19), copy to Archive GZ\\yyyy-MM-dd and delete (main.cs:119,130; helper 49-54). Errors go to Error output -> Set Warning columns -> ETL_Warning.",
+      "evidence": "main.cs:116-153; GZFilesHelper.cs:13-56; data-flow paths"
+    },
+    {
+      "id": "L|Package\\Extract GZ  Fiels|short",
+      "hash": "d02279d2438a",
+      "verdict": "CONFIRMED",
+      "detail": "Steps and the success/failure branches match main.cs:138-150.",
+      "evidence": "main.cs:138-150"
+    },
+    {
+      "id": "L|Package\\Extract GZ  Fiels|detailed",
+      "hash": "0eff72967233",
+      "verdict": "CONFIRMED",
+      "detail": "Re-derived all 21 units. ReadOnlyVariables at DTSX:4381. Archive path: main.cs:130. try/catch around listing: main.cs:128-137. Top-level GetFiles() with Extension.Contains. File.Create overwrite. Parse_GZ returns true or throws. CreateDirectory + Copy (no overwrite) + Delete. Per-file catch -> addError -> continue. Error rows reach the ETL warning framework.",
+      "evidence": "DTSX:4381; main.cs:116-158; GZFilesHelper.cs:13-56"
+    },
+    {
+      "id": "L|Package\\Extract GZ  Fiels|detail",
+      "hash": "a3abd6d2f6d9",
+      "verdict": "CONFIRMED",
+      "detail": "Population, matching, decisions and outcome are correct. MonthlyFilePath is loaded: it is in Set Variables ReadWriteVariables (DTSX:5381), which throws if the key is missing, but it is unused by Extract. CRM writes are framework only. The consumer is correctly labelled השערה.",
+      "evidence": "DTSX:5381; main.cs:123-124; GZFilesHelper.cs:43-46"
+    },
+    {
+      "id": "L|Package\\Extract GZ  Fiels|decisions",
+      "hash": "d8947c03fd2f",
+      "verdict": "CONFIRMED",
+      "detail": "All three conditions are quoted verbatim from code: GZFilesHelper.cs:45, main.cs:143-144, main.cs:124.",
+      "evidence": "as listed"
+    },
+    {
+      "id": "L|Package\\Extract GZ  Fiels|open",
+      "hash": "1045ef4d1f78",
+      "verdict": "CONFIRMED",
+      "detail": "All three are genuinely unanswerable from the files. The folder values are runtime gen_etlvariable data. The intent of the commented-out line is unknown. No supplied package shares scope LeumiFile-IC, and the folder paths are runtime values, so the consumer cannot be proven.",
+      "evidence": "DTSX:4478-4480; gen_scope grep across source/DailyProcess"
+    }
+  ]
+}

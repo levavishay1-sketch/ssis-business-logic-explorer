@@ -1,0 +1,138 @@
+{
+ "verifier": "ssis-verifier",
+ "package": "0019_StandingOrder",
+ "scope": "logic-claims all",
+ "checkedAt": "2026-11-07T11:38:15.693Z",
+ "checked": 15,
+ "results": [
+  {
+   "id": "L|summary",
+   "hash": "d6a582c236f7",
+   "verdict": "WRONG",
+   "detail": "Unit 1 verified against the source SQL (filters gen_isfirsttransactionreceivied = 0, gen_ispastrecord = 0, no statecode/statuscode filter; type '53' / group '02'; same bank (via gen_banks), branch, 12-digit left-padded account; amount equal to one-time or charge amount; execution date not before the charge date) and main.cs:84,126-127 (statuscode 100000009, flag true). Note: it does not mention that only one order per (amount, bank, account, branch) is marked per run (finding#1). Unit 2 says the meaning of deposit type 2 is not defined in the package, but the SQL itself labels it.",
+   "evidence": "0019_StandingOrder.dtsx:3975-4016; main.cs:84,120-137",
+   "wrongUnits": [
+    {
+     "unit": 2,
+     "problem": "scopeNote: meanings of the codes incl. \"deposit type 2\" are not defined in the package",
+     "correct": "The SQL labels the two branches with comments \"--One time\" (so.gen_depositType = 2) and \"--Not one time\" (so.gen_depositType <> 2), so the meaning of deposit type 2 = one-time is given by the file (comment). Only '53' and '02' have no label in the supplied files.",
+     "evidence": "0019_StandingOrder.dtsx:3998, 4005"
+    }
+   ]
+  },
+  {
+   "id": "L|exec",
+   "hash": "e15f011c0a12",
+   "verdict": "CONFIRMED",
+   "detail": "Three Success constraints (no DTS:Value, LogicalAnd=True): Get Organization Variables -> Create ETL Process record (5079) -> Update Standing Order First Transaction Received (5080) -> End ETL Process record (5081). No event handlers, no disabled executables.",
+   "evidence": "0019_StandingOrder.dtsx:5078-5082"
+  },
+  {
+   "id": "L|ignored",
+   "hash": "5dafae29b7b9",
+   "verdict": "CONFIRMED",
+   "detail": "Get Organization Variables only reads organization variables (OLE DB source on [Prod] + Set Organization Variables); Create ETL Process record / ETL Record Finish write gen_etlprocess; ETL Warning writes gen_etlprocesswarning; Set Warning columns only on the Error output path of update Standing Order; log provider to SSIS_Logs. None filters or feeds the business write.",
+   "evidence": "code scan of evidence codeFiles; 0019_StandingOrder.dtsx:5070-5072 (paths), 16"
+  },
+  {
+   "id": "L|finding#1",
+   "hash": "50bb117b0149",
+   "verdict": "CONFIRMED",
+   "detail": "ROW_NUMBER() over(partition by ft.gen_transtotalamount, so.gen_bankname, so.gen_bankaccountnumber, so.gen_branch order by ft.gen_ActualExecutionDate asc), RowNum = 1; standing order id is not in the partition; marked orders drop out next run (flag = 0 filter); ties on execution date are non-deterministic. Consequence worded conditionally on such data.",
+   "evidence": "0019_StandingOrder.dtsx:3978, 4012"
+  },
+  {
+   "id": "L|finding#2",
+   "hash": "8d706b7f5165",
+   "verdict": "CONFIRMED",
+   "detail": "Equality so.gen_amountofonetime = ft.Gen_TransTotalAmount / so.Gen_chargeamount = ft.Gen_TransTotalAmount; worded conditionally.",
+   "evidence": "0019_StandingOrder.dtsx:4000, 4007"
+  },
+  {
+   "id": "L|finding#3",
+   "hash": "b7d5d51228d8",
+   "verdict": "CONFIRMED",
+   "detail": "Join Gen_ftCurrentYear -> Gen_fundmain on gen_fundnumber -> standing order by customer account, no fund-specific link. Only Gen_ftCurrentYear is read and there is no date-window filter. \"Current year only\" cannot be proven from the files (0008 inserts into Gen_ftCurrentYearBase, no supplied package deletes from it; other packages also read a separate gen_ftpreviousyear table), so the השערה label is correct.",
+   "evidence": "0019_StandingOrder.dtsx:3980-3985; 0008_LeumiFile-PY.dtsx:63115-63121; 0015_TransferIn.dtsx:46181-46201"
+  },
+  {
+   "id": "L|finding#4",
+   "hash": "f3460632c22b",
+   "verdict": "CONFIRMED",
+   "detail": "With gen_depositType NULL both \"= 2\" and \"<> 2\" are UNKNOWN; the order never matches.",
+   "evidence": "0019_StandingOrder.dtsx:3999, 4006"
+  },
+  {
+   "id": "L|finding#5",
+   "hash": "a2f53517d0a1",
+   "verdict": "CONFIRMED",
+   "detail": "main.cs sets only statuscode = OptionSetValue(100000009) and gen_isfirsttransactionreceivied = true, no statecode; service.Update per row, no ExecuteMultiple.",
+   "evidence": "update Standing Order main.cs:125-129 (0019_StandingOrder.dtsx:4090)"
+  },
+  {
+   "id": "L|Package\\Update Standing Order First Transaction Received|title",
+   "hash": "3787c9f4c27a",
+   "verdict": "CONFIRMED",
+   "detail": "Flow lines match the SQL and script; hypotheses (deposits, current year) are labelled.",
+   "evidence": "0019_StandingOrder.dtsx:3975-4016; main.cs:125-129"
+  },
+  {
+   "id": "L|Package\\Update Standing Order First Transaction Received|short",
+   "hash": "345b45fd6424",
+   "verdict": "CONFIRMED",
+   "detail": "Population, match decision, write, one-per-group limitation verified; unmatched orders remain flag 0 and are re-evaluated next run.",
+   "evidence": "0019_StandingOrder.dtsx:3975-4016; main.cs:125-129"
+  },
+  {
+   "id": "L|Package\\Update Standing Order First Transaction Received|detailed",
+   "hash": "0ae872c1efed",
+   "verdict": "INCOMPLETE",
+   "detail": "Units 1-9 and 12-15 verified (joins, padding to 12, branch, bank via gen_banks, one-time/monthly conditions, ROW_NUMBER, SDK update, catch -> ETL warning). The decision tree (units 7-11) presents \"one-time / not one-time\" as exhaustive, but The SQL does not have an \"other\" branch: the one-time branch requires so.gen_depositType = 2 and the second branch requires so.gen_depositType <> 2; a standing order with gen_depositType NULL satisfies neither and is never matched/marked (stated only in finding#4).",
+   "evidence": "0019_StandingOrder.dtsx:3994-4009",
+   "wrongUnits": [
+    {
+     "unit": 0,
+     "problem": "NULL deposit type not covered by the decision tree",
+     "correct": "The SQL does not have an \"other\" branch: the one-time branch requires so.gen_depositType = 2 and the second branch requires so.gen_depositType <> 2; a standing order with gen_depositType NULL satisfies neither and is never matched/marked (stated only in finding#4).",
+     "evidence": "0019_StandingOrder.dtsx:3999, 4006"
+    }
+   ]
+  },
+  {
+   "id": "L|Package\\Update Standing Order First Transaction Received|detail",
+   "hash": "6380c7ca9ff9",
+   "verdict": "INCOMPLETE",
+   "detail": "Units 1, 2, 4, 5 verified (source tables via [Prod], matching keys, update by Gen_standingorderId, statuscode 100000009 + flag, no statecode, no create/delete). Unit 3 describes the non-2 branch as \"אחר\" (any other), but The SQL does not have an \"other\" branch: the one-time branch requires so.gen_depositType = 2 and the second branch requires so.gen_depositType <> 2; a standing order with gen_depositType NULL satisfies neither and is never matched/marked (stated only in finding#4).",
+   "evidence": "0019_StandingOrder.dtsx:3994-4009; main.cs:84,126-128",
+   "wrongUnits": [
+    {
+     "unit": 3,
+     "problem": "\"deposit type 2: ...; other: Gen_chargeamount = ...\"",
+     "correct": "The SQL does not have an \"other\" branch: the one-time branch requires so.gen_depositType = 2 and the second branch requires so.gen_depositType <> 2; a standing order with gen_depositType NULL satisfies neither and is never matched/marked (stated only in finding#4).",
+     "evidence": "0019_StandingOrder.dtsx:3999, 4006"
+    }
+   ]
+  },
+  {
+   "id": "L|Package\\Update Standing Order First Transaction Received|decisions",
+   "hash": "2071a3ee9942",
+   "verdict": "CONFIRMED",
+   "detail": "All four conditions copied exactly from the SQL.",
+   "evidence": "0019_StandingOrder.dtsx:3978, 3986-4009, 4012"
+  },
+  {
+   "id": "L|Package\\Update Standing Order First Transaction Received|crm",
+   "hash": "c206385932c9",
+   "verdict": "CONFIRMED",
+   "detail": "gen_standingorder Update via SDK (service.Update) for each RowNum = 1 row; values const 100000009 and true.",
+   "evidence": "main.cs:84,125-129"
+  },
+  {
+   "id": "L|Package\\Update Standing Order First Transaction Received|open",
+   "hash": "d9bebe158d3e",
+   "verdict": "CONFIRMED",
+   "detail": "Meaning of '53'/'02' not labelled anywhere in the supplied packages (other packages filter 53 without a label); depositType acknowledged as \"One time\" comment only; validity of statuscode vs statecode and existence of NULL flags are CRM metadata/data questions not in the files.",
+   "evidence": "0019_StandingOrder.dtsx:3986-4009; grep transtypeid across source/DailyProcess"
+  }
+ ]
+}

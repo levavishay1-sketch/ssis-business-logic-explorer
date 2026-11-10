@@ -1,0 +1,211 @@
+{
+ "package": "0039_UpdateAgentAppointmentDate",
+ "analyst": "ssis-business-logic",
+ "source": {
+  "file": "source/DailyProcess/0039_UpdateAgentAppointmentDate.dtsx",
+  "sha256": "40CB7193EE5D3EDC1B31F9A6471941A2C00FC0CB367E054EAE8011313DA815A0"
+ },
+ "scopeNote_he": "מנהל חיבור יחיד [psql] (DTSX:4-6, DTSID {E17C4E23-BF4A-4B57-9957-BADD0EEB51CC}): Data Source=psql;Initial Catalog=ALTSHULER_MSCRM. כל הקריאות וגם ה-UPDATE עוברים דרכו (DTSX:3264, 3300, 3376, 2319). שהמסד הזה הוא מסד ה-CRM נתמך בראיות: אותו חיבור קורא את gen_etlprocess (DTSX:2319), טבלה שהחבילה עצמה יוצרת בה רשומה דרך CRM SDK ב-Create ETL Process record (ScriptMain.cs:106, DTSX:188). ה-UPDATE פונה ל-Gen_fundmainBase, תבנית השמות של טבלאות Base ב-CRM. ב-DTSX אין DTS:Configuration (evidence.configurations = []) ואין הפניה ל-SSISConfigFile.dtsConfig. עם זאת הקובץ C:\\Generix\\SSISConfigFile.dtsConfig, שלא סופק, או דריסה ברמת ה-Job/dtexec, יכולים להחליף את מחרוזת החיבור בזמן ריצה. זה external_unknown. השרת והארגון של CRM SDK (ServerName/OrganizationName) נטענים מ-gen_etlvariable, וערכיהם לא ידועים.",
+ "summary_he": "החבילה משלימה את 'תאריך מינוי הסוכן' (gen_agentappointmentdate) בקופות (Gen_fundmain) שהשדה ריק אצלן: לכל קופה כזו נלקח התאריך המאוחר ביותר מבין הקופות האחרות של אותו חשבון לקוח (Gen_customeraccountname) שיש להן תאריך. הכתיבה היא UPDATE ישיר ב-SQL לטבלה Gen_fundmainBase במסד CRM, ולכן היא Unsupported. Gen_customeraccountname הוא שדה Lookup מסוג guid לחשבון הלקוח, כלומר ההתאמה היא לפי מזהה החשבון ולא לפי שם (ראיה מחבילות אחרות: 0005_Customer Account.dtsx:2644, 0015_TransferIn.dtsx:75552). מה השדה מכיל, לפי חבילה 0004_LeumiFile-MY: ברכיב Minhali daily\\Set Date Fields הוא מקבל את הזמן הנוכחי (DateTime.Now) כשמספר הסוכן בקופה השתנה וגם שם הסוכן או הסוכנות השתנה. אז הרכיב Update 'gen_agentappointmentdate' for the same account כותב את אותו ערך לשאר הקופות של אותו חשבון (0004_LeumiFile-MY.dtsx:75547-75577, 92815-92825). כלומר זה המועד שבו 0004 זיהתה החלפת סוכן או סוכנות בקופה.",
+ "executionOrder": [
+  {
+   "step": 1,
+   "refId": "Package\\Get All Funds",
+   "title_he": "השלמת תאריך מינוי סוכן בקופות",
+   "trigger": "אחרי Package\\Create ETL Process record · Success (Constraint 1, DTSX:4225). שרשרת קודמת: Get Organization Variables → Create ETL Process record · Success (DTSX:4224). אחריו: End ETL Process record · Success (DTSX:4226)"
+  }
+ ],
+ "ignoredAsFramework": [
+  "Package\\Get Organization Variables",
+  "Package\\Create ETL Process record",
+  "Package\\End ETL Process record"
+ ],
+ "components": [
+  {
+   "refId": "Package\\Get All Funds",
+   "title_he": "השלמת תאריך מינוי סוכן בקופות",
+   "techName": "Get All Funds",
+   "short_he": "בקופות שאין להן תאריך מינוי סוכן נקבע התאריך האחרון שקיים בקופות אחרות של אותו חשבון לקוח. העדכון נכתב ישירות למסד ה-CRM.",
+   "flow_he": [
+    "איתור קופות בלי תאריך מינוי סוכן, כשלחשבון הלקוח שלהן יש קופה אחרת עם תאריך",
+    "חישוב התאריך המאוחר ביותר באותו חשבון לקוח",
+    "UPDATE ישיר ל-Gen_fundmainBase: התאריך, ModifiedBy ו-ModifiedOn"
+   ],
+   "short": {
+    "nodes": [
+     {
+      "type": "step",
+      "text": "החבילה מאתרת קופות שאין להן תאריך מינוי סוכן, אבל לחשבון הלקוח שלהן יש לפחות קופה אחת עם תאריך כזה."
+     },
+     {
+      "type": "step",
+      "text": "לכל קופה כזו נבחר התאריך המאוחר ביותר מבין הקופות של אותו חשבון לקוח."
+     },
+     {
+      "type": "write",
+      "text": "תאריך מינוי הסוכן של הקופה מתעדכן לתאריך שנבחר, בכתיבה ישירה למסד הנתונים של CRM ולא דרך שירותי CRM."
+     },
+     {
+      "type": "end",
+      "text": "כל הקופות של חשבון לקוח מקבלות תאריך מינוי סוכן, אם לפחות לאחת מהן היה תאריך. קופות שכבר יש להן תאריך לא משתנות."
+     }
+    ]
+   },
+   "detailed": {
+    "nodes": [
+     {
+      "type": "step",
+      "text": "החבילה מתחברת למסד ALTSHULER_MSCRM דרך מנהל החיבור psql. אותו חיבור משמש לקריאה ולכתיבה.",
+      "tech": "Connection [psql]: Data Source=psql;Initial Catalog=ALTSHULER_MSCRM (ייתכן שהוא נדרס בזמן ריצה מקובץ תצורה שלא סופק)",
+      "evidence": "DTSX:4-6, 3264, 3300"
+     },
+     {
+      "type": "step",
+      "text": "האוכלוסייה היא קופות שתאריך מינוי הסוכן שלהן ריק, ושחשבון הלקוח שלהן מופיע לפחות בקופה אחת שיש לה תאריך.",
+      "tech": "from Gen_fundmain targetdate with (nolock) where gen_agentappointmentdate is null and targetdate.Gen_customeraccountname in (select Gen_customeraccountname from Gen_fundmain with (nolock) where gen_agentappointmentdate is not null) — Gen_customeraccountname = מזהה (guid) של חשבון הלקוח (0005_Customer Account.dtsx:2644; 0015_TransferIn.dtsx:75552)",
+      "evidence": "GEt Relvante Funds To Update, SqlCommand DTSX:3246"
+     },
+     {
+      "type": "step",
+      "text": "לכל שורה, ערך המשתמש המעדכן נלקח מההגדרה CrmAdminId. אם ההגדרה ריקה או אינה מזהה תקין, זרימת הנתונים נכשלת עוד לפני ה-UPDATE הראשון.",
+      "tech": "Create System Variables main.cs:128: new Guid(Convert.ToString(ReadOnlyVariables[\"User::CrmAdminId\"].Value)). ערך ריק או לא תקין זורק FormatException (התנהגות .NET כללית), ואין try/catch. ערך ברירת המחדל במשתנה הוא \"\" (evidence.variables)",
+      "evidence": "DTSX:2372 (main.cs:122-129), 2620-2622, 3305"
+     },
+     {
+      "type": "decision",
+      "text": "האם לחשבון הלקוח של הקופה יש קופה אחרת עם תאריך מינוי סוכן?",
+      "tech": "targetdate.Gen_customeraccountname in (... where gen_agentappointmentdate is not null). קופה בלי חשבון לקוח (NULL) לא נבחרת",
+      "branches": [
+       {
+        "label": "כן",
+        "nodes": [
+         {
+          "type": "step",
+          "text": "התאריך שיוזן הוא התאריך המאוחר ביותר מבין הקופות של אותו חשבון לקוח שיש להן תאריך.",
+          "tech": "(select top 1 gen_agentappointmentdate from Gen_fundmain sourcedate with (nolock) where sourcedate.gen_agentappointmentdate is not null and sourcedate.Gen_customeraccountname is not null and sourcedate.Gen_customeraccountname=targetdate.Gen_customeraccountname order by sourcedate.gen_agentappointmentdate desc) as AgentAppointmentDateToInsert",
+          "evidence": "DTSX:3246"
+         },
+         {
+          "type": "write",
+          "text": "תאריך מינוי הסוכן של הקופה מתעדכן לתאריך שחושב. בנוסף נרשמים המשתמש המעדכן (משתמש מנהל מההגדרות) וזמן העדכון.",
+          "tech": "gen_fundmain · update Gen_fundmainBase set gen_agentappointmentdate=?(AgentAppointmentDateToInsert),ModifiedBy=?(ModifiedBy),ModifiedOn=?(ModifiedOn) where Gen_fundmainId=?(Gen_fundmainId) · SQL (Unsupported), שורה אחר שורה (OLE DB Command). ModifiedBy / ModifiedOn מגיעים מרכיב Create System Variables (main.cs:127-128: DateTime.UtcNow; new Guid(User::CrmAdminId))",
+          "evidence": "Update agent appointment date DTSX:3294; Param_0..Param_3 mapping"
+         }
+        ]
+       },
+       {
+        "label": "לא",
+        "nodes": [
+         {
+          "type": "step",
+          "text": "הקופה לא נבחרת ולא מתעדכנת."
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "type": "step",
+      "text": "אם עדכון של קופה נכשל, כל זרימת הנתונים נכשלת, ושלב סיום התהליך לא רץ.",
+      "tech": "OLE DB Command Input errorRowDisposition=\"FailComponent\". Error Output לא מחובר",
+      "evidence": "DTSX:3291-3354"
+     },
+     {
+      "type": "end",
+      "text": "קופות בלי תאריך מינוי סוכן מקבלות את התאריך האחרון הידוע בחשבון הלקוח שלהן. העדכון עוקף את שכבת השירותים של CRM."
+     }
+    ]
+   },
+   "detail_he": [
+    {
+     "h": "מקור ואוכלוסייה",
+     "t": "Gen_fundmain (בלי Base, אובייקט במסד שלא סופק; השערה: ה-View של הישות) במסד ALTSHULER_MSCRM. נבחרות רשומות שבהן gen_agentappointmentdate is null ו-Gen_customeraccountname נמצא ברשימת החשבונות שיש להם לפחות קופה אחת עם gen_agentappointmentdate is not null (DTSX:3246). select distinct מחזיר שורה אחת לכל Gen_fundmainId. הקריאה היא with (nolock)."
+    },
+    {
+     "h": "התאמה לרשומות קיימות",
+     "t": "הקופה המעודכנת מזוהה לפי Gen_fundmainId שנקרא מהמקור (Param_3). ה'מקור' של התאריך הוא קופות אחרות עם אותו Gen_customeraccountname. זהו שדה Lookup מסוג guid לחשבון הלקוח (gen_customeraccount), ולכן ההתאמה היא לפי מזהה החשבון ולא לפי שם. ראיה מחבילות אחרות: ב-0005_Customer Account.dtsx:2644 העמודה ExternalColumns[Gen_customeraccountname] היא dataType=\"guid\", וב-0015_TransferIn.dtsx:75552 יש join fm.Gen_customeraccountname = ca.Gen_customeraccountId. ה-DTSX של 0039 לבדו לא מראה את הטיפוס."
+    },
+    {
+     "h": "החלטות",
+     "t": "אין רכיבי פיצול. ההחלטה כולה ב-SQL: רק קופות בלי תאריך, שבחשבון הלקוח שלהן יש קופה עם תאריך. הערך הנבחר הוא top 1 ... order by gen_agentappointmentdate desc, כלומר התאריך המאוחר ביותר."
+    },
+    {
+     "h": "כתיבה ל-CRM",
+     "t": "UPDATE ישיר: update Gen_fundmainBase set gen_agentappointmentdate=?,ModifiedBy=?,ModifiedOn=? where Gen_fundmainId=? (DTSX:3294), דרך [psql] → psql/ALTSHULER_MSCRM. Param_0=AgentAppointmentDateToInsert, Param_1=ModifiedBy (User::CrmAdminId), Param_2=ModifiedOn (DateTime.UtcNow), Param_3=Gen_fundmainId. סיווג: Unsupported."
+    },
+    {
+     "h": "תוצאה עסקית",
+     "t": "השלמת תאריך מינוי הסוכן לכל קופות חשבון הלקוח לפי התאריך האחרון הידוע. מה השדה מכיל: בחבילה 0004_LeumiFile-MY הוא מקבל את הזמן הנוכחי כשמספר הסוכן בקופה השתנה וגם שם הסוכן או הסוכנות השתנה, והערך מועתק לשאר הקופות של אותו חשבון (0004_LeumiFile-MY.dtsx:75547-75577, 92815-92825). כלומר זה המועד שבו 0004 זיהתה החלפת סוכן או סוכנות בקופה. הקשר לחשבון הלקוח מוכח מחבילות אחרות (0005:2644, 0015:75552)."
+    }
+   ],
+   "decisions": [
+    {
+     "where": "GEt Relvante Funds To Update (DTSX:3246)",
+     "condition": "gen_agentappointmentdate is null and targetdate.Gen_customeraccountname in (select Gen_customeraccountname from Gen_fundmain with (nolock) where gen_agentappointmentdate is not null)",
+     "meaning_he": "קופה בלי תאריך מינוי סוכן, שבחשבון הלקוח שלה יש קופה עם תאריך.",
+     "outcome_he": "הקופה נבחרת לעדכון."
+    },
+    {
+     "where": "GEt Relvante Funds To Update (DTSX:3246), תת-שאילתה",
+     "condition": "select top 1 gen_agentappointmentdate ... where sourcedate.gen_agentappointmentdate is not null and sourcedate.Gen_customeraccountname is not null and sourcedate.Gen_customeraccountname=targetdate.Gen_customeraccountname order by sourcedate.gen_agentappointmentdate desc",
+     "meaning_he": "התאריך המאוחר ביותר באותו חשבון לקוח.",
+     "outcome_he": "הערך שנכתב ל-gen_agentappointmentdate."
+    }
+   ],
+   "crmEffects": [
+    {
+     "entity": "gen_fundmain (טבלה Gen_fundmainBase)",
+     "verb": "UPDATE gen_agentappointmentdate, ModifiedBy, ModifiedOn",
+     "mechanism": "SQL",
+     "when_he": "בכל ריצה, לכל קופה שנבחרה במקור. Unsupported: SQL ישיר על מסד CRM דרך [psql]."
+    }
+   ],
+   "evidence": [
+    "DTSX:4-6 ConnectionManager [psql] {E17C4E23-BF4A-4B57-9957-BADD0EEB51CC}: Data Source=psql;Initial Catalog=ALTSHULER_MSCRM",
+    "DTSX:2365 Executable Package\\Get All Funds (Microsoft.Pipeline)",
+    "DTSX:3241/3246 GEt Relvante Funds To Update (OLEDBSource, [psql]) SqlCommand",
+    "DTSX:2370 / main.cs:127-128 (DTSX:2372, sha 9e0690549ab2) Create System Variables: ModifiedOn = DateTime.UtcNow; ModifiedBy = User::CrmAdminId",
+    "DTSX:3291/3294 Update agent appointment date (OLEDBCommand, [psql]) SqlCommand; input → Param_0..3; errorRowDisposition=FailComponent",
+    "DTSX:4224-4226 Precedence constraints (Success)"
+   ],
+   "openQuestions_he": [
+    "Gen_fundmain (בלי Base) לא סופק: אם זה View מסונן (למשל לפי statecode), האוכלוסייה עשויה להיות מצומצמת יותר. external_unknown.",
+    "האם קובץ התצורה C:\\Generix\\SSISConfigFile.dtsConfig או ה-Job דורסים את מחרוזת החיבור [psql] בזמן ריצה? לא ידוע.",
+    "ערך User::CrmAdminId מגיע מ-gen_etlvariable, והערך לא ידוע. אם הוא ריק או לא תקין, הזרימה נכשלת לפני כל UPDATE (main.cs:128).",
+    "האם הכוונה העסקית היא התאריך המאוחר או המוקדם? הקוד בוחר את המאוחר (order by desc). הכוונה לא ידועה."
+   ]
+  }
+ ],
+ "findings_he": [
+  {
+   "severity": "high",
+   "text": "הכתיבה ל-CRM היא UPDATE ישיר ב-SQL על טבלת Base (Gen_fundmainBase), כולל ModifiedBy/ModifiedOn. זו כתיבה Unsupported שעוקפת את שכבת ה-SDK של CRM.",
+   "evidence": "DTSX:3294, connection [psql] DTSX:4-6"
+  },
+  {
+   "severity": "medium",
+   "text": "שגיאה בעדכון של קופה אחת מכשילה את כל זרימת הנתונים (FailComponent), ושלב End ETL Process record לא ירוץ. העדכונים שכבר בוצעו שורה-שורה לא מבוטלים, כי אין טרנזקציה מוגדרת בחבילה (השערה: לפי ברירת המחדל של OLE DB Command).",
+   "evidence": "DTSX:3291-3354 errorRowDisposition=\"FailComponent\""
+  },
+  {
+   "severity": "medium",
+   "text": "אם CrmAdminId ב-gen_etlvariable ריק או אינו GUID תקין, new Guid(...) ב-Create System Variables זורק FormatException (התנהגות .NET כללית). זרימת הנתונים נכשלת לפני כל UPDATE, ושלב End ETL לא רץ.",
+   "evidence": "main.cs:128 (DTSX:2372); DTSX:3305; precedence DTSX:4226"
+  },
+  {
+   "severity": "low",
+   "text": "הקריאה היא with (nolock), כך שהשאילתה עלולה לקרוא נתונים לא מחויבים.",
+   "evidence": "DTSX:3246"
+  },
+  {
+   "severity": "info",
+   "text": "ב-DTSX אין Package Configurations. דריסת חיבורים בזמן ריצה (C:\\Generix\\SSISConfigFile.dtsConfig, שלא סופק, או Job) אפשרית ולא ידועה.",
+   "evidence": "evidence.configurations = []"
+  },
+  {
+   "severity": "info",
+   "text": "המשתנים FileName='reject_reasons_full_22052019' ו-FilePath='C:\\Test\\RejectReasons' מוגדרים בחבילה, ולא נמצא להם שימוש ברכיבים העסקיים שנבדקו.",
+   "evidence": "evidence.variables"
+  }
+ ]
+}

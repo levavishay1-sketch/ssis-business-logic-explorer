@@ -1,0 +1,102 @@
+{
+ "verifier": "ssis-verifier",
+ "package": "0021_Account",
+ "scope": "mapping-A.json",
+ "source": {
+  "file": "source/DailyProcess/0021_Account.dtsx",
+  "sha256": "bad3b657f536c5fccd90c47d9e503ec056323813f4e7577ac1ed5fa2d16213be"
+ },
+ "checked": 14,
+ "results": [
+  {
+   "id": "Update Account|account|UPDATE|gen_isfundinternalagent",
+   "verdict": "CONFIRMED",
+   "detail": "RE-CHECK 2026-11-06: Condition text now states the NULL gap: compared as isnull(gen_isfundinternalagent,0) AS gen_isfundinternalagentDB (DTSX:3298 verified) so stored NULL + computed 0 is never selected/updated; NULL replaced only when computed is 1. Correct per SQL DTSX:3294-3310. Rest as before. | Previous finding: SQL 'Update accountbase set gen_isfundinternalagent = ? where accountid = ?' (DTSX:3388-3390): 2 '?' -> Param_0 = input gen_isfundinternalagent (i4, external Param_0 declared bool), Param_1 = input accountid (DTSX:3399-3400). Value = 'case when funds.gen_accountname is null then 0 else 1 end' from Get Account to update (DTSX:3294-3309), passed through Sort (key accountid, EliminateDuplicates=false DTSX:3345). Row filter 'temp.gen_isfundinternalagent != temp.gen_isfundinternalagentDB' where DB = isnull(gen_isfundinternalagent,0): note that an account with stored NULL and computed 0 is NOT written (stays NULL) - the claim carries this only through the isnull(...,0) DB-source label, not in the condition text. Unqualified names in the query: gen_isfundinternalagent inside isnull binds to account (derived table funds exposes only gen_accountname); 'gen_estatecodeidid' in the join is unqualified (assumed to be gen_estatecodeid's PK, schema-dependent). CRM DB: [CRM] stored as Data Source=Psql; Initial Catalog=ALTSHULER_MSCRM (DTSX:6) and also used to read CRM entity views (account, gen_fundmain, gen_etlprocess); package loads C:\\Generix\\SSISConfigFile.dtsConfig (DTSX:16-18, not supplied) which may override the connection string - recorded in unresolved, so 'Unsupported' rests on the design-time value. Precedence Create ETL -> this flow Success (DTSX:3643).",
+   "evidence": "0021_Account.dtsx:6,16-18,3294-3309,3345,3388-3400,3643",
+   "previousVerdict": "CONFIRMED"
+  },
+  {
+   "id": "Update accounts|account|UPDATE|gen_fundwithoutagent",
+   "verdict": "CONFIRMED",
+   "detail": "RE-CHECK 2026-11-06: Condition text now states the NULL gap via isnull(gen_fundwithoutagent,0) AS gen_isfundwithoutagentDB (DTSX:3490 verified); stored NULL + computed 0 never updated. Correct per SQL DTSX:3486-3500. Rest as before. | Previous finding: SQL 'Update accountbase set gen_fundwithoutagent= ? where accountid = ?' (DTSX:3591-3593): Param_0 = input gen_isfundwithoutagent, Param_1 = input accountid (DTSX:3602-3603). Value from Get accounts to update (DTSX:3486-3500): funds = gen_fundmain join Gen_estatecodeid ON Gen_estatecodeid.Gen_estatecodeidId = Gen_fundmain.gen_estatetype WHERE gen_brokernumbername = '00000004000' AND Gen_EstateTypeID not in ('0210','3'). Alias gen_isfundwithoutagent vs CRM column gen_fundwithoutagent correctly bound positionally. gen_isfundwithoutagentDB passes the Sort but is not bound. Same NULL nuance (stored NULL + computed 0 -> not written) and same config-file caveat as the other writer. Precedence Update internal Agent account -> this flow Success (DTSX:3644).",
+   "evidence": "0021_Account.dtsx:3486-3500,3537,3591-3603,3644",
+   "previousVerdict": "CONFIRMED"
+  },
+  {
+   "id": "LOGIC scopeNote_he",
+   "verdict": "CONFIRMED",
+   "detail": "RE-CHECK 2026-11-06: Proof (3) removed; the note now says the catalog is design-time circumstantial evidence and explains why the read-back is not proof (Lookup NoMatchBehavior=0 + RedirectRow to a dead-end Derived Column, DTSX:2367, path DTSX:2417; SDK target loaded from gen_etlvariable via [CRM], circular). Three SDK writers listed with correct lines (311-319, 974-983, 3819-3834 incl. annotation). Config-file caveat kept. | Previous finding: Evidence (1) catalog name and (2) CRM objects read via [CRM] are correct, and the config-file caveat is present. Evidence (3) is overstated: 'ולכן החיבור מצביע על מסד הנתונים של אותו ארגון CRM' does not follow from the DTSX. The End ETL Lookup on [CRM] has NoMatchBehavior=0 with errorRowDisposition=RedirectRow to a dead-end Derived Column (DTSX:2367, Lookup Error Output path DTSX:2417), so a run in which the SDK-created gen_etlprocess is NOT found in [CRM] completes silently; also the SDK target (ServerName/OrganizationName) is itself loaded from gen_etlvariable through [CRM] (circular). It shows design intent, not proof. Second error: 'סקריפט ה-SDK היחיד שכותב רשומות' - there are three SDK writers (Create ETL Process record DTSX:311-319, ETL Record Finish DTSX:974-983, OnError handler DTSX:3819-3834 which also creates an annotation), all ETL plumbing. ScriptMain.cs:46-54 = DTSX:311-319 verified.",
+   "evidence": "0021_Account.dtsx:6,17,311-319,974-983,2367,2417,3819-3834",
+   "previousVerdict": "INCOMPLETE"
+  },
+  {
+   "id": "LOGIC summary_he",
+   "verdict": "CONFIRMED",
+   "detail": "RE-CHECK 2026-11-06: Estate wording now carries the hypothesis label (by field name gen_estatetypeid) in the summary and in every occurrence in components[1]/[2], decisions and open questions (all 15 occurrences checked). | Previous finding: Logic is right (flags, codes, only changed accounts, direct SQL). But 'סוגי עיזבון' (estate) is a translation of the field name gen_estatetypeid / Gen_EstateTypeID stated as fact; the business meaning of these codes is not in the DTSX (the package's own findings say the meaning is unknown). Should be labelled השערה or left as the technical name. Same unlabelled wording recurs in components[1] and components[2]. 'gen_brokernumbername = 00000004000' is described as 'מספר סוכן' - acceptable as a literal description.",
+   "evidence": "0021_Account.dtsx:3294-3310,3486-3500",
+   "previousVerdict": "INCOMPLETE"
+  },
+  {
+   "id": "LOGIC executionOrder",
+   "verdict": "CONFIRMED",
+   "detail": "Constraints DTSX:3642-3645 chain Get Variables -> Create ETL -> Update internal Agent account -> Update no Agent account -> End ETL, LogicalAnd, no DTS:Value (Success). OnError handler DTSX:3648.",
+   "evidence": "0021_Account.dtsx:3642-3645,3648"
+  },
+  {
+   "id": "LOGIC components[0]",
+   "verdict": "CONFIRMED",
+   "detail": "RE-CHECK 2026-11-06: detail_he 'write to CRM' now has the same corrected text as scopeNote_he: no 'therefore same organisation' claim, RedirectRow dead end (DTSX:2367/2417) and circular SDK target explained. | Previous finding: Control flow, Success chain and step semantics verified. detail_he 'כתיבה ל-CRM' repeats the overstated evidence (3) 'ולכן החיבור מצביע...' - the End ETL Lookup redirects no-match rows silently (RedirectRow, DTSX:2367/2417), so it is not proof that [CRM] is the same organisation as the SDK target. Rest correct.",
+   "evidence": "0021_Account.dtsx:2367,2417,3642-3645",
+   "previousVerdict": "INCOMPLETE"
+  },
+  {
+   "id": "LOGIC components[1]",
+   "verdict": "CONFIRMED",
+   "detail": "Query (DTSX:3294-3309), INNER JOINs (fund without contract/agent/estate type not counted), case 0/1, isnull(...,0) comparison, Sort, positional UPDATE and FailComponent (DTSX:3397) verified. No state filter on account/gen_fundmain - correct. Note: 'סוג עיזבון' label is a name-based translation (see summary_he); 'סוכן פנימי' correctly labelled השערה.",
+   "evidence": "0021_Account.dtsx:3294-3309,3343-3345,3388-3400,3397,3644"
+  },
+  {
+   "id": "LOGIC components[2]",
+   "verdict": "CONFIRMED",
+   "detail": "Query (DTSX:3486-3500), INNER JOIN on Gen_estatecodeid, filter '00000004000', case 0/1, isnull comparison, Sort, positional UPDATE, FailComponent (DTSX:3600), Success to End ETL (DTSX:3645) verified. '00000004000 = ללא סוכן' labelled השערה. Same 'עיזבון' labelling note as summary_he.",
+   "evidence": "0021_Account.dtsx:3486-3500,3535-3537,3591-3603,3600,3645"
+  },
+  {
+   "id": "LOGIC findings_he[0]",
+   "verdict": "CONFIRMED",
+   "detail": "Two direct SQL UPDATEs on accountbase via [CRM]; platform side effects labelled as hypothesis.",
+   "evidence": "0021_Account.dtsx:3388,3591"
+  },
+  {
+   "id": "LOGIC findings_he[1]",
+   "verdict": "CONFIRMED",
+   "detail": "FailComponent on both command inputs; Success constraints stop later steps; rows already updated stay (no TransactionOption set).",
+   "evidence": "0021_Account.dtsx:3397,3600,3644-3645"
+  },
+  {
+   "id": "LOGIC findings_he[2]",
+   "verdict": "CONFIRMED",
+   "detail": "DTS:Configuration type 1 (XML file) C:\\Generix\\SSISConfigFile.dtsConfig, not supplied. Note: the domain/ETL variables are re-set at runtime by Set Variables from gen_etlvariable, so the config can matter mainly for connection strings.",
+   "evidence": "0021_Account.dtsx:16-18"
+  },
+  {
+   "id": "LOGIC findings_he[3]",
+   "verdict": "CONFIRMED",
+   "detail": "No statecode/statuscode filter in either query.",
+   "evidence": "0021_Account.dtsx:3294-3309,3486-3500"
+  },
+  {
+   "id": "LOGIC findings_he[4]",
+   "verdict": "CONFIRMED",
+   "detail": "Literals gen_agenttype = 1, not in ('0210','3'), '00000004000' present in SQL; meaning stated as unknown.",
+   "evidence": "0021_Account.dtsx:3294-3309,3486-3500"
+  },
+  {
+   "id": "LOGIC findings_he[5]",
+   "verdict": "CONFIRMED",
+   "detail": "Application Name=SSIS-BO_LeumiImportMonthly-... in [CRM] connection string; 'נראה שהועתק' is hedged.",
+   "evidence": "0021_Account.dtsx:6"
+  }
+ ],
+ "missingWrites": []
+}

@@ -1,0 +1,1669 @@
+{
+  "package": "0022_Company Workers",
+  "analyst": "ssis-business-logic",
+  "source": {
+    "file": "source/DailyProcess/0022_Company Workers.dtsx",
+    "sha256": "F838665D8308355A5FDEB4383396D4D72B33064003318F08932428D4F2EE8D76"
+  },
+  "scopeNote_he": "ניתוח לפי ה-DTSX בלבד. [CRM] = OLEDB, Data Source=Psql; Initial Catalog=ALTSHULER_MSCRM (DTSX:4-6). זה מסד הנתונים של ה-CRM לפי הראיות הבאות: (1) שם הקטלוג בתבנית <Org>_MSCRM; (2) באותו חיבור נקראות ונכתבות טבלאות CRM (SystemUser, gen_fundmain, Gen_fundmainBase וכו'); (3) רשומת gen_etlprocess שנוצרת דרך ה-SDK (Create ETL Process record ScriptMain.cs:46-54, crmServiceProxy.Create) נקראת בחזרה דרך [CRM] (End ETL Process record\\Lookup DTSX:2235). הסתייגות: קובץ התצורה C:\\Generix\\SSISConfigFile.dtsConfig (DTSX:17) לא סופק וייתכן שהוא דורס את מחרוזת החיבור (blocked_external_dependency). כל שמונה הכתיבות העסקיות הן UPDATE ישיר לטבלאות Base של CRM (Unsupported). אין כתיבה עסקית דרך ה-SDK. בחבילה שלושה כותבי SDK, וכולם מסגרת ETL: Create ETL Process record (DTSX:273-278), End ETL Process record\\ETL Record Finish (DTSX:840-848) ו-OnError\\Error ETL Process record (DTSX:5320-5334, כולל יצירת annotation). ערכי שמות הדומיין (CompanyEmployeesDomainName, RegularFundsDomainName) נטענים בזמן ריצה מ-gen_etlvariable ולא ידועים.",
+  "summary_he": "החבילה מנהלת בעלות (Owner) ב-CRM על קופות (gen_fundmain) ובקשות FT (gen_ftrequest) לפי הטבלה Gen_companyworker. בקשת FT עוברת למשתמש \"עובדי החברה\" כשמספר הזהות שבבקשה מופיע ב-Gen_companyworker (cw.gen_identitynumber = ft.Gen_identitynumber), ואחרת למשתמש \"קופות רגילות\". קופה עוברת למשתמש \"עובדי החברה\" כשמתקיים התנאי exists (select Gen_companyworker.Gen_identitynumber from Gen_companyworker where gen_customeridnumber = Gen_identitynumber) (השערה: התאמה לפי ת.ז. הלקוח; העמודה ללא קידומת טבלה; ראו ממצא 5), ואחרת (not exists) למשתמש \"קופות רגילות\". בשני המקרים מועברות רק רשומות שבבעלות משתמש מערכת ששם הדומיין שלו אינו NULL ושונה משם משתמש היעד של אותו שלב. קופות ובקשות בבעלות צוות, או בבעלות משתמש ללא שם דומיין (NULL), נשארות עם הבעלים שלהן. רשומות gen_ftcurrentyear ו-MF (שנה נוכחית, שנה קודמת, ארכיון) שהבעלים שלהן שונה מהבעלים של הקופה מיושרות לבעלים של הקופה. כל העדכונים הם SQL ישיר לטבלאות Base (Unsupported).",
+  "executionOrder": [
+    {
+      "step": 1,
+      "refId": "Package\\Get Variables From SystemConfigurarion",
+      "title_he": "טעינת משתני ETL ושמות משתמשי היעד",
+      "trigger": "start (no incoming constraint)"
+    },
+    {
+      "step": 2,
+      "refId": "Package\\Create ETL Process record",
+      "title_he": "רשומת תהליך ETL (מסגרת)",
+      "trigger": "after Get Variables From SystemConfigurarion · Success (DTSX:5115)"
+    },
+    {
+      "step": 3,
+      "refId": "Package\\Update CW Funds",
+      "title_he": "קופות שעומדות בתנאי Gen_companyworker (השערה: של עובדי החברה) → משתמש עובדי החברה",
+      "trigger": "after Create ETL Process record · Success (DTSX:5116)"
+    },
+    {
+      "step": 4,
+      "refId": "Package\\Update Regular Funds",
+      "title_he": "קופות שאינן עומדות בתנאי Gen_companyworker → משתמש הקופות הרגילות",
+      "trigger": "after Update CW Funds · Success (DTSX:5117)"
+    },
+    {
+      "step": 5,
+      "refId": "Package\\Update Trans",
+      "title_he": "יישור gen_ftcurrentyear לבעלות הקופה",
+      "trigger": "after Update Regular Funds · Success (DTSX:5118)"
+    },
+    {
+      "step": 6,
+      "refId": "Package\\Update MF Current Year",
+      "title_he": "יישור MF שנה נוכחית",
+      "trigger": "after Update Trans · Success (DTSX:5119)"
+    },
+    {
+      "step": 7,
+      "refId": "Package\\Update MF Previous Year",
+      "title_he": "יישור MF שנה קודמת",
+      "trigger": "after Update MF Current Year · Success (DTSX:5120)"
+    },
+    {
+      "step": 8,
+      "refId": "Package\\Update MF Archive",
+      "title_he": "יישור ארכיון MF",
+      "trigger": "after Update MF Previous Year · Success (DTSX:5121)"
+    },
+    {
+      "step": 9,
+      "refId": "Package\\Update CW FTRequests",
+      "title_he": "בקשות FT של עובדי החברה → משתמש עובדי החברה",
+      "trigger": "after Update MF Archive · Success (DTSX:5122)"
+    },
+    {
+      "step": 10,
+      "refId": "Package\\Update Regular FTRequest",
+      "title_he": "שאר בקשות ה-FT → משתמש הקופות הרגילות",
+      "trigger": "after Update CW FTRequests · Success (DTSX:5123)"
+    },
+    {
+      "step": 11,
+      "refId": "Package\\End ETL Process record",
+      "title_he": "סגירת תהליך ETL (מסגרת)",
+      "trigger": "after Update Regular FTRequest · Success (DTSX:5124)"
+    },
+    {
+      "step": "on error",
+      "refId": "Package.EventHandlers[OnError]\\Error ETL Process record",
+      "title_he": "סימון שגיאה (מסגרת)",
+      "trigger": "OnError event handler (DTSX:5127)"
+    }
+  ],
+  "ignoredAsFramework": [
+    "Package\\Get Variables From SystemConfigurarion (מסגרת; נזכר רק כמקור של CompanyEmployeesDomainName ו-RegularFundsDomainName)",
+    "Package\\Create ETL Process record",
+    "Package\\End ETL Process record (כולל Lookup, ETL Record Finish, Get gen_etlprocessid)",
+    "Package.EventHandlers[OnError]\\Error ETL Process record",
+    "LogProvider SSIS log provider for SQL Server → [SRS.SSIS_Logs] (DTSX:20)"
+  ],
+  "components": [
+    {
+      "refId": "Package (control flow)",
+      "title_he": "זרימת בקרה: שיוך בעלות לפי עובדי חברה ויישור רשומות נלוות",
+      "techName": "Update CW Funds → Update Regular Funds → Update Trans → Update MF Current Year → Update MF Previous Year → Update MF Archive → Update CW FTRequests → Update Regular FTRequest",
+      "short_he": "בכל ריצה החבילה קובעת את הבעלות על קופות ועל בקשות FT שבבעלות משתמש מערכת ששם הדומיין שלו אינו NULL ושונה משם משתמש היעד של השלב. רשומה שעומדת בתנאי Gen_companyworker עוברת למשתמש ייעודי לעובדי החברה, ורשומה שאינה עומדת בו עוברת למשתמש \"קופות רגילות\". בבקשות FT התנאי הוא שמספר הזהות שבבקשה מופיע ב-Gen_companyworker. בקופות התנאי הוא gen_customeridnumber = Gen_identitynumber בתת-שאילתה על Gen_companyworker (השערה: התאמה לפי ת.ז. הלקוח; העמודה ללא קידומת טבלה). קופות ובקשות בבעלות צוות, או בבעלות משתמש ללא שם דומיין, אינן מועברות. רשומות FT לשנה הנוכחית (בחבילה 0008 הן נוצרות רק משורות של פלט פיצול בשם 'תנועות והחזר דמי ניהול', gen_TranstypeId != \"58\" && Transfer_Type_2 == \"2\") ורשומות MF של כל קופה, שהבעלים שלהן שונה מהבעלים של הקופה, מקבלות את הבעלים של הקופה, בלי קשר לסוג הבעלים.",
+      "flow_he": [
+        "טעינת משתנים ופתיחת רשומת תהליך (מסגרת).",
+        "Update CW Funds → Update Regular Funds.",
+        "Update Trans → Update MF Current Year → Update MF Previous Year → Update MF Archive.",
+        "Update CW FTRequests → Update Regular FTRequest.",
+        "סגירת תהליך (מסגרת). כל המעברים Success."
+      ],
+      "short": {
+        "nodes": [
+          {
+            "type": "step",
+            "text": "החבילה רצה בלי קובץ קלט ועובדת על נתוני ה-CRM עצמו."
+          },
+          {
+            "type": "write",
+            "text": "קופות שבבעלות משתמש מערכת ששם הדומיין שלו אינו NULL ושונה משם משתמש היעד מועברות: קופות שעומדות בתנאי עובדי החברה (קיימת ב-Gen_companyworker שורה שבה gen_customeridnumber = Gen_identitynumber) (השערה: התאמה לפי ת.ז. הלקוח; העמודה ללא קידומת טבלה) עוברות לבעלות משתמש \"עובדי החברה\", וקופות שאינן עומדות בתנאי עוברות לבעלות משתמש \"קופות רגילות\". קופות בבעלות צוות, או בבעלות משתמש ללא שם דומיין, נשארות עם הבעלים שלהן."
+          },
+          {
+            "type": "write",
+            "text": "רשומות FT לשנה הנוכחית (בחבילה 0008 רשומות אלה נוצרות מפלט בשם 'תנועות והחזר דמי ניהול') ורשומות MF של כל קופה (שנה נוכחית, שנה קודמת וארכיון), שהבעלים שלהן שונה מהבעלים של הקופה, מקבלות את הבעלים של הקופה."
+          },
+          {
+            "type": "write",
+            "text": "בקשות FT מקבלות בעלות באותו כלל, לפי מספר הזהות שבבקשה."
+          },
+          {
+            "type": "end",
+            "text": "קופות ובקשות FT שבבעלות משתמש מערכת מחולקות בין משתמש עובדי החברה למשתמש הקופות הרגילות. רשומות בבעלות צוות, או שלבעלים שלהן אין שם דומיין (NULL), אינן נכללות, כי יש INNER JOIN ל-SystemUser והשוואת DomainName != ? אינה מתקיימת עבור NULL. השינוי נעשה בעדכון SQL ישיר."
+          }
+        ]
+      },
+      "detailed": {
+        "nodes": [
+          {
+            "type": "step",
+            "text": "הגדרות הריצה נטענות מטבלת ההגדרות של ה-ETL (gen_etlvariable), כולל שמות הדומיין של שני משתמשי היעד. אם אחד המפתחות חסר, השלב נכשל. ערך שקובץ התצורה החיצוני קובע למשתנים אלה נדרס בשלב זה, כי השלב רץ אחרי טעינת התצורה. הקובץ יכול להשפיע עליהם רק בעקיפין, למשל דרך מחרוזת החיבור [CRM] שממנה נקראת הטבלה.",
+            "tech": "Get Variables From SystemConfigurarion DTSX:2306 (ReadWriteVariables DTSX:3165: CompanyEmployeesDomainName, RegularFundsDomainName, …); Set Variables main.cs:46-52 (PostExecute: ערך מ-gen_etlvariable או throw); Configuration DTSX:17 (external_unknown)"
+          },
+          {
+            "type": "step",
+            "text": "נפתחת רשומת תהליך ETL (מסגרת).",
+            "tech": "Create ETL Process record DTSX:95 · after Get Variables · Success (DTSX:5115)"
+          },
+          {
+            "type": "write",
+            "text": "קופות שעומדות בתנאי עובדי החברה (קיימת ב-Gen_companyworker שורה שבה gen_customeridnumber = Gen_identitynumber) (השערה: התאמה לפי ת.ז. הלקוח; העמודה ללא קידומת טבלה), ושבבעלות משתמש מערכת אחר עם שם דומיין, עוברות למשתמש עובדי החברה. קופות בבעלות צוות, או בבעלות משתמש ללא שם דומיין, אינן מועברות.",
+            "tech": "Update CW Funds DTSX:3487 · Success (DTSX:5116) · Gen_fundmainBase · SQL"
+          },
+          {
+            "type": "write",
+            "text": "קופות שאינן עומדות בתנאי זה (not exists על אותה תת-שאילתה), ושבבעלות משתמש מערכת אחר עם שם דומיין, עוברות למשתמש הקופות הרגילות, באותה הסתייגות.",
+            "tech": "Update Regular Funds DTSX:4633 · Success (DTSX:5117) · Gen_fundmainBase · SQL"
+          },
+          {
+            "type": "write",
+            "text": "רשומות gen_ftcurrentyear מיושרות לבעלים של הקופה.",
+            "tech": "Update Trans DTSX:4926 · Success (DTSX:5118) · Gen_ftcurrentyearBase · SQL"
+          },
+          {
+            "type": "write",
+            "text": "רשומות MF לשנה הנוכחית, לשנה הקודמת ולארכיון מיושרות לבעלים של הקופה, בזו אחר זו.",
+            "tech": "Update MF Current Year DTSX:3967 (Success DTSX:5119) → Update MF Previous Year DTSX:4154 (DTSX:5120) → Update MF Archive DTSX:3780 (DTSX:5121) · SQL"
+          },
+          {
+            "type": "write",
+            "text": "בקשות FT של עובדי החברה עוברות למשתמש עובדי החברה, ושאר הבקשות למשתמש הקופות הרגילות. גם כאן מועברות רק בקשות בבעלות משתמש מערכת עם שם דומיין.",
+            "tech": "Update CW FTRequests DTSX:3195 (Success DTSX:5122) → Update Regular FTRequest DTSX:4341 (DTSX:5123) · Gen_ftrequestBase · SQL"
+          },
+          {
+            "type": "decision",
+            "text": "האם כל שלב הסתיים בהצלחה?",
+            "tech": "כל האילוצים Success, LogicalAnd=true (DTSX:5115-5124)",
+            "branches": [
+              {
+                "label": "כן",
+                "nodes": [
+                  {
+                    "type": "step",
+                    "text": "החבילה ממשיכה לשלב הבא, ובסוף נסגרת רשומת התהליך (מסגרת).",
+                    "tech": "Update Regular FTRequest → End ETL Process record · Success (DTSX:5124)"
+                  }
+                ]
+              },
+              {
+                "label": "לא",
+                "nodes": [
+                  {
+                    "type": "step",
+                    "text": "כל השלבים שאחריו אינם רצים, כי כל המעברים בשרשרת הם Success. דוגמה: משתמש יעד שלא נמצא, כשמקור הנתונים של אותו שלב מחזיר לפחות שורה אחת (ראו ממצא 3). הטיפול בשגיאות ברמת החבילה (OnError) הוא מסגרת ETL ואינו מתואר כאן.",
+                    "tech": "כל האילוצים Success (DTSX:5115-5124). מטפל OnError (DTSX:5127) הוא מסגרת (ignoredAsFramework)."
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "type": "end",
+            "text": "הבעלות על קופות, בקשות FT ורשומות נלוות מתעדכנת בכל ריצה. הסדר מבטיח שהקופות משויכות לפני שהרשומות הנלוות מיושרות אליהן."
+          }
+        ]
+      },
+      "detail_he": [
+        {
+          "h": "מקור ואוכלוסייה",
+          "t": "אין קובץ קלט. האוכלוסייה היא כל gen_fundmain ו-gen_ftrequest שבבעלות SystemUser שיש לו DomainName שאינו NULL. רשומות בבעלות צוות אינן נכללות (INNER JOIN, DTSX:3498-3507). בנוסף: רשומות gen_ftcurrentyear, gen_mfcurrentyear, gen_mfpreviousyear ו-gen_mfarchive המקושרות לקופה."
+        },
+        {
+          "h": "התאמה לרשומות קיימות",
+          "t": "עובד חברה: בבקשות FT, מספר הזהות שבבקשה קיים ב-Gen_companyworker (cw.gen_identitynumber = ft.Gen_identitynumber, מוכח). בקופות, התנאי exists (select Gen_companyworker.Gen_identitynumber from Gen_companyworker where gen_customeridnumber = Gen_identitynumber) (השערה: התאמה לפי ת.ז. הלקוח; העמודה ללא קידומת טבלה; ראו ממצא 5). משתמש יעד = SystemUser.domainname לפי gen_etlvariable."
+        },
+        {
+          "h": "החלטות",
+          "t": "ראו את הרכיבים. הסדר נקבע רק ב-Success constraints, DTSX:5115-5124."
+        },
+        {
+          "h": "כתיבה ל-CRM",
+          "t": "שמונה עדכוני SQL ישירים על טבלאות Base (Unsupported). [CRM] = OLEDB, Data Source=Psql; Initial Catalog=ALTSHULER_MSCRM (DTSX:4-6). זה מסד הנתונים של ה-CRM לפי הראיות הבאות: (1) שם הקטלוג בתבנית <Org>_MSCRM; (2) באותו חיבור נקראות ונכתבות טבלאות CRM (SystemUser, gen_fundmain, Gen_fundmainBase וכו'); (3) רשומת gen_etlprocess שנוצרת דרך ה-SDK (Create ETL Process record ScriptMain.cs:46-54, crmServiceProxy.Create) נקראת בחזרה דרך [CRM] (End ETL Process record\\Lookup DTSX:2235). הסתייגות: קובץ התצורה C:\\Generix\\SSISConfigFile.dtsConfig (DTSX:17) לא סופק וייתכן שהוא דורס את מחרוזת החיבור (blocked_external_dependency)."
+        },
+        {
+          "h": "תוצאה עסקית",
+          "t": "הפרדת בעלות בין רשומות שעומדות בתנאי Gen_companyworker של אותו שלב לשאר הרשומות (השערה: נתוני עובדי החברה מול שאר הרשומות; השערה לגבי המטרה: הגבלת הרשאות צפייה בנתוני עובדים). בקופות, הקישור של התנאי ל-gen_customeridnumber אינו מאומת (ראו ממצא 5)."
+        }
+      ],
+      "decisions": [
+        {
+          "where": "Precedence DTSX:5116-5124",
+          "condition": "Success (כל המעברים)",
+          "meaning_he": "שרשרת סדרתית.",
+          "outcome_he": "כישלון בשלב עוצר את כל השלבים שאחריו."
+        }
+      ],
+      "crmEffects": [
+        {
+          "entity": "gen_fundmain, gen_ftrequest, gen_ftcurrentyear, gen_mfcurrentyear, gen_mfpreviousyear, gen_mfarchive",
+          "verb": "update OwnerId, OwningBusinessUnit, OwnerIdType",
+          "mechanism": "SQL",
+          "when_he": "ראו את הרכיבים. Unsupported."
+        }
+      ],
+      "evidence": [
+        "Precedence DTSX:5115-5124",
+        "Executables DTSX:95, 580, 2306, 3195, 3487, 3780, 3967, 4154, 4341, 4633, 4926, 5134",
+        "[CRM] DTSX:4-6; Configuration DTSX:17"
+      ],
+      "openQuestions_he": [
+        "האם קובץ התצורה C:\\Generix\\SSISConfigFile.dtsConfig דורס את מחרוזת החיבור [CRM] או מאפיינים אחרים שאינם משתנים? הקובץ לא סופק. (המשתנים עצמם נקבעים מחדש מ-gen_etlvariable ב-Set Variables, אחרי טעינת התצורה.)"
+      ]
+    },
+    {
+      "refId": "Package\\Update CW Funds",
+      "title_he": "שיוך קופות לפי תנאי Gen_companyworker למשתמש עובדי החברה",
+      "techName": "Update CW Funds",
+      "short_he": "קופות שמתקיים עבורן התנאי exists (select Gen_companyworker.Gen_identitynumber from Gen_companyworker where gen_customeridnumber = Gen_identitynumber) (השערה: התאמה לפי ת.ז. הלקוח; העמודה ללא קידומת טבלה), ושהבעלים שלהן הוא משתמש מערכת עם שם דומיין שאינו המשתמש \"עובדי החברה\", מועברות לבעלות המשתמש הזה. שם המשתמש מוגדר בטבלת ההגדרות.",
+      "flow_he": [
+        "שליפת gen_fundmain שהבעלים שלה הוא SystemUser עם DomainName != @[User::CompanyEmployeesDomainName] ו-exists ב-Gen_companyworker.",
+        "Set Columns: OwnerIdType = 8; DomainName = (DT_WSTR,50)@[User::CompanyEmployeesDomainName].",
+        "Lookup ב-SystemUser לפי domainname ← OwnerId, OwningBusinessUnit (אם אין התאמה הרכיב נכשל).",
+        "Sort לפי gen_fundmainid ואז UPDATE Gen_fundmainBase SET OwnerId, OwningBusinessUnit, OwnerIdType (SQL ישיר, Unsupported)."
+      ],
+      "short": {
+        "nodes": [
+          {
+            "type": "step",
+            "text": "נבדקות קופות שבבעלות משתמש מערכת."
+          },
+          {
+            "type": "decision",
+            "text": "האם הקופה עומדת בתנאי עובדי החברה (קיימת ב-Gen_companyworker שורה שבה gen_customeridnumber = Gen_identitynumber) (השערה: התאמה לפי ת.ז. הלקוח; העמודה ללא קידומת טבלה), והיא נמצאת כרגע בבעלות משתמש מערכת עם שם דומיין שאינו המשתמש \"עובדי החברה\"?",
+            "branches": [
+              {
+                "label": "כן",
+                "nodes": [
+                  {
+                    "type": "write",
+                    "text": "הבעלות על הקופה ב-CRM מועברת למשתמש \"עובדי החברה\" ולאגף העסקי שלו, בעדכון SQL ישיר."
+                  }
+                ]
+              },
+              {
+                "label": "לא",
+                "nodes": [
+                  {
+                    "type": "step",
+                    "text": "הקופה לא משתנה."
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "type": "end",
+            "text": "קופות שעומדות בתנאי ה-exists על Gen_companyworker (השערה: התאמה לפי ת.ז. הלקוח; העמודה ללא קידומת טבלה), ושבבעלות משתמש מערכת עם שם דומיין שאינו המשתמש \"עובדי החברה\", עוברות לבעלות המשתמש הזה. קופות בבעלות צוות, או בבעלות משתמש ללא שם דומיין (NULL), נשארות עם הבעלים שלהן."
+          }
+        ]
+      },
+      "detailed": {
+        "nodes": [
+          {
+            "type": "step",
+            "text": "נשלפות קופות מ-CRM שהבעלים שלהן הוא משתמש מערכת ושם הדומיין שלו שונה משם המשתמש שהוגדר לעובדי החברה. רשומות בבעלות צוות אינן נכללות, כי החיבור ל-SystemUser הוא INNER JOIN. גם רשומות בבעלות משתמש ללא שם דומיין (NULL) אינן נכללות, כי ההשוואה != אינה מתקיימת עבור NULL.",
+            "tech": "Get CW funds (OLEDBSource, [CRM]) DTSX:3493, SQL DTSX:3498: from gen_fundmain join SystemUser on systemuserid = OwnerId where SystemUser.DomainName != ? · ParameterMapping DTSX:3512: Parameter0 ← User::CompanyEmployeesDomainName ({96B6AFE4-8A58-4D34-B999-BEA05E54AA95}, DTSX:27)"
+          },
+          {
+            "type": "decision",
+            "text": "האם קיימת ב-Gen_companyworker שורה שבה gen_customeridnumber = Gen_identitynumber? (השערה: התאמה לפי ת.ז. הלקוח; העמודה ללא קידומת טבלה). אם ל-Gen_companyworker יש עמודה בשם gen_customeridnumber, תת-השאילתה אינה תלויה בקופה, והתנאי מתקיים לכל הקופות או לאף אחת (ראו ממצא 5).",
+            "tech": "exists (select Gen_companyworker.Gen_identitynumber from Gen_companyworker where gen_customeridnumber = Gen_identitynumber)",
+            "branches": [
+              {
+                "label": "כן (נשלפת)",
+                "nodes": [
+                  {
+                    "type": "step",
+                    "text": "הקופה נכללת באוכלוסייה של שלב זה."
+                  }
+                ]
+              },
+              {
+                "label": "לא",
+                "nodes": [
+                  {
+                    "type": "step",
+                    "text": "הקופה לא מטופלת בשלב זה. היא נבחרת בשלב הקופות הרגילות (not exists על אותה תת-שאילתה) רק אם הבעלים שלה עומד גם בתנאי שם הדומיין של אותו שלב."
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "type": "step",
+            "text": "לכל רשומה נקבעים סוג הבעלים \"משתמש\" ושם הדומיין של המשתמש \"עובדי החברה\", שנלקח ממשתנה שנטען מטבלת ההגדרות gen_etlvariable.",
+            "tech": "Set Columns (DerivedColumn) DTSX:3604: OwnerIdType = 8 (literal; 8 = systemuser לפי ידע פלטפורמה); DomainName = (DT_WSTR,50)@[User::CompanyEmployeesDomainName]. המשתנה נטען ב-Get Variables From SystemConfigurarion\\Set Variables main.cs:46-52 לפי gen_key = 'CompanyEmployeesDomainName' (gen_scope='global' או שם החבילה). ערך ברירת מחדל ב-DTSX: \"FormDB\". הערך בזמן ריצה לא ידוע."
+          },
+          {
+            "type": "decision",
+            "text": "האם קיים ב-CRM משתמש עם שם הדומיין שהוגדר?",
+            "tech": "get user (Lookup, [CRM]) DTSX:3536: SystemUser.domainname = DomainName → OwnerId ← systemuserid, OwningBusinessUnit ← BusinessUnitId · NoMatchBehavior=0, CacheType=1 · Match Output errorRowDisposition=\"FailComponent\" (DTSX:3577); No Match Output לא מחובר",
+            "branches": [
+              {
+                "label": "כן",
+                "nodes": [
+                  {
+                    "type": "step",
+                    "text": "נלקחים מזהה המשתמש והאגף העסקי (Business Unit) שלו."
+                  }
+                ]
+              },
+              {
+                "label": "לא",
+                "nodes": [
+                  {
+                    "type": "step",
+                    "text": "זרימת הנתונים נכשלת, אף רשומה לא מעודכנת, וכל השלבים הבאים בחבילה אינם רצים."
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "type": "step",
+            "text": "הרשומות ממוינות לפי המזהה שלהן ונשלחות לעדכון אחת-אחת.",
+            "tech": "Sort DTSX:3637 (sort key gen_fundmainid, EliminateDuplicates=false)"
+          },
+          {
+            "type": "write",
+            "text": "הבעלים של הקופה, האגף העסקי של הבעלים וסוג הבעלים מתעדכנים ישירות בטבלת ה-CRM.",
+            "tech": "Update owner on fund (OLEDBCommand, [CRM]) DTSX:3712, SQL DTSX:3715: update [Gen_fundmainBase] set [OwnerId]=?, [OwningBusinessUnit]=?, [OwnerIdType]=? where [Gen_fundmainId] = ? · Param_0..3 ← OwnerId, OwningBusinessUnit, OwnerIdType, gen_fundmainid · SQL (Unsupported) · errorRowDisposition=\"FailComponent\" (DTSX:3726)"
+          },
+          {
+            "type": "end",
+            "text": "קופות שעומדות בתנאי ה-exists על Gen_companyworker (השערה: התאמה לפי ת.ז. הלקוח; העמודה ללא קידומת טבלה), ושבבעלות משתמש מערכת עם שם דומיין שאינו המשתמש \"עובדי החברה\", עוברות לבעלות המשתמש הזה. העדכון עוקף את פעולת השיוך (Assign) של ה-CRM."
+          }
+        ]
+      },
+      "detail_he": [
+        {
+          "h": "מקור ואוכלוסייה",
+          "t": "gen_fundmain בבעלות SystemUser שה-DomainName שלו != @[User::CompanyEmployeesDomainName], ו-exists (select Gen_companyworker.Gen_identitynumber from Gen_companyworker where gen_customeridnumber = Gen_identitynumber) (השערה: התאמה לפי ת.ז. הלקוח; העמודה ללא קידומת טבלה)."
+        },
+        {
+          "h": "התאמה לרשומות קיימות",
+          "t": "הרשומות נשלפות מ-CRM ומתעדכנות לפי gen_fundmainid. הקופה נחשבת של עובד חברה לפי התנאי exists (select Gen_companyworker.Gen_identitynumber from Gen_companyworker where gen_customeridnumber = Gen_identitynumber) (השערה: התאמה לפי ת.ז. הלקוח; העמודה ללא קידומת טבלה; ראו ממצא 5). המשתמש היעד מזוהה לפי SystemUser.domainname = הערך שהוגדר ב-gen_etlvariable."
+        },
+        {
+          "h": "החלטות",
+          "t": "רק רשומות שהבעלים שלהן אינו כבר המשתמש היעד. רק קופות שעומדות בתנאי ה-exists על Gen_companyworker (השערה: התאמה לפי ת.ז. הלקוח; העמודה ללא קידומת טבלה). אם המשתמש היעד לא נמצא, הרכיב נכשל."
+        },
+        {
+          "h": "כתיבה ל-CRM",
+          "t": "UPDATE Gen_fundmainBase SET OwnerId, OwningBusinessUnit, OwnerIdType=8 WHERE Gen_fundmainId, עדכון SQL ישיר (Unsupported)."
+        },
+        {
+          "h": "תוצאה עסקית",
+          "t": "בעלות אחידה על הקופות שעומדות בתנאי Gen_companyworker (השערה: קופות של עובדי החברה, לפי ת.ז. הלקוח; העמודה ללא קידומת טבלה): קופות בבעלות משתמש מערכת עם שם דומיין עוברות למשתמש ייעודי (השערה: לצורך הגבלת הרשאות צפייה). קופות בבעלות צוות, או בבעלות משתמש ללא שם דומיין, אינן משתנות."
+        }
+      ],
+      "decisions": [
+        {
+          "where": "Get CW funds (SQL DTSX:3498)",
+          "condition": "SystemUser.DomainName != ?  (? = User::CompanyEmployeesDomainName)",
+          "meaning_he": "הבעלים הנוכחי הוא משתמש מערכת עם שם דומיין שאינו המשתמש היעד. משתמש ללא שם דומיין (NULL) אינו עומד בתנאי.",
+          "outcome_he": "רק רשומות כאלה מעודכנות."
+        },
+        {
+          "where": "Get CW funds (SQL DTSX:3498)",
+          "condition": "exists (select Gen_companyworker.Gen_identitynumber from Gen_companyworker where gen_customeridnumber = Gen_identitynumber)",
+          "meaning_he": "קיימת ב-Gen_companyworker שורה שבה gen_customeridnumber = Gen_identitynumber (השערה: התאמה לפי ת.ז. הלקוח; העמודה ללא קידומת טבלה).",
+          "outcome_he": "קובע אם הרשומה שייכת לאוכלוסיית השלב."
+        },
+        {
+          "where": "get user (DTSX:3536)",
+          "condition": "NoMatchBehavior=0; Match Output errorRowDisposition=FailComponent",
+          "meaning_he": "המשתמש היעד חייב להתקיים ב-SystemUser.",
+          "outcome_he": "אם אין התאמה, זרימת הנתונים נכשלת והחבילה נעצרת."
+        }
+      ],
+      "crmEffects": [
+        {
+          "entity": "gen_fundmain (Gen_fundmainBase)",
+          "verb": "update OwnerId, OwningBusinessUnit, OwnerIdType=8",
+          "mechanism": "SQL",
+          "when_he": "gen_fundmain שעומדת בתנאי ה-exists על Gen_companyworker (השערה: התאמה לפי ת.ז. הלקוח; העמודה ללא קידומת טבלה), ושהבעלים שלה הוא משתמש מערכת עם שם דומיין שאינו המשתמש היעד. Unsupported."
+        },
+        {
+          "entity": "gen_fundmain, SystemUser, Gen_companyworker",
+          "verb": "read",
+          "mechanism": "SQL (SELECT / Lookup)",
+          "when_he": "בתחילת זרימת הנתונים"
+        }
+      ],
+      "evidence": [
+        "0022_Company Workers.dtsx sha F838665D… · Data Flow Update CW Funds DTSX:3487",
+        "Get CW funds DTSX:3493, SqlCommand DTSX:3498, ParameterMapping DTSX:3512 → variable DTSX:27",
+        "Set Columns DTSX:3604; get user DTSX:3536 (disposition DTSX:3577); Sort DTSX:3637",
+        "Update owner on fund DTSX:3712, SqlCommand DTSX:3715, disposition DTSX:3726",
+        "[CRM] DTSX:4-6; Set Variables main.cs:46-52 (Get Variables From SystemConfigurarion)"
+      ],
+      "openQuestions_he": [
+        "מה הערך של CompanyEmployeesDomainName ב-gen_etlvariable בסביבת הייצור? (ב-DTSX: \"FormDB\")",
+        "בתת-השאילתה gen_customeridnumber ו-Gen_identitynumber אינם מסויגים. אם ל-Gen_companyworker יש עמודה בשם gen_customeridnumber, היא תיקשר לטבלה הפנימית ולא ל-gen_fundmain. לא ניתן לאמת זאת מהחבילה."
+      ]
+    },
+    {
+      "refId": "Package\\Update Regular Funds",
+      "title_he": "שיוך קופות שאינן עומדות בתנאי Gen_companyworker למשתמש הקופות הרגילות",
+      "techName": "Update Regular Funds",
+      "short_he": "קופות שמתקיים עבורן התנאי not exists (select Gen_companyworker.Gen_identitynumber from Gen_companyworker where gen_customeridnumber = Gen_identitynumber) (השערה: התאמה לפי ת.ז. הלקוח; העמודה ללא קידומת טבלה), ושהבעלים שלהן הוא משתמש מערכת עם שם דומיין שאינו המשתמש \"הקופות הרגילות\", מועברות לבעלות המשתמש הזה. שם המשתמש מוגדר בטבלת ההגדרות.",
+      "flow_he": [
+        "שליפת gen_fundmain שהבעלים שלה הוא SystemUser עם DomainName != @[User::RegularFundsDomainName] ו-not exists ב-Gen_companyworker.",
+        "Set Columns: OwnerIdType = 8; DomainName = (DT_WSTR,50)@[User::RegularFundsDomainName].",
+        "Lookup ב-SystemUser לפי domainname ← OwnerId, OwningBusinessUnit (אם אין התאמה הרכיב נכשל).",
+        "Sort לפי gen_fundmainid ואז UPDATE Gen_fundmainBase SET OwnerId, OwningBusinessUnit, OwnerIdType (SQL ישיר, Unsupported)."
+      ],
+      "short": {
+        "nodes": [
+          {
+            "type": "step",
+            "text": "נבדקות קופות שבבעלות משתמש מערכת."
+          },
+          {
+            "type": "decision",
+            "text": "האם הקופה אינה עומדת בתנאי עובדי החברה (אין ב-Gen_companyworker שורה שבה gen_customeridnumber = Gen_identitynumber) (השערה: התאמה לפי ת.ז. הלקוח; העמודה ללא קידומת טבלה), והיא נמצאת כרגע בבעלות משתמש מערכת עם שם דומיין שאינו המשתמש \"הקופות הרגילות\"?",
+            "branches": [
+              {
+                "label": "כן",
+                "nodes": [
+                  {
+                    "type": "write",
+                    "text": "הבעלות על הקופה ב-CRM מועברת למשתמש \"הקופות הרגילות\" ולאגף העסקי שלו, בעדכון SQL ישיר."
+                  }
+                ]
+              },
+              {
+                "label": "לא",
+                "nodes": [
+                  {
+                    "type": "step",
+                    "text": "הקופה לא משתנה."
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "type": "end",
+            "text": "קופות שאינן עומדות בתנאי ה-exists על Gen_companyworker (השערה: התאמה לפי ת.ז. הלקוח; העמודה ללא קידומת טבלה), ושבבעלות משתמש מערכת עם שם דומיין שאינו המשתמש \"הקופות הרגילות\", עוברות לבעלות המשתמש הזה. קופות בבעלות צוות, או בבעלות משתמש ללא שם דומיין (NULL), נשארות עם הבעלים שלהן."
+          }
+        ]
+      },
+      "detailed": {
+        "nodes": [
+          {
+            "type": "step",
+            "text": "נשלפות קופות מ-CRM שהבעלים שלהן הוא משתמש מערכת ושם הדומיין שלו שונה משם המשתמש שהוגדר לקופות הרגילות. רשומות בבעלות צוות אינן נכללות, כי החיבור ל-SystemUser הוא INNER JOIN. גם רשומות בבעלות משתמש ללא שם דומיין (NULL) אינן נכללות, כי ההשוואה != אינה מתקיימת עבור NULL.",
+            "tech": "Get regular  funds (OLEDBSource, [CRM]) DTSX:4639, SQL DTSX:4644: from gen_fundmain join SystemUser on systemuserid = OwnerId where SystemUser.DomainName != ? · ParameterMapping DTSX:4658: Parameter0 ← User::RegularFundsDomainName ({781FC0E7-A295-46B9-89EF-177DD30285EE}, DTSX:45)"
+          },
+          {
+            "type": "decision",
+            "text": "האם קיימת ב-Gen_companyworker שורה שבה gen_customeridnumber = Gen_identitynumber? (השערה: התאמה לפי ת.ז. הלקוח; העמודה ללא קידומת טבלה). אם ל-Gen_companyworker יש עמודה בשם gen_customeridnumber, תת-השאילתה אינה תלויה בקופה, והתנאי מתקיים לכל הקופות או לאף אחת (ראו ממצא 5). אם הקישור הוא ל-gen_fundmain.gen_customeridnumber (השערה), קופה שבה ערך זה ריק (NULL) אינה מוצאת שורה, ולכן נבחרת בשלב זה.",
+            "tech": "not exists (select Gen_companyworker.Gen_identitynumber from Gen_companyworker where gen_customeridnumber = Gen_identitynumber)",
+            "branches": [
+              {
+                "label": "לא (נשלפת)",
+                "nodes": [
+                  {
+                    "type": "step",
+                    "text": "הקופה נכללת באוכלוסייה של שלב זה."
+                  }
+                ]
+              },
+              {
+                "label": "כן",
+                "nodes": [
+                  {
+                    "type": "step",
+                    "text": "הקופה לא מטופלת בשלב זה. היא נבחרת בשלב עובדי החברה (exists על אותה תת-שאילתה) רק אם הבעלים שלה עומד גם בתנאי שם הדומיין של אותו שלב."
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "type": "step",
+            "text": "לכל רשומה נקבעים סוג הבעלים \"משתמש\" ושם הדומיין של המשתמש \"הקופות הרגילות\", שנלקח ממשתנה שנטען מטבלת ההגדרות gen_etlvariable.",
+            "tech": "Set Columns (DerivedColumn) DTSX:4750: OwnerIdType = 8 (literal; 8 = systemuser לפי ידע פלטפורמה); DomainName = (DT_WSTR,50)@[User::RegularFundsDomainName]. המשתנה נטען ב-Get Variables From SystemConfigurarion\\Set Variables main.cs:46-52 לפי gen_key = 'RegularFundsDomainName' (gen_scope='global' או שם החבילה). ערך ברירת מחדל ב-DTSX: \"FromDB\". הערך בזמן ריצה לא ידוע."
+          },
+          {
+            "type": "decision",
+            "text": "האם קיים ב-CRM משתמש עם שם הדומיין שהוגדר?",
+            "tech": "Get User (Lookup, [CRM]) DTSX:4682: SystemUser.domainname = DomainName → OwnerId ← systemuserid, OwningBusinessUnit ← BusinessUnitId · NoMatchBehavior=0, CacheType=1 · Match Output errorRowDisposition=\"FailComponent\" (DTSX:4723); No Match Output לא מחובר",
+            "branches": [
+              {
+                "label": "כן",
+                "nodes": [
+                  {
+                    "type": "step",
+                    "text": "נלקחים מזהה המשתמש והאגף העסקי (Business Unit) שלו."
+                  }
+                ]
+              },
+              {
+                "label": "לא",
+                "nodes": [
+                  {
+                    "type": "step",
+                    "text": "זרימת הנתונים נכשלת, אף רשומה לא מעודכנת, וכל השלבים הבאים בחבילה אינם רצים."
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "type": "step",
+            "text": "הרשומות ממוינות לפי המזהה שלהן ונשלחות לעדכון אחת-אחת.",
+            "tech": "Sort DTSX:4783 (sort key gen_fundmainid, EliminateDuplicates=false)"
+          },
+          {
+            "type": "write",
+            "text": "הבעלים של הקופה, האגף העסקי של הבעלים וסוג הבעלים מתעדכנים ישירות בטבלת ה-CRM.",
+            "tech": "Update owner on fund (OLEDBCommand, [CRM]) DTSX:4858, SQL DTSX:4861: update [Gen_fundmainBase] set [OwnerId]=?, [OwningBusinessUnit]=?, [OwnerIdType]=? where [Gen_fundmainId] = ? · Param_0..3 ← OwnerId, OwningBusinessUnit, OwnerIdType, gen_fundmainid · SQL (Unsupported) · errorRowDisposition=\"FailComponent\" (DTSX:4872)"
+          },
+          {
+            "type": "end",
+            "text": "קופות שאינן עומדות בתנאי ה-exists על Gen_companyworker (השערה: התאמה לפי ת.ז. הלקוח; העמודה ללא קידומת טבלה), ושבבעלות משתמש מערכת עם שם דומיין שאינו המשתמש \"הקופות הרגילות\", עוברות לבעלות המשתמש הזה. העדכון עוקף את פעולת השיוך (Assign) של ה-CRM."
+          }
+        ]
+      },
+      "detail_he": [
+        {
+          "h": "מקור ואוכלוסייה",
+          "t": "gen_fundmain בבעלות SystemUser שה-DomainName שלו != @[User::RegularFundsDomainName], ו-not exists (select Gen_companyworker.Gen_identitynumber from Gen_companyworker where gen_customeridnumber = Gen_identitynumber) (השערה: התאמה לפי ת.ז. הלקוח; העמודה ללא קידומת טבלה)."
+        },
+        {
+          "h": "התאמה לרשומות קיימות",
+          "t": "הרשומות נשלפות מ-CRM ומתעדכנות לפי gen_fundmainid. הקופה נחשבת שאינה של עובד חברה לפי התנאי not exists (select Gen_companyworker.Gen_identitynumber from Gen_companyworker where gen_customeridnumber = Gen_identitynumber) (השערה: התאמה לפי ת.ז. הלקוח; העמודה ללא קידומת טבלה; ראו ממצא 5). המשתמש היעד מזוהה לפי SystemUser.domainname = הערך שהוגדר ב-gen_etlvariable."
+        },
+        {
+          "h": "החלטות",
+          "t": "רק רשומות שהבעלים שלהן אינו כבר המשתמש היעד. רק קופות שאינן עומדות בתנאי ה-exists על Gen_companyworker (השערה: התאמה לפי ת.ז. הלקוח; העמודה ללא קידומת טבלה). אם המשתמש היעד לא נמצא, הרכיב נכשל."
+        },
+        {
+          "h": "כתיבה ל-CRM",
+          "t": "UPDATE Gen_fundmainBase SET OwnerId, OwningBusinessUnit, OwnerIdType=8 WHERE Gen_fundmainId, עדכון SQL ישיר (Unsupported)."
+        },
+        {
+          "h": "תוצאה עסקית",
+          "t": "קופות שאינן עומדות בתנאי Gen_companyworker (השערה: קופות של לקוחות שאינם עובדי חברה, לפי ת.ז. הלקוח; העמודה ללא קידומת טבלה), בבעלות משתמש מערכת ששם הדומיין שלו אינו NULL ושונה משם היעד, עוברות בכל ריצה למשתמש \"קופות רגילות\" אחד. אם הקישור הוא ל-gen_fundmain.gen_customeridnumber (השערה), גם קופה שבה ערך זה ריק (NULL) עומדת בתנאי not exists ומועברת. קופות בבעלות צוות, או בבעלות משתמש ללא שם דומיין, אינן משתנות."
+        }
+      ],
+      "decisions": [
+        {
+          "where": "Get regular  funds (SQL DTSX:4644)",
+          "condition": "SystemUser.DomainName != ?  (? = User::RegularFundsDomainName)",
+          "meaning_he": "הבעלים הנוכחי הוא משתמש מערכת עם שם דומיין שאינו המשתמש היעד. משתמש ללא שם דומיין (NULL) אינו עומד בתנאי.",
+          "outcome_he": "רק רשומות כאלה מעודכנות."
+        },
+        {
+          "where": "Get regular  funds (SQL DTSX:4644)",
+          "condition": "not exists (select Gen_companyworker.Gen_identitynumber from Gen_companyworker where gen_customeridnumber = Gen_identitynumber)",
+          "meaning_he": "אין ב-Gen_companyworker שורה שבה gen_customeridnumber = Gen_identitynumber (השערה: התאמה לפי ת.ז. הלקוח; העמודה ללא קידומת טבלה).",
+          "outcome_he": "קובע אם הרשומה שייכת לאוכלוסיית השלב."
+        },
+        {
+          "where": "Get User (DTSX:4682)",
+          "condition": "NoMatchBehavior=0; Match Output errorRowDisposition=FailComponent",
+          "meaning_he": "המשתמש היעד חייב להתקיים ב-SystemUser.",
+          "outcome_he": "אם אין התאמה, זרימת הנתונים נכשלת והחבילה נעצרת."
+        }
+      ],
+      "crmEffects": [
+        {
+          "entity": "gen_fundmain (Gen_fundmainBase)",
+          "verb": "update OwnerId, OwningBusinessUnit, OwnerIdType=8",
+          "mechanism": "SQL",
+          "when_he": "gen_fundmain שאינה עומדת בתנאי ה-exists על Gen_companyworker (השערה: התאמה לפי ת.ז. הלקוח; העמודה ללא קידומת טבלה), ושהבעלים שלה הוא משתמש מערכת עם שם דומיין שאינו המשתמש היעד. Unsupported."
+        },
+        {
+          "entity": "gen_fundmain, SystemUser, Gen_companyworker",
+          "verb": "read",
+          "mechanism": "SQL (SELECT / Lookup)",
+          "when_he": "בתחילת זרימת הנתונים"
+        }
+      ],
+      "evidence": [
+        "0022_Company Workers.dtsx sha F838665D… · Data Flow Update Regular Funds DTSX:4633",
+        "Get regular  funds DTSX:4639, SqlCommand DTSX:4644, ParameterMapping DTSX:4658 → variable DTSX:45",
+        "Set Columns DTSX:4750; Get User DTSX:4682 (disposition DTSX:4723); Sort DTSX:4783",
+        "Update owner on fund DTSX:4858, SqlCommand DTSX:4861, disposition DTSX:4872",
+        "[CRM] DTSX:4-6; Set Variables main.cs:46-52 (Get Variables From SystemConfigurarion)"
+      ],
+      "openQuestions_he": [
+        "מה הערך של RegularFundsDomainName ב-gen_etlvariable בסביבת הייצור? (ב-DTSX: \"FromDB\")",
+        "האם זה מכוון שכל קופה שאינה עומדת בתנאי Gen_companyworker, ובבעלות משתמש מערכת ששם הדומיין שלו אינו NULL ושונה מהיעד, מועברת בכל ריצה למשתמש אחד (\"קופות רגילות\")?",
+        "אותה שאלת קישור של gen_customeridnumber הלא מסויג כמו ב-Update CW Funds."
+      ]
+    },
+    {
+      "refId": "Package\\Update Trans",
+      "title_he": "יישור בעלות רשומות gen_ftcurrentyear לבעלות הקופה",
+      "techName": "Update Trans",
+      "short_he": "ברשומות FT לשנה הנוכחית שהבעלים שלהן שונה מהבעלים של הקופה המקושרת, הבעלים מיושר לבעלים של הקופה.",
+      "flow_he": [
+        "שליפת Gen_ftCurrentYear join gen_fundmain לפי ft.gen_fundnumber, where f.OwnerId != ft.OwnerId.",
+        "Sort לפי Gen_ftCurrentYearId ואז UPDATE Gen_ftcurrentyearBase SET OwnerId, OwningBusinessUnit, OwnerIdType מהקופה (SQL ישיר, Unsupported)."
+      ],
+      "short": {
+        "nodes": [
+          {
+            "type": "step",
+            "text": "לכל רשומת FT לשנה הנוכחית מאתרים את הקופה שהיא שייכת אליה."
+          },
+          {
+            "type": "decision",
+            "text": "האם הבעלים של הרשומה שונה מהבעלים של הקופה?",
+            "branches": [
+              {
+                "label": "כן",
+                "nodes": [
+                  {
+                    "type": "write",
+                    "text": "הבעלים, האגף העסקי וסוג הבעלים של הרשומה מועתקים מהקופה, בעדכון SQL ישיר."
+                  }
+                ]
+              },
+              {
+                "label": "לא",
+                "nodes": [
+                  {
+                    "type": "step",
+                    "text": "הרשומה לא משתנה."
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "type": "end",
+            "text": "רשומות FT לשנה הנוכחית נמצאות באותה בעלות כמו הקופה שלהן."
+          }
+        ]
+      },
+      "detailed": {
+        "nodes": [
+          {
+            "type": "step",
+            "text": "נשלפות רשומות gen_ftcurrentyear שמקושרות לקופה. רשומה בלי קופה מקושרת אינה נכללת, כי החיבור הוא INNER JOIN.",
+            "tech": "Get ft (OLEDBSource, [CRM]) DTSX:4932, SQL DTSX:4937: from Gen_ftCurrentYear ft join gen_fundmain f on gen_fundmainid = ft.gen_fundnumber"
+          },
+          {
+            "type": "decision",
+            "text": "האם הבעלים של הרשומה שונה מהבעלים של הקופה?",
+            "tech": "where f.OwnerId != ft.OwnerId",
+            "branches": [
+              {
+                "label": "כן",
+                "nodes": [
+                  {
+                    "type": "step",
+                    "text": "נלקחים מהקופה הבעלים, האגף העסקי של הבעלים וסוג הבעלים.",
+                    "tech": "f.OwnerId, f.OwningBusinessUnit, f.OwnerIdType"
+                  }
+                ]
+              },
+              {
+                "label": "לא",
+                "nodes": [
+                  {
+                    "type": "step",
+                    "text": "הרשומה אינה נשלפת ואינה מעודכנת."
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "type": "step",
+            "text": "הרשומות ממוינות לפי המזהה שלהן ונשלחות לעדכון אחת-אחת.",
+            "tech": "Sort DTSX:4982 (sort key Gen_ftCurrentYearId, EliminateDuplicates=false)"
+          },
+          {
+            "type": "write",
+            "text": "הבעלים של רשומת gen_ftcurrentyear מתעדכן ישירות בטבלת ה-CRM לבעלים של הקופה.",
+            "tech": "Update owner on FT (OLEDBCommand, [CRM]) DTSX:5046, SQL DTSX:5049: update [Gen_ftcurrentyearBase] set [OwnerId]=?, [OwningBusinessUnit]=?, [OwnerIdType]=? where [Gen_ftcurrentyearId] = ? · Param_0..3 ← OwnerId, OwningBusinessUnit, OwnerIdType, Gen_ftCurrentYearId · SQL (Unsupported) · errorRowDisposition=\"FailComponent\" (DTSX:5061)"
+          },
+          {
+            "type": "step",
+            "text": "אם עדכון נכשל, זרימת הנתונים נכשלת והשלבים הבאים אינם רצים.",
+            "tech": "Update Trans → Update MF Current Year · Success (DTSX:5119)"
+          },
+          {
+            "type": "end",
+            "text": "הבעלות על רשומות gen_ftcurrentyear עוקבת אחרי הבעלות על הקופה. השלב רץ אחרי שיוך הקופות לעובדי חברה ולקופות רגילות."
+          }
+        ]
+      },
+      "detail_he": [
+        {
+          "h": "מקור ואוכלוסייה",
+          "t": "Gen_ftCurrentYear שמקושרת ל-gen_fundmain (ft.gen_fundnumber), כשהבעלים שלה שונה מהבעלים של הקופה. בחבילה 0008 רשומות Gen_ftCurrentYear נוצרות (insert ftCurrentYearBase 1-5) רק משורות של פלט הפיצול בשם 'תנועות והחזר דמי ניהול' (gen_TranstypeId != \"58\" && Transfer_Type_2 == \"2\")."
+        },
+        {
+          "h": "התאמה לרשומות קיימות",
+          "t": "קישור ft.gen_fundnumber = gen_fundmainid. העדכון לפי Gen_ftCurrentYearId."
+        },
+        {
+          "h": "החלטות",
+          "t": "where f.OwnerId != ft.OwnerId"
+        },
+        {
+          "h": "כתיבה ל-CRM",
+          "t": "UPDATE Gen_ftcurrentyearBase SET OwnerId, OwningBusinessUnit, OwnerIdType (ערכים מהקופה), עדכון SQL ישיר (Unsupported)."
+        },
+        {
+          "h": "תוצאה עסקית",
+          "t": "רשומות gen_ftcurrentyear באותה בעלות כמו הקופה שלהן."
+        }
+      ],
+      "decisions": [
+        {
+          "where": "Get ft (SQL DTSX:4937)",
+          "condition": "f.OwnerId != ft.OwnerId",
+          "meaning_he": "הבעלים של הרשומה שונה מהבעלים של הקופה.",
+          "outcome_he": "הבעלות מועתקת מהקופה."
+        }
+      ],
+      "crmEffects": [
+        {
+          "entity": "Gen_ftCurrentYear (Gen_ftcurrentyearBase)",
+          "verb": "update OwnerId, OwningBusinessUnit, OwnerIdType (מ-gen_fundmain)",
+          "mechanism": "SQL",
+          "when_he": "כשהבעלים שונה מהבעלים של הקופה המקושרת. Unsupported."
+        },
+        {
+          "entity": "Gen_ftCurrentYear, gen_fundmain",
+          "verb": "read",
+          "mechanism": "SQL (SELECT)",
+          "when_he": "בתחילת זרימת הנתונים"
+        }
+      ],
+      "evidence": [
+        "0022_Company Workers.dtsx sha F838665D… · Data Flow Update Trans DTSX:4926",
+        "Get ft DTSX:4932, SqlCommand DTSX:4937; Sort DTSX:4982",
+        "Update owner on FT DTSX:5046, SqlCommand DTSX:5049, disposition DTSX:5061",
+        "ParameterMapping DTSX:4949 מפנה ל-{8C07AFF0-B44D-4A94-BBCF-C5ECCAC23605}. אין משתנה עם המזהה הזה בחבילה, וב-SQL אין \"?\". לא ידוע אם זה מכשיל את ולידציית החבילה (אין DelayValidation) או שאין לכך השפעה. סיכון פתוח, ראו findings_he[5]"
+      ],
+      "openQuestions_he": [
+        "האם ה-ParameterMapping (DTSX:4949) למשתנה {8C07AFF0-…}, שאינו קיים בחבילה, מכשיל את הוולידציה? אם כן, לפי התנהגות SSIS הרגילה (אין DelayValidation) החבילה כולה נכשלת לפני כל שלב. אם לא, השלב רץ כרגיל. ה-DTSX לא מכריע."
+      ]
+    },
+    {
+      "refId": "Package\\Update MF Current Year",
+      "title_he": "יישור בעלות רשומות MF לשנה הנוכחית לבעלות הקופה",
+      "techName": "Update MF Current Year",
+      "short_he": "ברשומות MF לשנה הנוכחית שהבעלים שלהן שונה מהבעלים של הקופה המקושרת, הבעלים מיושר לבעלים של הקופה.",
+      "flow_he": [
+        "שליפת Gen_mfCurrentYear join gen_fundmain לפי mf.gen_fundnumber, where f.OwnerId != mf.OwnerId.",
+        "Sort לפי Gen_mfCurrentYearId ואז UPDATE Gen_mfcurrentyearBase SET OwnerId, OwningBusinessUnit, OwnerIdType מהקופה (SQL ישיר, Unsupported)."
+      ],
+      "short": {
+        "nodes": [
+          {
+            "type": "step",
+            "text": "לכל רשומת MF לשנה הנוכחית מאתרים את הקופה שהיא שייכת אליה."
+          },
+          {
+            "type": "decision",
+            "text": "האם הבעלים של הרשומה שונה מהבעלים של הקופה?",
+            "branches": [
+              {
+                "label": "כן",
+                "nodes": [
+                  {
+                    "type": "write",
+                    "text": "הבעלים, האגף העסקי וסוג הבעלים של הרשומה מועתקים מהקופה, בעדכון SQL ישיר."
+                  }
+                ]
+              },
+              {
+                "label": "לא",
+                "nodes": [
+                  {
+                    "type": "step",
+                    "text": "הרשומה לא משתנה."
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "type": "end",
+            "text": "רשומות MF לשנה הנוכחית נמצאות באותה בעלות כמו הקופה שלהן."
+          }
+        ]
+      },
+      "detailed": {
+        "nodes": [
+          {
+            "type": "step",
+            "text": "נשלפות רשומות MF לשנה הנוכחית שמקושרות לקופה. רשומה בלי קופה מקושרת אינה נכללת, כי החיבור הוא INNER JOIN.",
+            "tech": "Get MF (OLEDBSource, [CRM]) DTSX:3973, SQL DTSX:3978: from Gen_mfCurrentYear mf join gen_fundmain f on gen_fundmainid = mf.gen_fundnumber"
+          },
+          {
+            "type": "decision",
+            "text": "האם הבעלים של הרשומה שונה מהבעלים של הקופה?",
+            "tech": "where f.OwnerId != mf.OwnerId",
+            "branches": [
+              {
+                "label": "כן",
+                "nodes": [
+                  {
+                    "type": "step",
+                    "text": "נלקחים מהקופה הבעלים, האגף העסקי של הבעלים וסוג הבעלים.",
+                    "tech": "f.OwnerId, f.OwningBusinessUnit, f.OwnerIdType"
+                  }
+                ]
+              },
+              {
+                "label": "לא",
+                "nodes": [
+                  {
+                    "type": "step",
+                    "text": "הרשומה אינה נשלפת ואינה מעודכנת."
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "type": "step",
+            "text": "הרשומות ממוינות לפי המזהה שלהן ונשלחות לעדכון אחת-אחת.",
+            "tech": "Sort DTSX:4023 (sort key Gen_mfCurrentYearId, EliminateDuplicates=false)"
+          },
+          {
+            "type": "write",
+            "text": "הבעלים של רשומת MF לשנה הנוכחית מתעדכן ישירות בטבלת ה-CRM לבעלים של הקופה.",
+            "tech": "Update owner on MF (OLEDBCommand, [CRM]) DTSX:4087, SQL DTSX:4090: update [Gen_mfcurrentyearBase] set [OwnerId]=?, [OwningBusinessUnit]=?, [OwnerIdType]=? where [Gen_mfcurrentyearId] = ? · Param_0..3 ← OwnerId, OwningBusinessUnit, OwnerIdType, Gen_mfCurrentYearId · SQL (Unsupported) · errorRowDisposition=\"FailComponent\" (DTSX:4102)"
+          },
+          {
+            "type": "step",
+            "text": "אם עדכון נכשל, זרימת הנתונים נכשלת והשלבים הבאים אינם רצים.",
+            "tech": "Update MF Current Year → Update MF Previous Year · Success (DTSX:5120)"
+          },
+          {
+            "type": "end",
+            "text": "הבעלות על רשומות MF לשנה הנוכחית עוקבת אחרי הבעלות על הקופה. השלב רץ אחרי שיוך הקופות לעובדי חברה ולקופות רגילות."
+          }
+        ]
+      },
+      "detail_he": [
+        {
+          "h": "מקור ואוכלוסייה",
+          "t": "Gen_mfCurrentYear שמקושרת ל-gen_fundmain (mf.gen_fundnumber), כשהבעלים שלה שונה מהבעלים של הקופה."
+        },
+        {
+          "h": "התאמה לרשומות קיימות",
+          "t": "קישור mf.gen_fundnumber = gen_fundmainid. העדכון לפי Gen_mfCurrentYearId."
+        },
+        {
+          "h": "החלטות",
+          "t": "where f.OwnerId != mf.OwnerId"
+        },
+        {
+          "h": "כתיבה ל-CRM",
+          "t": "UPDATE Gen_mfcurrentyearBase SET OwnerId, OwningBusinessUnit, OwnerIdType (ערכים מהקופה), עדכון SQL ישיר (Unsupported)."
+        },
+        {
+          "h": "תוצאה עסקית",
+          "t": "רשומות MF לשנה הנוכחית באותה בעלות כמו הקופה שלהן."
+        }
+      ],
+      "decisions": [
+        {
+          "where": "Get MF (SQL DTSX:3978)",
+          "condition": "f.OwnerId != mf.OwnerId",
+          "meaning_he": "הבעלים של הרשומה שונה מהבעלים של הקופה.",
+          "outcome_he": "הבעלות מועתקת מהקופה."
+        }
+      ],
+      "crmEffects": [
+        {
+          "entity": "Gen_mfCurrentYear (Gen_mfcurrentyearBase)",
+          "verb": "update OwnerId, OwningBusinessUnit, OwnerIdType (מ-gen_fundmain)",
+          "mechanism": "SQL",
+          "when_he": "כשהבעלים שונה מהבעלים של הקופה המקושרת. Unsupported."
+        },
+        {
+          "entity": "Gen_mfCurrentYear, gen_fundmain",
+          "verb": "read",
+          "mechanism": "SQL (SELECT)",
+          "when_he": "בתחילת זרימת הנתונים"
+        }
+      ],
+      "evidence": [
+        "0022_Company Workers.dtsx sha F838665D… · Data Flow Update MF Current Year DTSX:3967",
+        "Get MF DTSX:3973, SqlCommand DTSX:3978; Sort DTSX:4023",
+        "Update owner on MF DTSX:4087, SqlCommand DTSX:4090, disposition DTSX:4102",
+        "ParameterMapping DTSX:3990 מפנה ל-{8C07AFF0-B44D-4A94-BBCF-C5ECCAC23605}. אין משתנה עם המזהה הזה בחבילה, וב-SQL אין \"?\". לא ידוע אם זה מכשיל את ולידציית החבילה (אין DelayValidation) או שאין לכך השפעה. סיכון פתוח, ראו findings_he[5]"
+      ],
+      "openQuestions_he": [
+        "מה המשמעות העסקית של Gen_mfCurrentYear? MF כנראה דמי ניהול (השערה).",
+        "האם ה-ParameterMapping (DTSX:3990) למשתנה {8C07AFF0-…}, שאינו קיים בחבילה, מכשיל את הוולידציה? אם כן, לפי התנהגות SSIS הרגילה (אין DelayValidation) החבילה כולה נכשלת לפני כל שלב. אם לא, השלב רץ כרגיל. ה-DTSX לא מכריע."
+      ]
+    },
+    {
+      "refId": "Package\\Update MF Previous Year",
+      "title_he": "יישור בעלות רשומות MF לשנה הקודמת לבעלות הקופה",
+      "techName": "Update MF Previous Year",
+      "short_he": "ברשומות MF לשנה הקודמת שהבעלים שלהן שונה מהבעלים של הקופה המקושרת, הבעלים מיושר לבעלים של הקופה.",
+      "flow_he": [
+        "שליפת Gen_mfPreviousYear join gen_fundmain לפי mf.gen_fundnumber, where f.OwnerId != mf.OwnerId.",
+        "Sort לפי Gen_mfPreviousYearId ואז UPDATE Gen_mfPreviousYearBase SET OwnerId, OwningBusinessUnit, OwnerIdType מהקופה (SQL ישיר, Unsupported)."
+      ],
+      "short": {
+        "nodes": [
+          {
+            "type": "step",
+            "text": "לכל רשומת MF לשנה הקודמת מאתרים את הקופה שהיא שייכת אליה."
+          },
+          {
+            "type": "decision",
+            "text": "האם הבעלים של הרשומה שונה מהבעלים של הקופה?",
+            "branches": [
+              {
+                "label": "כן",
+                "nodes": [
+                  {
+                    "type": "write",
+                    "text": "הבעלים, האגף העסקי וסוג הבעלים של הרשומה מועתקים מהקופה, בעדכון SQL ישיר."
+                  }
+                ]
+              },
+              {
+                "label": "לא",
+                "nodes": [
+                  {
+                    "type": "step",
+                    "text": "הרשומה לא משתנה."
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "type": "end",
+            "text": "רשומות MF לשנה הקודמת נמצאות באותה בעלות כמו הקופה שלהן."
+          }
+        ]
+      },
+      "detailed": {
+        "nodes": [
+          {
+            "type": "step",
+            "text": "נשלפות רשומות MF לשנה הקודמת שמקושרות לקופה. רשומה בלי קופה מקושרת אינה נכללת, כי החיבור הוא INNER JOIN.",
+            "tech": "Get MF (OLEDBSource, [CRM]) DTSX:4160, SQL DTSX:4165: from Gen_mfPreviousYear mf join gen_fundmain f on gen_fundmainid = mf.gen_fundnumber"
+          },
+          {
+            "type": "decision",
+            "text": "האם הבעלים של הרשומה שונה מהבעלים של הקופה?",
+            "tech": "where f.OwnerId != mf.OwnerId",
+            "branches": [
+              {
+                "label": "כן",
+                "nodes": [
+                  {
+                    "type": "step",
+                    "text": "נלקחים מהקופה הבעלים, האגף העסקי של הבעלים וסוג הבעלים.",
+                    "tech": "f.OwnerId, f.OwningBusinessUnit, f.OwnerIdType"
+                  }
+                ]
+              },
+              {
+                "label": "לא",
+                "nodes": [
+                  {
+                    "type": "step",
+                    "text": "הרשומה אינה נשלפת ואינה מעודכנת."
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "type": "step",
+            "text": "הרשומות ממוינות לפי המזהה שלהן ונשלחות לעדכון אחת-אחת.",
+            "tech": "Sort DTSX:4210 (sort key Gen_mfPreviousYearId, EliminateDuplicates=false)"
+          },
+          {
+            "type": "write",
+            "text": "הבעלים של רשומת MF לשנה הקודמת מתעדכן ישירות בטבלת ה-CRM לבעלים של הקופה.",
+            "tech": "Update owner on MF (OLEDBCommand, [CRM]) DTSX:4274, SQL DTSX:4277: update [Gen_mfPreviousYearBase] set [OwnerId]=?, [OwningBusinessUnit]=?, [OwnerIdType]=? where [Gen_mfPreviousYearId] = ? · Param_0..3 ← OwnerId, OwningBusinessUnit, OwnerIdType, Gen_mfPreviousYearId · SQL (Unsupported) · errorRowDisposition=\"FailComponent\" (DTSX:4289)"
+          },
+          {
+            "type": "step",
+            "text": "אם עדכון נכשל, זרימת הנתונים נכשלת והשלבים הבאים אינם רצים.",
+            "tech": "Update MF Previous Year → Update MF Archive · Success (DTSX:5121)"
+          },
+          {
+            "type": "end",
+            "text": "הבעלות על רשומות MF לשנה הקודמת עוקבת אחרי הבעלות על הקופה. השלב רץ אחרי שיוך הקופות לעובדי חברה ולקופות רגילות."
+          }
+        ]
+      },
+      "detail_he": [
+        {
+          "h": "מקור ואוכלוסייה",
+          "t": "Gen_mfPreviousYear שמקושרת ל-gen_fundmain (mf.gen_fundnumber), כשהבעלים שלה שונה מהבעלים של הקופה."
+        },
+        {
+          "h": "התאמה לרשומות קיימות",
+          "t": "קישור mf.gen_fundnumber = gen_fundmainid. העדכון לפי Gen_mfPreviousYearId."
+        },
+        {
+          "h": "החלטות",
+          "t": "where f.OwnerId != mf.OwnerId"
+        },
+        {
+          "h": "כתיבה ל-CRM",
+          "t": "UPDATE Gen_mfPreviousYearBase SET OwnerId, OwningBusinessUnit, OwnerIdType (ערכים מהקופה), עדכון SQL ישיר (Unsupported)."
+        },
+        {
+          "h": "תוצאה עסקית",
+          "t": "רשומות MF לשנה הקודמת באותה בעלות כמו הקופה שלהן."
+        }
+      ],
+      "decisions": [
+        {
+          "where": "Get MF (SQL DTSX:4165)",
+          "condition": "f.OwnerId != mf.OwnerId",
+          "meaning_he": "הבעלים של הרשומה שונה מהבעלים של הקופה.",
+          "outcome_he": "הבעלות מועתקת מהקופה."
+        }
+      ],
+      "crmEffects": [
+        {
+          "entity": "Gen_mfPreviousYear (Gen_mfPreviousYearBase)",
+          "verb": "update OwnerId, OwningBusinessUnit, OwnerIdType (מ-gen_fundmain)",
+          "mechanism": "SQL",
+          "when_he": "כשהבעלים שונה מהבעלים של הקופה המקושרת. Unsupported."
+        },
+        {
+          "entity": "Gen_mfPreviousYear, gen_fundmain",
+          "verb": "read",
+          "mechanism": "SQL (SELECT)",
+          "when_he": "בתחילת זרימת הנתונים"
+        }
+      ],
+      "evidence": [
+        "0022_Company Workers.dtsx sha F838665D… · Data Flow Update MF Previous Year DTSX:4154",
+        "Get MF DTSX:4160, SqlCommand DTSX:4165; Sort DTSX:4210",
+        "Update owner on MF DTSX:4274, SqlCommand DTSX:4277, disposition DTSX:4289",
+        "ParameterMapping DTSX:4177 מפנה ל-{8C07AFF0-B44D-4A94-BBCF-C5ECCAC23605}. אין משתנה עם המזהה הזה בחבילה, וב-SQL אין \"?\". לא ידוע אם זה מכשיל את ולידציית החבילה (אין DelayValidation) או שאין לכך השפעה. סיכון פתוח, ראו findings_he[5]"
+      ],
+      "openQuestions_he": [
+        "מה המשמעות העסקית של Gen_mfPreviousYear? MF כנראה דמי ניהול (השערה).",
+        "האם ה-ParameterMapping (DTSX:4177) למשתנה {8C07AFF0-…}, שאינו קיים בחבילה, מכשיל את הוולידציה? אם כן, לפי התנהגות SSIS הרגילה (אין DelayValidation) החבילה כולה נכשלת לפני כל שלב. אם לא, השלב רץ כרגיל. ה-DTSX לא מכריע."
+      ]
+    },
+    {
+      "refId": "Package\\Update MF Archive",
+      "title_he": "יישור בעלות רשומות ארכיון MF לבעלות הקופה",
+      "techName": "Update MF Archive",
+      "short_he": "ברשומות ארכיון MF שהבעלים שלהן שונה מהבעלים של הקופה המקושרת, הבעלים מיושר לבעלים של הקופה.",
+      "flow_he": [
+        "שליפת Gen_mfArchive join gen_fundmain לפי mf.gen_fundnumber, where f.OwnerId != mf.OwnerId.",
+        "Sort לפי Gen_mfArchiveId ואז UPDATE Gen_mfArchiveBase SET OwnerId, OwningBusinessUnit, OwnerIdType מהקופה (SQL ישיר, Unsupported)."
+      ],
+      "short": {
+        "nodes": [
+          {
+            "type": "step",
+            "text": "לכל רשומת ארכיון MF מאתרים את הקופה שהיא שייכת אליה."
+          },
+          {
+            "type": "decision",
+            "text": "האם הבעלים של הרשומה שונה מהבעלים של הקופה?",
+            "branches": [
+              {
+                "label": "כן",
+                "nodes": [
+                  {
+                    "type": "write",
+                    "text": "הבעלים, האגף העסקי וסוג הבעלים של הרשומה מועתקים מהקופה, בעדכון SQL ישיר."
+                  }
+                ]
+              },
+              {
+                "label": "לא",
+                "nodes": [
+                  {
+                    "type": "step",
+                    "text": "הרשומה לא משתנה."
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "type": "end",
+            "text": "רשומות ארכיון MF נמצאות באותה בעלות כמו הקופה שלהן."
+          }
+        ]
+      },
+      "detailed": {
+        "nodes": [
+          {
+            "type": "step",
+            "text": "נשלפות רשומות ארכיון MF שמקושרות לקופה. רשומה בלי קופה מקושרת אינה נכללת, כי החיבור הוא INNER JOIN.",
+            "tech": "Get MF (OLEDBSource, [CRM]) DTSX:3786, SQL DTSX:3791: from Gen_mfArchive mf join gen_fundmain f on gen_fundmainid = mf.gen_fundnumber"
+          },
+          {
+            "type": "decision",
+            "text": "האם הבעלים של הרשומה שונה מהבעלים של הקופה?",
+            "tech": "where f.OwnerId != mf.OwnerId",
+            "branches": [
+              {
+                "label": "כן",
+                "nodes": [
+                  {
+                    "type": "step",
+                    "text": "נלקחים מהקופה הבעלים, האגף העסקי של הבעלים וסוג הבעלים.",
+                    "tech": "f.OwnerId, f.OwningBusinessUnit, f.OwnerIdType"
+                  }
+                ]
+              },
+              {
+                "label": "לא",
+                "nodes": [
+                  {
+                    "type": "step",
+                    "text": "הרשומה אינה נשלפת ואינה מעודכנת."
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "type": "step",
+            "text": "הרשומות ממוינות לפי המזהה שלהן ונשלחות לעדכון אחת-אחת.",
+            "tech": "Sort DTSX:3836 (sort key Gen_mfArchiveId, EliminateDuplicates=false)"
+          },
+          {
+            "type": "write",
+            "text": "הבעלים של רשומת ארכיון MF מתעדכן ישירות בטבלת ה-CRM לבעלים של הקופה.",
+            "tech": "Update owner on MF (OLEDBCommand, [CRM]) DTSX:3900, SQL DTSX:3903: update [Gen_mfArchiveBase] set [OwnerId]=?, [OwningBusinessUnit]=?, [OwnerIdType]=? where [Gen_mfArchiveId] = ? · Param_0..3 ← OwnerId, OwningBusinessUnit, OwnerIdType, Gen_mfArchiveId · SQL (Unsupported) · errorRowDisposition=\"FailComponent\" (DTSX:3915)"
+          },
+          {
+            "type": "step",
+            "text": "אם עדכון נכשל, זרימת הנתונים נכשלת והשלבים הבאים אינם רצים.",
+            "tech": "Update MF Archive → Update CW FTRequests · Success (DTSX:5122)"
+          },
+          {
+            "type": "end",
+            "text": "הבעלות על רשומות ארכיון MF עוקבת אחרי הבעלות על הקופה. השלב רץ אחרי שיוך הקופות לעובדי חברה ולקופות רגילות."
+          }
+        ]
+      },
+      "detail_he": [
+        {
+          "h": "מקור ואוכלוסייה",
+          "t": "Gen_mfArchive שמקושרת ל-gen_fundmain (mf.gen_fundnumber), כשהבעלים שלה שונה מהבעלים של הקופה."
+        },
+        {
+          "h": "התאמה לרשומות קיימות",
+          "t": "קישור mf.gen_fundnumber = gen_fundmainid. העדכון לפי Gen_mfArchiveId."
+        },
+        {
+          "h": "החלטות",
+          "t": "where f.OwnerId != mf.OwnerId"
+        },
+        {
+          "h": "כתיבה ל-CRM",
+          "t": "UPDATE Gen_mfArchiveBase SET OwnerId, OwningBusinessUnit, OwnerIdType (ערכים מהקופה), עדכון SQL ישיר (Unsupported)."
+        },
+        {
+          "h": "תוצאה עסקית",
+          "t": "רשומות ארכיון MF באותה בעלות כמו הקופה שלהן."
+        }
+      ],
+      "decisions": [
+        {
+          "where": "Get MF (SQL DTSX:3791)",
+          "condition": "f.OwnerId != mf.OwnerId",
+          "meaning_he": "הבעלים של הרשומה שונה מהבעלים של הקופה.",
+          "outcome_he": "הבעלות מועתקת מהקופה."
+        }
+      ],
+      "crmEffects": [
+        {
+          "entity": "Gen_mfArchive (Gen_mfArchiveBase)",
+          "verb": "update OwnerId, OwningBusinessUnit, OwnerIdType (מ-gen_fundmain)",
+          "mechanism": "SQL",
+          "when_he": "כשהבעלים שונה מהבעלים של הקופה המקושרת. Unsupported."
+        },
+        {
+          "entity": "Gen_mfArchive, gen_fundmain",
+          "verb": "read",
+          "mechanism": "SQL (SELECT)",
+          "when_he": "בתחילת זרימת הנתונים"
+        }
+      ],
+      "evidence": [
+        "0022_Company Workers.dtsx sha F838665D… · Data Flow Update MF Archive DTSX:3780",
+        "Get MF DTSX:3786, SqlCommand DTSX:3791; Sort DTSX:3836",
+        "Update owner on MF DTSX:3900, SqlCommand DTSX:3903, disposition DTSX:3915",
+        "ParameterMapping DTSX:3803 מפנה ל-{8C07AFF0-B44D-4A94-BBCF-C5ECCAC23605}. אין משתנה עם המזהה הזה בחבילה, וב-SQL אין \"?\". לא ידוע אם זה מכשיל את ולידציית החבילה (אין DelayValidation) או שאין לכך השפעה. סיכון פתוח, ראו findings_he[5]"
+      ],
+      "openQuestions_he": [
+        "מה המשמעות העסקית של Gen_mfArchive? MF כנראה דמי ניהול (השערה).",
+        "האם ה-ParameterMapping (DTSX:3803) למשתנה {8C07AFF0-…}, שאינו קיים בחבילה, מכשיל את הוולידציה? אם כן, לפי התנהגות SSIS הרגילה (אין DelayValidation) החבילה כולה נכשלת לפני כל שלב. אם לא, השלב רץ כרגיל. ה-DTSX לא מכריע."
+      ]
+    },
+    {
+      "refId": "Package\\Update CW FTRequests",
+      "title_he": "שיוך בקשות FT של עובדי החברה למשתמש עובדי החברה",
+      "techName": "Update CW FTRequests",
+      "short_he": "בקשות FT שמספר הזהות שבהן (ft.Gen_identitynumber) מופיע ב-Gen_companyworker, שהבעלים שלהן הוא משתמש מערכת עם שם דומיין שאינו המשתמש \"עובדי החברה\", מועברות לבעלות המשתמש הזה. שם המשתמש מוגדר בטבלת ההגדרות.",
+      "flow_he": [
+        "שליפת gen_ftrequest שהבעלים שלה הוא SystemUser עם DomainName != @[User::CompanyEmployeesDomainName] ו-exists ב-Gen_companyworker.",
+        "Set Columns: OwnerIdType = 8; DomainName = (DT_WSTR,50)@[User::CompanyEmployeesDomainName].",
+        "Lookup ב-SystemUser לפי domainname ← OwnerId, OwningBusinessUnit (אם אין התאמה הרכיב נכשל).",
+        "Sort לפי gen_ftrequestid ואז UPDATE Gen_ftrequestBase SET OwnerId, OwningBusinessUnit, OwnerIdType (SQL ישיר, Unsupported)."
+      ],
+      "short": {
+        "nodes": [
+          {
+            "type": "step",
+            "text": "נבדקות בקשות FT שבבעלות משתמש מערכת."
+          },
+          {
+            "type": "decision",
+            "text": "האם הבקשה שייכת לעובד החברה ונמצאת כרגע בבעלות משתמש אחר מהמשתמש \"עובדי החברה\"?",
+            "branches": [
+              {
+                "label": "כן",
+                "nodes": [
+                  {
+                    "type": "write",
+                    "text": "הבעלות על הבקשה ב-CRM מועברת למשתמש \"עובדי החברה\" ולאגף העסקי שלו, בעדכון SQL ישיר."
+                  }
+                ]
+              },
+              {
+                "label": "לא",
+                "nodes": [
+                  {
+                    "type": "step",
+                    "text": "הבקשה לא משתנה."
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "type": "end",
+            "text": "בקשות FT שמספר הזהות שבהן מופיע בטבלת עובדי החברה (Gen_companyworker), ושבבעלות משתמש מערכת עם שם דומיין, עוברות לבעלות המשתמש \"עובדי החברה\". בקשות FT בבעלות צוות, או בבעלות משתמש ללא שם דומיין (NULL), נשארות עם הבעלים שלהן."
+          }
+        ]
+      },
+      "detailed": {
+        "nodes": [
+          {
+            "type": "step",
+            "text": "נשלפות בקשות FT (gen_ftrequest) מ-CRM שהבעלים שלהן הוא משתמש מערכת ושם הדומיין שלו שונה משם המשתמש שהוגדר לעובדי החברה. רשומות בבעלות צוות אינן נכללות, כי החיבור ל-SystemUser הוא INNER JOIN. גם רשומות בבעלות משתמש ללא שם דומיין (NULL) אינן נכללות, כי ההשוואה != אינה מתקיימת עבור NULL.",
+            "tech": "Get CW ftrequests (OLEDBSource, [CRM]) DTSX:3201, SQL DTSX:3206: from gen_ftrequest join SystemUser on systemuserid = OwnerId where SystemUser.DomainName != ? · ParameterMapping DTSX:3219: Parameter0 ← User::CompanyEmployeesDomainName ({96B6AFE4-8A58-4D34-B999-BEA05E54AA95}, DTSX:27)"
+          },
+          {
+            "type": "decision",
+            "text": "האם מספר הזהות שבבקשה מופיע בטבלת עובדי החברה (Gen_companyworker)?",
+            "tech": "exists (select cw.Gen_identitynumber from Gen_companyworker cw where cw.gen_identitynumber = ft.Gen_identitynumber)",
+            "branches": [
+              {
+                "label": "כן (נשלפת)",
+                "nodes": [
+                  {
+                    "type": "step",
+                    "text": "הבקשה נכללת באוכלוסייה של שלב זה."
+                  }
+                ]
+              },
+              {
+                "label": "לא",
+                "nodes": [
+                  {
+                    "type": "step",
+                    "text": "הבקשה לא מטופלת בשלב זה. היא מטופלת בשלב הקופות/הבקשות הרגילות."
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "type": "step",
+            "text": "לכל רשומה נקבעים סוג הבעלים \"משתמש\" ושם הדומיין של המשתמש \"עובדי החברה\", שנלקח ממשתנה שנטען מטבלת ההגדרות gen_etlvariable.",
+            "tech": "Set Columns (DerivedColumn) DTSX:3311: OwnerIdType = 8 (literal; 8 = systemuser לפי ידע פלטפורמה); DomainName = (DT_WSTR,50)@[User::CompanyEmployeesDomainName]. המשתנה נטען ב-Get Variables From SystemConfigurarion\\Set Variables main.cs:46-52 לפי gen_key = 'CompanyEmployeesDomainName' (gen_scope='global' או שם החבילה). ערך ברירת מחדל ב-DTSX: \"FormDB\". הערך בזמן ריצה לא ידוע."
+          },
+          {
+            "type": "decision",
+            "text": "האם קיים ב-CRM משתמש עם שם הדומיין שהוגדר?",
+            "tech": "get user (Lookup, [CRM]) DTSX:3243: SystemUser.domainname = DomainName → OwnerId ← systemuserid, OwningBusinessUnit ← BusinessUnitId · NoMatchBehavior=0, CacheType=1 · Match Output errorRowDisposition=\"FailComponent\" (DTSX:3284); No Match Output לא מחובר",
+            "branches": [
+              {
+                "label": "כן",
+                "nodes": [
+                  {
+                    "type": "step",
+                    "text": "נלקחים מזהה המשתמש והאגף העסקי (Business Unit) שלו."
+                  }
+                ]
+              },
+              {
+                "label": "לא",
+                "nodes": [
+                  {
+                    "type": "step",
+                    "text": "זרימת הנתונים נכשלת, אף רשומה לא מעודכנת, וכל השלבים הבאים בחבילה אינם רצים."
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "type": "step",
+            "text": "הרשומות ממוינות לפי המזהה שלהן ונשלחות לעדכון אחת-אחת.",
+            "tech": "Sort DTSX:3344 (sort key gen_ftrequestid, EliminateDuplicates=false)"
+          },
+          {
+            "type": "write",
+            "text": "הבעלים של הבקשה, האגף העסקי של הבעלים וסוג הבעלים מתעדכנים ישירות בטבלת ה-CRM.",
+            "tech": "Update owner on ftrequest (OLEDBCommand, [CRM]) DTSX:3419, SQL DTSX:3422: update [Gen_ftrequestBase] set [OwnerId]=?, [OwningBusinessUnit]=?, [OwnerIdType]=? where [Gen_ftrequestId] = ? · Param_0..3 ← OwnerId, OwningBusinessUnit, OwnerIdType, gen_ftrequestid · SQL (Unsupported) · errorRowDisposition=\"FailComponent\" (DTSX:3433)"
+          },
+          {
+            "type": "end",
+            "text": "בקשות FT (gen_ftrequest) שמספר הזהות שבהן מופיע ב-Gen_companyworker עוברות לבעלות המשתמש \"עובדי החברה\". העדכון עוקף את פעולת השיוך (Assign) של ה-CRM."
+          }
+        ]
+      },
+      "detail_he": [
+        {
+          "h": "מקור ואוכלוסייה",
+          "t": "gen_ftrequest בבעלות SystemUser שה-DomainName שלו != @[User::CompanyEmployeesDomainName], ו-exists (select cw.Gen_identitynumber from Gen_companyworker cw where cw.gen_identitynumber = ft.Gen_identitynumber). בחבילה 0009 זרימת הנתונים שיוצרת ומעדכנת רשומות gen_ftrequest נקראת 'Create or update  Fund Trunsaction Request'. הפירוש 'בקשה לתנועה בקופה' נגזר משם זרימת הנתונים בלבד (השערה)."
+        },
+        {
+          "h": "התאמה לרשומות קיימות",
+          "t": "הרשומות נשלפות מ-CRM ומתעדכנות לפי gen_ftrequestid. עובד חברה מזוהה לפי מספר זהות (exists (select cw.Gen_identitynumber from Gen_companyworker cw where cw.gen_identitynumber = ft.Gen_identitynumber)). המשתמש היעד מזוהה לפי SystemUser.domainname = הערך שהוגדר ב-gen_etlvariable."
+        },
+        {
+          "h": "החלטות",
+          "t": "רק רשומות שהבעלים שלהן אינו כבר המשתמש היעד. רק בקשות שמספר הזהות שבהן (ft.Gen_identitynumber) מופיע ב-Gen_companyworker (cw.gen_identitynumber = ft.Gen_identitynumber). אם המשתמש היעד לא נמצא, הרכיב נכשל."
+        },
+        {
+          "h": "כתיבה ל-CRM",
+          "t": "UPDATE Gen_ftrequestBase SET OwnerId, OwningBusinessUnit, OwnerIdType=8 WHERE Gen_ftrequestId, עדכון SQL ישיר (Unsupported)."
+        },
+        {
+          "h": "תוצאה עסקית",
+          "t": "בעלות אחידה על בקשות FT (gen_ftrequest) של עובדי החברה: בקשות בבעלות משתמש מערכת עם שם דומיין עוברות למשתמש ייעודי (השערה: לצורך הגבלת הרשאות צפייה). בקשות בבעלות צוות, או בבעלות משתמש ללא שם דומיין, אינן משתנות."
+        }
+      ],
+      "decisions": [
+        {
+          "where": "Get CW ftrequests (SQL DTSX:3206)",
+          "condition": "SystemUser.DomainName != ?  (? = User::CompanyEmployeesDomainName)",
+          "meaning_he": "הבעלים הנוכחי הוא משתמש מערכת עם שם דומיין שאינו המשתמש היעד. משתמש ללא שם דומיין (NULL) אינו עומד בתנאי.",
+          "outcome_he": "רק רשומות כאלה מעודכנות."
+        },
+        {
+          "where": "Get CW ftrequests (SQL DTSX:3206)",
+          "condition": "exists (select cw.Gen_identitynumber from Gen_companyworker cw where cw.gen_identitynumber = ft.Gen_identitynumber)",
+          "meaning_he": "מספר הזהות שבבקשה (ft.Gen_identitynumber) מופיע ב-Gen_companyworker.",
+          "outcome_he": "קובע אם הרשומה שייכת לאוכלוסיית השלב."
+        },
+        {
+          "where": "get user (DTSX:3243)",
+          "condition": "NoMatchBehavior=0; Match Output errorRowDisposition=FailComponent",
+          "meaning_he": "המשתמש היעד חייב להתקיים ב-SystemUser.",
+          "outcome_he": "אם אין התאמה, זרימת הנתונים נכשלת והחבילה נעצרת."
+        }
+      ],
+      "crmEffects": [
+        {
+          "entity": "gen_ftrequest (Gen_ftrequestBase)",
+          "verb": "update OwnerId, OwningBusinessUnit, OwnerIdType=8",
+          "mechanism": "SQL",
+          "when_he": "gen_ftrequest של עובד חברה שהבעלים שלה אינו המשתמש היעד. Unsupported."
+        },
+        {
+          "entity": "gen_ftrequest, SystemUser, Gen_companyworker",
+          "verb": "read",
+          "mechanism": "SQL (SELECT / Lookup)",
+          "when_he": "בתחילת זרימת הנתונים"
+        }
+      ],
+      "evidence": [
+        "0022_Company Workers.dtsx sha F838665D… · Data Flow Update CW FTRequests DTSX:3195",
+        "Get CW ftrequests DTSX:3201, SqlCommand DTSX:3206, ParameterMapping DTSX:3219 → variable DTSX:27",
+        "Set Columns DTSX:3311; get user DTSX:3243 (disposition DTSX:3284); Sort DTSX:3344",
+        "Update owner on ftrequest DTSX:3419, SqlCommand DTSX:3422, disposition DTSX:3433",
+        "[CRM] DTSX:4-6; Set Variables main.cs:46-52 (Get Variables From SystemConfigurarion)"
+      ],
+      "openQuestions_he": [
+        "מה הערך של CompanyEmployeesDomainName ב-gen_etlvariable בסביבת הייצור? (ב-DTSX: \"FormDB\")"
+      ]
+    },
+    {
+      "refId": "Package\\Update Regular FTRequest",
+      "title_he": "שיוך שאר בקשות ה-FT למשתמש הקופות הרגילות",
+      "techName": "Update Regular FTRequest",
+      "short_he": "בקשות FT שמספר הזהות שבהן (ft.Gen_identitynumber) אינו מופיע ב-Gen_companyworker, שהבעלים שלהן הוא משתמש מערכת עם שם דומיין שאינו המשתמש \"הקופות הרגילות\", מועברות לבעלות המשתמש הזה. שם המשתמש מוגדר בטבלת ההגדרות.",
+      "flow_he": [
+        "שליפת gen_ftrequest שהבעלים שלה הוא SystemUser עם DomainName != @[User::RegularFundsDomainName] ו-not exists ב-Gen_companyworker.",
+        "Set Columns: OwnerIdType = 8; DomainName = (DT_WSTR,50)@[User::RegularFundsDomainName].",
+        "Lookup ב-SystemUser לפי domainname ← OwnerId, OwningBusinessUnit (אם אין התאמה הרכיב נכשל).",
+        "Sort לפי gen_ftrequestid ואז UPDATE gen_ftrequestBase SET OwnerId, OwningBusinessUnit, OwnerIdType (SQL ישיר, Unsupported)."
+      ],
+      "short": {
+        "nodes": [
+          {
+            "type": "step",
+            "text": "נבדקות בקשות FT שבבעלות משתמש מערכת."
+          },
+          {
+            "type": "decision",
+            "text": "האם מספר הזהות שבבקשה אינו מופיע בטבלת עובדי החברה (Gen_companyworker), והבקשה נמצאת כרגע בבעלות משתמש אחר מהמשתמש \"הקופות הרגילות\"?",
+            "branches": [
+              {
+                "label": "כן",
+                "nodes": [
+                  {
+                    "type": "write",
+                    "text": "הבעלות על הבקשה ב-CRM מועברת למשתמש \"הקופות הרגילות\" ולאגף העסקי שלו, בעדכון SQL ישיר."
+                  }
+                ]
+              },
+              {
+                "label": "לא",
+                "nodes": [
+                  {
+                    "type": "step",
+                    "text": "הבקשה לא משתנה."
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "type": "end",
+            "text": "בקשות FT שמספר הזהות שבהן אינו מופיע בטבלת עובדי החברה (Gen_companyworker), ושבבעלות משתמש מערכת עם שם דומיין, עוברות לבעלות המשתמש \"הקופות הרגילות\". בקשות FT בבעלות צוות, או בבעלות משתמש ללא שם דומיין (NULL), נשארות עם הבעלים שלהן."
+          }
+        ]
+      },
+      "detailed": {
+        "nodes": [
+          {
+            "type": "step",
+            "text": "נשלפות בקשות FT (gen_ftrequest) מ-CRM שהבעלים שלהן הוא משתמש מערכת ושם הדומיין שלו שונה משם המשתמש שהוגדר לקופות הרגילות. רשומות בבעלות צוות אינן נכללות, כי החיבור ל-SystemUser הוא INNER JOIN. גם רשומות בבעלות משתמש ללא שם דומיין (NULL) אינן נכללות, כי ההשוואה != אינה מתקיימת עבור NULL.",
+            "tech": "Get regular  ftrequest (OLEDBSource, [CRM]) DTSX:4347, SQL DTSX:4352: from gen_ftrequest join SystemUser on systemuserid = OwnerId where SystemUser.DomainName != ? · ParameterMapping DTSX:4365: Parameter0 ← User::RegularFundsDomainName ({781FC0E7-A295-46B9-89EF-177DD30285EE}, DTSX:45)"
+          },
+          {
+            "type": "decision",
+            "text": "האם מספר הזהות שבבקשה מופיע בטבלת עובדי החברה (Gen_companyworker)?",
+            "tech": "not exists (select cw.Gen_identitynumber from Gen_companyworker cw where cw.gen_identitynumber = ft.Gen_identitynumber)",
+            "branches": [
+              {
+                "label": "לא (נשלפת)",
+                "nodes": [
+                  {
+                    "type": "step",
+                    "text": "הבקשה נכללת באוכלוסייה של שלב זה."
+                  }
+                ]
+              },
+              {
+                "label": "כן",
+                "nodes": [
+                  {
+                    "type": "step",
+                    "text": "הבקשה לא מטופלת בשלב זה. היא מטופלת בשלב עובדי החברה."
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "type": "step",
+            "text": "לכל רשומה נקבעים סוג הבעלים \"משתמש\" ושם הדומיין של המשתמש \"הקופות הרגילות\", שנלקח ממשתנה שנטען מטבלת ההגדרות gen_etlvariable.",
+            "tech": "Set Columns (DerivedColumn) DTSX:4457: OwnerIdType = 8 (literal; 8 = systemuser לפי ידע פלטפורמה); DomainName = (DT_WSTR,50)@[User::RegularFundsDomainName]. המשתנה נטען ב-Get Variables From SystemConfigurarion\\Set Variables main.cs:46-52 לפי gen_key = 'RegularFundsDomainName' (gen_scope='global' או שם החבילה). ערך ברירת מחדל ב-DTSX: \"FromDB\". הערך בזמן ריצה לא ידוע."
+          },
+          {
+            "type": "decision",
+            "text": "האם קיים ב-CRM משתמש עם שם הדומיין שהוגדר?",
+            "tech": "Get User (Lookup, [CRM]) DTSX:4389: SystemUser.domainname = DomainName → OwnerId ← systemuserid, OwningBusinessUnit ← BusinessUnitId · NoMatchBehavior=0, CacheType=1 · Match Output errorRowDisposition=\"FailComponent\" (DTSX:4430); No Match Output לא מחובר",
+            "branches": [
+              {
+                "label": "כן",
+                "nodes": [
+                  {
+                    "type": "step",
+                    "text": "נלקחים מזהה המשתמש והאגף העסקי (Business Unit) שלו."
+                  }
+                ]
+              },
+              {
+                "label": "לא",
+                "nodes": [
+                  {
+                    "type": "step",
+                    "text": "זרימת הנתונים נכשלת, אף רשומה לא מעודכנת, וכל השלבים הבאים בחבילה אינם רצים."
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "type": "step",
+            "text": "הרשומות ממוינות לפי המזהה שלהן ונשלחות לעדכון אחת-אחת.",
+            "tech": "Sort DTSX:4490 (sort key gen_ftrequestid, EliminateDuplicates=false)"
+          },
+          {
+            "type": "write",
+            "text": "הבעלים של הבקשה, האגף העסקי של הבעלים וסוג הבעלים מתעדכנים ישירות בטבלת ה-CRM.",
+            "tech": "Update owner on ftrequest (OLEDBCommand, [CRM]) DTSX:4565, SQL DTSX:4568: update [gen_ftrequestBase] set [OwnerId]=?, [OwningBusinessUnit]=?, [OwnerIdType]=? where [gen_ftrequestId] = ? · Param_0..3 ← OwnerId, OwningBusinessUnit, OwnerIdType, gen_ftrequestid · SQL (Unsupported) · errorRowDisposition=\"FailComponent\" (DTSX:4579)"
+          },
+          {
+            "type": "end",
+            "text": "בקשות FT (gen_ftrequest) שמספר הזהות שבהן אינו מופיע ב-Gen_companyworker עוברות לבעלות המשתמש \"הקופות הרגילות\". העדכון עוקף את פעולת השיוך (Assign) של ה-CRM."
+          }
+        ]
+      },
+      "detail_he": [
+        {
+          "h": "מקור ואוכלוסייה",
+          "t": "gen_ftrequest בבעלות SystemUser שה-DomainName שלו != @[User::RegularFundsDomainName], ו-not exists (select cw.Gen_identitynumber from Gen_companyworker cw where cw.gen_identitynumber = ft.Gen_identitynumber)."
+        },
+        {
+          "h": "התאמה לרשומות קיימות",
+          "t": "הרשומות נשלפות מ-CRM ומתעדכנות לפי gen_ftrequestid. עובד חברה מזוהה לפי מספר זהות (not exists (select cw.Gen_identitynumber from Gen_companyworker cw where cw.gen_identitynumber = ft.Gen_identitynumber)). המשתמש היעד מזוהה לפי SystemUser.domainname = הערך שהוגדר ב-gen_etlvariable."
+        },
+        {
+          "h": "החלטות",
+          "t": "רק רשומות שהבעלים שלהן אינו כבר המשתמש היעד. רק בקשות שמספר הזהות שבהן (ft.Gen_identitynumber) אינו מופיע ב-Gen_companyworker (not exists על cw.gen_identitynumber = ft.Gen_identitynumber). אם המשתמש היעד לא נמצא, הרכיב נכשל."
+        },
+        {
+          "h": "כתיבה ל-CRM",
+          "t": "UPDATE gen_ftrequestBase SET OwnerId, OwningBusinessUnit, OwnerIdType=8 WHERE gen_ftrequestId, עדכון SQL ישיר (Unsupported)."
+        },
+        {
+          "h": "תוצאה עסקית",
+          "t": "בקשות FT (gen_ftrequest) שמספר הזהות שבהן אינו מופיע ב-Gen_companyworker, בבעלות משתמש מערכת ששם הדומיין שלו אינו NULL ושונה משם היעד, עוברות בכל ריצה למשתמש \"קופות רגילות\" אחד. בקשות בבעלות צוות, או בבעלות משתמש ללא שם דומיין, אינן משתנות. בקשה שאין בה מספר זהות (Gen_identitynumber = NULL) עומדת בתנאי not exists, ולכן גם היא מועברת בשלב זה."
+        }
+      ],
+      "decisions": [
+        {
+          "where": "Get regular  ftrequest (SQL DTSX:4352)",
+          "condition": "SystemUser.DomainName != ?  (? = User::RegularFundsDomainName)",
+          "meaning_he": "הבעלים הנוכחי הוא משתמש מערכת עם שם דומיין שאינו המשתמש היעד. משתמש ללא שם דומיין (NULL) אינו עומד בתנאי.",
+          "outcome_he": "רק רשומות כאלה מעודכנות."
+        },
+        {
+          "where": "Get regular  ftrequest (SQL DTSX:4352)",
+          "condition": "not exists (select cw.Gen_identitynumber from Gen_companyworker cw where cw.gen_identitynumber = ft.Gen_identitynumber)",
+          "meaning_he": "מספר הזהות שבבקשה (ft.Gen_identitynumber) אינו מופיע ב-Gen_companyworker, כולל בקשה שבה מספר הזהות ריק (NULL).",
+          "outcome_he": "קובע אם הרשומה שייכת לאוכלוסיית השלב."
+        },
+        {
+          "where": "Get User (DTSX:4389)",
+          "condition": "NoMatchBehavior=0; Match Output errorRowDisposition=FailComponent",
+          "meaning_he": "המשתמש היעד חייב להתקיים ב-SystemUser.",
+          "outcome_he": "אם אין התאמה, זרימת הנתונים נכשלת והחבילה נעצרת."
+        }
+      ],
+      "crmEffects": [
+        {
+          "entity": "gen_ftrequest (gen_ftrequestBase)",
+          "verb": "update OwnerId, OwningBusinessUnit, OwnerIdType=8",
+          "mechanism": "SQL",
+          "when_he": "gen_ftrequest שמספר הזהות שבה אינו מופיע ב-Gen_companyworker, ושהבעלים שלה הוא משתמש מערכת עם שם דומיין שאינו המשתמש היעד. Unsupported."
+        },
+        {
+          "entity": "gen_ftrequest, SystemUser, Gen_companyworker",
+          "verb": "read",
+          "mechanism": "SQL (SELECT / Lookup)",
+          "when_he": "בתחילת זרימת הנתונים"
+        }
+      ],
+      "evidence": [
+        "0022_Company Workers.dtsx sha F838665D… · Data Flow Update Regular FTRequest DTSX:4341",
+        "Get regular  ftrequest DTSX:4347, SqlCommand DTSX:4352, ParameterMapping DTSX:4365 → variable DTSX:45",
+        "Set Columns DTSX:4457; Get User DTSX:4389 (disposition DTSX:4430); Sort DTSX:4490",
+        "Update owner on ftrequest DTSX:4565, SqlCommand DTSX:4568, disposition DTSX:4579",
+        "[CRM] DTSX:4-6; Set Variables main.cs:46-52 (Get Variables From SystemConfigurarion)"
+      ],
+      "openQuestions_he": [
+        "מה הערך של RegularFundsDomainName ב-gen_etlvariable בסביבת הייצור? (ב-DTSX: \"FromDB\")"
+      ]
+    }
+  ],
+  "findings_he": [
+    {
+      "severity": "high",
+      "text": "שמונה עדכוני SQL ישירים של OwnerId, OwningBusinessUnit ו-OwnerIdType על Gen_fundmainBase (×2), Gen_ftrequestBase/gen_ftrequestBase (×2), Gen_ftcurrentyearBase, Gen_mfcurrentyearBase, Gen_mfPreviousYearBase ו-Gen_mfArchiveBase (Unsupported). שינוי בעלות שלא עובר דרך פעולת Assign של ה-SDK עוקף את ה-cascading, את רשומות השיתוף (PrincipalObjectAccess), את הביקורת, את התוספים ואת ModifiedOn (ההשפעה היא ידע פלטפורמה, השערה).",
+      "evidence": "DTSX:3422, 3715, 3903, 4090, 4277, 4568, 4861, 5049; [CRM] DTSX:4-6"
+    },
+    {
+      "severity": "medium",
+      "text": "Update Regular Funds ו-Update Regular FTRequest מעבירים בכל ריצה למשתמש אחד (RegularFundsDomainName) כל קופה או בקשה שאינה עומדת בתנאי Gen_companyworker של אותו שלב, אם היא בבעלות משתמש מערכת ששם הדומיין שלו אינו NULL ושונה משם היעד. בבקשות FT התנאי הוא not exists (select cw.Gen_identitynumber from Gen_companyworker cw where cw.gen_identitynumber = ft.Gen_identitynumber), כלומר מספר הזהות שבבקשה אינו מופיע ב-Gen_companyworker. בקופות התנאי הוא not exists (select Gen_companyworker.Gen_identitynumber from Gen_companyworker where gen_customeridnumber = Gen_identitynumber) (השערה: התאמה לפי ת.ז. הלקוח; העמודה ללא קידומת טבלה; ראו ממצא 5). אם רשומה כזו שויכה ידנית למשתמש כזה, השיוך מוחלף בריצה הבאה. רשומות בבעלות צוות (Team) אינן מועברות, בגלל ה-INNER JOIN ל-SystemUser. גם רשומות בבעלות משתמש ללא שם דומיין (NULL) אינן מועברות, כי התנאי SystemUser.DomainName != ? אינו מתקיים עבור NULL.",
+      "evidence": "SQL DTSX:4644, DTSX:4352"
+    },
+    {
+      "severity": "medium",
+      "text": "ב-Lookup של משתמש היעד NoMatchBehavior=0, CacheType=1 (Partial), ו-Match Output מוגדר FailComponent. אם שם הדומיין שהוגדר לא קיים ב-SystemUser, ואם מקור הנתונים של אותו שלב מחזיר לפחות שורה אחת, אז זרימת הנתונים נכשלת וכל השלבים שאחריה בשרשרת ה-Success אינם רצים. אם המקור אינו מחזיר שורות, ה-Lookup אינו מופעל על אף שורה והשלב מסתיים בהצלחה.",
+      "evidence": "DTSX:3258/3284, 3551/3577, 4404/4430, 4697/4723; precedence DTSX:5115-5124"
+    },
+    {
+      "severity": "medium",
+      "text": "קובץ תצורה חיצוני C:\\Generix\\SSISConfigFile.dtsConfig לא סופק (blocked_external_dependency). ערכי שמות הדומיין נטענים מ-gen_etlvariable בזמן ריצה. ברירת המחדל ב-DTSX היא \"FormDB\"/\"FromDB\", כנראה placeholder.",
+      "evidence": "DTSX:17, 27, 45; Set Variables main.cs:46-52"
+    },
+    {
+      "severity": "low",
+      "text": "בבדיקת עובד חברה לקופות העמודות gen_customeridnumber ו-Gen_identitynumber אינן מסויגות. הקישור תלוי בסכמה; לא מאומת.",
+      "evidence": "SQL DTSX:3498, DTSX:4644"
+    },
+    {
+      "severity": "medium",
+      "text": "ארבעת מקורות ה-Trans/MF מכילים ParameterMapping ל-{8C07AFF0-B44D-4A94-BBCF-C5ECCAC23605}. אין בחבילה משתנה עם המזהה הזה, וב-SQL אין \"?\". ה-DTSX לא מוכיח אף אחת משתי האפשרויות: (א) ה-ParameterMapping ל-{8C07AFF0-…} מכשיל את הוולידציה. אין בחבילה DelayValidation (ערך ברירת המחדל False), ולכן לפי התנהגות SSIS הרגילה החבילה כולה נכשלת בוולידציה לפני שרץ שלב כלשהו, כולל Update CW Funds ו-Update Regular Funds, ושום עדכון בעלות לא מתבצע. (ב) המקורות עוברים ולידציה ורצים כרגיל, והמיפוי אינו משפיע. זה סיכון פתוח.",
+      "evidence": "DTSX:3803, 3990, 4177, 4949; DelayValidation אינו מופיע ב-DTSX"
+    },
+    {
+      "severity": "info",
+      "text": "OwnerIdType = 8 הוא literal מוכח בנתיב הכתיבה (Set Columns ← Update owner). ב-Trans/MF, OwnerIdType מועתק מהקופה ואינו קבוע.",
+      "evidence": "DTSX:3311, 3604, 4457, 4750"
+    }
+  ]
+}

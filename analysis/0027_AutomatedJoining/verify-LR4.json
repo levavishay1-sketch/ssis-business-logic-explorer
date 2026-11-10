@@ -1,0 +1,105 @@
+{
+  "verifier": "ssis-verifier",
+  "package": "0027_AutomatedJoining",
+  "scope": "logic-claims re-check round 4",
+  "checkedAt": "2026-11-07",
+  "source": "source/DailyProcess/0027_AutomatedJoining.dtsx sha256 5A6CAEB48ACA544F938C452989B8E57F011631CC76A39E10E3A3A8B43938D556",
+  "checked": 6,
+  "results": [
+    {
+      "id": "L|finding#2",
+      "hash": "f36331cb6e6c",
+      "verdict": "CONFIRMED",
+      "detail": "Update Joinings main.cs:124-133 catches SoapException/Exception, sets ErrorDescription and calls DirectRowToError. The Error output (sync, excl. group 1) has no path: the data flow has only 2 paths (DTSX:6498-6499), and neither leaves Update Joinings. The package therefore creates no warning or error for these rows. CRM.Proxy is correctly marked unknown. In Close Joining processes, Update to close joining.Error -> Set Warning columns 1 2 1 -> ETL Warning 1 2 1, which runs crmServiceProxy.Create of gen_etlprocesswarning with no condition (main.cs:60-76). So failures there are recorded as ETL warnings. The finding is conditional ('אם ... נכשל') and is not framed as a bug.",
+      "evidence": "DTSX:5600 (Update Joinings) main.cs:114-134; DTSX:6498-6499; Close Joining processes paths (component.mjs --list); ETL Warning 1 2 1 main.cs:60-76",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Update LastThreeWorkingDays Variable|title",
+      "hash": "52694ca05032",
+      "verdict": "WRONG",
+      "detail": "Most of short_he is correct and matches ScriptMain.cs:107-134 (DTSX:4900 block): the start at DateTime.Now.AddDays(-1).Date; the skip only on an exact dt.Select(\"starttime = '\" + currDate.ToString() + \"'\") match; the culture-dependent string; the 3-calendar-day result when nothing matches (trace: D-1 count 1->2, D-2 2->3, D-3 break, returns D-3); the caveat that skipping is unproven; and the use of the threshold by Get Joinings From DB. Two units are wrong. (1) flow_he[1] 'שליפת ימי שישי, שבת וחג' says the step retrieves Friday/Saturday/holiday days. It actually retrieves the starttime of CalendarRule rows whose Name is 'Friday'/'Saturday'/'Holiday' with starttime in [GetutcDate()-21, GetutcDate()] (DTSX:4090). Whether those rows are those days is exactly what short_he says is unproven, so the label contradicts the claim's own caveat. (2) short_he 'ומחזירה את השלישי (הבדיקה מוגבלת ל-21 ימים אחורה)' does not say what is returned when the cap is reached. If the loop ends without the break (fewer than 3 non-matching days among D-1..D-21), it returns currDate after 21 decrements: D-22, which is not 'the third' working day. This depends on the data, so it must be conditional.",
+      "evidence": "DTSX:4090 (Get NonWorkingDays SqlStatementSource); ScriptMain.cs:111-133 (DTSX:5226-5263 region); DTSX:5541-5549",
+      "wrongUnits": [
+        {
+          "unit": "[3] flow_he[1]: 'שליפת ימי שישי, שבת וחג מ-21 הימים האחרונים'",
+          "problem": "Meaning taken from the rule names and stated as fact. The step fetches CalendarRule.starttime values for rules with those names, not the days themselves.",
+          "correct": "'שליפת starttime של כללי לוח שנה בשם Friday/Saturday/Holiday שהתחילו ב-21 הימים האחרונים'",
+          "evidence": "DTSX:4090"
+        },
+        {
+          "unit": "[2] short_he: 'ומחזירה את השלישי (הבדיקה מוגבלת ל-21 ימים אחורה)'",
+          "problem": "Omits the data-dependent outcome when 21 days pass without finding 3 non-matching days: the returned date is 22 days before today.",
+          "correct": "'... ומחזירה את השלישי; אם ב-21 הימים (אתמול ואחורה) לא נמצאו שלושה ימים כאלה, מוחזר התאריך 22 ימים לפני היום'",
+          "evidence": "ScriptMain.cs:119-133"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Update LastThreeWorkingDays Variable|short",
+      "hash": "a1cea78984e6",
+      "verdict": "WRONG",
+      "detail": "[2] is correct. [1] states as fact that what is fetched are 'הימים שאינם ימי עבודה (שישי, שבת וחג)'. The SQL (DTSX:4090) fetches the starttime of CalendarRule rows named Friday/Saturday/Holiday. 'Non-working days' is a meaning taken from the task and variable names (Get NonWorkingDays, User::NonWorkingDays), and whether these rows mark days is exactly what [2] and the title call unproven. The package's own detailed claim [1] words it correctly ('כללי לוח השנה בשם ...'). [3] 'יום העבודה השלישי לפני היום' is unconditional. If 3 non-matching days are not found within D-1..D-21, the result is D-22 (ScriptMain.cs:119-133).",
+      "evidence": "DTSX:4090; ScriptMain.cs:111-133",
+      "wrongUnits": [
+        {
+          "unit": "[1] 'מלוח השנה של ה-CRM נשלפים הימים שאינם ימי עבודה (שישי, שבת וחג) ב-21 הימים האחרונים'",
+          "problem": "The meaning 'non-working days' comes from names, and rows are equated with days. Both are stated as fact.",
+          "correct": "'מה-CRM נשלפים כללי לוח שנה בשם Friday, Saturday או Holiday שתאריך ההתחלה שלהם ב-21 הימים האחרונים'",
+          "evidence": "DTSX:4090"
+        },
+        {
+          "unit": "[3] 'התאריך שמתקבל, יום העבודה השלישי לפני היום'",
+          "problem": "Unconditional. If the 21-iteration loop ends without the break, the result is D-22.",
+          "correct": "Add: 'אם ב-21 הימים לא נמצאו שלושה ימי עבודה, מוחזר התאריך 22 ימים לפני היום'",
+          "evidence": "ScriptMain.cs:119-133"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Update LastThreeWorkingDays Variable|detailed",
+      "hash": "999e87b56687",
+      "verdict": "WRONG",
+      "detail": "[1]-[8], [10] and [11] are verified. [1]: the SQL is quoted exactly, the connection is {E2C17CCD} = [CRM], and the full result set goes to User::NonWorkingDays. [2]: line 116. [3]: line 121. [5]/[7]: counter starts at 1, and on no match: if ==3 break else ++ (lines 111, 123-130). [8]: line 119. [10]: catch sets Failure (line 100), then line 104 sets Success unconditionally. The exception arises before the assignment on line 96, so the variable keeps its prior value. No other writer of LastThreeWorkingDays exists in the DTSX (grep: only DTSX:42 definition, 4904 ReadWrite, 5226). The design value is 10/2/2017 5:29:05 PM (DTSX:43), and the config file may override it. [9] is wrong. 'התאריך שמתקבל הוא יום העבודה השלישי לפני היום' is unconditional, but [8] itself caps the loop at 21 iterations. If the loop ends without the break, the returned date is D-22 (21 decrements from D-1), which is not a counted working day.",
+      "evidence": "DTSX:4086-4091; ScriptMain.cs:92-134 (DTSX:4900 block); DTSX:42-43",
+      "wrongUnits": [
+        {
+          "unit": "[9] 'התאריך שמתקבל הוא יום העבודה השלישי לפני היום, כשאתמול נספר כראשון אם הוא יום עבודה'",
+          "problem": "Omits the data-dependent case where the loop is exhausted. The result is then 22 days before today.",
+          "correct": "Add: 'אם אחרי 21 ימים לא נמצא יום העבודה השלישי, מוחזר התאריך 22 ימים לפני היום'",
+          "evidence": "ScriptMain.cs:119-133"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Update SuspicionAsEmitted Joinings|detailed",
+      "hash": "f681c299b278",
+      "verdict": "WRONG",
+      "detail": "[1]-[3] and [5]-[9] are verified. [1]: precedence DTSX:6510 -> 6509 -> 6511 is all Success, and Close Joining processes sets gen_joiningstatus=8 (Set columns DTSX:1016) for status-7 rows (DTSX:980). [2]: the SQL and the ? -> Parameter0 -> {81CBF82A} = User::LastThreeWorkingDays (DTSX:5541-5549). [3]: DTSX:5573 = 12. [9]: the Error output has no path, and CRM.Proxy is unknown. Two units are wrong. [4] 'שום שדה אחר לא משתנה' is an absolute statement about the CRM record. The package writes only gen_joiningstatus (main.cs:118-122). But the CRM platform updates system fields (modifiedon/modifiedby) on every Update, and plugins/workflows are external_unknown, so the sentence is not true as written. [10] 'שתאריך gen_sendtobankdate שלהן לפני שלושה ימי עבודה או יותר' states as fact that the threshold is three working days ago. The package's own LastThreeWorkingDays claims say that skipping Friday/Saturday/holidays is unproven; if no rule matches, the threshold is 3 calendar days. So [10] contradicts them. Use 'לא מאוחר מתאריך הסף', as the detail claim does.",
+      "evidence": "DTSX:5541-5549, 5573, 5600 main.cs:114-134, 6498-6499, 6509-6511; LastThreeWorkingDays title short_he",
+      "wrongUnits": [
+        {
+          "unit": "[4] 'הבקשה מעודכנת ב-CRM לסטטוס 12. שום שדה אחר לא משתנה.'",
+          "problem": "Absolute claim about the record. Only the package's write is proven to be limited to gen_joiningstatus. System fields and any plugins are not covered.",
+          "correct": "'... החבילה אינה כותבת שום שדה אחר.'",
+          "evidence": "main.cs:118-122"
+        },
+        {
+          "unit": "[10] 'שתאריך gen_sendtobankdate שלהן לפני שלושה ימי עבודה או יותר'",
+          "problem": "States 'three working days' as fact, which contradicts the package's own caveat that working-day skipping is unproven.",
+          "correct": "'... ושתאריך gen_sendtobankdate שלהן אינו מאוחר (ברמת יום) מתאריך הסף LastThreeWorkingDays'",
+          "evidence": "DTSX:5544; ScriptMain.cs:116-133"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Update SuspicionAsEmitted Joinings|detail",
+      "hash": "f9391e0c2439",
+      "verdict": "CONFIRMED",
+      "detail": "[1]: the SQL is exact (DTSX:5541-5544), the parameter is mapped to User::LastThreeWorkingDays (DTSX:5549), and 'לא מאוחר מתאריך הסף' is the correct day-level reading of datediff(day, threshold, date) <= 0. The meaning of the field is labelled השערה. [2]: entity.Id = gen_automatedjoiningId (main.cs:120), with no other lookup. [3]: the only branch is the catch -> DirectRowToError, and the Error output has no path (DTSX:6498-6499). 'נשארת בסטטוס 7' follows for a failed Update. The package-only and CRM.Proxy-unknown qualification is present. [4]: gen_automatedjoining Update via SDK, gen_joiningstatus = OptionSetValue(12). [5]: the result uses 'תאריך הסף' rather than 'three working days', and the name meaning is labelled השערה.",
+      "evidence": "DTSX:5536-5549, 5573, 5600 main.cs:114-134, 6498-6499",
+      "wrongUnits": []
+    }
+  ],
+  "missingWrites": []
+}

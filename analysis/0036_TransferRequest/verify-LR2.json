@@ -1,0 +1,31 @@
+{
+  "verifier": "ssis-verifier",
+  "package": "0036_TransferRequest",
+  "scope": "logic-claims re-check round 2",
+  "checkedAt": "2026-11-07T17:20:50Z",
+  "checked": 1,
+  "results": [
+    {
+      "id": "L|Package\\Update SuspicionAsEmitted Transfer Request|short",
+      "hash": "e9c07bdd44e7",
+      "verdict": "WRONG",
+      "detail": "Re-derived:\n- The OLE DB source on [Psql] (design-time Psql/ALTSHULER_MSCRM; 0036 has no configurations) selects gen_transferrequestId WHERE gen_tanferinstatus = 7 AND gen_SendToBankDate IS NOT NULL AND datediff(day, ?, gen_SendToBankDate) <= 0. The parameter ? is User::LastThreeWorkingDays (DTSX:3584-3592).\n- Derived Column gen_suspicionAsEmitted = 11 (DTSX:3616).\n- main.cs sets entity[\"gen_tanferinstatus\"] = new OptionSetValue(11) and calls CrmProxy.GetCrmService().Update. On an exception it calls DirectRowToError, the error output is not connected, and the record is not updated.\n- Threshold (Script Task, DTSX:3270-3313): currDate starts at yesterday (DateTime.Now.AddDays(-1).Date) with the counter at 2. A day counts unless dt.Select(\"starttime = '\" + currDate.ToString() + \"'\") finds a row in NonWorkingDays. NonWorkingDays comes from CalendarRule rows named Friday/Saturday/Holiday with starttime between GetutcDate()-21 and GetutcDate() (DTSX:2257-2263). The result is the 3rd non-matched day back.\n\nUnit [2] is correct. Unit [3] is acceptable: the column is named with its technical name, and the SuspicionAsEmitted meaning is labelled unproven. Unit [1] has two problems:\n(a) 'ונשלחו לבנק' asserts an event (the request was sent to the bank). That meaning comes only from the column name gen_SendToBankDate and is not labelled.\n(b) 'לפני שלושה ימי עבודה' is stated as fact. Whether Fridays, Saturdays and holidays are actually skipped depends on data: a CalendarRule.starttime value must equal exactly the local-midnight DateTime currDate, compared as a culture-formatted string. Neither the stored time of day of CalendarRule.starttime nor the runtime culture is in the files. If nothing matches, the threshold is 3 calendar days back.\nPlumbing note, not counted: if the script throws, Main sets Failure and then Success, so the variable keeps its design-time value 10/3/2017 (DTSX:21).",
+      "evidence": "source/DailyProcess/0036_TransferRequest.dtsx:21, 2257-2263, 3270-3313 (ScriptMain LastThreeWorkingDays), 3584-3592, 3616, main.cs in DTSX:3767-3840, paths 4541-4542",
+      "wrongUnits": [
+        {
+          "unit": 1,
+          "problem": "'נשלחו לבנק' is a meaning taken from the column name gen_SendToBankDate and is not labelled.",
+          "correct": "בקשות שבסטטוס 7 ושערך gen_SendToBankDate שלהן (לפי שם השדה: תאריך שליחה לבנק – המשמעות לא מוכחת) אינו ריק ונופל ביום הסף או לפניו.",
+          "evidence": "DTSX:3586-3587"
+        },
+        {
+          "unit": 1,
+          "problem": "'שלושה ימי עבודה' is stated as fact, but non-working days are skipped only if a CalendarRule row (Friday/Saturday/Holiday, last 21 days) has a starttime exactly equal to local midnight of that day (DataTable.Select string match). That depends on data and runtime and is not shown in the files.",
+          "correct": "יום הסף הוא היום השלישי אחורה מאתמול שלא נמצא ברשימת NonWorkingDays (CalendarRule בשם Friday/Saturday/Holiday מ-21 הימים האחרונים). ימים אלה מדולגים רק אם starttime שלהם שווה בדיוק לחצות המקומית של אותו יום; אם אין התאמה, הסף הוא 3 ימים קלנדריים אחורה (תלוי בנתונים, לא מוצג בקבצים).",
+          "evidence": "DTSX:2257-2263, ScriptMain DTSX:3285-3311"
+        }
+      ]
+    }
+  ],
+  "missingWrites": []
+}

@@ -1,0 +1,99 @@
+# 0025_Agents_Agencies.dtsx · 829A8BDEFB30A1C25460DBA62A83427763EBF1EBEC1EE73F0CF1DE50E83D0B0B
+
+## Connection managers
+- [CRM] OLEDB Data Source=Psql;Initial Catalog=ALTSHULER_MSCRM;Integrated Security=SSPI;  
+- [SRS.SSIS_Logs] OLEDB  EXPR ConnectionString=@[User::ConnStringSrsSsis_Logs] 
+
+## Executables (disabled marked !)
+-   Create ETL Process record | Microsoft.ScriptTask  
+-   End ETL Process record | Microsoft.Pipeline  
+-   Get Variables From SystemConfigurarion | Microsoft.Pipeline  
+- ! Set Gen_commissionpostponed | Microsoft.ExecuteSQLTask  | SQL: Update Gen_agentsBase set Gen_commissionpostponed = 1 where ((Gen_bookkeepingexpdate is not null and Gen_bookkeepingexpdate < getutcdate()) or ( Gen_LicenseExpD
+-   update agencies commissionpostponed field | Microsoft.Pipeline  
+-   Update agents balance | Microsoft.Pipeline  
+-   update agents commissionpostponed field | Microsoft.Pipeline  
+-   Package.EventHandlers[OnError] | EventHandler  
+-   Package.EventHandlers[OnError]\Error ETL Process record | Microsoft.ScriptTask  
+
+## Precedence
+- Get Variables From SystemConfigurarion -> Create ETL Process record | Success Constraint   
+- Create ETL Process record -> Update agents balance | Success Constraint   
+- Update agents balance -> Set Gen_commissionpostponed | Success Constraint   
+- Set Gen_commissionpostponed -> update agents commissionpostponed field | Success Constraint   
+- update agents commissionpostponed field -> update agencies commissionpostponed field | Success Constraint   
+- update agencies commissionpostponed field -> End ETL Process record | Success Constraint   
+
+## DataFlow End ETL Process record
+  - ETL Record Finish | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 2 out 0
+  - Get gen_etlprocessid | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 0 out 1
+  - Lookup | Lookup  | conn [CRM]  | in 1 out 1
+     path Lookup.Outputs[Lookup Match Output] => ETL Record Finish.Inputs[Input 0]
+     path Get gen_etlprocessid.Outputs[Output 0] => Lookup.Inputs[Lookup Input]
+
+## DataFlow Get Variables From SystemConfigurarion
+  - Get SystemConfigurations | OLEDBSource  | conn [CRM]  | in 0 out 2
+  - Set Variables | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 2 out 0
+     path Get SystemConfigurations.Outputs[OLE DB Source Output] => Set Variables.Inputs[Input 0]
+
+## DataFlow update agencies commissionpostponed field
+  - ETL Warning 1 | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 4 out 0
+  - get Agencies details | OLEDBSource  | conn [CRM]  | in 0 out 3
+  - set 'pausereason' field | DerivedColumn  | conn   | in 2 out 0
+  - Set Warning columns 1 | DerivedColumn  | conn   | in 1 out 4
+  - update agencies commissionpostponed field | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 2 out 2
+     path set 'pausereason' field.Outputs[Derived Column Output] => update agencies commissionpostponed field.Inputs[Input 0]
+     path Set Warning columns 1.Outputs[Derived Column Output] => ETL Warning 1.Inputs[Input 0]
+     path update agencies commissionpostponed field.Outputs[Error] => Set Warning columns 1.Inputs[Derived Column Input]
+     path get Agencies details.Outputs[OLE DB Source Output] => set 'pausereason' field.Inputs[Derived Column Input]
+
+## DataFlow Update agents balance
+  - Agent Or Agency | ConditionalSplit  | conn   | in 2 out 0
+  - Get agent Data | OLEDBSource  | conn [CRM]  | in 0 out 3
+  - Update Agencies | OLEDBCommand  | conn [CRM]  | in 2 out 0
+  - Update Agents | OLEDBCommand  | conn [CRM]  | in 2 out 0
+     path Get agent Data.Outputs[OLE DB Source Output] => Agent Or Agency.Inputs[Conditional Split Input]
+     path Agent Or Agency.Outputs[Update Agency] => Update Agencies.Inputs[OLE DB Command Input]
+     path Agent Or Agency.Outputs[Update Agent] => Update Agents.Inputs[OLE DB Command Input]
+
+## DataFlow update agents commissionpostponed field
+  - ETL Warning 1 | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 4 out 0
+  - get Agents details | OLEDBSource  | conn [CRM]  | in 0 out 3
+  - set 'pausereason' field | DerivedColumn  | conn   | in 2 out 0
+  - Set Warning columns 1 | DerivedColumn  | conn   | in 1 out 4
+  - update agetns commissionpostponed field | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 2 out 2
+     path set 'pausereason' field.Outputs[Derived Column Output] => update agetns commissionpostponed field.Inputs[Input 0]
+     path Set Warning columns 1.Outputs[Derived Column Output] => ETL Warning 1.Inputs[Input 0]
+     path update agetns commissionpostponed field.Outputs[Error] => Set Warning columns 1.Inputs[Derived Column Input]
+     path get Agents details.Outputs[OLE DB Source Output] => set 'pausereason' field.Inputs[Derived Column Input]
+
+## SQL statements
+- End ETL Process record\Lookup | Microsoft.Lookup.SqlCommand | [CRM] 
+    select p.gen_etlprocessid , case when pw.gen_etlprocessid is null then 0 else 1 end as isWarningExist from gen_etlprocess p left join (select distinct gen_etlprocessId from gen_etlprocesswarning ) as pw on p.gen_etlprocessId = pw.gen_etlprocessId
+- End ETL Process record\Lookup | Microsoft.Lookup.SqlCommandParam | [CRM] 
+    select * from (select p.gen_etlprocessid , case when pw.gen_etlprocessid is null then 0 else 1 end as isWarningExist from gen_etlprocess p left join (select distinct gen_etlprocessId from gen_etlprocesswarning ) as pw on p.gen_etlprocessId = pw.gen_etlprocessId) [refTable] where [refTable].[gen_etlprocessid] = ?
+- Get Variables From SystemConfigurarion\Get SystemConfigurations | Microsoft.OLEDBSource.SqlCommand | [CRM] 
+    SELECT gen_key ,gen_Value FROM gen_etlvariable where gen_scope ='global' or gen_scope = ?
+- Set Gen_commissionpostponed | ExecuteSQLTask | [CRM] 
+    Update Gen_agentsBase set Gen_commissionpostponed = 1 where ((Gen_bookkeepingexpdate is not null and Gen_bookkeepingexpdate < getutcdate()) or ( Gen_LicenseExpDate is not null and Gen_LicenseExpDate < getutcdate())) AND (Gen_commissionpostponed IS NULL OR Gen_commissionpostponed = 0) Update Gen_agencieBase set Gen_commissionpostponed = 1 where ((gen_bookkeepingexp is not null and gen_bookkeepingex
+- update agencies commissionpostponed field\get Agencies details | Microsoft.OLEDBSource.SqlCommand | [CRM] 
+    select Gen_agencieId,dateadd(HOUR, 3, gen_licenseexpdate) gen_licenseexpdate,gen_pausereason from Gen_agencie where gen_commissionpostponed != 1 AND (gen_licenseexpdate is null OR dateadd(HOUR, 3, gen_licenseexpdate) < CONVERT(DATE, GETDATE()) OR gen_bookkeepingexp is null OR dateadd(HOUR, 3, gen_bookkeepingexp) < CONVERT(DATE, GETDATE()) OR gen_taxdeductionexp is null OR dateadd(HOUR, 3, gen_taxd
+- Update agents balance\Get agent Data | Microsoft.OLEDBSource.SqlCommand | [CRM] 
+    select gen_agentsid, isnull(gen_agentvalue,0) as gen_agentvalueDB, gen_agencieid, isnull(gen_agencyvalue,0) as gen_agencyvalueDB, sum(isnull(gen_accountbalance,0)) as balance from ( select ac.gen_agentname, ac.gen_agencyname, gen_accountbalance from gen_fundmain f join gen_agentcontract as ac on ac.Gen_agentcontractId = f.gen_brokernumber union all select acc.gen_agentname, acc.gen_agencyname, gen
+- Update agents balance\Update Agencies | Microsoft.OLEDBCommand.SqlCommand | [CRM] 
+    Update Gen_agencieBase set gen_agencyvalue = ? where gen_agencieid = ?
+- Update agents balance\Update Agents | Microsoft.OLEDBCommand.SqlCommand | [CRM] 
+    Update Gen_agentsBase set gen_agentvalue = ? where gen_agentsid = ?
+- update agents commissionpostponed field\get Agents details | Microsoft.OLEDBSource.SqlCommand | [CRM] 
+    select Gen_agentsId,dateadd(HOUR, 3, gen_licenseexpdate) gen_licenseexpdate,gen_pausereason from Gen_agents where gen_commissionpostponed != 1 AND (gen_licenseexpdate is null OR dateadd(HOUR, 3, gen_licenseexpdate) < CONVERT(DATE, GETDATE()) OR gen_bookkeepingexpdate is null OR dateadd(HOUR, 3, gen_bookkeepingexpdate) < CONVERT(DATE, GETDATE()) OR gen_taxdeductionexpdate is null OR dateadd(HOUR, 3
+
+## Code write candidates (per owner)
+- Create ETL Process record {"crm-entity":1,"crm-sdk-create":1,"variables-write":1}
+- End ETL Process record\ETL Record Finish {"sql-command":2,"crm-entity":3,"output-buffer":1,"crm-sdk-update":1}
+- End ETL Process record\Get gen_etlprocessid {"sql-command":2,"output-buffer":2}
+- update agencies commissionpostponed field\ETL Warning 1 {"crm-entity":3,"crm-sdk-create":1}
+- update agencies commissionpostponed field\update agencies commissionpostponed field {"crm-service":1,"crm-entity":2,"output-buffer":3,"crm-sdk-execute":3}
+- update agents commissionpostponed field\ETL Warning 1 {"crm-entity":3,"crm-sdk-create":1}
+- update agents commissionpostponed field\update agetns commissionpostponed field {"crm-service":1,"crm-entity":2,"output-buffer":3,"crm-sdk-execute":3}
+- Package.EventHandlers[OnError]\Error ETL Process record {"crm-entity":4,"crm-sdk-update":1,"crm-sdk-create":1}
+
+## External refs (non-framework) CRM2015.Proxy

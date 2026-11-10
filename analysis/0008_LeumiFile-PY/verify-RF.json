@@ -1,0 +1,23 @@
+{
+  "verifier": "ssis-verifier",
+  "package": "0008_LeumiFile-PY",
+  "scope": "fieldmap.json rowFilters (inner-join)",
+  "checked": 2,
+  "results": [
+    {
+      "id": "ROWFILTER inner-join Merge Join [Create fundmain for transferin]",
+      "verdict": "CONFIRMED",
+      "detail": "Raw DTSX: JoinType=2 (INNER), NumKeyColumns=1, TreatNullsAsEqual=true. Left input <- Sort (EliminateDuplicates=false) key 1 Request_ID_74; right input <- Sort 1 (EliminateDuplicates=false) key 1 Request_ID_74; pairing Request_ID_74 = Request_ID_74 is correct; Request_ID_74 is the staging ext column Request_ID_74. Left rows come from Split Transfer Direction default output (Action_Transfer_Direction_69 != \"2\"), right rows from Transfer Direction 2 (== \"2\"). Merge Join is upstream of Create gen_fundmain and copies 1-4 (Merge Join -> Append Zeros To Fields -> ... -> Split Rows For MultiThread -> writers). Notes: (a) the direction dependency is carried by the analyst declared Merge Join entries (fileFields include Action_Transfer_Direction_69); those entries still say \"not auto-detected\", which is now stale/duplicate. (b) neither Sort eliminates duplicates, so the join is many-to-many and can MULTIPLY rows, not only drop them (later script dedup \"remove duplicate\" is declared separately).",
+      "evidence": "source/DailyProcess/0008_LeumiFile-PY.dtsx:34586-34590 (Merge Join props), 34596/34604 (input cachedSortKeyPosition=1), 36275/36306 (Sort), 36328/36353 (Sort 1), paths 37759/37758 (Sort->Left, Sort 1->Right), 37764/37765 (Split Transfer Direction outputs), Split Transfer Direction DTSX 36425"
+    },
+    {
+      "id": "ROWFILTER inner-join Merge Join [Create transferin Maslulim]",
+      "verdict": "CONFIRMED",
+      "detail": "Raw DTSX: JoinType=2, NumKeyColumns=3, TreatNullsAsEqual=true. Left <- Sort (EliminateDuplicates=true) keys 1 gen_requestidentifier, 2 Source_Fund_AccountNumber_20, 3 Source_Fund_FundType_16 (4 gen_deliverydate not a join key); right <- Sort 1 (EliminateDuplicates=true) keys 1 gen_requestidentifier, 2 Target_Fund_AccountNumber_47, 3 Target_Fund_FundType_43. Tool pairing (gen_requestidentifier=gen_requestidentifier AND Source_Fund_AccountNumber_20=Target_Fund_AccountNumber_47 AND Source_Fund_FundType_16=Target_Fund_FundType_43) matches; gen_requestidentifier is staging ext column Request_ID_74 (DTSX 43657), so fileFields are right. Upstream of SDK Create gen_TransferIn and copies 1-4. Notes: both fund-type keys are normalised 5006->1025 before the join (Handle Gemel To Invest Case main.cs:120-124), so a source 5006 pairs with a target 1025; the direction dependency (Conditional Split DTSX 39413, Action_Transfer_Direction_69 == \"2\" -> right, default -> left) is carried by analyst declared entries; their \"not auto-detected\" wording is now stale.",
+      "evidence": "source/DailyProcess/0008_LeumiFile-PY.dtsx:43485-43489, 43495-43506 (cachedSortKeyPosition), 50315/50352-50367 (Sort), 50379/50410-50420 (Sort 1), paths 51795/51794, 51801/51802; ext col 43657"
+    }
+  ],
+  "missingWrites": [],
+  "notes": "Scope: INNER Merge Joins (JoinType=2) upstream of CRM writers. Missing-join sweep over 0004, 0005, 0008, 0009, 0012, 0013, 0015, 0028, 0029, 0031, 0032 (grep of contactInfo=\"Merge Join\" in raw DTSX): no INNER Merge Join is missing from rowFilters. Non-inner joins found: 0005 Create or Update Customer Accounts\\Merge Join JoinType=1 (DTSX 33702), 0012 Delete Beneficiaries\\Merge Join JoinType=1 (85207); outside the list 0023 Set MF on employers\\Merge Join JoinType=1 (5732). No Merge Join in 0004, 0015, 0028, 0029, 0031, 0032.",
+  "date": "2026-11-06"
+}

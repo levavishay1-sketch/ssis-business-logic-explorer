@@ -1,0 +1,679 @@
+{
+  "package": "0021_Account",
+  "analyst": "ssis-business-logic",
+  "source": {
+    "file": "source/DailyProcess/0021_Account.dtsx",
+    "sha256": "BAD3B657F536C5FCCD90C47D9E503EC056323813F4E7577AC1ED5FA2D16213BE"
+  },
+  "scopeNote_he": "ניתוח לפי ה-DTSX בלבד. [CRM] = OLEDB, Data Source=Psql; Initial Catalog=ALTSHULER_MSCRM (DTSX:4-6). זה מסד הנתונים של ה-CRM לפי הראיות הבאות: (1) שם הקטלוג בתבנית <Org>_MSCRM; (2) באותו חיבור נקראות טבלאות וישויות CRM (account, accountbase, gen_fundmain, gen_agents). זה ערך מזמן התכנון והראיה נסיבתית. אין הוכחה שזה אותו ארגון שאליו כותב ה-SDK: ה-Lookup ב-End ETL Process record על [CRM] מפנה שורות ללא התאמה ל-Derived Column שאין אחריו כלום (NoMatchBehavior=0, RedirectRow, DTSX:2367; path DTSX:2417), ולכן ריצה שבה רשומת gen_etlprocess שנוצרה ב-SDK לא נמצאת ב-[CRM] מסתיימת בשקט. בנוסף, יעד ה-SDK (ServerName/OrganizationName) נטען מ-gen_etlvariable דרך [CRM] עצמו, כך שהטיעון מעגלי. הסתייגות: קובץ התצורה C:\\Generix\\SSISConfigFile.dtsConfig (DTSX:17) לא סופק וייתכן שהוא דורס את מחרוזת החיבור (blocked_external_dependency). שני העדכונים העסקיים הם SQL DML ישיר על accountbase (Unsupported). אין בחבילה כתיבה עסקית דרך ה-SDK. בחבילה שלושה כותבי SDK, וכולם מסגרת ETL: Create ETL Process record (DTSX:311-319), End ETL Process record\\ETL Record Finish (DTSX:974-983) ו-OnError\\Error ETL Process record (DTSX:3819-3834, כולל יצירת annotation).",
+  "summary_he": "החבילה מתחזקת שני דגלים ברמת החשבון (account) לפי הקופות (gen_fundmain) שלו, כלומר קופות שבהן gen_accountname = accountid: gen_isfundinternalagent = 1 אם יש קופה שיש לה חוזה סוכן (gen_agentcontract) וסוכן (gen_agents) תואמים, והסוכן מסוג gen_agenttype = 1; gen_fundwithoutagent = 1 אם יש קופה שבה העמודה gen_brokernumbername שווה בדיוק למחרוזת '00000004000' (השערה: סימון \"ללא סוכן\"). בשני הדגלים קופה נספרת רק אם יש לה רשומת gen_estatecodeid תואמת שה-gen_estatetypeid שלה אינו ריק (NULL) ואינו '0210' או '3' (השערה לפי שם השדה: סוגי עיזבון). קופה בלי רשומה כזו או עם קוד סוג ריק אינה נספרת, ולכן אם אין לחשבון קופה נספרת אחרת, הדגל שלו מחושב כ-0. רק חשבונות שהערך המחושב בהם שונה מהערך השמור (ערך ריק נחשב 0) מתעדכנים, בעדכון SQL ישיר ל-accountbase (Unsupported).",
+  "executionOrder": [
+    {
+      "step": 1,
+      "refId": "Package\\Get Variables From SystemConfigurarion",
+      "title_he": "טעינת משתני ETL (מסגרת)",
+      "trigger": "start (no incoming constraint)"
+    },
+    {
+      "step": 2,
+      "refId": "Package\\Create ETL Process record",
+      "title_he": "רשומת תהליך ETL (מסגרת)",
+      "trigger": "after Get Variables From SystemConfigurarion · Success (DTSX:3642)"
+    },
+    {
+      "step": 3,
+      "refId": "Package\\Update internal Agent account",
+      "title_he": "סימון חשבונות עם קופה אצל סוכן פנימי",
+      "trigger": "after Create ETL Process record · Success (DTSX:3643)"
+    },
+    {
+      "step": 4,
+      "refId": "Package\\Update no Agent account",
+      "title_he": "סימון חשבונות עם קופה ללא סוכן",
+      "trigger": "after Update internal Agent account · Success (DTSX:3644)"
+    },
+    {
+      "step": 5,
+      "refId": "Package\\End ETL Process record",
+      "title_he": "סגירת תהליך ETL (מסגרת)",
+      "trigger": "after Update no Agent account · Success (DTSX:3645)"
+    },
+    {
+      "step": "on error",
+      "refId": "Package.EventHandlers[OnError]\\Error ETL Process record",
+      "title_he": "סימון שגיאה (מסגרת)",
+      "trigger": "OnError event handler (DTSX:3648)"
+    }
+  ],
+  "ignoredAsFramework": [
+    "Package\\Get Variables From SystemConfigurarion",
+    "Package\\Create ETL Process record",
+    "Package\\End ETL Process record (כולל Lookup, Derived Column, ETL Record Finish)",
+    "Package.EventHandlers[OnError]\\Error ETL Process record",
+    "LogProvider SSIS log provider for SQL Server → [SRS.SSIS_Logs] (DTSX:20)"
+  ],
+  "components": [
+    {
+      "refId": "Package (control flow)",
+      "title_he": "זרימת בקרה: עדכון שני דגלי סוכן בחשבונות",
+      "techName": "Update internal Agent account → Update no Agent account",
+      "short_he": "בכל ריצה מחושבים מחדש שני דגלים בכל חשבון: האם יש לו קופה אצל סוכן פנימי, והאם יש לו קופה ללא סוכן. החשבונות שהשתנו מתעדכנים בעדכון SQL ישיר.",
+      "flow_he": [
+        "טעינת משתנים ופתיחת רשומת תהליך (מסגרת).",
+        "Update internal Agent account.",
+        "אם הצליח: Update no Agent account.",
+        "אם הצליח: סגירת תהליך (מסגרת)."
+      ],
+      "short": {
+        "nodes": [
+          {
+            "type": "step",
+            "text": "החבילה רצה בלי קובץ קלט ומחשבת מחדש נתונים מתוך ה-CRM עצמו."
+          },
+          {
+            "type": "step",
+            "text": "תחילה מעודכן בכל חשבון הדגל שמציין שיש לו קופה אצל סוכן פנימי."
+          },
+          {
+            "type": "decision",
+            "text": "האם השלב הראשון הסתיים בהצלחה?",
+            "branches": [
+              {
+                "label": "כן",
+                "nodes": [
+                  {
+                    "type": "step",
+                    "text": "מעודכן בכל חשבון הדגל שמציין שיש לו קופה ללא סוכן."
+                  }
+                ]
+              },
+              {
+                "label": "לא",
+                "nodes": [
+                  {
+                    "type": "step",
+                    "text": "השלב השני אינו רץ."
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "type": "end",
+            "text": "שני דגלי הסוכן בחשבונות משקפים את הקופות שלהם נכון לזמן הריצה."
+          }
+        ]
+      },
+      "detailed": {
+        "nodes": [
+          {
+            "type": "step",
+            "text": "הגדרות הריצה נטענות מטבלת ההגדרות של ה-ETL (מסגרת). ייתכן שקובץ תצורה חיצוני דורס אותן.",
+            "tech": "Get Variables From SystemConfigurarion DTSX:2424; Configuration C:\\Generix\\SSISConfigFile.dtsConfig DTSX:17 (external_unknown)"
+          },
+          {
+            "type": "step",
+            "text": "נפתחת רשומת תהליך ETL (מסגרת).",
+            "tech": "Create ETL Process record DTSX:89 · after Get Variables · Success (DTSX:3642)"
+          },
+          {
+            "type": "write",
+            "text": "בכל חשבון שהערך בו השתנה מתעדכן הדגל \"קופה אצל סוכן פנימי\".",
+            "tech": "Update internal Agent account DTSX:3283 · after Create ETL Process record · Success (DTSX:3643) · accountbase.gen_isfundinternalagent · SQL"
+          },
+          {
+            "type": "decision",
+            "text": "האם עדכון הדגל הראשון הצליח?",
+            "tech": "Update internal Agent account → Update no Agent account · Success (DTSX:3644)",
+            "branches": [
+              {
+                "label": "כן",
+                "nodes": [
+                  {
+                    "type": "write",
+                    "text": "בכל חשבון שהערך בו השתנה מתעדכן הדגל \"קופה ללא סוכן\".",
+                    "tech": "Update no Agent account DTSX:3437 · accountbase.gen_fundwithoutagent · SQL"
+                  }
+                ]
+              },
+              {
+                "label": "לא",
+                "nodes": [
+                  {
+                    "type": "step",
+                    "text": "הדגל השני אינו מעודכן בריצה זו, ומטפל השגיאות מסמן את התהליך כשגוי (מסגרת).",
+                    "tech": "OnError → Error ETL Process record DTSX:3655"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "type": "step",
+            "text": "אם שני השלבים הצליחו, רשומת התהליך נסגרת (מסגרת).",
+            "tech": "End ETL Process record DTSX:674 · after Update no Agent account · Success (DTSX:3645)"
+          },
+          {
+            "type": "end",
+            "text": "שני דגלי הסוכן בחשבון (gen_isfundinternalagent, gen_fundwithoutagent) מסונכרנים עם הקופות שלו. העדכון עוקף את ה-SDK."
+          }
+        ]
+      },
+      "detail_he": [
+        {
+          "h": "מקור ואוכלוסייה",
+          "t": "אין קובץ קלט. כל הנתונים נקראים ממסד ה-CRM דרך [CRM]."
+        },
+        {
+          "h": "התאמה לרשומות קיימות",
+          "t": "לפי accountid שנשלף מ-CRM."
+        },
+        {
+          "h": "החלטות",
+          "t": "סדר השלבים נקבע אך ורק ב-Success constraints (DTSX:3642-3645). כישלון בשלב עוצר את השלבים שאחריו."
+        },
+        {
+          "h": "כתיבה ל-CRM",
+          "t": "שני עדכוני SQL ישירים על accountbase (Unsupported). [CRM] = OLEDB, Data Source=Psql; Initial Catalog=ALTSHULER_MSCRM (DTSX:4-6). זה מסד הנתונים של ה-CRM לפי הראיות הבאות: (1) שם הקטלוג בתבנית <Org>_MSCRM; (2) באותו חיבור נקראות טבלאות וישויות CRM (account, accountbase, gen_fundmain, gen_agents). זה ערך מזמן התכנון והראיה נסיבתית. אין הוכחה שזה אותו ארגון שאליו כותב ה-SDK: ה-Lookup ב-End ETL Process record על [CRM] מפנה שורות ללא התאמה ל-Derived Column שאין אחריו כלום (NoMatchBehavior=0, RedirectRow, DTSX:2367; path DTSX:2417), ולכן ריצה שבה רשומת gen_etlprocess שנוצרה ב-SDK לא נמצאת ב-[CRM] מסתיימת בשקט. בנוסף, יעד ה-SDK (ServerName/OrganizationName) נטען מ-gen_etlvariable דרך [CRM] עצמו, כך שהטיעון מעגלי. הסתייגות: קובץ התצורה C:\\Generix\\SSISConfigFile.dtsConfig (DTSX:17) לא סופק וייתכן שהוא דורס את מחרוזת החיבור (blocked_external_dependency)."
+        },
+        {
+          "h": "תוצאה עסקית",
+          "t": "דגלי הסוכן בחשבון משמשים, כנראה, לסינון ולתצוגה ב-CRM (השערה; הצרכנים לא ידועים מהחבילה)."
+        }
+      ],
+      "decisions": [
+        {
+          "where": "Precedence DTSX:3644",
+          "condition": "Update internal Agent account → Update no Agent account · Success",
+          "meaning_he": "השלב השני רץ רק אם הראשון הצליח.",
+          "outcome_he": "כישלון בשלב הראשון משאיר את gen_fundwithoutagent לא מעודכן."
+        }
+      ],
+      "crmEffects": [
+        {
+          "entity": "account (accountbase)",
+          "verb": "update gen_isfundinternalagent, gen_fundwithoutagent",
+          "mechanism": "SQL",
+          "when_he": "ראו שני הרכיבים. Unsupported."
+        }
+      ],
+      "evidence": [
+        "Precedence DTSX:3642-3645",
+        "Executables DTSX:89, 674, 2424, 3283, 3437, 3655",
+        "[CRM] DTSX:4-6; Configuration DTSX:17"
+      ],
+      "openQuestions_he": [
+        "האם קובץ התצורה C:\\Generix\\SSISConfigFile.dtsConfig דורס את מחרוזת החיבור [CRM]? הקובץ לא סופק."
+      ]
+    },
+    {
+      "refId": "Package\\Update internal Agent account",
+      "title_he": "סימון חשבונות עם קופה אצל סוכן פנימי",
+      "techName": "Update internal Agent account",
+      "short_he": "לכל חשבון נקבע אם יש לו קופה (gen_fundmain) עם חוזה סוכן וסוכן תואמים, שהסוכן בה מסוג 1, ושיש לה רשומת סוג עיזבון (השערה לפי שם השדה) תואמת שקוד הסוג בה אינו ריק ואינו 0210 או 3. קופה בלי חוזה סוכן, בלי סוכן, בלי רשומת סוג עיזבון או עם קוד סוג ריק אינה נספרת. הדגל בחשבון מתעדכן רק אם הערך השתנה.",
+      "flow_he": [
+        "חישוב לכל account: 1 אם קיימת gen_fundmain עם gen_agentcontract ו-gen_agents תואמים (INNER JOIN) שבה gen_agenttype = 1, ושיש לה רשומת gen_estatecodeid תואמת (INNER JOIN) עם gen_estatetypeid not in ('0210','3'); קופה בלי רשומה תואמת או עם gen_estatetypeid ריק אינה נספרת. אחרת 0.",
+        "השוואה ל-isnull(gen_isfundinternalagent,0) הקיים. רק חשבונות שהערך בהם שונה נשלפים.",
+        "Sort לפי accountid ואז UPDATE accountbase SET gen_isfundinternalagent (SQL ישיר, Unsupported)."
+      ],
+      "short": {
+        "nodes": [
+          {
+            "type": "step",
+            "text": "לכל חשבון ב-CRM בודקים את הקופות המשויכות אליו."
+          },
+          {
+            "type": "decision",
+            "text": "האם יש לחשבון קופה עם חוזה סוכן וסוכן תואמים, שהסוכן בה מסוג 1 (השערה: סוכן פנימי), ושיש לה רשומת סוג עיזבון (השערה לפי שם השדה) תואמת שקוד הסוג בה אינו ריק ואינו 0210 או 3?",
+            "branches": [
+              {
+                "label": "כן",
+                "nodes": [
+                  {
+                    "type": "step",
+                    "text": "הדגל \"קופה אצל סוכן פנימי\" צריך להיות 1."
+                  }
+                ]
+              },
+              {
+                "label": "לא",
+                "nodes": [
+                  {
+                    "type": "step",
+                    "text": "הדגל צריך להיות 0."
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "type": "decision",
+            "text": "האם הערך המחושב שונה מהערך שכבר שמור בחשבון?",
+            "branches": [
+              {
+                "label": "כן",
+                "nodes": [
+                  {
+                    "type": "write",
+                    "text": "הדגל \"קופה אצל סוכן פנימי\" בחשבון מתעדכן לערך המחושב, בעדכון SQL ישיר למסד ה-CRM."
+                  }
+                ]
+              },
+              {
+                "label": "לא",
+                "nodes": [
+                  {
+                    "type": "step",
+                    "text": "החשבון אינו מעודכן."
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "type": "end",
+            "text": "אם הזרימה רצה וכל העדכונים הצליחו, הדגל \"קופה אצל סוכן פנימי\" בכל חשבון שווה לערך המחושב מהקופות שלו, נכון לזמן הריצה. אם עדכון נכשל, לא כל החשבונות מעודכנים."
+          }
+        ]
+      },
+      "detailed": {
+        "nodes": [
+          {
+            "type": "step",
+            "text": "נבדקים כל החשבונות ב-CRM, בלי סינון לפי מצב החשבון.",
+            "tech": "Get Account to update (OLEDBSource, [CRM]) DTSX:3289, SQL DTSX:3294: FROM account left join (subquery funds) on funds.gen_accountname = accountid"
+          },
+          {
+            "type": "step",
+            "text": "לכל חשבון מאתרים קופות שבהן שדה החשבון (gen_accountname) שווה למזהה החשבון, דרך חוזה הסוכן אל הסוכן, ובודקים את סוג הסוכן ואת סוג העיזבון (השערה לפי שם השדה) של הקופה. רשומת סוג העיזבון מותאמת לקופה דרך העמודה gen_estatecodeidid, שמופיעה בשאילתה בלי שם טבלה. היא העמודה של gen_estatecodeid: אילו העמודה הייתה קיימת ביותר מטבלה אחת בשאילתה, השאילתה הייתה נכשלת; לפי המשתמש החבילה רצה בפרודקשן; והשאילתה השנייה באותה חבילה, על אותו חיבור, מפנה במפורש ל-Gen_estatecodeid.Gen_estatecodeidId. קופה בלי חוזה סוכן, בלי סוכן או בלי רשומת סוג עיזבון תואמת לא נספרת, כי החיבורים הם INNER JOIN. גם קופה שקוד סוג העיזבון שלה ריק (NULL) לא נספרת, כי תנאי NOT IN אינו מתקיים על ערך ריק.",
+            "tech": "select gen_fundmain.gen_accountname from gen_fundmain JOIN gen_agentcontract ON gen_fundmain.gen_brokernumber = gen_agentcontract.gen_agentcontractid JOIN gen_agents ON gen_agentcontract.gen_agentname = gen_agents.gen_agentsid join gen_estatecodeid on gen_estatecodeidid = gen_fundmain.gen_estatetype WHERE gen_agents.gen_agenttype = 1 and gen_estatecodeid.gen_estatetypeid not in ('0210','3') group by gen_fundmain.gen_accountname (DTSX:3294-3310) · gen_estatecodeidid לא מסויג; בעלות: Gen_estatecodeid.Gen_estatecodeidId מפורש ב-DTSX:3496 + כלל העמימות"
+          },
+          {
+            "type": "decision",
+            "text": "האם יש לחשבון קופה שהסוכן שלה מסוג 1 (השערה: סוכן פנימי), שקוד סוג העיזבון (השערה לפי שם השדה) שלה אינו ריק ואינו 0210 או 3?",
+            "tech": "case when funds.gen_accountname is null then 0 else 1 end as gen_isfundinternalagent",
+            "branches": [
+              {
+                "label": "כן",
+                "nodes": [
+                  {
+                    "type": "step",
+                    "text": "הדגל \"קופה אצל סוכן פנימי\" צריך להיות 1.",
+                    "tech": "ערך מחושב = 1"
+                  }
+                ]
+              },
+              {
+                "label": "לא",
+                "nodes": [
+                  {
+                    "type": "step",
+                    "text": "הדגל צריך להיות 0.",
+                    "tech": "ערך מחושב = 0"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "type": "step",
+            "text": "הערך שכבר שמור בחשבון נקרא. אם הוא ריק, הוא נחשב 0.",
+            "tech": "isnull(gen_isfundinternalagent,0) as gen_isfundinternalagentDB"
+          },
+          {
+            "type": "decision",
+            "text": "האם הערך המחושב שונה מהערך השמור?",
+            "tech": "where temp.gen_isfundinternalagent != temp.gen_isfundinternalagentDB",
+            "branches": [
+              {
+                "label": "כן",
+                "nodes": [
+                  {
+                    "type": "step",
+                    "text": "החשבונות שהשתנו ממוינים לפי מזהה החשבון ונשלחים לעדכון אחד-אחד.",
+                    "tech": "Sort DTSX:3343: sort key accountid, EliminateDuplicates=false (DTSX:3345)"
+                  },
+                  {
+                    "type": "write",
+                    "text": "הדגל \"קופה אצל סוכן פנימי\" בחשבון מתעדכן לערך המחושב, בעדכון SQL ישיר למסד ה-CRM.",
+                    "tech": "Update Account (OLEDBCommand, [CRM]) DTSX:3385, SQL DTSX:3388: Update accountbase set gen_isfundinternalagent = ? where accountid = ? · Param_0 ← gen_isfundinternalagent, Param_1 ← accountid · account · update · SQL (Unsupported)"
+                  },
+                  {
+                    "type": "step",
+                    "text": "אם עדכון של חשבון נכשל, זרימת הנתונים נכשלת וכל השלבים הבאים בחבילה אינם רצים.",
+                    "tech": "Update Account.Inputs errorRowDisposition=\"FailComponent\" (DTSX:3397); Update internal Agent account → Update no Agent account: Success (DTSX:3644)"
+                  }
+                ]
+              },
+              {
+                "label": "לא",
+                "nodes": [
+                  {
+                    "type": "step",
+                    "text": "החשבון אינו נשלף ואינו מעודכן."
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "type": "end",
+            "text": "אם כל העדכונים הצליחו, בכל חשבון הדגל gen_isfundinternalagent שווה לערך המחושב מהקופות שלו, נכון לזמן הריצה. אם עדכון נכשל, הריצה נעצרת ולא כל החשבונות מעודכנים."
+          }
+        ]
+      },
+      "detail_he": [
+        {
+          "h": "מקור ואוכלוסייה",
+          "t": "כל רשומות account (בלי סינון מצב). לכל חשבון נבדק אם קיימת gen_fundmain שבה gen_accountname = accountid, הסוכן שלה (gen_brokernumber → gen_agentcontract → gen_agents) הוא gen_agenttype = 1, וקוד סוג העיזבון (השערה לפי שם השדה) שלה אינו '0210' או '3'. סוג העיזבון מחובר דרך gen_estatecodeidid = gen_fundmain.gen_estatetype, כש-gen_estatecodeidid מופיע בלי שם טבלה. זו העמודה של gen_estatecodeid: אילו העמודה הייתה קיימת ביותר מטבלה אחת בשאילתה, השאילתה הייתה נכשלת; לפי המשתמש החבילה רצה בפרודקשן; והשאילתה של 'Update no Agent account' באותה חבילה מפנה במפורש ל-Gen_estatecodeid.Gen_estatecodeidId (DTSX:3496). קופה בלי gen_agentcontract, gen_agents או gen_estatecodeid תואמים אינה נספרת (INNER JOIN), וגם קופה שבה gen_estatetypeid ריק (NULL) אינה נספרת (NOT IN). גם קופות לא פעילות נספרות, כי אין סינון מצב על gen_fundmain."
+        },
+        {
+          "h": "התאמה לרשומות קיימות",
+          "t": "אין קובץ. החשבונות נשלפים ממסד ה-CRM עצמו, והעדכון נעשה לפי accountid."
+        },
+        {
+          "h": "החלטות",
+          "t": "ערך מחושב: case when funds.gen_accountname is null then 0 else 1. נשלפים רק חשבונות שבהם הערך המחושב != isnull(gen_isfundinternalagent,0)."
+        },
+        {
+          "h": "כתיבה ל-CRM",
+          "t": "UPDATE accountbase SET gen_isfundinternalagent = <0/1> WHERE accountid = <id>, עדכון SQL ישיר דרך [CRM] (Unsupported). כישלון בעדכון נכשל את הרכיב ועוצר את החבילה."
+        },
+        {
+          "h": "תוצאה עסקית",
+          "t": "אם כל העדכונים הצליחו, בכל חשבון הדגל gen_isfundinternalagent שווה לערך המחושב מהקופות שלו, נכון לזמן הריצה."
+        }
+      ],
+      "decisions": [
+        {
+          "where": "Get Account to update (SQL, DTSX:3294)",
+          "condition": "gen_agents.gen_agenttype = 1 and gen_estatecodeid.gen_estatetypeid not in ('0210','3')",
+          "meaning_he": "קופה נחשבת רק אם הסוכן שלה מסוג 1 וסוג העיזבון (השערה לפי שם השדה) שלה אינו ריק ואינו 0210 או 3 (ערך ריק אינו עובר את NOT IN). סוג העיזבון של הקופה נקבע דרך החיבור gen_estatecodeidid = gen_fundmain.gen_estatetype; gen_estatecodeidid מופיע בלי שם טבלה, והוא של gen_estatecodeid כי אילו העמודה הייתה קיימת ביותר מטבלה אחת השאילתה הייתה נכשלת (לפי המשתמש החבילה רצה בפרודקשן), והחבילה מפנה במפורש ל-Gen_estatecodeid.Gen_estatecodeidId (DTSX:3496). המשמעות העסקית של הקודים לא ידועה מהחבילה.",
+          "outcome_he": "קובע אם לחשבון יש לפחות קופה אחת כזו (ערך 1) או אין (ערך 0)."
+        },
+        {
+          "where": "Get Account to update (SQL, DTSX:3294)",
+          "condition": "where temp.gen_isfundinternalagent != temp.gen_isfundinternalagentDB",
+          "meaning_he": "רק חשבון שהערך המחושב שלו שונה מהערך השמור (ריק נחשב 0).",
+          "outcome_he": "רק חשבונות כאלה מתעדכנים."
+        }
+      ],
+      "crmEffects": [
+        {
+          "entity": "account (טבלה accountbase)",
+          "verb": "update gen_isfundinternalagent = 0/1",
+          "mechanism": "SQL",
+          "when_he": "כשהערך המחושב שונה מ-isnull(gen_isfundinternalagent,0). Unsupported, עדכון ישיר למסד ה-CRM."
+        },
+        {
+          "entity": "account, gen_fundmain, gen_agentcontract, gen_agents, gen_estatecodeid",
+          "verb": "read",
+          "mechanism": "SQL (SELECT)",
+          "when_he": "בתחילת זרימת הנתונים"
+        }
+      ],
+      "evidence": [
+        "0021_Account.dtsx sha BAD3B657… · Data Flow Update internal Agent account DTSX:3283",
+        "Get Account to update DTSX:3289, SqlCommand DTSX:3294",
+        "Sort DTSX:3343 (EliminateDuplicates=false DTSX:3345)",
+        "Update Account DTSX:3385, SqlCommand DTSX:3388, input disposition DTSX:3397",
+        "[CRM] connection DTSX:4-6; Configuration DTSX:17"
+      ],
+      "openQuestions_he": [
+        "מה המשמעות של gen_agenttype = 1 ושל קודי העיזבון (השערה לפי שם השדה) '0210' ו-'3'?",
+        "האם זה מכוון שאין סינון מצב (statecode) על account ועל gen_fundmain, כך שגם קופה לא פעילה מסמנת את החשבון?",
+        "נענה: העמודה gen_estatecodeidid בתנאי החיבור (DTSX:3306) מופיעה בלי שם טבלה. היא של gen_estatecodeid: אילו העמודה הייתה קיימת ביותר מטבלה אחת בשאילתה (gen_fundmain, gen_agentcontract, gen_agents, gen_estatecodeid), השאילתה הייתה נכשלת על שם עמודה דו-משמעי; לפי המשתמש החבילה רצה בפרודקשן; והשאילתה השנייה באותה חבילה מפנה במפורש ל-Gen_estatecodeid.Gen_estatecodeidId (DTSX:3496). שתי השאילתות כותבות את שם הטבלה באותיות שונות (gen_estatecodeid / Gen_estatecodeid) ושתיהן רצות, ולכן ההבדל באותיות גדולות/קטנות אינו משנה במסד הזה."
+      ]
+    },
+    {
+      "refId": "Package\\Update no Agent account",
+      "title_he": "סימון חשבונות עם קופה ללא סוכן",
+      "techName": "Update no Agent account",
+      "short_he": "לכל חשבון נקבע אם יש לו קופה שבה העמודה gen_brokernumbername שווה בדיוק למחרוזת '00000004000' (השערה: סימון \"ללא סוכן\") ושיש לה רשומת סוג עיזבון (השערה לפי שם השדה) תואמת שקוד הסוג בה אינו ריק ואינו 0210 או 3. קופה בלי רשומת סוג עיזבון או עם קוד סוג ריק אינה נספרת. הדגל בחשבון מתעדכן רק אם הערך השתנה.",
+      "flow_he": [
+        "חישוב לכל account: 1 אם קיימת gen_fundmain עם gen_brokernumbername = '00000004000' שיש לה רשומת Gen_estatecodeid תואמת (INNER JOIN) עם Gen_EstateTypeID not in ('0210','3'); קופה בלי רשומה תואמת או עם Gen_EstateTypeID ריק אינה נספרת. אחרת 0.",
+        "השוואה ל-isnull(gen_fundwithoutagent,0). רק חשבונות שהערך בהם שונה נשלפים.",
+        "Sort לפי accountid ואז UPDATE accountbase SET gen_fundwithoutagent (SQL ישיר, Unsupported)."
+      ],
+      "short": {
+        "nodes": [
+          {
+            "type": "step",
+            "text": "לכל חשבון ב-CRM בודקים את הקופות המשויכות אליו."
+          },
+          {
+            "type": "decision",
+            "text": "האם יש לחשבון קופה שבה העמודה gen_brokernumbername שווה בדיוק למחרוזת '00000004000' (השערה: סימון \"ללא סוכן\"), ושיש לה רשומת סוג עיזבון (השערה לפי שם השדה) תואמת שקוד הסוג בה אינו ריק ואינו 0210 או 3?",
+            "branches": [
+              {
+                "label": "כן",
+                "nodes": [
+                  {
+                    "type": "step",
+                    "text": "הדגל \"קופה ללא סוכן\" צריך להיות 1."
+                  }
+                ]
+              },
+              {
+                "label": "לא",
+                "nodes": [
+                  {
+                    "type": "step",
+                    "text": "הדגל צריך להיות 0."
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "type": "decision",
+            "text": "האם הערך המחושב שונה מהערך שכבר שמור בחשבון?",
+            "branches": [
+              {
+                "label": "כן",
+                "nodes": [
+                  {
+                    "type": "write",
+                    "text": "הדגל \"קופה ללא סוכן\" בחשבון מתעדכן לערך המחושב, בעדכון SQL ישיר למסד ה-CRM."
+                  }
+                ]
+              },
+              {
+                "label": "לא",
+                "nodes": [
+                  {
+                    "type": "step",
+                    "text": "החשבון אינו מעודכן."
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "type": "end",
+            "text": "אם הזרימה רצה וכל העדכונים הצליחו, הדגל \"קופה ללא סוכן\" בכל חשבון שווה לערך המחושב מהקופות שלו, נכון לזמן הריצה. אם עדכון נכשל, או אם השלב הקודם (סימון סוכן פנימי) נכשל ולכן זרימה זו לא רצה, לא כל החשבונות מעודכנים."
+          }
+        ]
+      },
+      "detailed": {
+        "nodes": [
+          {
+            "type": "step",
+            "text": "נבדקים כל החשבונות ב-CRM, בלי סינון לפי מצב החשבון.",
+            "tech": "Get accounts to update (OLEDBSource, [CRM]) DTSX:3481, SQL DTSX:3486: FROM account left join (subquery funds) on funds.gen_accountname = accountid"
+          },
+          {
+            "type": "step",
+            "text": "לכל חשבון מאתרים קופות שבהן שדה החשבון (gen_accountname) שווה למזהה החשבון, ושבהן הערך בעמודה gen_brokernumbername שווה בדיוק למחרוזת '00000004000' (השוואת טקסט, לא לפי מזהה), ובודקים את סוג העיזבון (השערה לפי שם השדה). קופה בלי רשומת סוג עיזבון תואמת לא נספרת, כי החיבור הוא INNER JOIN. גם קופה שקוד סוג העיזבון שלה ריק (NULL) לא נספרת, כי תנאי NOT IN אינו מתקיים על ערך ריק.",
+            "tech": "select gen_fundmain.gen_accountname from gen_fundmain join Gen_estatecodeid ON Gen_estatecodeid.Gen_estatecodeidId = Gen_fundmain.gen_estatetype WHERE gen_fundmain.gen_brokernumbername = '00000004000' AND Gen_estatecodeid.Gen_EstateTypeID not in ('0210','3') group by gen_fundmain.gen_accountname"
+          },
+          {
+            "type": "decision",
+            "text": "האם יש לחשבון קופה שבה gen_brokernumbername שווה בדיוק למחרוזת '00000004000', ושקוד סוג העיזבון (השערה לפי שם השדה) שלה אינו ריק ואינו 0210 או 3?",
+            "tech": "case when funds.gen_accountname is null then 0 else 1 end as gen_isfundwithoutagent",
+            "branches": [
+              {
+                "label": "כן",
+                "nodes": [
+                  {
+                    "type": "step",
+                    "text": "הדגל \"קופה ללא סוכן\" צריך להיות 1.",
+                    "tech": "ערך מחושב = 1"
+                  }
+                ]
+              },
+              {
+                "label": "לא",
+                "nodes": [
+                  {
+                    "type": "step",
+                    "text": "הדגל צריך להיות 0.",
+                    "tech": "ערך מחושב = 0"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "type": "step",
+            "text": "הערך שכבר שמור בחשבון נקרא. אם הוא ריק, הוא נחשב 0.",
+            "tech": "isnull(gen_fundwithoutagent,0) as gen_isfundwithoutagentDB"
+          },
+          {
+            "type": "decision",
+            "text": "האם הערך המחושב שונה מהערך השמור?",
+            "tech": "where temp.gen_isfundwithoutagent != temp.gen_isfundwithoutagentDB",
+            "branches": [
+              {
+                "label": "כן",
+                "nodes": [
+                  {
+                    "type": "step",
+                    "text": "החשבונות שהשתנו ממוינים לפי מזהה החשבון ונשלחים לעדכון אחד-אחד.",
+                    "tech": "Sort DTSX:3535: sort key accountid, EliminateDuplicates=false (DTSX:3537)"
+                  },
+                  {
+                    "type": "write",
+                    "text": "הדגל \"קופה ללא סוכן\" בחשבון מתעדכן לערך המחושב, בעדכון SQL ישיר למסד ה-CRM.",
+                    "tech": "Update accounts (OLEDBCommand, [CRM]) DTSX:3588, SQL DTSX:3591: Update accountbase set gen_fundwithoutagent= ? where accountid = ? · Param_0 ← gen_isfundwithoutagent, Param_1 ← accountid · account · update · SQL (Unsupported)"
+                  },
+                  {
+                    "type": "step",
+                    "text": "אם עדכון של חשבון נכשל, זרימת הנתונים נכשלת וכל השלבים הבאים בחבילה אינם רצים.",
+                    "tech": "Update accounts.Inputs errorRowDisposition=\"FailComponent\" (DTSX:3600); Update no Agent account → End ETL Process record: Success (DTSX:3645)"
+                  }
+                ]
+              },
+              {
+                "label": "לא",
+                "nodes": [
+                  {
+                    "type": "step",
+                    "text": "החשבון אינו נשלף ואינו מעודכן."
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "type": "end",
+            "text": "אם כל העדכונים הצליחו, בכל חשבון הדגל gen_fundwithoutagent שווה לערך המחושב מהקופות שלו, נכון לזמן הריצה. אם עדכון נכשל, הריצה נעצרת ולא כל החשבונות מעודכנים."
+          }
+        ]
+      },
+      "detail_he": [
+        {
+          "h": "מקור ואוכלוסייה",
+          "t": "כל רשומות account (בלי סינון מצב). לכל חשבון נבדק אם קיימת gen_fundmain שבה gen_accountname = accountid, gen_brokernumbername = '00000004000', וקוד סוג העיזבון (השערה לפי שם השדה) שלה (Gen_EstateTypeID) אינו '0210' או '3'. קופה בלי Gen_estatecodeid תואם אינה נספרת (INNER JOIN), וגם קופה שבה Gen_EstateTypeID ריק (NULL) אינה נספרת (NOT IN)."
+        },
+        {
+          "h": "התאמה לרשומות קיימות",
+          "t": "אין קובץ. החשבונות נשלפים ממסד ה-CRM עצמו, והעדכון נעשה לפי accountid."
+        },
+        {
+          "h": "החלטות",
+          "t": "ערך מחושב: case when funds.gen_accountname is null then 0 else 1. נשלפים רק חשבונות שבהם הערך המחושב != isnull(gen_fundwithoutagent,0)."
+        },
+        {
+          "h": "כתיבה ל-CRM",
+          "t": "UPDATE accountbase SET gen_fundwithoutagent = <0/1> WHERE accountid = <id>, עדכון SQL ישיר דרך [CRM] (Unsupported). כישלון בעדכון נכשל את הרכיב ועוצר את החבילה."
+        },
+        {
+          "h": "תוצאה עסקית",
+          "t": "אם כל העדכונים הצליחו, בכל חשבון הדגל gen_fundwithoutagent שווה לערך המחושב מהקופות שלו, נכון לזמן הריצה."
+        }
+      ],
+      "decisions": [
+        {
+          "where": "Get accounts to update (SQL, DTSX:3486)",
+          "condition": "gen_fundmain.gen_brokernumbername = '00000004000' AND Gen_estatecodeid.Gen_EstateTypeID not in ('0210','3')",
+          "meaning_he": "קופה נחשבת רק אם הערך בעמודה gen_brokernumbername שווה בדיוק למחרוזת '00000004000' וסוג העיזבון (השערה לפי שם השדה) שלה אינו ריק ואינו 0210 או 3 (ערך ריק אינו עובר את NOT IN). ההנחה ש-'00000004000' מסמן \"ללא סוכן\" היא השערה לפי שם הדגל gen_fundwithoutagent.",
+          "outcome_he": "קובע ערך 1 או 0 לחשבון."
+        },
+        {
+          "where": "Get accounts to update (SQL, DTSX:3486)",
+          "condition": "where temp.gen_isfundwithoutagent != temp.gen_isfundwithoutagentDB",
+          "meaning_he": "רק חשבון שהערך המחושב שלו שונה מהערך השמור (ריק נחשב 0).",
+          "outcome_he": "רק חשבונות כאלה מתעדכנים."
+        }
+      ],
+      "crmEffects": [
+        {
+          "entity": "account (טבלה accountbase)",
+          "verb": "update gen_fundwithoutagent = 0/1",
+          "mechanism": "SQL",
+          "when_he": "כשהערך המחושב שונה מ-isnull(gen_fundwithoutagent,0). Unsupported, עדכון ישיר למסד ה-CRM."
+        },
+        {
+          "entity": "account, gen_fundmain, gen_estatecodeid",
+          "verb": "read",
+          "mechanism": "SQL (SELECT)",
+          "when_he": "בתחילת זרימת הנתונים"
+        }
+      ],
+      "evidence": [
+        "0021_Account.dtsx sha BAD3B657… · Data Flow Update no Agent account DTSX:3437",
+        "Get accounts to update DTSX:3481, SqlCommand DTSX:3486",
+        "Sort DTSX:3535 (EliminateDuplicates=false DTSX:3537)",
+        "Update accounts DTSX:3588, SqlCommand DTSX:3591, input disposition DTSX:3600",
+        "[CRM] connection DTSX:4-6; Configuration DTSX:17"
+      ],
+      "openQuestions_he": [
+        "האם '00000004000' בשדה gen_brokernumbername הוא אכן קוד \"ללא סוכן\"? הסינון הוא לפי שדה השם של ה-lookup (השערה) ולא לפי מזהה.",
+        "האם זה מכוון שאין סינון מצב על account ועל gen_fundmain?"
+      ]
+    }
+  ],
+  "findings_he": [
+    {
+      "severity": "high",
+      "text": "עדכון SQL ישיר על accountbase (Unsupported) בשני ה-Data Flows: gen_isfundinternalagent ו-gen_fundwithoutagent. העדכון עוקף את ה-SDK, ולכן לא מופעלים תוספים, תהליכי עבודה וביקורת, ו-ModifiedOn אינו מתעדכן (ההשפעה היא ידע פלטפורמה, השערה).",
+      "evidence": "Update Account DTSX:3385-3388; Update accounts DTSX:3588-3591; [CRM] DTSX:4-6"
+    },
+    {
+      "severity": "medium",
+      "text": "כישלון בעדכון חשבון בודד (FailComponent) מכשיל את זרימת הנתונים ומונע את השלבים הבאים. כישלון בשלב הראשון משאיר את gen_fundwithoutagent לא מעודכן.",
+      "evidence": "DTSX:3397, DTSX:3600; precedence DTSX:3644-3645"
+    },
+    {
+      "severity": "medium",
+      "text": "קובץ תצורה חיצוני C:\\Generix\\SSISConfigFile.dtsConfig לא סופק (blocked_external_dependency). ייתכן שהוא דורס את מחרוזת החיבור [CRM] ואת המשתנים.",
+      "evidence": "DTSX:17"
+    },
+    {
+      "severity": "low",
+      "text": "אין סינון מצב על account ועל gen_fundmain. גם קופות או חשבונות לא פעילים משפיעים על הדגלים ומתעדכנים.",
+      "evidence": "SQL DTSX:3294, DTSX:3486"
+    },
+    {
+      "severity": "info",
+      "text": "הקודים gen_agenttype = 1, Gen_EstateTypeID not in ('0210','3') ו-gen_brokernumbername = '00000004000' הם literal בשאילתות. המשמעות העסקית שלהם לא ידועה מהחבילה.",
+      "evidence": "DTSX:3294, DTSX:3486"
+    },
+    {
+      "severity": "info",
+      "text": "ב-[CRM] יש Application Name=\"SSIS-BO_LeumiImportMonthly-…\". נראה שהחיבור הועתק מחבילה אחרת. אין לכך השפעה עסקית.",
+      "evidence": "DTSX:6"
+    }
+  ]
+}

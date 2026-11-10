@@ -1,0 +1,490 @@
+{
+  "verifier": "ssis-verifier",
+  "package": "0028_Fund Enrolment",
+  "scope": "logic-claims all",
+  "checkedAt": "2026-11-07T11:27:32.212Z",
+  "checked": 54,
+  "results": [
+    {
+      "id": "L|summary",
+      "hash": "1296d7f15d96",
+      "verdict": "CONFIRMED",
+      "detail": "Summary matches the DTSX: SDK creates of gen_fundenrolment for automated joinings (status 2) and pension joinings with rejects; owner set by direct SQL (OwnerIdType 9 reject team, or 8 referent for passed-and-reject pension rows); pension joining linked by SQL; close step sets gen_enrolmentstatus=3; reject-management link via SDK; gen_ismailsend=0 for IDs in staging TblFundEnrolments. Config files at DTSX:16-17, [CRM]=Psql/ALTSHULER_MSCRM DTSX:4-6, staging DTSX:9-11, transfer flow Disabled DTSX:8160. Both CRM.Proxy and CRM2015.Proxy are referenced in the scripts.",
+      "evidence": "DTSX:4-17; 1505 (main.cs:279); 4693/4696; 4758 (main.cs:327); 8053/8056; 8097/8100; 85 (main.cs:125-127); 14715 (main.cs:124-126); 13785 (main.cs:124-126); 8160",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|exec",
+      "hash": "05aa5b114fb1",
+      "verdict": "CONFIRMED",
+      "detail": "Precedence constraints re-derived: Get Org Vars -> Create ETL (Constraint) -> Truncate (Constraint 1) -> Create Fundenrolment (Constraint 8) -> Pension (Constraint 2) -> Close (Constraint 4) -> Transfer [Disabled] (Constraint 5) -> Reject Mgmt (Constraint 6) -> Update FundEnrolment (Constraint 7) -> End ETL (Constraint 9). All have no Value attribute (=Success), LogicalAnd=True, no expressions. No event handlers. A disabled task does not block its successors.",
+      "evidence": "DTSX:15640-15648; DTSX:8160 DTS:Disabled=True",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|ignored",
+      "hash": "2d5473dc200b",
+      "verdict": "CONFIRMED",
+      "detail": "Get Organization Variables reads gen_etlvariable (scope global or PackageName) and sets User::OrganizationName/ServerName/RejectTeamId. RejectTeamId later reaches CRM as the OwnerId of new Fund Enrolments, but that use is documented in the Create Fundenrolment/Pension claims (open[4], detailed[31]), and CLAUDE.md treats Organization Variables as plumbing. Create/End ETL Process only write gen_etlprocess. Truncate empties staging TblFundEnrolments (truncate step, plumbing per CLAUDE.md; its role is described under Update FundEnrolment). The three Derived Columns have no output columns and are dead-end sinks (Failure/Success sinks). None writes CRM business data or filters business rows.",
+      "evidence": "DTSX:12922 (gen_etlvariable SQL), 13707 (ReadWriteVariables), 982-1456 main.cs:177-183 (gen_etlprocess), End ETL ETL Record Finish main.cs:120-129, 13741 (truncate), Derived Columns DTSX:14623/14642/9930 (0 output columns)",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|finding#1",
+      "hash": "e374867b53c9",
+      "verdict": "CONFIRMED",
+      "detail": "Update Owner (DTSX:4696) and Update Fund Enrolment Owner (DTSX:8100) update Gen_fundenrolmentBase OwnerId/OwnerIdType; Upate Pension Joining (DTSX:8056) updates gen_pensionjoiningBase.gen_fundenrolmentid; all on [CRM] = Psql/ALTSHULER_MSCRM. The impact is labelled as a hypothesis (השערה).",
+      "evidence": "DTSX:4696, 8100, 8056; DTSX:4-6",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|finding#2",
+      "hash": "015f18dfb959",
+      "verdict": "CONFIRMED",
+      "detail": "Check If Rejects Null 'No CreateRow' FriendlyExpression ends with '&& JoiningStatus != 2'; JoiningStatus = gen_joiningstatus, and the source WHERE has aj.gen_joiningstatus = 2, so the condition is always false. The 'No CreateRow' output has no path anyway; the default 'Create Row' feeds the create. The question about intent is correctly left open.",
+      "evidence": "DTSX:1482-1486 (FriendlyExpression), DTSX:3357 SQL (… and aj.gen_joiningstatus = 2)",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|finding#3",
+      "hash": "4919d00457f3",
+      "verdict": "CONFIRMED",
+      "detail": "CastingError (Create gen_fundEnrolment) and CustingError (pension Create Fund Enrolment) have no outgoing paths; the reject-management script's Failure output goes to 'Derived Column', which has no output columns and no downstream path. Create failures leave the joining unlinked and without FE; nothing in the package changes the source filters, so the row is selected again next run.",
+      "evidence": "component list paths of Create Fundenrolment / Create FundEnrolment For Pension / Update Reject Management; main.cs:282-291 (DTSX:1505); main.cs:330-333 (DTSX:4758); DTSX:14623",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|finding#4",
+      "hash": "d74ba5d3829f",
+      "verdict": "CONFIRMED",
+      "detail": "Source left joins gen_transferrequest on tr.gen_automatedjoining = aj.gen_automatedjoiningId (1:N); the other joins are 1:1 (agentcontract by id, productByCourse num = 1). Lookup CacheType=0 (full cache) is loaded before rows flow and has no visibility of FEs created in this run, so N rows lead to N creates. Frequency is labelled השערה.",
+      "evidence": "DTSX:3357-3416; DTSX:3612/3632 CacheType=0, NoMatchBehavior=1 DTSX:3633",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|finding#5",
+      "hash": "76c2d742487f",
+      "verdict": "CONFIRMED",
+      "detail": "Close Fund Enrolment Input0_ProcessInputRow has no try/catch around service.Update. An exception fails the component and the task, and Constraint 5/6/7 are Success-only, so Reject Mgmt linking and the gen_ismailsend update (and End ETL) do not run.",
+      "evidence": "DTSX:85 main.cs:119-129; DTSX:15644-15646",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|finding#6",
+      "hash": "549f2bc77ce2",
+      "verdict": "CONFIRMED",
+      "detail": "The WHERE has 'and pj.gen_joiningsource != 4 and pj.gen_fellowsignature != 2'. Under SQL three-valued logic, NULL in either column makes the predicate unknown and excludes the row.",
+      "evidence": "DTSX:909 SQL",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|finding#7",
+      "hash": "a587445e7ab0",
+      "verdict": "CONFIRMED",
+      "detail": "Automated: gen_enrolmentstatus=1 only if !genclosedate_IsNull (main.cs:244-245). Pension: gen_ispension=true only if !gennewsletterapproval_IsNull (main.cs:284-285). Pension fullname = \"\" + \" \" + first + \" \" + last, so it has a leading space (main.cs:200-203).",
+      "evidence": "DTSX:1505 main.cs:244-245; DTSX:4758 main.cs:200-208, 284-285",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|finding#8",
+      "hash": "de9423759d61",
+      "verdict": "WRONG",
+      "detail": "The disabled flow's Insert To TemporaryTable does target '##TblFundEnrolments' on the [CRM] connection, not staging TblFundEnrolments. But the finding states unconditionally that, if enabled, the flow 'will record IDs in ##TblFundEnrolments in the CRM DB'. No step in the supplied files creates ##TblFundEnrolments, and a ## global temp table lives in tempdb on Psql, not in the ALTSHULER_MSCRM database. If the table does not exist at runtime, the OLE DB Command (errorRowDisposition=FailComponent) fails the data flow, and because of the Success chain, Update Reject Management and Update FundEnrolment would not run at all.",
+      "evidence": "DTSX:10188/10191 (insert into ##TblFundEnrolments, conn [CRM]); grep: no CREATE of ##TblFundEnrolments in any supplied DTSX; FailComponent at DTSX:10199; DTSX:15645-15646",
+      "wrongUnits": [
+        {
+          "unit": 1,
+          "problem": "Unconditional runtime consequence and an inaccurate location ('in the CRM DB').",
+          "correct": "If enabled, the flow's IDs are inserted, via the [CRM] connection, into a global temp table ##TblFundEnrolments (tempdb on Psql) that no supplied step creates. They would never reach staging TblFundEnrolments, so they would not get gen_ismailsend=0. If the ## table does not exist, the insert fails (FailComponent), the data flow fails, and the following Success-chained steps do not run.",
+          "evidence": "DTSX:10188-10199; DTSX:15645-15646"
+        }
+      ]
+    },
+    {
+      "id": "L|finding#9",
+      "hash": "d1e37b04f0e5",
+      "verdict": "CONFIRMED",
+      "detail": "gen_lastsyncdate appears only in the source SQL (select + WHERE); no write anywhere in 0028 (and no other supplied DTSX references it). Duplicate prevention relies on the Lookup only.",
+      "evidence": "DTSX:3361, 3415-3416; grep gen_lastsyncdate across source/DailyProcess",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Create Fundenrolment|title",
+      "hash": "93279f07a0db",
+      "verdict": "CONFIRMED",
+      "detail": "Status-2 automated joinings with lastsync null/older than ModifiedOn; Set gen_notes builds the note from Regect_1..4 + note; the Lookup skips joinings with an existing FE; the 'no rejects' split never filters; SDK create; Update Owner by SQL; insert into staging TblFundEnrolments.",
+      "evidence": "DTSX:3357; 3704 main.cs:117-129; 3612; 1463; 1505; 4693; 3575",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Create Fundenrolment|short",
+      "hash": "00856f8e7572",
+      "verdict": "WRONG",
+      "detail": "Units 1-8 match the DTSX. Unit 9 says each automated joining in status 2 gets exactly one handling record. The source left join to gen_transferrequest (1:N) combined with the pre-loaded full-cache Lookup produces one FE per source row, so a joining with several transfer requests gets several FEs in the same run (as the analysis itself states in detailed[2] and finding#4).",
+      "evidence": "DTSX:3357 (left join gen_transferrequest tr on tr.gen_automatedjoining = aj.gen_automatedjoiningId); DTSX:3632 CacheType=0",
+      "wrongUnits": [
+        {
+          "unit": 9,
+          "problem": "'נפתחת רשומת טיפול אחת' — not guaranteed.",
+          "correct": "One FE is created per source row. A joining with N transfer requests yields N rows, and N FEs are created in the same run, because the full-cache Lookup does not see FEs created during the run.",
+          "evidence": "DTSX:3357; DTSX:3612-3633"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Create Fundenrolment|detailed",
+      "hash": "4b03642b4e34",
+      "verdict": "CONFIRMED",
+      "detail": "Re-derived each unit. Source SQL filters (lastsync, status 2) and joins (tr 1:N, agentcontract, first coursepartition by createdon). Note format '1: x; 2: y; …' + note. Lookup full cache, Match output unconnected. Split expression exact and dead. SDK create fields main.cs:140-237. gen_actiontype=JoiningType. gen_source=100000000. Status 1 only with closedate. ParseExact dd/MM/yyyy (source pre-formats with +3h and style 103). Money. Document-type flags (const GEMEL=1, STUDY_FUND=2, GEMEL_INVEST=4, CHILDSAVING=5). CastingError unconnected. RejectTeamId = Guid.Parse(User::RejectTeamId), loaded from gen_etlvariable. Update Owner SQL params: Param_0=RejectTeamId, Param_1=FundEnrollmentId. Insert to staging.",
+      "evidence": "DTSX:3357-3416; 3704 main.cs:117-129; 3612-3638; 1482-1486; 1505 main.cs:33-38,130-292; 4696; 3578; 12922",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Create Fundenrolment|detail",
+      "hash": "aaa970bbb85a",
+      "verdict": "CONFIRMED",
+      "detail": "Population, Lookup match, decisions, writes and sourceTables verified. The creator of gen_automatedjoining is not found in the supplied packages (0027 and 0029 only Update it); this is correctly marked unproven/השערה.",
+      "evidence": "DTSX:3357; 3612; 1505; 4696; 3578; 0027_AutomatedJoining.dtsx:1371,5936; 0029_POA.dtsx:29686",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Create Fundenrolment|decisions",
+      "hash": "6e8cb8cb90da",
+      "verdict": "CONFIRMED",
+      "detail": "All six decisions match: Lookup (full cache, NoMatchBehavior=1, Match unconnected); split expression verbatim and unconnected; default Create Row; closedate -> status 1 (const ENROLMENT_STATUS_IN_PROCESS); document-type flags; catch (SoapException/Exception) -> CastingError with no path.",
+      "evidence": "DTSX:3612-3638; 1482-1490; 1505 main.cs:244-245, 263-277, 282-291",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Create Fundenrolment|crm",
+      "hash": "45b2098b9da0",
+      "verdict": "CONFIRMED",
+      "detail": "SDK Create of gen_fundenrolment through CrmProxy/IOrganizationService. SQL update of Gen_fundenrolmentBase OwnerId=?, OwnerIdType=9 on [CRM] for each Result row. Reads from the listed tables.",
+      "evidence": "DTSX:1505 main.cs:104-105,279; DTSX:4696; DTSX:3357, 3614",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Create Fundenrolment|open",
+      "hash": "34f64ea5a53e",
+      "verdict": "CONFIRMED",
+      "detail": "All four questions are genuinely open. No supplied file states the meaning of automated-joining gen_joiningstatus=2 (only 7 and 8 appear with comments elsewhere). No supplied package writes gen_lastsyncdate. RejectTeamId comes from gen_etlvariable at runtime (default 'From DB'), so its value is not in the files.",
+      "evidence": "grep joiningstatus comments across source/DailyProcess; DTSX:12922; DTSX:32-34",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Create FundEnrolment For Pension|title",
+      "hash": "cd57b43d1bd2",
+      "verdict": "CONFIRMED",
+      "detail": "Source filter, note building, owner/status branching (17 = const FUND_ENROLMENT_JOINING_STATUS_AVAR_BAKARA_AND_REJECT), product choice, underwriting, SDK create, SQL owner/link and staging insert all match.",
+      "evidence": "DTSX:6872; 7153 main.cs:115-131; 4758 main.cs:136-325; 8100; 8056; 7098",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Create FundEnrolment For Pension|short",
+      "hash": "acd44ff2c0f6",
+      "verdict": "CONFIRMED",
+      "detail": "One row per pension joining: all joins are by id, and rm is limited to Row_Num=1. The branch, writes and link all match. One FE per joining holds because gen_fundenrolmentid is set by SQL after creation.",
+      "evidence": "DTSX:6872-6941; 4758 main.cs:136-151; 8056; 8100",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Create FundEnrolment For Pension|detailed",
+      "hash": "8afd0727bab6",
+      "verdict": "INCOMPLETE",
+      "detail": "Every stated unit matches the code (SQL filter, product codes 200003/200004, note, branch, product, fields, constants, counter default, newsletter/ispension, joining source 3/4, underwriting branches, unconnected CustingError, SQL updates with positional params OwnerId/OwnerIdType/FundEnrolmentId and FundEnrolmentId/gen_pensionjoiningid). An implicit branch is missing. In the 'passed and reject' branch, Row.OwnerId = Row.genupdatedbyreferent is read with no null check. If gen_updatedbyreferent is NULL, reading the null buffer column throws inside the try, the row goes to the unconnected CustingError, and no FE is created; this repeats every run. The same applies to Row.ComprehensivePension / Row.GeneralPension when no product with type code 200003/200004 exists.",
+      "evidence": "DTSX:4758 main.cs:136-139, 166-171, 330-333; DTSX:6872 (gen_updatedbyreferent, product subqueries)",
+      "wrongUnits": [
+        {
+          "unit": 0,
+          "problem": "Missing behaviour: passed-and-reject joining with empty gen_updatedbyreferent (or a missing pension product) fails silently.",
+          "correct": "If gen_passedandreject = true and gen_updatedbyreferent is NULL, the script reads a NULL column, the exception is caught, the row goes to the unconnected CustingError output, no FE is created, and the joining is selected again next run. The same happens if gen_product = 1/2 and the ComprehensivePension/GeneralPension subquery returns NULL.",
+          "evidence": "main.cs:136-139, 168-171, 330-333 (DTSX:4758)"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Create FundEnrolment For Pension|detail",
+      "hash": "8047b00dc949",
+      "verdict": "CONFIRMED",
+      "detail": "Source uses with(nolock); filters verified; rm is the first gen_rejectmanagement by createdon (no statecode filter). No Lookup; duplicates are prevented by pj.gen_fundenrolmentid is null plus the SQL link. Decisions and writes verified. The pension-joining creator is not in the supplied files (0029 only updates it); this is correctly labelled השערה.",
+      "evidence": "DTSX:6872-6941; 4758; 8056; 8100; 7098; 0029_POA.dtsx:31614",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Create FundEnrolment For Pension|decisions",
+      "hash": "5b23570a15fe",
+      "verdict": "CONFIRMED",
+      "detail": "WHERE verbatim. Branch at main.cs:136 (OwnerIdType 8/9, joiningstatus 17/copied). Product at main.cs:168-171. Joining source 3/4 at main.cs:290 (consts JOINING_STATUS_INSERT_FROM_FILE / _EMPLOER_INTERFACE). Underwriting at main.cs:299-322 (comments No/Yes, אושר, אושר בהחרגה, בתהליך). CustingError unconnected.",
+      "evidence": "DTSX:6872; 4758 main.cs:34-37,136-151,166-173,287-325,330-333",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Create FundEnrolment For Pension|crm",
+      "hash": "6eed5a997a46",
+      "verdict": "CONFIRMED",
+      "detail": "SDK Create; SQL update of Gen_fundenrolmentBase OwnerId=?, OwnerIdType=? where id=?; SQL update of gen_pensionjoiningBase gen_fundenrolmentid; both on Multicast outputs after the Result output.",
+      "evidence": "DTSX:4758 main.cs:327; 8100; 8056; paths Multicast Output 1/2/4",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Create FundEnrolment For Pension|open",
+      "hash": "91e31f67d8d2",
+      "verdict": "CONFIRMED",
+      "detail": "The meanings of pension gen_joiningstatus 2 and 4 are not in any supplied file. 17 has only the const name. gen_ispension depends on newsletter approval as stated. The meaning of FOLDER_NUMBER '123456' is not given anywhere.",
+      "evidence": "DTSX:4758 main.cs:36-37, 284-285; grep across source/DailyProcess",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Close FundEnrolments For Pension|title",
+      "hash": "d2d1be368936",
+      "verdict": "CONFIRMED",
+      "detail": "Source: FE with gen_enrolmentstatus=1 joined to pension joining. Conditions: status in (5,6,7,8,13) or status 9 with no reject flags/reasons/notes, plus joiningsource != 4 and fellowsignature != 2. Update gen_enrolmentstatus=3 via SDK.",
+      "evidence": "DTSX:909; DTSX:85 main.cs:121-127",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Close FundEnrolments For Pension|short",
+      "hash": "55d09f12e2b5",
+      "verdict": "CONFIRMED",
+      "detail": "The decision matches the WHERE clause; the meanings come from the SQL comments (בוטל או הסתיים / עבר בקרה ואין רג'קטים) and the code comment //הסתיים for value 3.",
+      "evidence": "DTSX:909; DTSX:85 main.cs:125",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Close FundEnrolments For Pension|detailed",
+      "hash": "36d7a1811329",
+      "verdict": "CONFIRMED",
+      "detail": "SQL verbatim, including isnull(gen_existsreject,1)=1, NULL semantics of !=, Update to 3 with the //הסתיים comment, no try/catch, and the Success chain. Closing can include FEs created earlier in the same run, because Close runs after the Pension flow has set pj.gen_fundenrolmentid by SQL.",
+      "evidence": "DTSX:909; 85 main.cs:119-129; 15642-15646",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Close FundEnrolments For Pension|detail",
+      "hash": "e5faeb31dbdd",
+      "verdict": "WRONG",
+      "detail": "Units 1-4 and 6 are correct. Unit 5 says the closed records are those that would otherwise 'remain open with the rejects team'. The query has no owner condition. FEs linked to a pension joining may be owned by the referent user (OwnerIdType 8, passed-and-reject branch) or by anyone, and all of them are closed.",
+      "evidence": "DTSX:909 (no OwnerId filter); DTSX:4758 main.cs:136-139",
+      "wrongUnits": [
+        {
+          "unit": 5,
+          "problem": "'אצל צוות הרג'קטים' is not proven; ownership is not part of the rule.",
+          "correct": "FEs in status 1 whose pension joining meets the close conditions are closed regardless of owner (reject team, referent user, or other).",
+          "evidence": "DTSX:909"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Close FundEnrolments For Pension|decisions",
+      "hash": "211459019f3c",
+      "verdict": "CONFIRMED",
+      "detail": "WHERE condition verbatim; script guard !Row.Genfundenrolmentid_IsNull -> Update to 3.",
+      "evidence": "DTSX:909; DTSX:85 main.cs:121-127",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Close FundEnrolments For Pension|crm",
+      "hash": "68c868e45a73",
+      "verdict": "CONFIRMED",
+      "detail": "service.Update of gen_fundenrolment with gen_enrolmentstatus=OptionSetValue(3).",
+      "evidence": "DTSX:85 main.cs:122-127",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Close FundEnrolments For Pension|open",
+      "hash": "4d8005df3c26",
+      "verdict": "CONFIRMED",
+      "detail": "Only group meanings are given by SQL comments. 0029_POA confirms pension status 13 = הסתיים, which is consistent with the comment. Individual meanings of 5/6/7/8/9, existsreject, joiningsource 4 and fellowsignature 2 are not in the supplied files. The NULL question is technically right.",
+      "evidence": "DTSX:909; 0029_POA.dtsx:36384",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Create FundEnrolment For Transfer Request|title",
+      "hash": "de51cda1de0e",
+      "verdict": "CONFIRMED",
+      "detail": "Disabled at DTSX:8160. Type 5 = 'between courses' is proven by comments on gen_transferrequest.Gen_transferType = 5 in 0005 and 0029 ('בין מסלולים' / 'between courses'). 'Failed' comes from the component name Get Failed Transfer Request. Owner SQL to RejectTeamId, OwnerIdType 9; gen_transferrequestBase link by SQL.",
+      "evidence": "DTSX:8160; 9954; 11069; 11114; 0005_Customer Account.dtsx:70706; 0029_POA.dtsx:40249",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Create FundEnrolment For Transfer Request|short",
+      "hash": "60fe88f80040",
+      "verdict": "CONFIRMED",
+      "detail": "Disabled; population and would-be writes match.",
+      "evidence": "DTSX:8160; 9954; 8166; 11069; 11114",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Create FundEnrolment For Transfer Request|detailed",
+      "hash": "19b71bb6df2d",
+      "verdict": "WRONG",
+      "detail": "Units 1-10 and 12 match: disabled behaviour, WHERE, the 00000004000 broker case, contact/account branches (contact city commented out), constants AGENTS_DESK=1, TRANSFER_COURSES=6, DEFICITS_DEFICIENCIES=1, SYSTEM, and SQL owner/link. Unit 11 states as fact that the ID 'would be recorded in global temp table ##TblFundEnrolments in the CRM database'. The table is a ## global temp table, which lives in tempdb on the Psql server reached through the [CRM] connection, not in ALTSHULER_MSCRM. No supplied step creates it, so whether the insert would succeed is unknown; with FailComponent, a missing table fails the flow.",
+      "evidence": "DTSX:10188-10199; no CREATE ##TblFundEnrolments in supplied files",
+      "wrongUnits": [
+        {
+          "unit": 11,
+          "problem": "Location stated as the CRM database and the success of the insert assumed.",
+          "correct": "The OLE DB Command runs 'insert into ##TblFundEnrolments' on the [CRM] connection, a global temp table in tempdb that no supplied step creates. It is not the staging TblFundEnrolments, so these IDs would never get gen_ismailsend=0. If the ## table does not exist at runtime, the insert fails (FailComponent) and the flow fails.",
+          "evidence": "DTSX:10191, 10199"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Create FundEnrolment For Transfer Request|detail",
+      "hash": "89f1ec28da6e",
+      "verdict": "CONFIRMED",
+      "detail": "Population, match key, decisions, would-be writes and 'no business effect (disabled)' verified. The creator of gen_transferrequest is not in the supplied files and is correctly marked as a hypothesis.",
+      "evidence": "DTSX:8160; 9954; 8166 main.cs:145-223; 11069; 11114",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Create FundEnrolment For Transfer Request|decisions",
+      "hash": "f1b13105cc1f",
+      "verdict": "CONFIRMED",
+      "detail": "Disabled flag, WHERE verbatim, contact/account branch at main.cs:145/183.",
+      "evidence": "DTSX:8160; 9954; 8166 main.cs:145,183",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Create FundEnrolment For Transfer Request|crm",
+      "hash": "30769a860fdd",
+      "verdict": "INCOMPLETE",
+      "detail": "The row lists 'gen_fundenrolment; gen_transferrequest | create; update | SDK; SQL'. It omits the would-be SQL update of Gen_fundenrolmentBase OwnerId = RejectTeamId, OwnerIdType = 9 (Update Fund Enrolment Owner). The other CRM-write rows of this package list that write separately. The 'disabled — no effect' part is correct.",
+      "evidence": "DTSX:11066/11069",
+      "wrongUnits": [
+        {
+          "unit": 0,
+          "problem": "Would-be owner update by SQL not listed.",
+          "correct": "If enabled: gen_fundenrolment Create (SDK); Gen_fundenrolmentBase Update OwnerId=RejectTeamId, OwnerIdType=9 (SQL, Unsupported); gen_transferrequestBase Update gen_fundenrolmentid (SQL, Unsupported). Disabled, so there is no actual effect.",
+          "evidence": "DTSX:11069; DTSX:11114; DTSX:8160"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Create FundEnrolment For Transfer Request|open",
+      "hash": "f663f960ec48",
+      "verdict": "CONFIRMED",
+      "detail": "No reason for disabling appears in the DTSX (no annotation or description beyond the default).",
+      "evidence": "DTSX:8160",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Update Reject Management With Fund Enrolment|title",
+      "hash": "6a7779c821f4",
+      "verdict": "CONFIRMED",
+      "detail": "UNION of 3 sources, each requiring rm.gen_fundenrolmentid is null, rm.statecode=0, and the source not flagged gen_isoldrejectmethod=1. SDK update of gen_rejectmanagement.gen_fundenrolmentid.",
+      "evidence": "DTSX:14666; 14715 main.cs:120-126",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Update Reject Management With Fund Enrolment|short",
+      "hash": "2dd6e380bb26",
+      "verdict": "CONFIRMED",
+      "detail": "Matches the SQL and script.",
+      "evidence": "DTSX:14666; 14715 main.cs:116-136",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Update Reject Management With Fund Enrolment|detailed",
+      "hash": "30f9c9682478",
+      "verdict": "WRONG",
+      "detail": "Units 1-10 are correct: three UNION parts, old-method filter, SDK update, Failure to an empty Derived Column. Unit 11 states 'all active reject-management records are attached to their source's FE'. Only those whose source (automated joining / pension joining / transfer request) already has an FE and is not old-method are attached; the others stay unlinked.",
+      "evidence": "DTSX:14666-14686",
+      "wrongUnits": [
+        {
+          "unit": 11,
+          "problem": "Over-generalisation: 'כל רשומות ניהול הרג'קט הפעילות'.",
+          "correct": "Active, unlinked reject-management records whose source is linked to a Fund Enrolment and is not gen_isoldrejectmethod=1 are attached. Records of old-method sources, or of sources without an FE, remain unlinked.",
+          "evidence": "DTSX:14666"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Update Reject Management With Fund Enrolment|detail",
+      "hash": "fbdc595a612f",
+      "verdict": "CONFIRMED",
+      "detail": "Population, join keys, filter and write verified. Note: gen_rejectmanagement's creator is not in the supplied files; correctly marked as a hypothesis.",
+      "evidence": "DTSX:14666; 14715",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Update Reject Management With Fund Enrolment|decisions",
+      "hash": "c22b73f9054b",
+      "verdict": "CONFIRMED",
+      "detail": "SQL conditions verbatim; script guard on both IDs, Update, and catch -> Failure -> dead-end Derived Column.",
+      "evidence": "DTSX:14666; 14715 main.cs:118-135",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Update Reject Management With Fund Enrolment|crm",
+      "hash": "ad7200ba6283",
+      "verdict": "CONFIRMED",
+      "detail": "service.Update gen_rejectmanagement.gen_fundenrolmentid = EntityReference(gen_fundenrolment).",
+      "evidence": "DTSX:14715 main.cs:122-126",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Update Reject Management With Fund Enrolment|open",
+      "hash": "9ed78d12e014",
+      "verdict": "CONFIRMED",
+      "detail": "No supplied file explains gen_isoldrejectmethod (only 0028 uses it). With several FEs per automated joining, part 1 yields one row per FE; the updates run sequentially, and the last one processed wins (order unspecified).",
+      "evidence": "DTSX:14666; grep isoldrejectmethod",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Update FundEnrolment|title",
+      "hash": "dc044c54aee4",
+      "verdict": "CONFIRMED",
+      "detail": "Reads staging TblFundEnrolments (truncated at start, filled by the two active Insert To TemporaryTable components) and updates gen_ismailsend=OptionSetValue(0) via SDK; the catch is empty.",
+      "evidence": "DTSX:13741; 13755; 13785 main.cs:118-133; 3578; 7098",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Update FundEnrolment|short",
+      "hash": "daa67f8a249f",
+      "verdict": "CONFIRMED",
+      "detail": "Matches; the purpose is labelled השערה.",
+      "evidence": "DTSX:13755; 13785",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Update FundEnrolment|detailed",
+      "hash": "d16e11677c55",
+      "verdict": "CONFIRMED",
+      "detail": "Truncate on staging, inserts from both active flows, select * from TblFundEnrolments, null guard, update, empty catch. Unit 2 correctly says the disabled flow targets a different table (##TblFundEnrolments).",
+      "evidence": "DTSX:13741 (conn {67A3002B…}=SRS.GENERIX_STAGING); 3578; 7098; 10191; 13755; 13785 main.cs:116-134",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Update FundEnrolment|detail",
+      "hash": "8c4ca87d7956",
+      "verdict": "CONFIRMED",
+      "detail": "Source table, fill path and write verified; the meaning of 0 is labelled unknown. No other supplied package references TblFundEnrolments.",
+      "evidence": "DTSX:13741; 3578; 7098; 13755; 13785",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Update FundEnrolment|decisions",
+      "hash": "2e9afbed850c",
+      "verdict": "CONFIRMED",
+      "detail": "main.cs:120 null guard; update; empty catch.",
+      "evidence": "DTSX:13785 main.cs:120-133",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Update FundEnrolment|crm",
+      "hash": "37a315b2a254",
+      "verdict": "CONFIRMED",
+      "detail": "SDK update gen_ismailsend=0 for each ID in staging, i.e. FEs created this run by the two active flows.",
+      "evidence": "DTSX:13785 main.cs:122-126",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Update FundEnrolment|open",
+      "hash": "2e94ae18907a",
+      "verdict": "CONFIRMED",
+      "detail": "gen_ismailsend appears in no other supplied file; its OptionSet meaning is not in the DTSX.",
+      "evidence": "grep gen_ismailsend across source/DailyProcess",
+      "wrongUnits": []
+    }
+  ]
+}

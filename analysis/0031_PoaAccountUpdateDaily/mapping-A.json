@@ -1,0 +1,1127 @@
+{
+  "package": "0031_PoaAccountUpdateDaily",
+  "dataFlows": [
+    "Package\\Handle Wait Status",
+    "Package\\Handle Active Status",
+    "Package\\Send Poa Emails",
+    "Package\\Update Power Of Attorney Main",
+    "Package\\Create Power Of Attorney",
+    "Package\\Create Power Of Attorney - Pension",
+    "Package\\Get Valid Optionsets Values"
+  ],
+  "analyst": "ssis-field-lineage",
+  "source": {
+    "file": "source/DailyProcess/0031_PoaAccountUpdateDaily.dtsx",
+    "sha256": "1D9C0A0A0D405ED3B7114736358E142BB091823AC3A452112B2187D69D554475"
+  },
+  "scriptOutputs": [
+    {
+      "component": "Package\\Handle Wait Status\\Set Data For Start Date Poa Emails",
+      "output": "Custom Output",
+      "column": "Gen_powerofattorneyId",
+      "from": [
+        {
+          "column": "Gen_powerofattorneyId",
+          "role": "value"
+        }
+      ],
+      "expression": "Copied unchanged: Input0_ProcessInputRow adds new POADetails { PowerOfAttorneyId = Row.GenpowerofattorneyId } to the list of the POA Main (dictionary key Row.genpowerofattorneymain); at EndOfRowset one Custom Output row per POADetails: CustomOutputBuffer.GenpowerofattorneyId = poa.PowerOfAttorneyId. These rows reach the CRM writer path only via 'Is emailDetailsJson Contains Data' (Contains Data) -> Update Json -> 'Union All Data To Update Status' input 2, which also maps emailDetailsJson (non-NULL), so 'Is emailDetailsJson Contains Data 1' routes them to 'Contains Data' (no path) - they never reach 'Update gen_powerofattorney ACTIVE'.",
+      "condition": "One row per input row, emitted after the last buffer (EndOfRowset); only rows with IsFirst=true carry JSON",
+      "evidence": "Set Data For Start Date Poa Emails main.cs:52-59, 113-120 (DTSX:27372, sha 6a6ff063c606); split DTSX:26979 / 27012"
+    },
+    {
+      "component": "Package\\Handle Wait Status\\Set Data For Start Date Poa Emails",
+      "output": "Custom Output",
+      "column": "emailDetailsJson",
+      "from": [
+        {
+          "column": "Gen_receivingdatePoaMain",
+          "role": "value"
+        },
+        {
+          "column": "Gen_contactnameName",
+          "role": "value"
+        },
+        {
+          "column": "Gen_identitynumber",
+          "role": "value"
+        },
+        {
+          "column": "Gen_agentname",
+          "role": "value"
+        },
+        {
+          "column": "Gen_agencyname",
+          "role": "value"
+        },
+        {
+          "column": "Gen_contactname",
+          "role": "value"
+        },
+        {
+          "column": "Gen_CustomerAccount",
+          "role": "value"
+        },
+        {
+          "column": "gen_customerprogram",
+          "role": "value"
+        },
+        {
+          "column": "AccountEmailaddress",
+          "role": "value"
+        },
+        {
+          "column": "ContactEmailaddress",
+          "role": "value"
+        },
+        {
+          "column": "isAppointmentOfAgent",
+          "role": "value"
+        },
+        {
+          "column": "Gen_powerofattorneyId",
+          "role": "value"
+        },
+        {
+          "column": "AccountNumberCustomerAccountProgramMain",
+          "role": "value"
+        },
+        {
+          "column": "AccountBalanceCustomerAccountProgramMain",
+          "role": "value"
+        },
+        {
+          "column": "ProductNumberCustomerAccountProgramMain",
+          "role": "value"
+        },
+        {
+          "column": "gen_powerofattorneymain",
+          "role": "condition"
+        }
+      ],
+      "expression": "JavaScriptSerializer().Serialize(EmailDetails of the POA Main) written as UTF-16 bytes (GetBytes). EmailDetails = { RecievingDate = GenreceivingdatePoaMain, CustomerName = GencontactnameName, CustomerId = Genidentitynumber, Genagentname/Genagencyname/Gencontactname/Gencustomeraccount/Gencustomerprogram (NULL -> Guid.Empty), EmailaddressAccount/EmailaddressContact (NULL -> \"\"), IsAppointmentOfAgent, listPOADetails[ {PowerOfAttorneyId, AccountNumber, AccountBalance, ProductType: '4' -> \"פנסיה כללית\", '3' -> \"פנסיה מקיפה\", NULL/empty -> \"\", any other value -> null (the setter assigns nothing, POADetails.cs:31-42)}, IsFirst ] } built from the FIRST row seen for each gen_powerofattorneymain. Staging-only value; used downstream only as a routing condition (ISNULL(emailDetailsJson)).",
+      "condition": "poa.IsFirst == true (first row per gen_powerofattorneymain); otherwise NULL",
+      "evidence": "Set Data For Start Date Poa Emails main.cs:54-65, 86-121; POADetails.cs:26-44"
+    },
+    {
+      "component": "Package\\Handle Active Status\\Set Data For Cancel Poa Emails",
+      "output": "CustomOutput",
+      "column": "GenpowerofattorneyId",
+      "from": [
+        {
+          "column": "Gen_powerofattorneyId",
+          "role": "value"
+        }
+      ],
+      "expression": "Copied unchanged: POADetails.PowerOfAttorneyId = Row.GenpowerofattorneyId (main.cs:123); CustomOutputBuffer.GenpowerofattorneyId = poa.PowerOfAttorneyId (main.cs:59). These rows enter 'Union All Data' input 1 together with emailDetailsJson; only rows with non-NULL JSON pass 'Is emailDetailsJson Contains Data' and then 'Is emailDetailsJson Contains Data 1' routes them to 'Contains Data' (no path), so they never reach the CANCELED writer.",
+      "condition": "One row per input row, emitted at EndOfRowset",
+      "evidence": "Set Data For Cancel Poa Emails main.cs:51-59, 118-126 (DTSX:18330, sha 25d344511e90); splits DTSX:18037 and Is emailDetailsJson Contains Data"
+    },
+    {
+      "component": "Package\\Handle Active Status\\Set Data For Cancel Poa Emails",
+      "output": "CustomOutput",
+      "column": "genstatustransfertobank",
+      "from": [],
+      "expression": "NEVER ASSIGNED: the code sets only CustomOutputBuffer.GenpowerofattorneyId (main.cs:59) and emailDetailsJson (main.cs:64). POADetails.gen_statustransfertobank = Row.genstatustransfertobank (main.cs:125) is never copied to the buffer, so this output column is always NULL.",
+      "condition": null,
+      "evidence": "Set Data For Cancel Poa Emails main.cs:54-66, 125"
+    },
+    {
+      "component": "Package\\Handle Active Status\\Set Data For Cancel Poa Emails",
+      "output": "CustomOutput",
+      "column": "emailDetailsJson",
+      "from": [
+        {
+          "column": "gen_receivingdateofcancelpoa",
+          "role": "value"
+        },
+        {
+          "column": "FullName",
+          "role": "value"
+        },
+        {
+          "column": "Gen_identitynumber",
+          "role": "value"
+        },
+        {
+          "column": "MobilePhone",
+          "role": "value"
+        },
+        {
+          "column": "Telephone1",
+          "role": "value"
+        },
+        {
+          "column": "Telephone2",
+          "role": "value"
+        },
+        {
+          "column": "Gen_agentname",
+          "role": "value"
+        },
+        {
+          "column": "Gen_agencyname",
+          "role": "value"
+        },
+        {
+          "column": "Gen_contactname",
+          "role": "value"
+        },
+        {
+          "column": "Gen_CustomerAccount",
+          "role": "value"
+        },
+        {
+          "column": "gen_customerprogram",
+          "role": "value"
+        },
+        {
+          "column": "AccountEmailaddress",
+          "role": "value"
+        },
+        {
+          "column": "ContactEmailaddress",
+          "role": "value"
+        },
+        {
+          "column": "isAppointmentOfAgent",
+          "role": "value"
+        },
+        {
+          "column": "Gen_powerofattorneyId",
+          "role": "value"
+        },
+        {
+          "column": "AccountNumberCustomerAccountProgramMain",
+          "role": "value"
+        },
+        {
+          "column": "AccountBalanceCustomerAccountProgramMain",
+          "role": "value"
+        },
+        {
+          "column": "ProductNumberCustomerAccountProgramMain",
+          "role": "value"
+        },
+        {
+          "column": "gen_statustransfertobank",
+          "role": "value"
+        },
+        {
+          "column": "gen_powerofattorneymain",
+          "role": "condition"
+        }
+      ],
+      "expression": "JavaScriptSerializer().Serialize(EmailDetails of the POA Main) as UTF-16 bytes. EmailDetails = { RecievingDate = genreceivingdateofcancelpoa, CustomerName = FullName, CustomerId = Genidentitynumber, MobilePhone/HomeTelephone1(Telephone1)/WorkTelephone2(Telephone2) NULL -> \"\", Genagentname/Genagencyname NULL -> Guid.Empty, Gencontactname = Genagentname_IsNull ? Guid.Empty : Gencontactname (null-check on the WRONG column, main.cs:107), Gencustomeraccount/Gencustomerprogram NULL -> Guid.Empty, email addresses NULL -> \"\", IsAppointmentOfAgent, listPOADetails[...ProductType: '4' -> \"פנסיה כללית\", '3' -> \"פנסיה מקיפה\", NULL/empty -> \"\", any other value -> null (the setter assigns nothing, POADetails.cs:31-42), gen_statustransfertobank] }. Staging-only; used downstream only as routing condition.",
+      "condition": "poa.IsFirst == true (first row per gen_powerofattorneymain); otherwise NULL",
+      "evidence": "Set Data For Cancel Poa Emails main.cs:54-65, 86-127; POADetails.cs:26-44"
+    }
+  ],
+  "crmWrites": [
+    {
+      "component": "Package\\Handle Wait Status\\Update gen_powerofattorney ACTIVE",
+      "identicalCopies": [],
+      "entity": "gen_powerofattorney",
+      "verb": "UPDATE",
+      "mechanism": "SDK (CrmProxy.Update)",
+      "status": "Supported",
+      "recordKey": "entity.Id = Row.GenpowerofattorneyId (Gen_powerofattorneyId of the waiting POA from the OLE DB Source: poa.Gen_powerofattorneyId where Gen_startdate <= GETDATE() and Gen_currentstate = 3)",
+      "recordKeyColumns": [
+        "Gen_powerofattorneyId"
+      ],
+      "declaredRowFilters": [],
+      "condition": "In script: !Row.GenpowerofattorneyId_IsNull && (Row.gencurrentstate_IsNull || Row.gencurrentstate != 1); source WHERE forces Gen_currentstate = 3, so this check is always true. Rows arrive via the Renewal / Lookup No Match / AppendixTypeNoMail / Set Data Output 0 branches, unioned, sorted by PoaId, and only 'No Data' rows of 'Is emailDetailsJson Contains Data 1' continue. It is NOT guaranteed that every source row is activated: 'Is Renewal' and 'AppendixType' outputs have errorRowDisposition=FailComponent (DTSX:27056, 22859). Hypothesis per SSIS semantics: a NULL agentcyIdNumber / agentcyIdNumberPa (Is Renewal: agentcyIdNumberPa == agentcyIdNumber) or a NULL gen_appendixtype (AppendixType) makes the expression error -> component and data flow fail. 'Sort By PoaId' is blocking, so in that case no waiting POA is activated in that run, while 'Update NeedToSendMailBit' SQL updates already executed for earlier rows stay committed.",
+      "attributes": [
+        {
+          "attribute": "gen_currentstate",
+          "from": [
+            {
+              "column": "gen_currentstate",
+              "role": "condition"
+            }
+          ],
+          "expression": "entity[\"gen_currentstate\"] = new OptionSetValue(ACTIVE) with const int ACTIVE = 1",
+          "fixedValue": 1,
+          "condition": "Row.gencurrentstate_IsNull || Row.gencurrentstate != 1",
+          "evidence": "Update gen_powerofattorney ACTIVE main.cs:16, 32-42 (DTSX:30214, sha ea5addc3f307)",
+          "declaredSources": [
+            {
+              "db": "Handle Wait Status\\OLE DB Source: agentcyIdNumber",
+              "role": "condition",
+              "why": "Is Renewal condition agentcyIdNumberPa == agentcyIdNumber (FailComponent): a NULL makes the expression error and can fail the flow before any activation (hypothesis per SSIS semantics)",
+              "evidence": "DTSX:27045, 27056"
+            },
+            {
+              "db": "Lookup Match PowerOfAttorney By CustomerAccount Or CustomerProgram: agentcyIdNumberPa",
+              "role": "condition",
+              "why": "same Is Renewal condition (FailComponent on NULL, hypothesis)",
+              "evidence": "DTSX:27079-27105, 27056"
+            },
+            {
+              "db": "Handle Wait Status\\OLE DB Source: gen_appendixtype",
+              "role": "condition",
+              "why": "AppendixType condition gen_appendixtype != 2 && != 3 && != 5 (FailComponent): a NULL can fail the flow (hypothesis per SSIS semantics)",
+              "evidence": "DTSX:22849, 22859"
+            }
+          ]
+        }
+      ],
+      "evidence": "Update gen_powerofattorney ACTIVE main.cs:30-57 (DTSX:30214); OLE DB Source SQL DTSX:27226"
+    },
+    {
+      "component": "Package\\Handle Wait Status\\Update NeedToSendMailBit",
+      "identicalCopies": [],
+      "entity": "gen_powerofattorney",
+      "verb": "UPDATE",
+      "mechanism": "SQL (UPDATE Gen_powerofattorneyBase on [CRM] = psql/altshuler_mscrm)",
+      "status": "Unsupported",
+      "recordKey": "WHERE Gen_powerofattorneyId = ? (Param_1 = PowerOfAttorneyIdPa = the ACTIVE POA (Gen_currentstate = 1) returned by Lookup 'Match PowerOfAttorney By CustomerAccount Or CustomerProgram' for isnull(Gen_CustomerAccount, gen_customerprogram) of the waiting POA - i.e. the OLD active POA, not the waiting one)",
+      "recordKeyColumns": [
+        "PowerOfAttorneyIdPa"
+      ],
+      "declaredRowFilters": [],
+      "condition": "Only rows where the Lookup found an active POA on the same customer account/program (Match) and 'Is Renewal' (agentcyIdNumberPa == agentcyIdNumber) is not true -> 'Not Renewal'. Is Renewal output disposition is FailComponent (DTSX:27056): a NULL agentcyIdNumber or agentcyIdNumberPa makes the condition error -> data flow fails (hypothesis per SSIS semantics). Several waiting POAs on the same customer account/program map to the same active POA (PowerOfAttorneyIdPa) and each executes the UPDATE: the last processed row wins (row order not determined).",
+      "attributes": [
+        {
+          "attribute": "gen_receivingdateofcancelpoa",
+          "from": [
+            {
+              "column": "Gen_receivingdatePoa",
+              "role": "value"
+            }
+          ],
+          "expression": "SET gen_receivingdateofcancelpoa = CASE WHEN ((Gen_appendixtype = 2) or (Gen_appendixtype = 3) or (Gen_appendixtype = 5)) THEN ? END. Param_0 (first '?', line 31305) = Gen_receivingdatePoa = dateadd(HH,3,poa.gen_receivingdate) of the WAITING POA (source SQL DTSX:27244) - a +3 hour shift is applied before the value is written directly into the Base table. CASE has no ELSE: when the target (old active) row's Gen_appendixtype is not 2/3/5 the column is set to NULL (overwrites any existing value).",
+          "fixedValue": null,
+          "condition": "Value only when the TARGET row's own Gen_appendixtype (read inside the UPDATE from Gen_powerofattorneyBase, not an input column) is 2, 3 or 5; otherwise NULL is written; several waiting POAs can update the same active POA - the last processed row wins",
+          "evidence": "SqlCommand DTSX:31302-31307 ('?' #0 at line 31305 -> Param_0 = Gen_receivingdatePoa, DTSX:31317/31321; '?' #1 at line 31307 -> Param_1 = PowerOfAttorneyIdPa, DTSX:31318/31326)",
+          "declaredSources": [
+            {
+              "db": "Handle Wait Status\\OLE DB Source: agentcyIdNumber",
+              "role": "condition",
+              "why": "Is Renewal: only rows where agentcyIdNumberPa == agentcyIdNumber is not true reach the UPDATE; NULL -> expression error -> FailComponent (hypothesis per SSIS semantics)",
+              "evidence": "DTSX:27045, 27056"
+            },
+            {
+              "db": "Lookup Match PowerOfAttorney By CustomerAccount Or CustomerProgram: agentcyIdNumberPa",
+              "role": "condition",
+              "why": "same Is Renewal condition (agent/agency id of the existing active POA)",
+              "evidence": "DTSX:27079-27105, 27056"
+            }
+          ]
+        }
+      ],
+      "evidence": "Update NeedToSendMailBit DTSX:31299-31326; connection [CRM] DTSX:4 (catalog altshuler_mscrm); Lookup DTSX:27079-27105; Is Renewal DTSX:27045"
+    },
+    {
+      "component": "Package\\Handle Active Status\\Update gen_powerofattorney CANCELED And Status Transfer To Bank",
+      "identicalCopies": [],
+      "entity": "gen_powerofattorney",
+      "verb": "UPDATE",
+      "mechanism": "SDK (CrmProxy.Update)",
+      "status": "Supported",
+      "recordKey": "entity.Id = Row.GenpowerofattorneyId (poa.Gen_powerofattorneyId of active POAs whose Gen_enddate <= GETDATE(), OLE DB Source DTSX:18171)",
+      "recordKeyColumns": [
+        "Gen_powerofattorneyId"
+      ],
+      "declaredRowFilters": [],
+      "condition": "!Row.GenpowerofattorneyId_IsNull && (Row.gencurrentstate_IsNull || Row.gencurrentstate != 2). Every source row reaches the writer once (NoMail branch + Set Data Output 0 branch, unioned, sorted, 'No Data' of 'Is emailDetailsJson Contains Data 1'). Source WHERE forces Gen_currentstate = 1, so the check is always true.",
+      "attributes": [
+        {
+          "attribute": "gen_currentstate",
+          "from": [
+            {
+              "column": "gen_currentstate",
+              "role": "condition"
+            }
+          ],
+          "expression": "entity[\"gen_currentstate\"] = new OptionSetValue(CANCELED) with const int CANCELED = 2",
+          "fixedValue": 2,
+          "condition": "Row.gencurrentstate_IsNull || Row.gencurrentstate != 2",
+          "evidence": "Update gen_powerofattorney CANCELED And Status Transfer To Bank main.cs:27, 67-74 (DTSX:21671, sha 4f88b5db5017)"
+        },
+        {
+          "attribute": "gen_statustransfertobank",
+          "from": [
+            {
+              "column": "gen_statustransfertobank",
+              "role": "condition"
+            },
+            {
+              "column": "gen_currentstate",
+              "role": "condition"
+            }
+          ],
+          "expression": "entity[\"gen_statustransfertobank\"] = new OptionSetValue(WAITING_SENDING_TO_BANK) with const int WAITING_SENDING_TO_BANK = 2 (code comment: 'for audit history' - set only when it differs)",
+          "fixedValue": 2,
+          "condition": "Inside the gen_currentstate != 2 block AND (Row.genstatustransfertobank_IsNull || Row.genstatustransfertobank != 2)",
+          "evidence": "Update gen_powerofattorney CANCELED And Status Transfer To Bank main.cs:28, 69, 75-78"
+        }
+      ],
+      "evidence": "main.cs:65-97 (DTSX:21671); OLE DB Source DTSX:18166-18215"
+    },
+    {
+      "component": "Package\\Send Poa Emails\\Update sentToPrintOn",
+      "identicalCopies": [],
+      "entity": "gen_powerofattorney",
+      "verb": "UPDATE",
+      "mechanism": "SQL (UPDATE Gen_powerofattorney view on [CRM] = psql/altshuler_mscrm)",
+      "status": "Unsupported",
+      "recordKey": "WHERE Gen_powerofattorneyid = ? (Param_0 = PowerOfAttorneyId read from staging GENERIX_STAGING.dbo.PowerOfAttorneySendEmails where isProcessed = 0)",
+      "recordKeyColumns": [
+        "PowerOfAttorneyId"
+      ],
+      "declaredRowFilters": [],
+      "condition": "Every staging row (isProcessed = 0) that survives the enrichment lookups (Get Agent or else Get Agencie match; Get Power Of Attorney match; Get Contact match; Pension or else Provident Fund match) - both the 'Exists' (POA file) and 'Not Exists' (error file) branches of 'Check If Exists Agent_cy Email Address' are unioned into 'Update IsProcessed True' (staging) and then this command.",
+      "attributes": [
+        {
+          "attribute": "gen_senttoprinton",
+          "from": [],
+          "expression": "SET gen_SentToPrintOn = GETUTCDATE() (database server UTC time at execution; not a fixed value). Not related to any input value; the only input is the WHERE key.",
+          "fixedValue": null,
+          "condition": null,
+          "evidence": "SqlCommand DTSX:36595-36597 (single '?' at line 36597 -> Param_0 = PowerOfAttorneyId, DTSX:36606/36609)"
+        }
+      ],
+      "evidence": "Update sentToPrintOn DTSX:36592-36609; source 'Get Not Proceessed PowerOfAttorneySendEmails Data' DTSX:31813 (SQL.GENERIX_STAGING DTSX:53)"
+    },
+    {
+      "component": "Package\\Update Power Of Attorney Main\\Update Current State Poa Main",
+      "identicalCopies": [],
+      "entity": "gen_powerofattorneymain",
+      "verb": "UPDATE",
+      "mechanism": "SDK (CrmProxy.Update)",
+      "status": "Supported",
+      "recordKey": "entity.Id = Row.GenpowerofattorneymainId (POA Mains having a child gen_powerofattorney with ModifiedOn >= now-36h, source DTSX:38954)",
+      "recordKeyColumns": [
+        "Gen_powerofattorneymainId"
+      ],
+      "declaredRowFilters": [],
+      "condition": "Rows reaching the writer (Union All, DTSX:40169): (a) all children share one gen_currentstate (count(distinct gen_currentstate) = 1) and that state is 4 -> 'Is Wrong' True; (b) same, state 2 -> 'Set Related CurrentState To Canceled'; (c) count(distinct) > 1 and no child with gen_currentstate = 1 ('If Exists Active' No Match) -> 'Set Related Current State To Canceled'. In script: !GenpowerofattorneymainId_IsNull && !gencurrentstaterelated_IsNull && (gencurrentstatemain_IsNull || gencurrentstatemain != gencurrentstaterelated).",
+      "attributes": [
+        {
+          "attribute": "gen_currentstate",
+          "from": [
+            {
+              "column": "gen_currentstate_related",
+              "role": "value"
+            },
+            {
+              "column": "gen_currentstate",
+              "role": "condition"
+            }
+          ],
+          "expression": "entity[\"gen_currentstate\"] = new OptionSetValue(Row.gencurrentstaterelated). Upstream value of gen_currentstate_related: path (a) child state 4 passed unchanged (Lookup 'Get The Related Current State' ref.gen_currentstate); path (b) child state 2 -> Derived Column 'gen_currentstate_related + 1' = 3; path (c) Derived Column constant 3. So the main gets 4 (all children 4) or 3 (all children 2, or mixed states with no active child).",
+          "fixedValue": null,
+          "condition": "Row.gencurrentstatemain_IsNull || Row.gencurrentstatemain != Row.gencurrentstaterelated (gen_currentstate input = current state of the POA Main from the source query)",
+          "evidence": "Update Current State Poa Main main.cs:64-77 (DTSX:40252, sha cee3da6bb0c5); If All Statuses Are Same DTSX:39106; If Current State Is Canceled Or Wrong DTSX:39147; Is Wrong DTSX:39232; Set Related CurrentState To Canceled DTSX:39361; Set Related Current State To Canceled DTSX:39334; If Exists Active DTSX:39180"
+        }
+      ],
+      "evidence": "Update Power Of Attorney Main data flow DTSX:38949-41299"
+    },
+    {
+      "component": "Package\\Create Power Of Attorney\\Move Annotation To Customer Account",
+      "identicalCopies": [],
+      "entity": "annotation",
+      "verb": "UPDATE",
+      "mechanism": "SDK (IOrganizationService.Update via CrmProxy.GetCrmService)",
+      "status": "Supported",
+      "recordKey": "annotation.Id = Row.AnnotationId (Annotation whose ObjectId = the POA Main, left-joined in source DTSX:3295)",
+      "recordKeyColumns": [
+        "AnnotationId"
+      ],
+      "declaredRowFilters": [],
+      "condition": "Runs for every row reaching it (Lookup 'Check If POA Account Agent Exist' No Match), BEFORE 'Remove Duplicates'; returns without writing if AnnotationId or gencustomeraccountid is NULL. The Annotation left join is inside the ROW_NUMBER subquery that keeps rowNumber = 1 per customer account (DTSX:3323, 3336): each row carries at most ONE annotation of the POA Main; other annotations of that POA Main are never moved.",
+      "attributes": [
+        {
+          "attribute": "objectid",
+          "from": [
+            {
+              "column": "gen_customeraccountid",
+              "role": "value"
+            }
+          ],
+          "expression": "annotation[\"objectid\"] = new EntityReference(\"gen_customeraccount\", Row.gencustomeraccountid) - moves the note from the POA Main to the new customer account",
+          "fixedValue": null,
+          "condition": "!Row.AnnotationId_IsNull && !Row.gencustomeraccountid_IsNull",
+          "evidence": "Move Annotation To Customer Account main.cs:122-135 (DTSX:3431, sha 6a1e02b939af)"
+        }
+      ],
+      "evidence": "main.cs:122-143"
+    },
+    {
+      "component": "Package\\Create Power Of Attorney\\Create POA Account - Agent",
+      "identicalCopies": [],
+      "entity": "gen_powerofattorney",
+      "verb": "CREATE",
+      "mechanism": "SDK (IOrganizationService.Create via CrmProxy.GetCrmService)",
+      "status": "Supported",
+      "recordKey": "new record (no key)",
+      "recordKeyColumns": [],
+      "declaredRowFilters": [],
+      "condition": "One create per row after 'Check If POA Account Agent Exist' No Match (no gen_powerofattorney with this Gen_customeraccount) and 'Remove Duplicates' (sort keys gen_customeraccountid, Gen_powerofattorneymainId; EliminateDuplicates=true DTSX:4801). Source: customer accounts created in the last 2 days whose Gen_contactname equals the POA Main's gen_contactname, POA Main Gen_appendixtype = 2 and gen_currentstate = 1, product-sub/exclusion filter; latest POA Main per account (ROW_NUMBER by Gen_signaturedate desc).",
+      "attributes": [
+        {
+          "attribute": "gen_appendixtype",
+          "from": [
+            {
+              "column": "Gen_appendixtype",
+              "role": "value"
+            }
+          ],
+          "expression": "new OptionSetValue(Row.Genappendixtype) (source WHERE forces 2)",
+          "fixedValue": null,
+          "condition": "!Genappendixtype_IsNull && ValidOptionsetsValues[\"gen_appendixtype\"] contains the value (StringMap of gen_powerofattorney, DTSX:13693)",
+          "evidence": "main.cs:138-139 (DTSX:1781)"
+        },
+        {
+          "attribute": "gen_powerofattorneysource",
+          "from": [
+            {
+              "column": "gen_powerofattorneysource",
+              "role": "value"
+            }
+          ],
+          "expression": "new OptionSetValue(Row.genpowerofattorneysource)",
+          "fixedValue": null,
+          "condition": "not NULL and value in ValidOptionsetsValues[\"gen_powerofattorneysource\"]",
+          "evidence": "main.cs:142-143"
+        },
+        {
+          "attribute": "gen_appendixd",
+          "from": [
+            {
+              "column": "Gen_appendixtype",
+              "role": "value"
+            }
+          ],
+          "expression": "new OptionSetValue(Row.Genappendixtype) - the APPENDIX TYPE value is copied into gen_appendixd",
+          "fixedValue": null,
+          "condition": "Genappendixtype not NULL and value in ValidOptionsetsValues[\"gen_appendixd\"]",
+          "evidence": "main.cs:146-147"
+        },
+        {
+          "attribute": "gen_currentstate",
+          "from": [],
+          "expression": "new OptionSetValue(1) // ACTIVE",
+          "fixedValue": 1,
+          "condition": null,
+          "evidence": "main.cs:150"
+        },
+        {
+          "attribute": "gen_statustransfertobank",
+          "from": [
+            {
+              "column": "gen_statustransfertobank",
+              "role": "condition"
+            }
+          ],
+          "expression": "new OptionSetValue((int)StatusTransferToBank.WaitingTransferToBank) = 2 (enum main.cs:93-98); the POA Main value only decides whether it is set",
+          "fixedValue": 2,
+          "condition": "!genstatustransfertobank_IsNull && POA Main value in ValidOptionsetsValues[\"gen_statustransfertobank\"]",
+          "evidence": "main.cs:93-98, 153-154"
+        },
+        {
+          "attribute": "gen_contactname",
+          "from": [
+            {
+              "column": "Gen_contactname",
+              "role": "value"
+            }
+          ],
+          "expression": "new EntityReference(\"contact\", Row.Gencontactname)",
+          "fixedValue": null,
+          "condition": "not NULL and != Guid.Empty",
+          "evidence": "main.cs:157-158"
+        },
+        {
+          "attribute": "gen_powerofattorneymain",
+          "from": [
+            {
+              "column": "Gen_powerofattorneymainId",
+              "role": "value"
+            }
+          ],
+          "expression": "new EntityReference(\"gen_powerofattorneymain\", Row.GenpowerofattorneymainId)",
+          "fixedValue": null,
+          "condition": "not NULL and != Guid.Empty",
+          "evidence": "main.cs:161-162"
+        },
+        {
+          "attribute": "gen_customeraccount",
+          "from": [
+            {
+              "column": "gen_customeraccountid",
+              "role": "value"
+            }
+          ],
+          "expression": "new EntityReference(\"gen_customeraccount\", Row.gencustomeraccountid)",
+          "fixedValue": null,
+          "condition": "not NULL and != Guid.Empty",
+          "evidence": "main.cs:165-166"
+        },
+        {
+          "attribute": "gen_agentname",
+          "from": [
+            {
+              "column": "Gen_agentname",
+              "role": "value"
+            }
+          ],
+          "expression": "new EntityReference(\"gen_agents\", Row.Genagentname) - id = Gen_powerofattorneymain.Gen_agentname; logical name 'gen_agents' conflicts with this package's own SQL, which joins gen_powerofattorney.gen_agentname to contact.contactid (see notes)",
+          "fixedValue": null,
+          "condition": "not NULL and != Guid.Empty",
+          "evidence": "main.cs:169-170 (DTSX:1956)"
+        },
+        {
+          "attribute": "gen_agencyname",
+          "from": [
+            {
+              "column": "Gen_agencyname",
+              "role": "value"
+            }
+          ],
+          "expression": "new EntityReference(\"gen_agencie\", Row.Genagencyname) - id = Gen_powerofattorneymain.Gen_agencyname; logical name conflicts with the package SQL join gen_agencyname = account.accountid (see notes)",
+          "fixedValue": null,
+          "condition": "not NULL and != Guid.Empty",
+          "evidence": "main.cs:173-174 (DTSX:1960)"
+        },
+        {
+          "attribute": "gen_identitynumber",
+          "from": [
+            {
+              "column": "Gen_identitynumber",
+              "role": "value"
+            }
+          ],
+          "expression": "Row.Genidentitynumber.Trim() (POA Main identity number)",
+          "fixedValue": null,
+          "condition": "not NULL and not empty",
+          "evidence": "main.cs:177-178"
+        },
+        {
+          "attribute": "gen_signaturedate",
+          "from": [
+            {
+              "column": "gen_signaturedate",
+              "role": "value"
+            }
+          ],
+          "expression": "Row.gensignaturedate.AddHours(3) (fixed +3h, no DST handling)",
+          "fixedValue": null,
+          "condition": "not NULL",
+          "evidence": "main.cs:181-182"
+        },
+        {
+          "attribute": "gen_receivingdate",
+          "from": [
+            {
+              "column": "gen_receivingdate",
+              "role": "value"
+            }
+          ],
+          "expression": "Row.genreceivingdate.AddHours(3)",
+          "fixedValue": null,
+          "condition": "not NULL",
+          "evidence": "main.cs:184-185"
+        },
+        {
+          "attribute": "gen_enddate",
+          "from": [
+            {
+              "column": "gen_enddate",
+              "role": "value"
+            },
+            {
+              "column": "gen_receivingdate",
+              "role": "value"
+            }
+          ],
+          "expression": "if gen_enddate not NULL: Row.genenddate.AddHours(3); else if gen_receivingdate not NULL: Row.genreceivingdate.AddHours(3).AddYears(10)",
+          "fixedValue": null,
+          "condition": "gen_enddate or gen_receivingdate not NULL",
+          "evidence": "main.cs:188-192"
+        },
+        {
+          "attribute": "gen_startdate",
+          "from": [],
+          "expression": "DateTime.Now (SSIS host clock at row time; not a fixed value)",
+          "fixedValue": null,
+          "condition": null,
+          "evidence": "main.cs:195"
+        },
+        {
+          "attribute": "gen_agentcontract",
+          "from": [
+            {
+              "column": "gen_advisornumber",
+              "role": "value"
+            },
+            {
+              "column": "gen_productsubcustomeraccount",
+              "role": "condition"
+            }
+          ],
+          "expression": "new EntityReference(\"gen_agentcontract\", Row.genadvisornumber) (POA Main gen_advisornumber -> POA gen_agentcontract)",
+          "fixedValue": null,
+          "condition": "genproductsubcustomeraccount != 2 (not 'gemel to invest') && genadvisornumber not NULL",
+          "evidence": "main.cs:197-200"
+        },
+        {
+          "attribute": "gen_consultname",
+          "from": [
+            {
+              "column": "gen_consultname",
+              "role": "value"
+            },
+            {
+              "column": "gen_productsubcustomeraccount",
+              "role": "condition"
+            }
+          ],
+          "expression": "new EntityReference(\"account\", Row.genconsultname)",
+          "fixedValue": null,
+          "condition": "genproductsubcustomeraccount != 2 && not NULL",
+          "evidence": "main.cs:197, 202-203"
+        },
+        {
+          "attribute": "gen_startdateconsultation",
+          "from": [
+            {
+              "column": "gen_counselingstartdate",
+              "role": "value"
+            },
+            {
+              "column": "gen_productsubcustomeraccount",
+              "role": "condition"
+            }
+          ],
+          "expression": "Row.gencounselingstartdate.AddHours(3)",
+          "fixedValue": null,
+          "condition": "genproductsubcustomeraccount != 2 && not NULL",
+          "evidence": "main.cs:197, 205-206"
+        },
+        {
+          "attribute": "gen_advisorname",
+          "from": [
+            {
+              "column": "gen_advisorname",
+              "role": "value"
+            },
+            {
+              "column": "gen_productsubcustomeraccount",
+              "role": "condition"
+            }
+          ],
+          "expression": "new EntityReference(\"gen_bankadvisor\", Row.genadvisorname)",
+          "fixedValue": null,
+          "condition": "genproductsubcustomeraccount != 2 && not NULL",
+          "evidence": "main.cs:197, 208-209"
+        },
+        {
+          "attribute": "gen_branchbankadvisor",
+          "from": [
+            {
+              "column": "gen_branchbankadvisor",
+              "role": "value"
+            },
+            {
+              "column": "gen_productsubcustomeraccount",
+              "role": "condition"
+            }
+          ],
+          "expression": "new EntityReference(\"gen_bankbranch\", Row.genbranchbankadvisor)",
+          "fixedValue": null,
+          "condition": "genproductsubcustomeraccount != 2 && not NULL",
+          "evidence": "main.cs:197, 211-212"
+        },
+        {
+          "attribute": "gen_enddateconsultation",
+          "from": [
+            {
+              "column": "gen_counselingenddate",
+              "role": "value"
+            },
+            {
+              "column": "gen_productsubcustomeraccount",
+              "role": "condition"
+            }
+          ],
+          "expression": "Row.gencounselingenddate.AddHours(3)",
+          "fixedValue": null,
+          "condition": "genproductsubcustomeraccount != 2 && not NULL",
+          "evidence": "main.cs:197, 214-215"
+        },
+        {
+          "attribute": "gen_appointmentofagent",
+          "from": [
+            {
+              "column": "gen_agentappointment",
+              "role": "value"
+            },
+            {
+              "column": "gen_productsubcustomeraccount",
+              "role": "condition"
+            }
+          ],
+          "expression": "Row.genagentappointment (bool, POA Main gen_agentappointment -> POA gen_appointmentofagent)",
+          "fixedValue": null,
+          "condition": "genproductsubcustomeraccount != 2 && not NULL",
+          "evidence": "main.cs:197, 217-218"
+        }
+      ],
+      "evidence": "Create POA Account - Agent main.cs:131-231 (DTSX:1781, code at DTSX line = 1786 + main.cs line; sha 13fb42f94f44); source Get Customer Accounts DTSX:3295; Get Valid Optionsets Values DTSX:13693 + Build Valid Values Dictionary main.cs:103, 116-129"
+    },
+    {
+      "component": "Package\\Create Power Of Attorney - Pension\\Move Annotation To Policies",
+      "identicalCopies": [],
+      "entity": "annotation",
+      "verb": "UPDATE",
+      "mechanism": "SDK (IOrganizationService.Update via CrmProxy.GetCrmService)",
+      "status": "Supported",
+      "recordKey": "annotation.Id = Row.AnnotationId (Annotation whose ObjectId = the POA Main, source DTSX:7589)",
+      "recordKeyColumns": [
+        "AnnotationId"
+      ],
+      "declaredRowFilters": [],
+      "condition": "Runs for every row after Lookup 'Check If POA Account Agent' No Match, BEFORE 'Remove Duplicates'; returns without writing if AnnotationId or Genprogrammainid is NULL. The Annotation left join is inside the ROW_NUMBER subquery keeping rowNumber = 1 per program (DTSX:7618, 7630): each row carries at most one annotation; other annotations of the POA Main never move. Because the move precedes 'Remove Duplicates' (key Gen_powerofattorneymainId only), the note can be moved to a program whose POA create is then dropped by Remove Duplicates.",
+      "attributes": [
+        {
+          "attribute": "objectid",
+          "from": [
+            {
+              "column": "Gen_programmainid",
+              "role": "value"
+            }
+          ],
+          "expression": "annotation[\"objectid\"] = new EntityReference(\"gen_policies\", Row.Genprogrammainid) - id comes from Gen_programmain.Gen_programmainid, logical name given is 'gen_policies' (see notes)",
+          "fixedValue": null,
+          "condition": "!Row.AnnotationId_IsNull && !Row.Genprogrammainid_IsNull",
+          "evidence": "Move Annotation To Policies main.cs:123-135 (DTSX:7724 code; DTSX:7979, sha ae8b41b1a495)"
+        }
+      ],
+      "evidence": "main.cs:123-144"
+    },
+    {
+      "component": "Package\\Create Power Of Attorney - Pension\\Create POA Account - Agent",
+      "identicalCopies": [],
+      "entity": "gen_powerofattorney",
+      "verb": "CREATE",
+      "mechanism": "SDK (IOrganizationService.Create via CrmProxy.GetCrmService)",
+      "status": "Supported",
+      "recordKey": "new record (no key)",
+      "recordKeyColumns": [],
+      "declaredRowFilters": [],
+      "condition": "One create per row after 'Check If POA Account Agent' No Match and 'Remove Duplicates' (sort key Gen_powerofattorneymainId ONLY, EliminateDuplicates=true DTSX:9068 -> at most one program per POA Main per run). Source: Gen_programmain created in the last 2 days whose Gen_customername = POA Main gen_contactname, POA Main Gen_appendixtype = 2, gen_currentstate = 1, ProductTypeCode 200003 with gen_includingcomprehensivepension = 1 or 200004 with gen_includinggeneralpension = 1.",
+      "attributes": [
+        {
+          "attribute": "gen_appendixtype",
+          "from": [
+            {
+              "column": "Gen_appendixtype",
+              "role": "value"
+            }
+          ],
+          "expression": "new OptionSetValue(Row.Genappendixtype) (source WHERE forces 2)",
+          "fixedValue": null,
+          "condition": "not NULL and value in ValidOptionsetsValues[\"gen_appendixtype\"]",
+          "evidence": "main.cs:138-139 (DTSX:6102)"
+        },
+        {
+          "attribute": "gen_powerofattorneysource",
+          "from": [
+            {
+              "column": "gen_powerofattorneysource",
+              "role": "value"
+            }
+          ],
+          "expression": "new OptionSetValue(Row.genpowerofattorneysource)",
+          "fixedValue": null,
+          "condition": "not NULL and value in ValidOptionsetsValues[\"gen_powerofattorneysource\"]",
+          "evidence": "main.cs:142-143"
+        },
+        {
+          "attribute": "gen_appendixd",
+          "from": [
+            {
+              "column": "Gen_appendixtype",
+              "role": "value"
+            }
+          ],
+          "expression": "new OptionSetValue(Row.Genappendixtype) - appendix TYPE value copied into gen_appendixd",
+          "fixedValue": null,
+          "condition": "not NULL and value in ValidOptionsetsValues[\"gen_appendixd\"]",
+          "evidence": "main.cs:146-147"
+        },
+        {
+          "attribute": "gen_currentstate",
+          "from": [],
+          "expression": "new OptionSetValue(1) // ACTIVE",
+          "fixedValue": 1,
+          "condition": null,
+          "evidence": "main.cs:150"
+        },
+        {
+          "attribute": "gen_statustransfertobank",
+          "from": [
+            {
+              "column": "gen_statustransfertobank",
+              "role": "condition"
+            }
+          ],
+          "expression": "new OptionSetValue((int)StatusTransferToBank.WaitingTransferToBank) = 2 (enum main.cs:87-92)",
+          "fixedValue": 2,
+          "condition": "!genstatustransfertobank_IsNull && POA Main value in ValidOptionsetsValues[\"gen_statustransfertobank\"]",
+          "evidence": "main.cs:87-92, 153-154"
+        },
+        {
+          "attribute": "gen_contactname",
+          "from": [
+            {
+              "column": "Gen_contactname",
+              "role": "value"
+            }
+          ],
+          "expression": "new EntityReference(\"contact\", Row.Gencontactname)",
+          "fixedValue": null,
+          "condition": "not NULL and != Guid.Empty",
+          "evidence": "main.cs:157-158"
+        },
+        {
+          "attribute": "gen_powerofattorneymain",
+          "from": [
+            {
+              "column": "Gen_powerofattorneymainId",
+              "role": "value"
+            }
+          ],
+          "expression": "new EntityReference(\"gen_powerofattorneymain\", Row.GenpowerofattorneymainId)",
+          "fixedValue": null,
+          "condition": "not NULL and != Guid.Empty",
+          "evidence": "main.cs:161-162"
+        },
+        {
+          "attribute": "gen_customerprogram",
+          "from": [
+            {
+              "column": "Gen_programmainid",
+              "role": "value"
+            }
+          ],
+          "expression": "new EntityReference(\"gen_policies\", Row.Genprogrammainid) - id is Gen_programmain.Gen_programmainid; this package's SQL joins gen_powerofattorney.gen_customerprogram to Gen_programmain.Gen_programmainId (DTSX:18206) (see notes)",
+          "fixedValue": null,
+          "condition": "not NULL and != Guid.Empty",
+          "evidence": "main.cs:165-166 (DTSX:6392)"
+        },
+        {
+          "attribute": "gen_agentname",
+          "from": [
+            {
+              "column": "Gen_agentname",
+              "role": "value"
+            }
+          ],
+          "expression": "new EntityReference(\"gen_agents\", Row.Genagentname) (see notes)",
+          "fixedValue": null,
+          "condition": "not NULL and != Guid.Empty",
+          "evidence": "main.cs:169-170 (DTSX:6396)"
+        },
+        {
+          "attribute": "gen_agencyname",
+          "from": [
+            {
+              "column": "Gen_agencyname",
+              "role": "value"
+            }
+          ],
+          "expression": "new EntityReference(\"gen_agencie\", Row.Genagencyname) (see notes)",
+          "fixedValue": null,
+          "condition": "not NULL and != Guid.Empty",
+          "evidence": "main.cs:173-174 (DTSX:6400)"
+        },
+        {
+          "attribute": "gen_identitynumber",
+          "from": [
+            {
+              "column": "Gen_identitynumber",
+              "role": "value"
+            }
+          ],
+          "expression": "Row.Genidentitynumber.Trim() (POA Main Gen_identitynumber; programmainIdentityNumber input is NOT used)",
+          "fixedValue": null,
+          "condition": "not NULL and not empty",
+          "evidence": "main.cs:177-178"
+        },
+        {
+          "attribute": "gen_signaturedate",
+          "from": [
+            {
+              "column": "gen_signaturedate",
+              "role": "value"
+            }
+          ],
+          "expression": "Row.gensignaturedate.AddHours(3)",
+          "fixedValue": null,
+          "condition": "not NULL",
+          "evidence": "main.cs:181-182"
+        },
+        {
+          "attribute": "gen_receivingdate",
+          "from": [
+            {
+              "column": "gen_receivingdate",
+              "role": "value"
+            }
+          ],
+          "expression": "Row.genreceivingdate.AddHours(3)",
+          "fixedValue": null,
+          "condition": "not NULL",
+          "evidence": "main.cs:184-185"
+        },
+        {
+          "attribute": "gen_enddate",
+          "from": [
+            {
+              "column": "gen_enddate",
+              "role": "value"
+            },
+            {
+              "column": "gen_receivingdate",
+              "role": "value"
+            }
+          ],
+          "expression": "if gen_enddate not NULL: genenddate.AddHours(3); else if gen_receivingdate not NULL: genreceivingdate.AddHours(3).AddYears(10)",
+          "fixedValue": null,
+          "condition": "gen_enddate or gen_receivingdate not NULL",
+          "evidence": "main.cs:188-192"
+        },
+        {
+          "attribute": "gen_startdate",
+          "from": [],
+          "expression": "DateTime.Now (not a fixed value)",
+          "fixedValue": null,
+          "condition": null,
+          "evidence": "main.cs:195"
+        },
+        {
+          "attribute": "gen_agentcontract",
+          "from": [
+            {
+              "column": "gen_advisornumber",
+              "role": "value"
+            }
+          ],
+          "expression": "new EntityReference(\"gen_agentcontract\", Row.genadvisornumber) (no product-sub condition in the pension variant)",
+          "fixedValue": null,
+          "condition": "not NULL",
+          "evidence": "main.cs:198-199"
+        },
+        {
+          "attribute": "gen_consultname",
+          "from": [
+            {
+              "column": "gen_consultname",
+              "role": "value"
+            }
+          ],
+          "expression": "new EntityReference(\"account\", Row.genconsultname)",
+          "fixedValue": null,
+          "condition": "not NULL",
+          "evidence": "main.cs:201-202"
+        },
+        {
+          "attribute": "gen_startdateconsultation",
+          "from": [
+            {
+              "column": "gen_counselingstartdate",
+              "role": "value"
+            }
+          ],
+          "expression": "Row.gencounselingstartdate.AddHours(3)",
+          "fixedValue": null,
+          "condition": "not NULL",
+          "evidence": "main.cs:204-205"
+        },
+        {
+          "attribute": "gen_advisorname",
+          "from": [
+            {
+              "column": "gen_advisorname",
+              "role": "value"
+            }
+          ],
+          "expression": "new EntityReference(\"gen_bankadvisor\", Row.genadvisorname)",
+          "fixedValue": null,
+          "condition": "not NULL",
+          "evidence": "main.cs:207-208"
+        },
+        {
+          "attribute": "gen_branchbankadvisor",
+          "from": [
+            {
+              "column": "gen_branchbankadvisor",
+              "role": "value"
+            }
+          ],
+          "expression": "new EntityReference(\"gen_bankbranch\", Row.genbranchbankadvisor)",
+          "fixedValue": null,
+          "condition": "not NULL",
+          "evidence": "main.cs:210-211"
+        },
+        {
+          "attribute": "gen_enddateconsultation",
+          "from": [
+            {
+              "column": "gen_counselingenddate",
+              "role": "value"
+            }
+          ],
+          "expression": "Row.gencounselingenddate.AddHours(3)",
+          "fixedValue": null,
+          "condition": "not NULL",
+          "evidence": "main.cs:213-214"
+        },
+        {
+          "attribute": "gen_appointmentofagent",
+          "from": [
+            {
+              "column": "gen_agentappointment",
+              "role": "value"
+            }
+          ],
+          "expression": "Row.genagentappointment (bool)",
+          "fixedValue": null,
+          "condition": "not NULL",
+          "evidence": "main.cs:216-217"
+        }
+      ],
+      "evidence": "Create POA Account - Agent (Pension) main.cs:131-229 (DTSX:6102, code at DTSX line = 6226 + main.cs line; sha 334269e88007); source Get Policies DTSX:7589"
+    }
+  ],
+  "readWriteModifications": [],
+  "lookupBridges": [],
+  "unresolved": [
+    {
+      "where": "Create Power Of Attorney / Create Power Of Attorney - Pension: gen_agentname, gen_agencyname, gen_customerprogram, annotation.objectid (Pension)",
+      "reason": "Whether CRM accepts EntityReference(\"gen_agents\"/\"gen_agencie\"/\"gen_policies\", id) for these lookups depends on CRM attribute metadata (lookup Targets) and on the external CRM.Proxy assembly, neither supplied (external_unknown). The DTSX proves only the mismatch described in notes; it cannot prove whether creates/updates fail at runtime."
+    },
+    {
+      "where": "Handle Wait Status / Handle Active Status - source of dbo.PowerOfAttorneySendEmails rows and Send Poa Emails source",
+      "reason": "Staging table GENERIX_STAGING.dbo.PowerOfAttorneySendEmails is not INSERTed in this package (only UPDATEd); its loader is outside this package (external to 0031). PowerOfAttorneyId used as the WHERE key of Update sentToPrintOn therefore originates from a staging column whose writer is not in scope."
+    }
+  ],
+  "notes": [
+    "Writers in lineage (20): 9 business CRM writers mapped here (52 attributes). Excluded: 6 ETL plumbing (Etl Warning x2, ETL Warning, Create ETL Warning x2, ETL Record Finish); 4 agent e-mail scripts (Handle Wait Status\\Email - Start Date Poa, ...With Commission Appointment; Handle Active Status\\Email - Cancel Poa To Perform Actions, ...With Commission Appointment) whose Input0_ProcessInput and Input0_ProcessInputRow bodies are fully commented out ('In Comment due to 13366', e.g. Email - Start Date Poa main.cs:46-73, 239-267) - CreateEmail/SendEmail are dead code, no CRM write; Send Poa Emails\\Send Email (email create + SendEmail in PostExecute) excluded as e-mail sending per assignment.",
+    "EntityReference logical names (logic-analyst hypothesis). DTSX facts: (1) Both create scripts send gen_agentname = EntityReference(\"gen_agents\", Gen_powerofattorneymain.Gen_agentname) and gen_agencyname = EntityReference(\"gen_agencie\", Gen_powerofattorneymain.Gen_agencyname) (DTSX:1956/1960, 6396/6400). (2) In the SAME package the SQL treats gen_powerofattorney.gen_agentname as a contact id and gen_agencyname as an account id: 'join contact on gen_agentname = contactid' + 'join Gen_agents on Gen_agents.gen_contactname = gen_agentname' (Get Agent DTSX:31644-31645), 'join account on gen_agencyname = accountid' + 'join Gen_agencie on Gen_agencie.gen_agencyname = Gen_powerofattorney.gen_agencyname' (Get Agencie DTSX:31565-31566), 'left join Contact on Contact.ContactId=poa.Gen_agentname' / 'Account.AccountId=poa.Gen_agencyname' (DTSX:27226 source). So Gen_agents/Gen_agencie exist as CRM tables but are linked to the contact/account via their own gen_contactname/gen_agencyname columns, i.e. a gen_agents record id is NOT the contact id stored in gen_powerofattorney.gen_agentname. (3) Other supplied code (0029_POA, disabled flows) writes gen_powerofattorney.gen_agentname/gen_agencyname as EntityReference(\"contact\"/\"account\") (0029 DTSX:10987-10988, 13906-13907) and gen_powerofattorneymain.gen_agentname as \"contact\" (0029 DTSX:22820/22823). (4) gen_customerprogram = EntityReference(\"gen_policies\", Gen_programmain.Gen_programmainid) while this package joins gen_powerofattorney.gen_customerprogram to Gen_programmain.Gen_programmainId (DTSX:18206, 27226) and 'gen_policies' appears nowhere else in the DTSX (only DTSX:6392, 7979). Conclusion: the DTSX proves the logical names disagree with the entity the id comes from / the package's own joins; it does NOT prove the runtime outcome (CRM metadata not supplied). If CRM validates lookup targets, these attributes would make every such create (and the pension annotation move) fail into the Error output -> ETL warning. Status: hypothesis strengthened, still unverified.",
+    "Handle Wait Status\\Update NeedToSendMailBit (Unsupported SQL on Gen_powerofattorneyBase): writes dateadd(HH,3, waiting POA gen_receivingdate) - an already +3h-shifted value - straight into the Base table; CASE without ELSE sets gen_receivingdateofcancelpoa to NULL on the old active POA when its own Gen_appendixtype is not 2/3/5. The target row is the active POA picked by a Full-cache Lookup (first match if several active POAs share the account/program).",
+    "Send Poa Emails\\Update sentToPrintOn (Unsupported SQL on view Gen_powerofattorney, gen_SentToPrintOn = GETUTCDATE()) also runs for rows routed only to the error file (no agent e-mail) because both 'Check If Exists Agent_cy Email Address' branches are unioned before 'Update IsProcessed True' -> 'Update sentToPrintOn'.",
+    "Handle Wait / Active Status: the async Custom Output rows of the Set Data scripts never reach the CRM status writers (only 'No Data' of 'Is emailDetailsJson Contains Data 1' is connected and those rows carry non-NULL JSON); the CRM writers receive each source row once through the sync Output 0 / other branches. In Handle Active Status the Custom Output column genstatustransfertobank is never assigned (always NULL).",
+    "Set Data For Cancel Poa Emails main.cs:107: Gencontactname = Row.Genagentname_IsNull ? Guid.Empty : Row.Gencontactname - null check on the wrong column (staging JSON only, not CRM). main.cs:125 reads Row.genstatustransfertobank without an _IsNull check inside a try that wraps the whole while(NextRow) loop (main.cs:45-79); behaviour on NULL not verified - affects only staging JSON.",
+    "Update Power Of Attorney Main: child status 2 is turned into main status 3 by 'gen_currentstate_related + 1' (DTSX:39361); mixed statuses without an active child also give 3 (constant, DTSX:39334) even if a child is waiting (3); all children 4 -> 4. Lineage tool tags the '+1' in-place derived column on the 'Is Wrong' True path too (same lineageId), but that path bypasses the derived column: value 4 passes unchanged. count(distinct gen_currentstate) ignores NULL states. Meaning of option values 1/2/3/4 not defined in the DTSX (StringMap not supplied).",
+    "Update Current State Poa Main main.cs:66-91: the 'else NoNeedUpdateBuffer' belongs to the outer null-check; rows where state already equals the related state produce no output row (counter only).",
+    "Move Annotation To Customer Account / To Policies run per row BEFORE 'Remove Duplicates'. The Annotation join sits inside the ROW_NUMBER subquery (rowNumber = 1 per account/program, DTSX:3323/3336, 7618/7630), so each row carries one annotation and other annotations of the POA Main never move. Only when several rows carry the SAME AnnotationId (several new accounts/programs of one POA Main) is the note re-pointed once per row, ending on the last processed row (order undetermined); the logic analyst's 'first created account' is not proven. In Pension the note can move to a program whose create is then dropped by Remove Duplicates (key Gen_powerofattorneymainId only). Create Power Of Attorney runs before the Pension flow (precedence DTSX:44839-44841), so an annotation already moved to a customer account is no longer found by the Pension source (join ObjectId = POA Main).",
+    "Create scripts: dates from CRM SQL (stored UTC) are shifted by a fixed AddHours(3) before Create (no DST logic); gen_startdate = DateTime.Now; gen_appendixd receives the appendix TYPE value; gen_statustransfertobank is always 2 when the POA Main value is valid. In the account create the advisor/consult block is skipped when gen_productsubcustomeraccount == 2 ('gemel to invest'); the pension create has no such condition. Unused inputs: Gen_customeridnumber (account), programmainIdentityNumber (pension), AnnotationId in creates.",
+    "Remove Duplicates in the Pension flow keys only on Gen_powerofattorneymainId (DTSX:9066-9068) -> at most one pension program per POA Main per run; others only on later runs while still within the 2-day CreatedOn window.",
+    "Mechanism note: SDK calls go through CRM.Proxy (CrmProxy / GetCrmService) - external assembly, not supplied; the DLLs of script components are not decompiled (C# source analysed).",
+    "Verifier finding (hypothesis per SSIS semantics): 'Is Renewal' and 'AppendixType' fail the component on expression error (NULL operands); because 'Sort By PoaId' is blocking, such a failure stops all activations in the run while NeedToSendMailBit SQL updates already done stay committed. See ACTIVE and NeedToSendMailBit conditions."
+  ]
+}

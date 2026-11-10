@@ -1,0 +1,1335 @@
+{
+ "generatedAt": "2026-11-10T06:42:09.667Z",
+ "totals": {
+  "packages": 35,
+  "claims": 1398,
+  "verified": 1315,
+  "not_checked": 0,
+  "stale": 83,
+  "wrong": 0,
+  "incomplete": 0,
+  "unverifiable": 0,
+  "other": 0,
+  "foreignIds": 0
+ },
+ "packages": [
+  {
+   "package": "0002_ExtractDailyAndMonthlyFiles",
+   "claims": 14,
+   "verified": 14,
+   "foreign": [],
+   "open": []
+  },
+  {
+   "package": "0003_ExtractMislakaFiles",
+   "claims": 15,
+   "verified": 15,
+   "foreign": [],
+   "open": []
+  },
+  {
+   "package": "0004_LeumiFile-MY",
+   "claims": 85,
+   "verified": 81,
+   "stale": 4,
+   "foreign": [],
+   "open": [
+    {
+     "id": "L|Package (control flow)|detailed",
+     "state": "stale",
+     "detail": "Units 1 and 3-18 match the DTSX (gen_etlvariable load, CalendarRule SQL, GetFiles, isFileExist ExpressionAndConstraint, ascending sort, ADO enumerator, Success-only chain Truncate -> Write -> Create Account For Employers -> ... -> Minhali daily, disabled archive loop). Unit 2 (Get Sytem User Id) is correct for the fund INSERT (Add System Columns: CreatedBy/ModifiedBy/OwnerId = SystemUserId, OwningBusinessUnit, OwnerIdType, TransactionCurrencyId), contact UPDATE ModifiedBy (Param_10 = userId), Accounts For Minhali ModifiedBy (Param_5) and kibbutz Account update ModifiedBy (AdminId). But its enumeration of where these values are written to CRM omits part of the gen_contactlogs INSERT: besides CreatedBy/ModifiedBy (Param_2/3 = userId/modifiedby), the log row also gets OwnerId (Param_4 = User::UserId), OwnerIdType (Param_5 = User::OwnerIdType) and OwningBusinessUnit (Param_6 = User::BusinessUnitIdStr).",
+     "wrongUnits": [
+      {
+       "unit": 2,
+       "problem": "Written attributes omitted from the list of uses",
+       "correct": "In gen_contactlogs the system user is written as CreatedBy, ModifiedBy and OwnerId, and the owner type and business unit as OwnerIdType and OwningBusinessUnit",
+       "evidence": "source/DailyProcess/0004_LeumiFile-MY.dtsx:26706-26722, 27015-27034"
+      }
+     ]
+    },
+    {
+     "id": "L|Package\\Foreach Loop Container\\Create Account For Employers|detailed",
+     "state": "stale",
+     "detail": "Units 1-30, 32 and 34-36 match the DTSX (Trim, Last row, ignored lookups, padding with conditional NULL-read wording, employer-funds condition, Create Additional Columns, merge, unknown name, HashSet dedupe, Format Dates, lookup statecode = 0 with accountsWithFunds, create attributes and constants, batch 1000/100, gen_modifiedbybank, dob else = null, commented-out fax/telephones/accountnumber, end state vs CRM funds). Units 31/33 misstate the change test for the postal code (NULL semantics).",
+     "wrongUnits": [
+      {
+       "unit": "31/33",
+       "problem": "Change test is stated as \"file value differs from CRM value (NULL vs value = change)\". For address1_postalcode the lookup reads isnull(Address1_PostalCode,'0000000'), so a CRM NULL postal code is compared as \"0000000\". A file zip that is empty (Trim String Fields turns \"\" into NULL) against an empty CRM postal code therefore counts as a change, and the code then assigns Row.address1postalcode without a NULL check.",
+       "correct": "Add: CRM postal code NULL is compared as \"0000000\"; so if both file and CRM postal codes are empty, CheckIfToUpdate is true. Then, if reading a missing value throws (documented SSIS behaviour, not shown in the files), the row goes to CastingError and the account is not updated at all; if it returns null, an update is sent (address1_postalcode = null, gen_modifiedbybank = Now, plus any changed fields) although no compared value changed.",
+       "evidence": "source/DailyProcess/0004_LeumiFile-MY.dtsx:4164-4185 (line ~4173 isnull(Address1_PostalCode,'0000000')); Set null to empty String fileds DTSX:8808 (only \"\" -> NULL); Update Account main.cs 172-176 @DTSX:12241; Extensions.cs IsEqual 12-14, 30-32; Trim String Fields FormatField 41-50"
+      }
+     ]
+    },
+    {
+     "id": "L|Package\\Foreach Loop Container\\Create Account For Employers|detail",
+     "state": "stale",
+     "detail": "Units 1, 2, 4 and 5 match (population condition, active account by padded accountnumber, accountsWithFunds, create list and constants, batches, gen_modifiedbybank). Unit 3 says an existing account without such a fund is updated only if one of the seven fields differs from the DB, else DontNeedToUpdate. For address1_postalcode the DB side is isnull(Address1_PostalCode,'0000000'), so an empty file zip against an empty CRM postal code counts as different; the outcome then depends on the NULL read (CastingError and no update, or an update with gen_modifiedbybank although nothing compared changed).",
+     "wrongUnits": [
+      {
+       "unit": 3,
+       "problem": "Change test is stated as \"file value differs from CRM value (NULL vs value = change)\". For address1_postalcode the lookup reads isnull(Address1_PostalCode,'0000000'), so a CRM NULL postal code is compared as \"0000000\". A file zip that is empty (Trim String Fields turns \"\" into NULL) against an empty CRM postal code therefore counts as a change, and the code then assigns Row.address1postalcode without a NULL check.",
+       "correct": "Add: CRM postal code NULL is compared as \"0000000\"; so if both file and CRM postal codes are empty, CheckIfToUpdate is true. Then, if reading a missing value throws (documented SSIS behaviour, not shown in the files), the row goes to CastingError and the account is not updated at all; if it returns null, an update is sent (address1_postalcode = null, gen_modifiedbybank = Now, plus any changed fields) although no compared value changed.",
+       "evidence": "source/DailyProcess/0004_LeumiFile-MY.dtsx:4164-4185 (line ~4173 isnull(Address1_PostalCode,'0000000')); Set null to empty String fileds DTSX:8808 (only \"\" -> NULL); Update Account main.cs 172-176 @DTSX:12241; Extensions.cs IsEqual 12-14, 30-32; Trim String Fields FormatField 41-50"
+      }
+     ]
+    },
+    {
+     "id": "L|Package\\Foreach Loop Container\\Create Contacts For Minhali|detailed",
+     "state": "stale",
+     "detail": "Most units match (classification, level 1, Add 0 no-op, dedupe, unknown values, Custom Fields, mobile/e-mail rules, create attributes batch 10, UPDATE parameter positions 0-43, log path conditions). Two problems. (a) Unit 35 says that without a fill-in the CRM values are written back. Update Correct Value uses gen_recordsorceDB == 1 && ISNULL(<db>) && !ISNULL(<file>) ? new : DB. If gen_recordsorce is NULL in CRM, the CRM mobile/e-mail is empty and the file has a value, the condition evaluates to NULL and, per documented SSIS expression behaviour (not shown in the files), a NULL condition makes the ?: result NULL; the UPDATE (Param_18-31) then writes NULL into that channel's last-update date, source, transmission status (and transmission date/file/feedback/error) instead of the CRM values. (b) Written values omitted: Create Contact also writes gen_modifiedbybank = DateTime.Now (main.cs 119), and the ContactBase UPDATE also writes gen_modifiedbybank = GETDATE(), ModifiedOn = GETDATE() and ModifiedBy = system user (Param_10). Units 33 and 41 list the written fields without them (the same omission was corrected in Create Accounts For Minhali).",
+     "wrongUnits": [
+      {
+       "unit": 35,
+       "problem": "\"When there is no fill-in, the CRM values are written\" ignores a NULL gen_recordsorce",
+       "correct": "If gen_recordsorce in CRM is NULL, the CRM field is empty and the file has a value, the condition is NULL; per documented SSIS behaviour (not shown in the files) the result is NULL, so NULL is written to that channel's last-update date, source and transmission status/details",
+       "evidence": "source/DailyProcess/0004_LeumiFile-MY.dtsx:34651-34772; 34278 Param_18-31"
+      },
+      {
+       "unit": "33/41",
+       "problem": "Written attributes omitted",
+       "correct": "Create also writes gen_modifiedbybank = Now; the SQL update also writes gen_modifiedbybank = GETDATE(), ModifiedOn = GETDATE(), ModifiedBy = system user",
+       "evidence": "Create Contact main.cs 119; source/DailyProcess/0004_LeumiFile-MY.dtsx:34278"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "package": "0005_Customer Account",
+   "claims": 75,
+   "stale": 8,
+   "verified": 67,
+   "foreign": [],
+   "open": [
+    {
+     "id": "L|summary",
+     "state": "stale",
+     "detail": "Re-derived. The precedence chain (DTSX:82412-82427, 16 Success constraints, one incoming each) gives this order: Create/Update, Connect, Set Joining, Aggregations, Paragraph14, Consulting CA, Consulting FM, Currency. Only Create sets gen_joiningmailtoagent = 1 (main.cs:43); the term appears in no other supplied package. The Currency task updates TransactionCurrencyId IS NULL rows using variable CurrencyName = 'שקל חדש' (DTSX:29-31). There is no configuration and no expression, and no script writes this variable. scopeNote: the evidence configurations array is empty. All 42 component connections and the 3 Execute SQL tasks use [qsql] = psql/ALTSHULER_MSCRM. The direct SQL targets Gen_customeraccountBase, Gen_fundmainbase and gen_transferrequest (the view name, labelled as not shown). The SDK goes through CrmProxy. The package reads no files.",
+     "wrongUnits": []
+    },
+    {
+     "id": "L|Package (control flow)|detailed",
+     "state": "stale",
+     "detail": "These units check out. The chain order and Success-only constraints match DTSX:82412-82427. [1]: gen_etlvariable sets ServerName/OrganizationName/CrmMinimumDate; the system user is found by domainname like '%crmadmin%' and used as ModifiedBy (DTSX:29585). [4]: isnull(c.EMailAddress1, a.EMailAddress1) / isnull(c.DoNotEMail, a.DoNotEMail) where gen_joiningmailtoagent = 1 (DTSX:62354-62360); the update is 2 if !email_IsNull && !donotemail_IsNull && donotemail == false, else 4 (Set Joining main.cs:15-17, 41-48); AWAITING_EMAIL_SEND = 1 is the constant at Create main.cs:19; there is no mail-sending task or code. [9]: TransactionCurrency where CurrencyName = User::CurrencyName, a design value of 'שקל חדש' that nothing assigns, with ExchangeRate 1 where TransactionCurrencyId is null (DTSX:29-31, 79895-79896). [14]: the OnError script casts the String variable with (Guid) before Update/Create (DTSX:82604; variable DataType 8 at DTSX:41-42; .ToString() at DTSX:9869), so 'not proven' is correct. [15] is consistent with step 7.\nWRONG: unit [2] states universally that a customer account is created or updated 'for every combination of account type and bank account number in the funds'. Only funds with gen_existinfile = 1 that inner-join to product and gen_customeraccounttype are read (DTSX:33309-33313). An existing account is updated only when a compared field differs (Is Need To Update All / Is Need To Update All 1 == TRUE, DTSX:33634, 33667). Three other overview units drop a row condition in the same way (counted under this verdict). [3]: only gen_existinfile = 1 funds with a matching product/type/account are linked (DTSX:2606-2613). [5]: the account is written only when |balance diff| > 1 or DATEDIFF(HH) > 12 on a date, aggregated over gen_existinfile = 1 funds (DTSX:68399), not on any difference. [6]: the copy happens only from funds where both gen_paragraph14 and gen_employerconfirmation are not null; when several such funds are linked to an account, the source fund is not determined (DTSX:79889).",
+     "wrongUnits": [
+      {
+       "unit": "[2] 'שלב 1: לכל צירוף של סוג חשבון ומספר חשבון בנק בקופות נוצר חשבון לקוח או מתעדכן החשבון הקיים'",
+       "problem": "This is universal ('every combination in the funds') and makes the update unconditional. Only funds with gen_existinfile = 1 and a matching product and customer-account type are read. An existing account is updated only if a compared field differs.",
+       "correct": "שלב 1: לכל צירוף של סוג חשבון ומספר חשבון בנק בקופות המסומנות gen_existinfile = 1 שיש להן מוצר וסוג חשבון לקוח תואמים נוצר חשבון לקוח, או שהחשבון הקיים מתעדכן כשיש הבדל באחד השדות המושווים.",
+       "evidence": "DTSX:33309-33313, 33634, 33667"
+      },
+      {
+       "unit": "[3] 'קופות שאינן מקושרות לחשבון הנכון מקושרות אליו'",
+       "problem": "The row condition gen_existinfile = 1 is omitted. Funds without it are never linked.",
+       "correct": "קופות המסומנות gen_existinfile = 1 שנמצא להן חשבון תואם ואינן מקושרות אליו מקושרות אליו; פרטי ייעוץ שיש להם ערך בחשבון מועתקים לקופה.",
+       "evidence": "DTSX:2606-2613; Update Customer Account Guid in Fund main.cs:42-65"
+      },
+      {
+       "unit": "[5] '…ונכתבים לחשבון כשיש הבדל'",
+       "problem": "The write happens only above thresholds, not on any difference: balance |diff| > 1, dates DATEDIFF(HH) > 12 hour boundaries. The aggregation covers only funds with Gen_existinfile = 1.",
+       "correct": "…מחושבים מהקופות המסומנות Gen_existinfile = 1 ונכתבים לחשבון כשהיתרה שונה ביותר מ-1 או כש-DATEDIFF בשעות של אחד התאריכים גדול מ-12.",
+       "evidence": "DTSX:68399"
+      },
+      {
+       "unit": "[6] 'סעיף 14 ואישור המעסיק מועתקים מהקופה לחשבון הלקוח'",
+       "problem": "The condition that both values are not null on the fund is omitted. With several qualifying linked funds, which fund supplies the values is not determined.",
+       "correct": "סעיף 14 ואישור המעסיק מועתקים לחשבון הלקוח מקופה מקושרת שבה שני השדות אינם ריקים (כשיש כמה קופות כאלה, לא נקבע מאיזו).",
+       "evidence": "DTSX:79889"
+      }
+     ]
+    },
+    {
+     "id": "L|Package\\Create or Update Customer Accounts|title",
+     "state": "stale",
+     "detail": "Correct units: the ownership argument (DTSX:68399); the inner joins; the partition on bank + account + product type, ordered by gen_modifiedbybank desc; name = producttypeid-account; the block flag from a fund with gen_IsDepositBlocked = '1' and the same account/type (DTSX:31964-31971); the lookup on gen_customeraccounttype + gen_bankaccountnumber; the automated joining as first created per (id, document type, account) and used only if status 7; the 5050 exception (Create main.cs:19-20, 41-44); the SQL path when the broker is equal and both are present (DTSX:18090), with the 41-column UPDATE and Param_26 <- p.gen_subproduct (DTSX:40982-41027, 41210, 33306); the SDK path for the rest, with the block flag always sent and mfratedtotal/letterofbenefit sent when not null. WRONG: flow_he[1] says that in 0004 and 0008 'the field gets the run time when the fund record is written'. In 0004 only the UPDATE Gen_fundmain sets gen_modifiedbybank = getdate() (0004:92873-92875). The fund INSERT 'Create gen_FundMain' (insert into Gen_fundmainbase, 0004:61789-61898, 108 columns, including Gen_existinfile = Param_74) does not write gen_modifiedbybank. Its output goes to a contact update, not to Update gen_fundmain, so a fund inserted by 0004 has no value from that run. The 'Update gen_agentappointmentdate' write on Gen_fundmain (0004:92815-92820) also leaves it unchanged. All five 0008 'Create gen_fundmain' copies do set DateTime.Now (0008:23801, 25673, 27545, …). Note: 0009 writes gen_fundmain with gen_existinfile = true and does not set gen_modifiedbybank (no occurrence in 0009). A NULL value sorts last under DESC. Note, not counted: short_he says 'לכל צירוף של סוג חשבון לקוח ומספר חשבון', but the partition key is bank + account + p.gen_producttypeid (flow_he[1] states it exactly). The two are equivalent only if gen_customeraccounttype is unique per (gen_id, gen_bankname), which the files do not show.",
+     "wrongUnits": [
+      {
+       "unit": "flow_he[1] '(בחבילות 0004 ו-0008 שסופקו השדה מקבל את זמן הריצה כשרשומת הקופה נכתבת …)'",
+       "problem": "This is not exact for 0004. The INSERT of a new fund (0004:61789-61898) does not write gen_modifiedbybank. Only the UPDATE Gen_fundmain (0004:92873-92875) sets getdate(). In 0008 every fund create sets DateTime.Now.",
+       "correct": "(ב-0004 השדה מקבל getdate() כשקופה קיימת מתעדכנת (0004:92875), אבל הוספת קופה חדשה (0004:61789-61898) אינה כותבת אותו; ב-0008 יצירת קופה כותבת DateTime.Now (0008:23801); קופה בלי ערך ממוינת אחרונה; שזה מועד העדכון האחרון מהבנק הוא השערה לפי שם השדה)",
+       "evidence": "0004_LeumiFile-MY.dtsx:61789-61898, 92873-92875; 0008_LeumiFile-PY.dtsx:23801"
+      }
+     ]
+    },
+    {
+     "id": "L|Package\\Create or Update Customer Accounts|short",
+     "state": "stale",
+     "detail": "Units [2]-[12] are correct. [2] block lookup: gen_IsDepositBlocked = '1', keys gen_bankaccountnumber + gen_customeraccounttype, No Match -> FALSE / Match -> TRUE (DTSX:31964-31971, 33580, 33607). [3] Get Customer Account Guid on the same two keys (DTSX:32121-32176). [5] Create main.cs:39-228: fund consulting values are overwritten by non-null AJ values; the automated joining is num = 1 by createdon over all statuses, AND joiningstatus = 7 (DTSX:32038); joiningmailtoagent = 1 unless '5050'. [7]/[9] Conditional Split UnSupported = both broker numbers present and equal (DTSX:18090) -> SQL UPDATE of 41 columns incl. gen_issmallaccount/gen_productsubcustomeraccount (Param_26 <- p.gen_subproduct). The Compare (DTSX:12421) inputs have neither column. [11] Compare 1 (DTSX:14893) lacks gen_issmallaccount. Update CustomerAccounts sends changed fields, always the block flag, and mfratedtotal/letterofbenefit when not null (main.cs:44-56). [12] is conditional. WRONG: unit [1] repeats the cross-package statement about gen_modifiedbybank. 0004's fund INSERT (0004:61789-61898) does not write the field; only 0004's UPDATE (0004:92875) does.",
+     "wrongUnits": [
+      {
+       "unit": "[1] '(בחבילות 0004 ו-0008 שסופקו השדה מקבל את זמן הריצה כשרשומת הקופה נכתבת …)'",
+       "problem": "0004 inserts new funds without gen_modifiedbybank. Only 0004's UPDATE sets getdate().",
+       "correct": "(ב-0004 השדה מקבל getdate() רק כשקופה קיימת מתעדכנת (0004:92875); הוספת קופה (0004:61789-61898) אינה כותבת אותו; ב-0008 יצירת קופה כותבת DateTime.Now (0008:23801); שזה מועד העדכון האחרון מהבנק הוא השערה)",
+       "evidence": "0004_LeumiFile-MY.dtsx:61789-61898, 92873-92875"
+      }
+     ]
+    },
+    {
+     "id": "L|Package\\Create or Update Customer Accounts|detailed",
+     "state": "stale",
+     "detail": "I re-derived every unit. These are correct: [2] CASE ProductTypeCode (DTSX:33299-33304); [3] Set gen_name casts with FailComponent; [4]-[8] block lookup (CacheType 1, NoMatchBehavior 1); [9] Full-cache lookup on two keys; [11] Get Automated Joining SQL, Convert Product Type 4->2, 5->3, 2->4, Merge Join JoinType 1 with 3 keys (Sort keys bankaccountnumberO / documenttype~ProductTypeFromDerivedColumn / id) and TreatNullsAsEqual = true (DTSX:33702-33704); [12] Dates To Local 1 inputs are birth date, consulting start/end and AJ start/end advising (DTSX:31041); [14]; [16]; [18] Compare input types are only wstr/guid/i4/bool/r8/dbTimeStamp, so the listed rules are complete, and gen_issmallaccount/gen_productsubcustomeraccount are absent; [22] the 41-column UPDATE, ModifiedBy = ?, ModifiedOn = GETUTCDATE(), Param_26 <- gen_subproduct; the five SQL texts and param maps are identical; [24] Dates To Local inputs are birth/consulting dates for fund and DB (DTSX:30078); [25] Compare 1 uses exact Equals and has gen_productsubcustomeraccount but not gen_issmallaccount; [29] Update CustomerAccounts main.cs:44-111 and Helpers.cs:8-108 (tolerances < 12h, < 0.01, < 0.001); copies 0-3 are identical and copy 4 differs only by a '//' line. WRONG: unit [1] repeats the gen_modifiedbybank statement, and 0004's fund INSERT (0004:61789-61898) does not write the field. Also counted under this verdict: the [13] list of created attributes is presented as the content of the new record but omits written attributes. Create main.cs also writes gen_name (130), gen_customeridnumber (73), gen_customerdateofbirth (76), gen_estatetype (79), gen_brokernumber (82), gen_coursenumber (61), gen_mftemplate (52), gen_mfratedtotal (49), gen_depositmfindicator/gen_accrualmfindicator (184, 189), gen_letterofbenefitindex (214), gen_lastdepositon (223), gen_employmentstartedon (227) and gen_address1_name (109). Some of these may fall under 'לקוח'/'דמי ניהול', but gen_name, gen_estatetype, gen_coursenumber, gen_letterofbenefitindex, gen_lastdepositon and gen_employmentstartedon fall under none of the named categories.",
+     "wrongUnits": [
+      {
+       "unit": "[1] '(בחבילות 0004 ו-0008 שסופקו השדה מקבל את זמן הריצה כשרשומת הקופה נכתבת …)'",
+       "problem": "0004 inserts new funds without gen_modifiedbybank. Only 0004's UPDATE sets getdate().",
+       "correct": "(ב-0004 השדה מקבל getdate() רק כשקופה קיימת מתעדכנת (0004:92875); הוספת קופה (0004:61789-61898) אינה כותבת אותו; ב-0008 יצירת קופה כותבת DateTime.Now (0008:23801); שזה מועד העדכון האחרון מהבנק הוא השערה)",
+       "evidence": "0004_LeumiFile-MY.dtsx:61789-61898, 92873-92875"
+      },
+      {
+       "unit": "[13] 'נוצר חשבון לקוח חדש עם פרטי הקופה: מספר חשבון, בנק, סוג חשבון, מוצר, לקוח, סוכן, סוכנות, מעסיק, כתובת, דמי ניהול, עמלות, חשבון קטן וחסימת הפקדות'",
+       "problem": "Written attributes are missing from the enumeration: gen_name, gen_estatetype, gen_coursenumber, gen_letterofbenefitindex, gen_lastdepositon and gen_employmentstartedon (all written when not null).",
+       "correct": "Add them to the list (gen_name = שם החשבון משלב [3]; gen_estatetype; gen_coursenumber; gen_letterofbenefitindex; gen_lastdepositon ← gen_lastdepositdate; gen_employmentstartedon), or state that the list is partial and point to the field mapping.",
+       "evidence": "Create Customer Account main.cs:61, 79, 130, 214, 223, 227 (DTSX:18171)"
+      }
+     ]
+    },
+    {
+     "id": "L|Package\\Create or Update Customer Accounts|detail",
+     "state": "stale",
+     "detail": "Correct units: [1] the source tables, gen_existinfile ownership and partition; 0004 writes gen_fundmain by SQL including gen_existinfile = 1 (0004:92873-92874) and 0008/0009 by SDK with gen_existinfile = true (0008:23781-23784, 0009:27019-27026). No supplied package creates gen_automatedjoining: 0029:29686 is an Update and 0027 updates status 7 joinings (0027:980-984, 1370-1376). [2] matching keys, conversion and TreatNullsAsEqual. [3] the three branches, the uncompared columns and the p.gen_subproduct vs cat.gen_productsubcustomeraccount difference (DTSX:33305-33306, 41060, 41210, 20336, 45455). [4] Create/Update via ExecuteMultiple, plus a direct UPDATE on Gen_customeraccountBase through [qsql] (Unsupported). [6] the sourceFeed citations check out. WRONG: [5] repeats the gen_modifiedbybank statement. 0004's fund INSERT (0004:61789-61898) does not write the field; only 0004's UPDATE (0004:92875) sets getdate().",
+     "wrongUnits": [
+      {
+       "unit": "[5] '(בחבילות 0004 ו-0008 שסופקו השדה מקבל את זמן הריצה כשרשומת הקופה נכתבת …)'",
+       "problem": "0004 inserts new funds without gen_modifiedbybank. Only 0004's UPDATE sets getdate().",
+       "correct": "(ב-0004 השדה מקבל getdate() רק כשקופה קיימת מתעדכנת (0004:92875); הוספת קופה (0004:61789-61898) אינה כותבת אותו; ב-0008 יצירת קופה כותבת DateTime.Now (0008:23801); שזה מועד העדכון האחרון מהבנק הוא השערה)",
+       "evidence": "0004_LeumiFile-MY.dtsx:61789-61898, 92873-92875"
+      }
+     ]
+    },
+    {
+     "id": "L|Package\\Connect Funds to Customer Accounts|detailed",
+     "state": "stale",
+     "detail": "Units [1]-[13] are correct: the joins/WHERE (DTSX:2588-2613), the ownership argument, Dates To Local inputs (DTSX:1697: gen_consultingstartdate/enddate, fm_consultingstartdate/enddate), five identical script copies (DTSX:3110-8347), the field mapping (main.cs:42-65) and ExecuteMultiple Update in batches of 10. WRONG: the end state [14] 'הקופות מקושרות לחשבון הלקוח הנכון ונושאות את פרטי הייעוץ שלו' contradicts units [2]-[4] and [13] of the same claim. A fund already linked to the right account is not selected, so its consulting details are not synced in this step even if they differ from the account. A null value in the account does not overwrite the fund's value. Only gen_existinfile = 1 funds with a matching account are handled.",
+     "wrongUnits": [
+      {
+       "unit": "[14] (end) 'הקופות מקושרות לחשבון הלקוח הנכון ונושאות את פרטי הייעוץ שלו'",
+       "problem": "This overstates the end state. Funds already linked to the account are not selected, so their consulting details are not synced. Empty account values are not copied.",
+       "correct": "קופות שנבחרו (gen_existinfile = 1, לא מקושרות או מקושרות לחשבון אחר, ונמצא להן חשבון תואם) מקושרות לחשבון ומקבלות ממנו את פרטי הייעוץ שיש להם ערך בחשבון (אם העדכון הצליח). קופות שכבר מקושרות לחשבון הנכון אינן מתעדכנות בשלב זה.",
+       "evidence": "DTSX:2610-2613; main.cs:42-65"
+      }
+     ]
+    },
+    {
+     "id": "L|Package\\Update Consulting Field  In Fund Main From Transfer Request|detail",
+     "state": "stale",
+     "detail": "Correct units: [1] the SQL (DTSX:77180-77213) is tr LEFT JOIN Gen_fundmain on tr.gen_customeraccount = fm.gen_customeraccountname, with type 5, status 8 (comments 'בין מסלולים'/'הסתיים') and gen_dateofcopyingconsultingdetailstofund is null. The ownership argument rests on the single-table 'update gen_transferrequest set gen_dateofcopyingconsultingdetailstofund = GETUTCDATE()' (DTSX:79598-79599). No supplied package creates gen_transferrequest (only updates in 0005, 0028:11114, 0029:40559, 0036:3886-3888), and 0036 updates only gen_tanferinstatus of status-7 requests. [2] There is no join to a specific fund; note that 0028:3382 reads a tr.gen_sourcefundnumber column, but its target is not shown and it is not used to join gen_fundmain. [3] the Derived Column ISNULL(tr_X) ? fm_X : tr_X; Update Fund Main 1-5 (identical SQL); success rows -> Aggregate on gen_transferrequestid -> Update TransferRequest (identical SQL), so a request is marked if at least one fund row succeeded. [4] direct UPDATEs through [qsql] (Unsupported). WRONG: [5] states unconditionally 'כשאין לחשבון קופות, הבקשה מסומנת בלי שעודכנה קופה'. With no fund, all fm.* are NULL, and the row is selected only if at least one tr consulting field is not null (DTSX:77207-77212). In that case Update Fund Main runs with Gen_fundmainId = NULL (0 rows, success) and the request is marked. A request with no funds and all six consulting fields empty is never selected and never marked.",
+     "wrongUnits": [
+      {
+       "unit": "[5] 'כשאין לחשבון קופות, הבקשה מסומנת בלי שעודכנה קופה.'",
+       "problem": "This is stated unconditionally. Without funds, the request is selected, and so marked, only if at least one of its six consulting fields is not null.",
+       "correct": "כשאין לחשבון קופות (או ש-gen_customeraccount של הבקשה ריק), הבקשה מסומנת בלי שעודכנה קופה – בתנאי שלפחות אחד מששת פרטי הייעוץ בבקשה אינו ריק; אחרת היא אינה נבחרת ואינה מסומנת.",
+       "evidence": "DTSX:77200, 77207-77212, 79190-79199"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "package": "0006_LeumiFile-MY-Distributor",
+   "claims": 23,
+   "verified": 23,
+   "foreign": [],
+   "open": []
+  },
+  {
+   "package": "0008_LeumiFile-PY",
+   "claims": 54,
+   "stale": 11,
+   "verified": 43,
+   "foreign": [],
+   "open": [
+    {
+     "id": "L|summary",
+     "state": "stale",
+     "detail": "executionNotes [2]-[5] verified: 17 PrecedenceConstraints at DTSX:89153-89169, all Success/LogicalAnd, one serial chain (Get Organization Variables -> ... -> FT -> Step1 -> Create fundmain -> Step2 -> Create transferin Maslulim -> Step3 -> Create Acount Courses -> Step4 -> Move File -> End); Constraint 1 (DTSX:89154) EvalOp=3 '@[User::isFileExist]==TRUE'; no DTS:Disabled; OnError -> Error ETL Process record (DTSX:89179). [6] order correct; get tranferin in the courses flow is Partial cache, so requests created by Create transferin Maslulim can be matched (they also match pre-existing requests - 'נבנים על' reads as exclusive; 'יכולים להיבנות גם על' would be exact). summary_he facts are correct (Gen_ftCurrentYearBase INSERT via SQL, ContactBase / gen_demislikamonthsalary updates with meanings labelled, SDK gen_fundmain + gen_transferin for action 57 same account/fund type, courses/partitions with get tranferin on Request_ID_74 + Target_Fund_AccountNumber_47 via gen_customeraccountdest, no state/origin filter). Missing row-selection: the sentence 'לכל שורה ש...תואמים gen_transferin קיים ב-CRM' states the courses/partitions creation condition as complete, but a record is created only if, in addition, (a) a bank-10 gen_fundmain exists for Target_Fund_AccountNumber_47 + Source_Fund_Course_17 (source side, direction != 2) or for Target_Fund_AccountNumber_47 + Target_Fund_course_44 with Contact and Gen_agentcontract inner-joined (destination side), and (b) no gen_accountcourses (gen_transferin + gen_fundnumber) / gen_coursepartition (gen_transferin + gen_fundnumberdest) exists yet. Rows failing these are dropped (No Match outputs unconnected / Match unconnected).",
+     "wrongUnits": []
+    },
+    {
+     "id": "L|Package\\FT|title",
+     "state": "stale",
+     "detail": "Flow units otherwise verified (last row '@', split gen_TranstypeId != \"58\" && Transfer_Type_2 == \"2\", Full-cache existence key, /100 money, direction 1/2, product -> warning, competitor, fund (No Match dropped), group/provision type, trans type (warning, continues), overpayment, salary, tax, financial module way, 5 inserts, ContactBase update on success, parallel demislika branch). Two unproven meanings stated as fact.",
+     "wrongUnits": [
+      {
+       "unit": "short_he: '(סוג רשומה 2, פעולה שאינה 58)'",
+       "problem": "The filter is Transfer_Type_2 == \"2\". The field is named Transfer_Type; no supplied file (CM column, code comment, SQL comment, other package) says it is a record type. 'סוג רשומה' is an unproven meaning.",
+       "correct": "Transfer_Type_2 = \"2\" (or label the meaning השערה).",
+       "evidence": "0008:15, 69975"
+      },
+      {
+       "unit": "short_he: 'ובהפקדות (53)'; flow_he[8]: 'הפקדה 53'",
+       "problem": "Action_Type_56 = 53 is stated to be a deposit. No code comment, constant or SQL comment in the supplied files says so; the only hint is the conditional-split output name 'FtCurrentOrPrevDepositCondition' (a component name, not proof under the standard).",
+       "correct": "Action_Type_56 = 53 (השערה: הפקדה, לפי שם היציאה FtCurrentOrPrevDepositCondition).",
+       "evidence": "0008:57393"
+      }
+     ]
+    },
+    {
+     "id": "L|Package\\FT|short",
+     "state": "stale",
+     "detail": "Steps [2]-[13], [15] verified (Full-cache existence check, product warning vs silent fund drop, insert, ContactBase after success, in-file duplicates both inserted). Wrong: [14] states the meaning 'הפקדה' for action 53 as fact. Also missing (would be INCOMPLETE on its own): the direction gate - rows whose Action_Transfer_Direction_69 is not \"1\" or \"2\" go to the unconnected 'אחר' output and are not inserted (Split by trans direction DTSX:69934); [1] lists only the last-row and 'תנועות והחזר דמי ניהול' filters.",
+     "wrongUnits": [
+      {
+       "unit": "[14] 'בהפקדה לשנת שכר שוטפת או קודמת'",
+       "problem": "Meaning of Action_Type_56 = 53 ('deposit') not proven by any supplied file; only the output name FtCurrentOrPrevDepositCondition suggests it.",
+       "correct": "כאשר Action_Type_56 = 53 (השערה: הפקדה) וחודש השכר בשנה הנוכחית או הקודמת ...",
+       "evidence": "0008:57393"
+      }
+     ]
+    },
+    {
+     "id": "L|Package\\FT|detailed",
+     "state": "stale",
+     "detail": "Every structural unit re-derived and correct: Trim All Input Columns (47 inputs) before the '@' check; gen_TranstypeId != \"58\" && Transfer_Type_2 == \"2\"; Check if trans exists Full cache (CacheType 0) on Gen_ftCurrentYearBase/Gen_fundmainBase/Product/gen_banks bank 10, gen_transferid not null (tech omits the (DT_WSTR,6)(DT_I4) conversion of the finance id - note only); /100 DT_CY with NULL->0; Format Dates 8/6 chars, <1900 or invalid -> NULL (input lengths 30); ToUniversalTime except CrmMinimumDate; Param numbers 14/23/24/31/32/45/46/49/58/67 and Param_40 = gen_banksid verified against the 80-column INSERT; Get Bank Id NoMatchBehavior 0 + FailComponent; transfer/recived derived columns ('0' string comparison); product lookup -> warning; competitor IgnoreFailure; Append Zeros (12/4/4, dot removal); fund lookup NoMatch unconnected; group-type mapping and provision 1-7 (main.vb:17-47); trans type no-match -> Multicast -> continue + warning; overpayment main.cs:118-130; salary split and NULL rules (enum Employee=2, Gemel=1, EducationFund=4); tax arrays {01,02,04}/{05,06}; FinancialModuleWay; insert RedirectRow; ContactBase update; demislika branch. Wrong units below.",
+     "wrongUnits": [
+      {
+       "unit": "[51] and [68] 'האם זו הפקדה (סוג הפעולה Action_Type_56 = 53) ...'",
+       "problem": "The meaning 'deposit' for Action_Type_56 = 53 is not proven by any supplied file; only the output name FtCurrentOrPrevDepositCondition suggests it.",
+       "correct": "האם Action_Type_56 = 53 (השערה: הפקדה) ...",
+       "evidence": "0008:57393, 70009"
+      },
+      {
+       "unit": "[72] 'ModifiedBy = משתמש המערכת' (with [62] 'הבעלים והיוצר הם משתמש המערכת')",
+       "problem": "The same Hebrew term is used for two different variables: owner/creator of the transaction = User::UserId (Create System Columns main.cs:119-124), ModifiedBy of gen_demislikamonthsalary = User::CrmAdminId (Row.AdminId, main.cs:125 -> Param_0). The text implies the same user; nothing in the files shows they are equal.",
+       "correct": "ModifiedBy = User::CrmAdminId (משתנה נפרד מ-UserId שמשמש כבעלים/יוצר התנועה).",
+       "evidence": "0008:57722-57730 (Create System Columns), 82516-82519, variables DTSX:215, 281"
+      }
+     ]
+    },
+    {
+     "id": "L|Package\\FT|detail",
+     "state": "stale",
+     "detail": "[1], [2], [4], [5] verified (population incl. direction 1/2; match keys and Full cache; bank '10' FailComponent; dot removal + padding to 12; 80-column INSERT with UserId owner/creator, StateCode 0 / StatusCode 1; ContactBase after successful insert; demislika update with CrmAdminId; meanings labelled; gen_isdailytrans = TRUE). One wrong unit in [3].",
+     "wrongUnits": [
+      {
+       "unit": "[3] 'סינון שורת סיום וסוג רשומה'",
+       "problem": "Calls the Transfer_Type_2 == \"2\" filter a 'record type' filter. The field is Transfer_Type; no supplied file gives it the meaning 'record type'.",
+       "correct": "סינון שורת סיום ו-Transfer_Type_2 = \"2\" (עם Action_Type_56 != 58).",
+       "evidence": "0008:15, 69975"
+      }
+     ]
+    },
+    {
+     "id": "L|Package\\FT|decisions",
+     "state": "stale",
+     "detail": "All 18 conditions match the DTSX expressions / script code verbatim (incl. Full-cache key mapping Target_Fund_FinanceID_INT, VB Select Case, provision 1-7, overpayment conditions, salary split, NULL rules, tax codes 01/02/04/05/06 = Withdrawals/UndoWithdrawals arrays, FinancialModuleWay, Check Type And Year, open-month lookup, counter % 5 split).",
+     "wrongUnits": []
+    },
+    {
+     "id": "L|Package\\Create fundmain for transferin|title",
+     "state": "stale",
+     "detail": "Filter (Action_Type_56=='57' && Transfer_Type_2=='1' && account == Target account && same fund type && Age_Dependent_Model_112 != '1'), direction split + Inner Merge Join (JoinType 2) on Request_ID_74, dest product by productnumber (bank 10), dest-fund existence (no action on match), fund number 'course-account' + dedupe, source fund (bank 10, gen_existinfile = 1), SDK ExecuteMultiple batches of 10, 5 identical copies (same code hash).",
+     "wrongUnits": []
+    },
+    {
+     "id": "L|Package\\Create fundmain for transferin|short",
+     "state": "stale",
+     "detail": "Stated steps are correct (pairing by request, existing dest fund -> nothing, source fund bank 10 with gen_existinfile = 1 labelled unproven, SDK create with source details, zero balances, temporary address). Missing write-deciding gates that the crm claim of the same component now lists: (a) a bank-10 Product must exist for the target course (get dest fundtype, DTSX:34127; No Match has no path, row dropped); (b) only the first row per new fund number (course-account) is created (remove duplicate, duplicates output unconnected); (c) [2] does not say unpaired rows are dropped (Merge Join JoinType=2 inner on Request_ID_74, DTSX:34586). [1] also omits the concrete filter (Action_Type_56 = \"57\", Transfer_Type_2 = \"1\", Age_Dependent_Model_112 != \"1\", DTSX:34026).",
+     "wrongUnits": []
+    },
+    {
+     "id": "L|Package\\Create transferin Maslulim|title",
+     "state": "stale",
+     "detail": "Flow units verified (5006->1025, '@', filter incl. Action_Operation_Type_57 != \"04\" and Age != \"1\", Full-cache get tranferin on gen_requestidentifier, Inner Merge Join on 3 keys, > UtcNow-2 months, customer account by account + gen_id, SDK create type 5 / state 1, batches of 10, 5 copies). One unproven meaning.",
+     "wrongUnits": [
+      {
+       "unit": "short_he: '(סוג הפעולה Action_Type_56 = 57, סוג רשומה 2, ...)'",
+       "problem": "The condition is Transfer_Type_2 == \"2\"; the field is Transfer_Type and no supplied file says it is a record type.",
+       "correct": "Transfer_Type_2 = \"2\" (or label the meaning השערה).",
+       "evidence": "0008:15, 40871"
+      }
+     ]
+    },
+    {
+     "id": "L|Package\\Create transferin Maslulim|detail",
+     "state": "stale",
+     "detail": "Population (including the 5006->1025 mapping, Age_Dependent_Model_112 != 1, lower-bound date and empty-date failure), matching, decisions and the written attribute list (gen_transfertype 5, gen_currentstate 1, gen_deliverydate, gen_requestidentifier, gen_identitynumber, gen_transferid = account number, gen_accountnumbersrc = gen_customeraccountdest, gen_contactname, transactioncurrencyid) all match SDK Create gen_TransferIn main.cs:36-88. The meaning of state 1 is marked as unknown.",
+     "wrongUnits": []
+    },
+    {
+     "id": "L|Package\\Create Acount Courses and course partition for transferin|detail",
+     "state": "stale",
+     "detail": "Population (no action/record-type filter), matching rules (incl. no state filter, dest fund only with Contact + Gen_agentcontract), decisions and the two SDK creates verified.",
+     "wrongUnits": []
+    }
+   ]
+  },
+  {
+   "package": "0009_LeumiFile-BY",
+   "claims": 124,
+   "verified": 115,
+   "stale": 9,
+   "foreign": [],
+   "open": [
+    {
+     "id": "L|Package\\Foreach Loop Container\\Create transferin from outside source|title",
+     "state": "stale",
+     "detail": "flow_he 1-10 are correct and match the path order, the conditions, the IgnoreFailure lookups, the window, the create gates and the annotation scope. short_he is correct on the create links, the TryParse gate, the update fields and the annotation scope. One unit states as fact meanings that the package labels as hypotheses.",
+     "wrongUnits": [
+      {
+       "unit": 2,
+       "problem": "'ובקטינים גם סטטוס ביטוח לאומי/קבלת הפקדה' states the national-insurance and deposit-received meanings as fact. They come only from the code method names IsNationalInsuranceApproval/IsNationalInsuranceReject and the constant ACTION_STATUS_DEPOSIT_RECIVED. The package's own open item [4] labels the gen_actionstatus/gen_rejecttype meanings as constant-name based with no CRM labels supplied (השערה). The summary attributes them ('לפי שמות המתודות והקבועים בקוד'). This unit does not, so it contradicts the package's own labelling.",
+       "correct": "...ובקטינים (גיל < 18, gen_transfertype 1) גם gen_actionstatus / gen_rejecttype / gen_fixtransferdate – לפי שמות המתודות והקבועים בקוד: אישור/דחיית ביטוח לאומי, קבלת הפקדה (תוויות CRM לא סופקו – השערה).",
+       "evidence": "Compare Fields Before Update main.cs:27-35, 139-188; open hash ef278ca56c28 [4]"
+      }
+     ]
+    },
+    {
+     "id": "L|Package\\Foreach Loop Container\\Create transferin from outside source|short",
+     "state": "stale",
+     "detail": "Units 1-3 and 5-8 are correct: the population incl. 22/02/2020 and the window with child-saving bypass labelled השערה, the existence branch, the create gates incl. the TryParse codes, and the document attachment for existing requests. Unit 4 states the national-insurance and deposit meanings as fact, unattributed. Note: unit 5 attaches documents unconditionally in the 'exists' branch. Requests whose update fails (CastingError) get no documents, but that is the failure path (plumbing) and the title and detailed claims state it.",
+     "wrongUnits": [
+      {
+       "unit": 4,
+       "problem": "'אצל קטינים מתעדכנים גם אישור או דחיית ביטוח לאומי וקבלת ההפקדה' presents the national-insurance and deposit-received meanings as fact. Their only basis is method and constant names, and the package's open item [4] labels them as hypotheses.",
+       "correct": "אצל קטינים (גיל < 18) בבקשות מסוג 1 מתעדכנים גם סטטוס הפעולה, סוג הדחייה ותאריך ההעברה המתוקן – לפי שמות המתודות והקבועים בקוד: אישור/דחיית ביטוח לאומי וקבלת הפקדה (השערה לגבי תוויות CRM).",
+       "evidence": "Compare Fields Before Update main.cs:27-35, 139-188, 238-313"
+      }
+     ]
+    },
+    {
+     "id": "L|Package\\Foreach Loop Container\\Create transferin from outside source|detail",
+     "state": "stale",
+     "detail": "Units 1-6 are correct. Population: the Financial Course filter has no effect after Subject_56 == \"56\", the 22/02/2020 cutoff, and the Convert Data Types gate. Lookups: IgnoreFailure, the child-saving lookup labelled, the create lookups. Create list = SDK Create main.cs:72-173 exactly: clientstatus guard, statusleumi incl. 0, ToLocalTime, three Source_Account_Number_20 fields, fundfinanceid from the competitor (the Remove 0's script only alters Source_Curator_Course_Id_18), currentdeposits, the 0.0 amounts and the lookups. Update list = Update TransferIn main.cs:128-168 including the else-if branch. Annotation = Create Annotation main.cs:66-145, with 12 code mappings. Unit 7 states the national-insurance and deposit meanings as fact.",
+     "wrongUnits": [
+      {
+       "unit": 7,
+       "problem": "'לקטינים ... מנוהל סטטוס אישור/דחיית ביטוח לאומי וקבלת הפקדה' presents meanings based on method and constant names as fact. The package's open item [4] labels these as hypotheses (constant names only, CRM labels not supplied).",
+       "correct": "לקטינים (גיל < 18) בבקשות מסוג 1 מנוהלים gen_actionstatus, gen_rejecttype ו-gen_fixtransferdate – לפי שמות המתודות והקבועים בקוד: אישור/דחיית ביטוח לאומי וקבלת הפקדה (השערה לגבי תוויות CRM).",
+       "evidence": "Compare Fields Before Update main.cs:27-35, 139-188"
+      }
+     ]
+    },
+    {
+     "id": "L|Package\\Foreach Loop Container\\Create transferin from outside source|decisions",
+     "state": "stale",
+     "detail": "Decisions 1-17 and 19-23 match the DTSX and code exactly. That covers the expressions, the unconnected outputs, DaysCount, ProductTypeId, First/remove duplications, set additional fields, the Convert gen_isActive quote, the Approval/Reject/Deposit quotes with their override outcomes, mislaka, status > 0, MapLeumiStatus (identical in Compare and Create), needToUpdate, and round-robin. Decision 18's outcome is stated unconditionally, but the code makes it conditional.",
+     "wrongUnits": [
+      {
+       "unit": 18,
+       "problem": "outcome_he 'needToUpdate = true והתאריך ייכתב (ToLocalTime)' omits that both happen only when DateTime.TryParse of the file string succeeds (main.cs:195, 204, 214). An unparsable AppendixDReceived154 / AppendixDSended153 / RequestCancellationDate156 that differs from the DB string sets nothing and is silently ignored. Update TransferIn also writes the date only if it is >= 1900-01-01 (main.cs:144-156).",
+       "correct": "אם המחרוזת מתפענחת (DateTime.TryParse) – needToUpdate = true והתאריך (ToLocalTime) נשלח בעדכון כשהוא מ-1900 ואילך; אם אינה מתפענחת – אין שינוי.",
+       "evidence": "Compare Fields Before Update main.cs:192-219; Update TransferIn 1 main.cs:144-156"
+      }
+     ]
+    },
+    {
+     "id": "L|Package\\Foreach Loop Container\\Create transferin from outside source|crm",
+     "state": "stale",
+     "detail": "The entities, verbs and mechanisms are correct: service.Create per row, service.Update per row, annotation service.Create. The listed conditions are correct. However, all three when_he omit the creation-date window. It is a row-selection condition between the population (as defined in the detail claim, unit 1) and the create/update split, so every Create, Update and annotation depends on it. Rows reach 'If transferin Exists' only via Union All 2: either Lookup Child Saving matched, or Creation_Date_70 is within ±DaysCount days of User::LastWorkingDay. DaysCount = 10 when there is no existing gen_transferin or the competitor has gen_excludedtransfernotice = TRUE, else 120. The Maslulim crm claim does list its date gate.",
+     "wrongUnits": [
+      {
+       "unit": 1,
+       "problem": "Create when_he omits the window. A new request is created only if its Creation_Date_70 is within ±10 days of LastWorkingDay, or if Dest_Account_Number_47 matches gen_customeraccount with gen_productsubcustomeraccount = 3.",
+       "correct": "Add: 'תאריך היצירה בטווח ±10 ימים מיום העבודה האחרון, או שחשבון היעד נמצא ב-Lookup Child Saving (gen_productsubcustomeraccount = 3)'.",
+       "evidence": "DTSX:104469, 94094, 94908"
+      },
+      {
+       "unit": 2,
+       "problem": "Update when_he omits the window. The window is ±120 days, or ±10 when the competitor has gen_excludedtransfernotice = TRUE, and the Lookup Child Saving match bypasses it.",
+       "correct": "Add the ±120 / ±10 window or the Child Saving bypass to 'קיימת בקשה ו-needToUpdate = true'.",
+       "evidence": "DTSX:104469, 94094, 94908"
+      },
+      {
+       "unit": 3,
+       "problem": "Annotation when_he inherits the same window, because it applies only to update and no-update rows. The window is not stated.",
+       "correct": "Add 'לבקשות קיימות שעברו את חלון התאריכים (או עקיפת Child Saving)'.",
+       "evidence": "DTSX:104469, 94094, 108245"
+      }
+     ]
+    },
+    {
+     "id": "L|Package\\Foreach Loop Container\\update gen_ftrequest,gen_status from 1(active) to 0|detailed",
+     "state": "stale",
+     "detail": "Units 1-7, 9 and 10 are correct: the chain position, WHERE gen_status = 1, the write including ModifiedOn, the direct SQL on the CRM DB (Unsupported), NULL not included, and the closure outcome. Unit 8 contradicts the SQL and unit 4 of the same claim.",
+     "wrongUnits": [
+      {
+       "unit": 8,
+       "problem": "'בפועל משתנה רק הסימון \"קיים בקובץ\"' is literally false. The same UPDATE also sets ModifiedOn = GETUTCDATE(), as unit 4 of this claim states.",
+       "correct": "שם המשימה מדבר על שינוי סטטוס, אבל gen_status אינו משתנה; משתנים רק gen_existinfile (ל-0) ו-ModifiedOn.",
+       "evidence": "DTSX:189416 'set gen_existinfile=0, ModifiedOn = GETUTCDATE()'"
+      }
+     ]
+    },
+    {
+     "id": "L|Package\\Foreach Loop Container\\Create or update  Fund Trunsaction Request|detailed",
+     "state": "stale",
+     "detail": "Units 1-26 and 28-30 are correct:\n- identity and employer padding (checkIdentitynumberLength main.cs:117-137; padded only if shorter than 9);\n- calc diff;\n- the ftrequest lookup has full cache and no filter, and both outputs continue;\n- the Case 1 expression is exact;\n- account and contact lookups use the right(...,9) keys;\n- Create Contact: identity + gen_recordsorce 1, exceptions swallowed, the synchronous output always continues;\n- estate and agent-type lookups (SQL comments Internal/External);\n- Set Final Fields mappings;\n- Is Create Or Update;\n- the INSERT with system user crmadmin as owner, statecode 0, statuscode 1, gen_status param, agent type default 1 (AGENT_AGENCY_TYPE_EXTERNAL) and existinfile 1. The 30 positional parameters were checked: Param_25..29 = agentagencytype, transtotalamount, filereceivingdatenoga, status, ftrequestid, which matches the column order. The 5 copies are identical;\n- the 18-field comparison (Compare main.cs:117-159);\n- SDK update with gen_existinfile true;\n- the existinfile=1 SQL.\nUnit 27 asserts a reopening that the code does not perform.",
+     "wrongUnits": [
+      {
+       "unit": 27,
+       "problem": "'נפתחת מחדש אם הייתה סגורה' is not what the code does. Closing (step 21) sets gen_treatmentstatus = 4 and gen_status = 0. The update sends gen_status = true (Set Final Fields main.cs:262; Update main.cs:188-189), but gen_treatmentstatus is written nowhere else in the package, so it stays 4. In addition, 'open/closed' as the meaning of gen_status rests on the task name, which the package labels השערה.",
+       "correct": "הבקשה מתעדכנת דרך CRM בכל הפרטים מהקובץ שאינם NULL, gen_status מוחזר ל-true (gen_treatmentstatus אינו משתנה – בקשה שנסגרה בשלב 21 נשארת עם gen_treatmentstatus = 4), ומסומנת gen_existinfile = true.",
+       "evidence": "Update Fund Transaction Request 1 main.cs:134-191; DTSX:189422"
+      }
+     ]
+    },
+    {
+     "id": "L|Package\\Foreach Loop Container\\Create or update  Fund Trunsaction Request|detail",
+     "state": "stale",
+     "detail": "Units 1-5 are correct. That covers the match keys, the 18 compared fields (counted against Compare main.cs:118-159), the mappings (main.cs:128-276), the INSERT columns and parameters, SDK ExecuteMultiple Update in batches of 10, the existinfile SQL, and the contact create. Unit 6 repeats the 'reopening' statement.",
+     "wrongUnits": [
+      {
+       "unit": 6,
+       "problem": "'כולל פתיחה מחדש של בקשה סגורה – gen_status = true' claims the closure is undone. Only gen_status is reset; gen_treatmentstatus = 4 set by step 21 remains. The same unit also labels the gen_status = 1 meaning ('פעילה') as a hypothesis, yet uses it here as fact.",
+       "correct": "...משתנות מתעדכנות (gen_status מוחזר ל-true; gen_treatmentstatus אינו מתעדכן ונשאר כפי שהיה, למשל 4 אחרי סגירה)...",
+       "evidence": "Update Fund Transaction Request 1 main.cs:188-191; DTSX:189422"
+      }
+     ]
+    },
+    {
+     "id": "L|Package\\Foreach Loop Container\\Update Account|detailed",
+     "state": "stale",
+     "detail": "Units 1-3 and 5-21 are correct:\n- BY_FileData_2 and the trailer filter;\n- the exact Primary Conditions with FailComponent (DTSX:179755), with the conversion-failure branch worded conditionally and labelled;\n- Select Employer ID;\n- Aggregate -> Sort (Source_CustomerID_4 asc, Date desc) -> Trim -> Set Account Details first row per employer;\n- accountnumber lookup with No Match not connected;\n- write fields and checks as in Update Account 1 main.cs:48-80, 134-149 (copies 1 and 5 differ only in whitespace; copy 2 differs only in comments).\nNote: Append Zeros pads only Source_CustomerID_4 to 9 digits before Primary Conditions; Target_CustomerID_31 (direction 2) is not padded. The title mentions this; unit 9 does not. Unit 4 states, as unmarked fact, how SSIS handles a NULL phone.",
+     "wrongUnits": [
+      {
+       "unit": 4,
+       "problem": "'השורה לא מטופלת – למשל שורה ללא טלפון (NULL)' asserts a runtime outcome that the files do not show, and it is unmarked. For a row where the other four conditions are TRUE, (DT_I4)NULL > 1 is NULL and the whole condition is NULL. By documented SSIS behaviour (not shown in the files), a NULL Conditional Split result is an error, and here the error disposition is FailComponent, so the row does not go quietly to Default. Only when one of the other conditions is FALSE does a NULL phone row go to Default.",
+       "correct": "השורה לא מטופלת – למשל שורה עם טלפון מספרי קטן מ-2, או שורה שאינה עונה על אחד מתנאי הנושא/הפעולה/המקור/הכיוון. טלפון NULL בשורה שעונה על שאר התנאים: לפי התנהגות SSIS המתועדת (לא מוצג בקבצים) תוצאת NULL היא שגיאה, והרכיב מוגדר FailComponent – השערה.",
+       "evidence": "DTSX:179741 (expression), 179755 (FailComponent)"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "package": "0012_LeumiFile_CHN_Daily",
+   "claims": 108,
+   "verified": 108,
+   "foreign": [],
+   "open": []
+  },
+  {
+   "package": "0013_Heir_Daily",
+   "claims": 30,
+   "verified": 30,
+   "foreign": [],
+   "open": []
+  },
+  {
+   "package": "0014_AccountCourses",
+   "claims": 18,
+   "verified": 18,
+   "foreign": [],
+   "open": []
+  },
+  {
+   "package": "0015_TransferIn",
+   "claims": 84,
+   "verified": 78,
+   "stale": 6,
+   "foreign": [],
+   "open": [
+    {
+     "id": "L|Package (control flow)|detail",
+     "state": "stale",
+     "detail": "[1] correct (no file sources; every OLE DB source/lookup uses [CRM]). [2] correct: 23 constraints DTSX:110984-111007, no Value/Expression (Success), LogicalAnd=True, one incoming each; no disabled executables. Two units are literally false. [3] 'כתיבה ל-CRM: SDK בלבד' contradicts L|summary of the same package, which (correctly) states that ETL warnings are inserted into the CRM database by direct SQL through [CRM] (10 OLE DB Commands 'insert gen_etlprocesswarningBase'); the business writes listed are correct (gen_transferin Create: Clone, TI Joining; Update: FT56, expected, Close x2, 53; gen_coursepartition Create: FT56, CP Joining; Update: CP internal/external). [4] the parenthetical 'בפיצולים נכתבים רק gen_actualtransferamount ו-gen_actualtransferdate' contradicts [3] of the same claim (gen_coursepartition Create): SDK Create gen_coursepartition (FT56) writes 13 attributes and Create CoursePartition (CP Joining) writes 14 attributes. The intended fact is correct: no Create writes a state/status attribute, and the only partition updates (Update Course Partition, DTSX:76304-76305, 84504-84505) write only those two fields; so no step closes a partition. The rest of [4] (1/7 closing condition DTSX:14395; 5/6 by Close TI internal) is correct.",
+     "wrongUnits": [
+      {
+       "unit": "[3] כתיבה ל-CRM: SDK בלבד",
+       "problem": "Exclusive 'SDK only' is false at package level and contradicts L|summary (direct SQL INSERT gen_etlprocesswarningBase via [CRM] in all 10 data flows).",
+       "correct": "כתיבה עסקית ל-CRM: SDK בלבד: gen_transferin (Create/Update), gen_coursepartition (Create/Update). (אזהרות ETL – מסגרת – נוספות ב-SQL ישיר דרך [CRM].)",
+       "evidence": "DTSX:11303 ... 99571 (10 x 'insert gen_etlprocesswarningBase', connection [CRM])"
+      },
+      {
+       "unit": "[4] (בפיצולים נכתבים רק gen_actualtransferamount ו-gen_actualtransferdate)",
+       "problem": "Partitions are also created in this package with many attributes (FT56, CP Joining); the statement is true only for the partition updates.",
+       "correct": "אף שלב לא סוגר פיצול מסלול: בעדכון פיצולים קיימים (Update CoursePartition internal/external) נכתבים רק gen_actualtransferamount ו-gen_actualtransferdate (DTSX:76304-76305, 84504-84505), וביצירת פיצולים (FT56, CP - Joining Only) לא נכתב שדה מצב.",
+       "evidence": "DTSX:76304-76305; DTSX:84504-84505; Create CoursePartition main.cs:41-103; SDK Create gen_coursepartition main.cs"
+      }
+     ]
+    },
+    {
+     "id": "L|Package\\Close TI internal|title",
+     "state": "stale",
+     "detail": "Matches the SQL HAVING ABS(...)<30, Is Between Course or Funds (output names BetweenOurCourses=5 / BetweenOurFunds=6; the 0005 comment also says type 5 = בין מסלולים), need to update? and the derived values."
+    },
+    {
+     "id": "L|Package\\Close TI internal|short",
+     "state": "stale",
+     "detail": "Branches and writes match. The 'not to close' rows get only gen_actionstatus=22 and gen_modifiedByBank, so the state stays as is."
+    },
+    {
+     "id": "L|Package\\Close TI internal|detailed",
+     "state": "stale",
+     "detail": "Correct units: SQL DTSX:24801-24843 (state 1, types 5/6, CP actual amount and date NOT NULL, sum/min, HAVING ABS(DATEDIFF(day, min(actualdate), ti.CreatedOn)) < 30); [2] percent = expected * 0.15 (DTSX:25990); [3]-[6] Is Between Course or Funds (5/6, default unconnected); [7]-[13] need to update? evaluation order 0/1/2 + default (DTSX:25083 onward) and paths Not To Close/2/3 -> Union All 1, Need To Close + BetweenOurFunds -> Union All 2; [14] Create transferIn Column (DTSX:23882) 3/1/1/actualdate; [15] Create transferIn Column 1 (DTSX:23930) 22/actualdate; [16] Dates To Local (DTSX:23966) 5 inputs without gen_modifiedByBank, delay code identical (main.cs 3814bf877402:117-124); [17] Update transferin x5 (main.cs f64b92ff1b2a, identical inputs) writes only non-NULL changed fields incl. gen_rejectreason. Three units are wrong (see wrongUnits): [1] DATEDIFF stated as elapsed time; [7] ownership of unqualified gen_customersignaturedate / gen_receivedstamp assumed without argument; [18] outcome contradicts [7]-[13]. Note (accepted wording, not graded): 'מומרים לשעון מקומי' omits that dates before 2005 get +2 hours instead of ToLocalTime (Dates To Local main.cs:47-53, 67-73).",
+     "wrongUnits": [
+      {
+       "unit": "[1] נבחרות רק בקשות שהתאריך המוקדם רחוק פחות מ-30 יום מיצירת הבקשה",
+       "problem": "DATEDIFF(day, ...) counts day boundaries crossed, not elapsed time; 'רחוק פחות מ-30 יום' describes elapsed time (e.g. 29 days and a few minutes across 30 midnights is excluded).",
+       "correct": "נבחרות רק בקשות שבין תאריך ההעברה המוקדם בפיצולים לתאריך יצירת הבקשה עוברים פחות מ-30 גבולות יום (ABS(DATEDIFF(day, ...)) < 30, בכל כיוון, על הערכים השמורים לפני ההמרה לשעון מקומי).",
+       "evidence": "DTSX:24843 having ABS(DATEDIFF(day,min(cp.gen_actualtransferdate),ti.CreatedOn )) < 30"
+      },
+      {
+       "unit": "[7] חסר תאריך חתימת לקוח? חסרה חותמת 'נתקבל'?",
+       "problem": "gen_customersignaturedate and gen_receivedstamp are unqualified in a query joining gen_coursepartition and gen_transferin (SELECT and GROUP BY, DTSX:24810-24811, 24833-24834); the text treats them as the request's fields without stating the owner as unknown or giving the ambiguity argument.",
+       "correct": "Add the accepted-form argument: ti.gen_customersignaturedate and ti.gen_receivedstamp exist on gen_transferin (qualified at DTSX:11146, 11154, 14182); had the columns also existed on gen_coursepartition the query would fail; per the user the package runs in production; so these are the request's fields. (Or state the owner as unknown.)",
+       "evidence": "DTSX:24810-24811; DTSX:24833-24834; DTSX:11146; DTSX:11154; DTSX:14182"
+      },
+      {
+       "unit": "[18] העברות פנימיות שהכסף שלהן התקבל נסגרות, והשאר מסומנות בסטטוס 22",
+       "problem": "Every selected request already has actual amount and date (SQL filter), so this says all of them close; it contradicts [7]-[13]: a type-5 request with money but missing customer signature date or stamp, or outside 15% of the expected amount, gets action status 22 and is not closed. Requests whose earliest actual date is 30 or more day boundaries from creation are not touched at all, so 'השאר' is also too broad.",
+       "correct": "מבין בקשות מסוג 5/6 במצב 1 שיש להן פיצולים עם סכום ותאריך בפועל ופחות מ-30 גבולות יום מיצירתן: סוג 6 נסגר תמיד; סוג 5 נסגר רק כשיש תאריך חתימת לקוח וחותמת 'נתקבל' ואין סכום צפוי או שהסכום בפועל בטווח 15% ממנו; שאר בקשות סוג 5 שנבחרו מקבלות סטטוס פעולה 22, ובכולן נרשמים הסכום והתאריך בפועל (רק כשהם שונים מהקיים).",
+       "evidence": "DTSX:24801-24843; DTSX:25024; DTSX:25083; DTSX:23882; DTSX:23930"
+      }
+     ]
+    },
+    {
+     "id": "L|Package\\Close TI internal|detail",
+     "state": "stale",
+     "detail": "Correct. Within the supplied files only 0015 writes gen_coursepartition actual amount/date (0009 sets gen_actualtransferamount=0 only on gen_transferin). Other sources are correctly left unknown."
+    },
+    {
+     "id": "L|Package\\Close TI internal|decisions",
+     "state": "stale",
+     "detail": "Conditions are copied exactly."
+    }
+   ]
+  },
+  {
+   "package": "0016_TransferOut",
+   "claims": 20,
+   "verified": 20,
+   "foreign": [],
+   "open": []
+  },
+  {
+   "package": "0017_CloseWithdrawalForecast",
+   "claims": 23,
+   "stale": 1,
+   "verified": 22,
+   "foreign": [],
+   "open": [
+    {
+     "id": "L|summary",
+     "state": "stale",
+     "detail": "summary_he re-derived and correct: both source queries (DTSX:1094-1142 state 8, gen_valuedate >= gen_datesenttothebank with NULL never matching; DTSX:2176-2216 state 10, gen_valuedate >= w.CreatedOn full datetime), action 54 / group type 5, inner join to a partition subquery, status logic (auto main.cs:30-41: default 14, 3 if min=max=4, 15 on partial + Truncate(Abs) mismatch; manual: default 3, 15 likewise), ToLocalTime dates (min value date) for gen_dateofactualwithdrawal and gen_withdrawalfinishdate, Money sums for gen_actualwithdrawalamount / gen_nettransferamount. Status names correctly attributed to code comments. scopeNote_he is correct except one unit: the HintPath. Notes (not failing): 'שיש להן לפחות פיצול שכבות נזילות מתאים' leaves the partition filter unstated (auto: feedbackstatus not in (5,6); manual: != 5; NULL excluded in both); 'במשיכה חלקית' is the code comment '//משיחה חלקית' (condition: min(gen_withdrawaltype+0)=0 or min(gen_withdrawalfromfund+0)=0) but is not attributed here; '(namespace CRM.Proxy)' is not provable (the code imports both CRM.Proxy and CRM.Proxy.CrmSdk), though the class can only come from CRM2015.Proxy, the only non-system reference.",
+     "wrongUnits": [
+      {
+       "unit": "scopeNote_he: 'CRM2015.Proxy (גרסה 4.1.9.1, HintPath D:\\CRM2015.Proxy.dll; DTSX:119, 1557; external_unknown)'",
+       "problem": "Presents one HintPath for both cited references. Only the auto-flow script (DTSX:119) has HintPath D:\\CRM2015.Proxy.dll. The manual-flow script reference at DTSX:1557 has HintPath C:\\Windows\\assembly\\GAC_MSIL\\CRM2015.Proxy\\4.1.9.1__711cada7bd1faa44\\CRM2015.Proxy.dll (DTSX:1559).",
+       "correct": "Version 4.1.9.1 in both; HintPath D:\\CRM2015.Proxy.dll (DTSX:119, close withdrawal of the automatic flow) and C:\\Windows\\assembly\\GAC_MSIL\\CRM2015.Proxy\\4.1.9.1__711cada7bd1faa44\\CRM2015.Proxy.dll (DTSX:1557-1559, close withdrawal of the manual flow); or drop the HintPath.",
+       "evidence": "0017_CloseWithdrawalForecast.dtsx:119, 1557, 1559"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "package": "0018_EmployerCare",
+   "claims": 22,
+   "verified": 22,
+   "foreign": [],
+   "open": []
+  },
+  {
+   "package": "0019_StandingOrder",
+   "claims": 15,
+   "verified": 14,
+   "stale": 1,
+   "foreign": [],
+   "open": [
+    {
+     "id": "L|Package\\Update Standing Order First Transaction Received|short",
+     "state": "stale",
+     "detail": "I re-derived the units from the SqlCommand at DTSX:3975-4012 and from update Standing Order main.cs (DTSX:4092, sha 0d253194…). These units are correct. [1]: the filters are gen_isfirsttransactionreceivied = 0 and gen_ispastrecord = 0 (DTSX:3987-3988), with no statecode/statuscode filter. [2]: the conditions are '53'/'02' (DTSX:3989-3990); bank via gen_banks.Gen_BankNumber = ft.Gen_CurrentAccountBank (DTSX:3994); branch equality (DTSX:3993); account number right(13 zeros + x, 12) on both sides (DTSX:3992), which I accept as 'same account' because leading zeros are ignored; amount and date per depositType = 2 / <> 2 with '<=' (DTSX:3996-4009); a NULL depositType matches neither branch. The table meaning is labelled השערה. [6]: an order that is not updated keeps flag 0 and is read again next run. [7]: ROW_NUMBER partitions by ft.gen_transtotalamount, so.gen_bankname, so.gen_bankaccountnumber, so.gen_branch, with RowNum = 1 (DTSX:3978, 4012). Each order falls in one partition, because its amount is fixed by depositType, so only one order per combination is marked. The hedge in [8] about '53'/'02' and 'first transaction' is correct. What is missing is a written attribute. The write in unit [4], and the outcome in unit [8], name only statuscode = 100000009. The script also sets gen_isfirsttransactionreceivied = true in the same service.Update (main.cs:127, DTSX:4341). This second write is business logic: it is why a marked order is not selected again (filter = 0 at DTSX:3987). Contrast unit [6], where an order that is not marked is re-checked.",
+     "wrongUnits": [
+      {
+       "unit": "[4] write / [8] end",
+       "problem": "Only statuscode = 100000009 is listed. The script also writes gen_isfirsttransactionreceivied = true in the same Update.",
+       "correct": "הוראת הקבע מעודכנת דרך ה-SDK (Update): statuscode = 100000009 (FIRST_TRANSACTION_RECEIVED) ו-gen_isfirsttransactionreceivied = true, ולכן לא תיבחר שוב בריצות הבאות.",
+       "evidence": "main.cs:126-127 (DTSX:4340-4341)"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "package": "0020_Preservation",
+   "claims": 16,
+   "verified": 16,
+   "foreign": [],
+   "open": []
+  },
+  {
+   "package": "0021_Account",
+   "claims": 30,
+   "verified": 30,
+   "foreign": [],
+   "open": []
+  },
+  {
+   "package": "0022_Company Workers",
+   "claims": 73,
+   "verified": 73,
+   "foreign": [],
+   "open": []
+  },
+  {
+   "package": "0023_Employers",
+   "claims": 32,
+   "stale": 1,
+   "verified": 31,
+   "foreign": [],
+   "open": [
+    {
+     "id": "L|summary",
+     "state": "stale",
+     "detail": "The stated facts are correct. That covers the isFileExist trigger (Check File Existence ScriptMain.cs:308-325; Constraints 4/5/6 at DTSX:8057-8059, with 5 and 6 OR). It also covers the MF Source design-time path with the config caveat (DTSX:11, 33), the inner join to product with the ownership argument (0004:37558/37568/37617/70147/70153 checked), and the 'ערך' wording with the meaning labelled השערה. Part (2) is correct too: all accounts by LEFT JOIN, 0 when there is no balance, direct UPDATE dbo.AccountBase (Unsupported, DTSX:7991-7994) when a stored value is NULL or different, and the NULL-fee failure condition (Check if to update orders 0-3, all FailComponent, DTSX:7744-7772). MISSING: part (1) gives the update condition only as 'שמקושרות למוצר ... בתנאי שאחד התוקפים חל'. It leaves out the product-type filter that decides which gen_employers records are written. Only records whose ProductTypeCode is 200001/1 (Pension Fund) or 200000/2 (Study Fund) continue. A record of any other non-NULL type goes to 'DE Output', which has no path, so it is never updated even when a validity condition holds. A NULL type fails the data flow, so part (2) does not run in that run. The text 'ערך הצבירה לפי סוג המוצר (עמודת גמל או השתלמות)' only implies this.",
+     "wrongUnits": [
+      {
+       "unit": "[1] summary_he (1): 'לכל מספר תאגיד בקובץ מתעדכנות ... רשומות gen_employers ... שמקושרות למוצר ... בתנאי שאחד התוקפים חל'",
+       "problem": "Missing row-selection condition: the product type. Records with another product type are silently skipped, and a NULL type fails the step.",
+       "correct": "Only gen_employers records whose product has ProductTypeCode 200001/1 or 200000/2 are updated. Other types are skipped without documentation. A NULL ProductTypeCode fails the data flow (FailComponent), and then the archive and the account calculation do not run.",
+       "evidence": "DTSX:3702-3724; no PATH from Check Fund type.Outputs[DE Output]"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "package": "0024_AgentFundInformation",
+   "claims": 29,
+   "stale": 10,
+   "verified": 19,
+   "foreign": [],
+   "open": [
+    {
+     "id": "L|summary",
+     "state": "stale",
+     "detail": "I re-derived every unit. The table label is given as a name, and its meaning is labelled השערה. The package reads the table only in the existence Lookup ('select * from [dbo].[Gen_allowedinformationforfundBase]', DTSX:2139) and in the Delete Rows source ('select ... from Gen_allowedinformationforfund', DTSX:2608-2616). All 19 'allowedinformationforfund' hits under source/ are in 0024. The insert adds 5-key combinations from state-1 POAs through two UNION ALL branches; the branch-2 conditions are the ac1 data-sharing flag plus POA agent = fund agent OR POA agency = fund agency (DTSX:2033-2082). Deceased contacts are skipped (N'נפטר', DTSX:1906-1922). Three delete rules follow. (1) Deceased contacts: Get customers dead Match -> 'Delete  Row of customer dead'. (2) No 6-key match: Check if valid allow on agency, agent, fund, contact, POW_MAIN, account; No Match -> 'Delete Not Valid Row'. Its active SQL is identical to the population query; I checked this with a comment-stripped diff. (3) Agent and agency both NULL: Execute SQL Task, DTSX:4481. Precedence order: Create Fund View Table -> Delete Rows -> Execute SQL Task (DTSX:7370-7371). All business writers use [CRM] {EC67FF20} (direct SQL). The SDK calls are only crmServiceProxy.Create(gen_etlprocess) at DTSX:297 and .Update at DTSX:3019. There are no event handlers and no disabled objects. Two notes, not counted: (a) CrmProxy comes from the unsupplied CRM2015.Proxy.dll (namespace CRM.Proxy.CrmSdk, DTSX:268, 3305), so 'דרך ה-SDK' rests on the wrapper's namespace, not on its implementation; this is ETL framework only. (b) 'שיתוף מידע' and 'חוזה האב' are column-name and SQL-comment labels ('--Agent with parent contracr and POA and data sharing', DTSX:2055); they are not cited.",
+     "wrongUnits": []
+    },
+    {
+     "id": "L|finding#4",
+     "state": "stale",
+     "detail": "Two commented-out branches ('Agents with contract and no POA' and the parent-contract branch with 'gen_powerofattorneyid is null' and data sharing) are verified. Both active branches INNER JOIN gen_powerofattorney with gen_currentstate = 1.",
+     "wrongUnits": []
+    },
+    {
+     "id": "L|Package\\Create Fund View Table|title",
+     "state": "stale",
+     "detail": "The title is a label. short_he matches the SQL. The fund condition is (Gen_existinfile = 1 OR year(gen_revaluationdate) >= year(getdate())-3) AND gen_powerofattorney.gen_currentstate = 1. That is a lower bound only, so future years are included. Both meanings are labelled השערה. Only new combinations pass (Lookup NoMatchBehavior 1, Match unconnected) and deceased contacts are skipped. flow_he[1-4] match the path order: source -> Lookup(No Match) -> filtering customers dead(No Match) -> Create system columns -> OLE DB Destination (DTSX:2211-2214). Branch 2 is correctly an addition (UNION ALL, DTSX:2054) with both of its conditions, and its agent/agency come from ac2. The insert is direct SQL (AccessMode 0, OpenRowset [dbo].[Gen_allowedinformationforfundBase], [CRM]).",
+     "wrongUnits": []
+    },
+    {
+     "id": "L|Package\\Create Fund View Table|short",
+     "state": "stale",
+     "detail": "[1] matches the SQL: the existinfile flag (labelled השערה) OR a revaluation-year lower bound; a state-1 POA on the fund's customer account (join through gen_customeraccount); and branch 2 as an addition with both its conditions (ac1.Gen_isContractDataSharing = 1, and POA agent = fund agent OR POA agency = fund agency). [2]-[4] match the 5-key full-cache Lookup on agent, agency, contact, account and fund, with the Match output unconnected. [6]-[8] match the deceased Lookup on Contact where gen_customeragename = N'נפטר', with Match unconnected. [10] matches the written columns, which include Gen_powerofattorneymainname and gen_agentreceivescommissionnly. [11] is correct: deceased and no-6-key-match rows are deleted only in Delete Rows, which runs next (DTSX:7370). Note, not counted: the per-combination ROW_NUMBER choice of the latest-start POA is not mentioned at this summary level. It is covered in detailed [8].",
+     "wrongUnits": []
+    },
+    {
+     "id": "L|Package\\Create Fund View Table|detail",
+     "state": "stale",
+     "detail": "I re-derived every unit from the raw DTSX, and all units except one wording in [5] are correct.\n[1] The source 'Get Agent Or Agency Detail From Fund' uses connection [CRM] (DTSX:2088), with the SqlCommand at DTSX:1970. In both active branches the WHERE is ((Gen_existinfile not null and = 1) OR (gen_revaluationdate not null and year(...) >= year(getdate())-3)) AND poa.gen_currentstate = 1 (DTSX:2049-2053, 2073-2077). That is a lower bound only, evaluated on the DB server clock. The existinfile meaning is labelled השערה. The ownership argument is the ambiguity rule plus 0034 DTSX:15 ('from Gen_fundmain where gen_existinfile = 1', a single-table FROM). Branch 1 uses LEFT JOINs gen_agents.gen_contactname = poa.gen_agentname and gen_agencie.gen_agencyname = poa.gen_agencyname, and outputs the record IDs gen_agentsid / gen_agencieid (DTSX:2038-2039, 2046-2047). The contact/account reading is supported by 0029 DTSX:26979 'Account.AccountId = Gen_agencie.gen_agencyname'. Branch 2 uses ac1 on fund.gen_brokernumber and ac2 on ac1.gen_agencycontractnumber; agent and agency are LEFT JOINed by PK from ac2. It requires (poa agent = fund agent OR poa agency = fund agency) and ac1.Gen_isContractDataSharing = 1 (DTSX:2055-2082). 'Parent contract' matches the SQL comment at DTSX:2055. The ROW_NUMBER partition is FUND_NUMBER (= gen_fundmain.gen_fundnumber), CONTACT, ACCOUNT, AGENT, AGENCY, ordered by POW_START_DATE desc over the UNION ALL, with RowNum = 1 (DTSX:1973, 2034, 2054, 2084). The NULL-partition, NULL-sorts-last and tie statements are correct.\n[2] The Lookup is full cache, NoMatchBehavior 1, on [CRM], 'select * from [dbo].[Gen_allowedinformationforfundBase]'. It joins AGENT_NAME->Gen_agentname, AGENCY_NAME->Gen_agencyname, CONTACT_NAME->Gen_contactname, ACCOUNT_NAME->Gen_accountname and FUND_GUID->Gen_fundname. Only the No Match path continues. 'filtering customers dead' is full cache, CONTACT_NAME->ContactId from 'select ContactId from Contact where gen_customeragename = N'נפטר''; only No Match continues to Create system columns (DTSX:1906-1922, 2137-2216 paths). [3] matches this.\n[4] The OLE DB Destination uses AccessMode 0, OpenRowset [dbo].[Gen_allowedinformationforfundBase] and [CRM] (DTSX:608-616). It has exactly 16 mapped columns, all listed with the right sources (AGENCY_NAME->Gen_agencyname, AGENT_NAME->Gen_agentname, AllowedfundinfoID->Gen_allowedinformationforfundId, ACCOUNT_NAME->Gen_accountname, CONTACT_NAME->Gen_contactname, FUND_GUID->Gen_fundname, POW_MAIN->Gen_powerofattorneymainname, CreatedBy, CreatedOn, ModifiedBy, ModifiedOn, OwningBusinessUnit, StateCode->statecode, StatusCode->statuscode, OwningUser->OwnerId, IS_COMMISSION_AGENT->gen_agentreceivescommissionnly). The main.vb (DTSX:686) lines are exact: 18 BusinessUnitId, 19-21 SystemUserId, 25/33 UtcNow, 27 StatusCode = 1, 29 DeletionStateCode = 0 (unmapped), 30 StateCode = 0, 36 Guid.NewGuid. Step 3 = 'Get systemuser organisationname and curency' in the precedence chain. 'Get System user id' looks up SystemUser.DomainName = derived @[User::UserName] (DTSX:5390-5414, 7314). 'Set system variables' sets BusinessUnitId and SystemUserId (DTSX:6503-6512). The design-time connection plus config-override caveat is present (DTSX:6, 17).\n[5] WRONG on one wording. It twice calls the POA 'ייפוי כוח נוכחי' ('לקוחות שנתנו להם ייפוי כוח נוכחי', 'ללקוח יש ייפוי כוח נוכחי'), as fact and without a hedge. The only proven condition is gen_powerofattorney.gen_currentstate = 1, which [1] itself states literally. No supplied file defines value 1 for gen_powerofattorney. The code constants ACTIVE = 1 / CURRENT_STATE_ACTIVE = 1 / '//active' in 0029 (DTSX:22710, 22760, 33990, 38017, 38077-38082) apply to gen_powerofattorneymain, a different entity. 'Active POA' (0029) and 'Get Active Poa' / 'ActivePoas' (0030 DTSX:4187, 4222) are data-flow, component and alias names, and under the standard names are not proof. The package's own open-question text records this: 'בחבילה זו משמעות הערך gen_powerofattorney.gen_currentstate = 1 אינה מוגדרת'. [1] in this same claim labels the analogous Gen_existinfile meaning השערה. So 'נוכחי' is an unproven meaning stated as fact, and it is inconsistent with that open-question statement.\nNot counted: the Lookup NULL-key matching behaviour in full-cache mode is not shown in the files, and the text makes no claim about it. FastLoadKeepNulls = false (DTSX:612) means unmapped or NULL columns take table defaults if any exist; the schema is external and the text does not claim otherwise.",
+     "wrongUnits": [
+      {
+       "unit": "[5] 'לקוחות שנתנו להם ייפוי כוח נוכחי' / 'ללקוח יש ייפוי כוח נוכחי'",
+       "problem": "This states the meaning of gen_powerofattorney.gen_currentstate = 1 ('current') as fact. No supplied file defines that value for gen_powerofattorney. The ACTIVE = 1 constants in 0029 are for gen_powerofattorneymain, and the 0029/0030 'Active POA' / 'ActivePoas' evidence consists of names only. The package's open-question text says the meaning is not defined.",
+       "correct": "Use the literal condition, e.g. 'ייפוי כוח עם gen_currentstate = 1', or label it: 'ייפוי כוח במצב 1 (המשמעות \"נוכחי/פעיל\" – השערה; בחבילה 0030 ערך זה מסונן ברכיב Get Active Poa)'.",
+       "evidence": "0024 DTSX:2053, 2077; 0029 DTSX:22710-22760, 38077-38082; 0030 DTSX:4187, 4222"
+      }
+     ]
+    },
+    {
+     "id": "L|Package\\Delete Rows|title",
+     "state": "stale",
+     "detail": "Source reads all of Gen_allowedinformationforfund (no WHERE). Multicast feeds two independent Lookups. Matches in Get customers dead and No Match in Check if valid allow each go to a DELETE by id.",
+     "wrongUnits": []
+    },
+    {
+     "id": "L|Package\\Delete Rows|short",
+     "state": "stale",
+     "detail": "Both decisions and their branches match the paths (Get customers dead Match → delete; Check if valid allow No Match → delete). The end state holds, with 'valid' as defined by the 6-key lookup.",
+     "wrongUnits": []
+    },
+    {
+     "id": "L|Package\\Delete Rows|detailed",
+     "state": "stale",
+     "detail": "Every unit verified. Source SQL DTSX:2608 has no filter. Multicast Output 1 is dangling (2735). Get customers dead has full cache (CacheType 0), NoMatch=1, and only Match connected. Check if valid allow has full cache, NoMatch=1, only No Match connected, and 6 keys. Its active SQL is identical to the Create Fund View Table source after stripping comments (programmatic comparison). Both DELETE commands are 'delete Gen_allowedinformationforfundBase where Gen_allowedinformationforfundid = ?' (identical copies per dupes.json).",
+     "wrongUnits": []
+    },
+    {
+     "id": "L|Package\\Delete Rows|detail",
+     "state": "stale",
+     "detail": "I re-derived every unit. [1] 'get allow information' selects 7 columns from the view Gen_allowedinformationforfund with no WHERE clause, over the [CRM] connection (DTSX:2603-2620). The view definition was not supplied. [2] A Multicast has 2 connected outputs, and Output 1 is dangling (DTSX:2722-2746). (a) 'Get customers dead' is full cache, NoMatchBehavior 1, Gen_contactname -> ContactId, reference 'select ContactId from Contact where gen_customeragename = N'נפטר'', and only its Match output is connected (DTSX:2663-2679, 2742). (b) 'Check if valid allow' is full cache, NoMatchBehavior 1, with 6 join keys: AGENCY_NAME, AGENT_NAME, FUND_GUID, CONTACT_NAME, POW_MAIN, ACCOUNT_NAME (DTSX:2341, 2457-2463). Only its No Match output is connected (DTSX:2743). I stripped comments, whitespace and case from both SqlCommands with my own script, and the reference query is character-identical to the insert source query, so 'identical in its active part' is correct. [3]/[4] Both OLE DB Commands run 'delete Gen_allowedinformationforfundBase where Gen_allowedinformationforfundid = ?' over [CRM]. Param_0 comes from get allow information.Gen_allowedinformationforfundid (DTSX:2529-2602). The design-time connection plus config caveat is present (DTSX:6, 17), and Unsupported is correct. The double-delete outcome is labelled השערה. [5] The two independent cases and the 6 keys are correct. The examples are explicitly open-ended and each is consistent with the SQL, including the OR/NULL semantics of the branch-2 agent/agency condition and the RowNum = 1 / POW_MAIN example. NULL keys are deferred to an open question. Neither Delete Rows component is disabled. Note, not counted: the dedupe key of the population query ('בצירוף שלה') is not spelled out here either. That gap is counted on the Create Fund View Table claim, which this claim references as 'identical'.",
+     "wrongUnits": []
+    },
+    {
+     "id": "L|Package\\Delete Rows|decisions",
+     "state": "stale",
+     "detail": "Both conditions and outcomes match.",
+     "wrongUnits": []
+    }
+   ]
+  },
+  {
+   "package": "0025_Agents_Agencies",
+   "claims": 36,
+   "verified": 36,
+   "foreign": [],
+   "open": []
+  },
+  {
+   "package": "0026_Expectedtransfervalue",
+   "claims": 23,
+   "verified": 22,
+   "stale": 1,
+   "foreign": [],
+   "open": [
+    {
+     "id": "L|Package\\Expected Transfer Value|short",
+     "state": "stale",
+     "detail": "All row logic re-derived and correct: CASE on Gen_transferType 1/3 -> isnull(amount,50000)*(isnull(gen_depositpercent,100)/100), 5/6 -> isnull(amount,0)*(...), no ELSE (NULL, ignored by SUM); Gen_transferType != 4 excludes NULL; branch 2 = -1*isnull(gen_expectedtransferamount, Gen_fundmain.Gen_AccountBalance) with statecode = 0; withdrawal (statecode = 0) and customercare (no statecode filter) = -1*gen_transactionamount; UNION dedupe over the 7 columns; date = CAST(dateadd(hh,8,x) AS date); cited line numbers 149/153-155/167/168/169/189/193/213/215 exact. One wrong unit in the tech of [1]. Also note (not counted separately): 'דרך מסלול ההפקדה' is an unattributed label for gen_coursepartition (0008 claims call the same entity 'פיצול מסלול'); the only supplied comment is on the column ('--אחוזים מבוקשים מהפקדה', 0015:42638).",
+     "wrongUnits": [
+      {
+       "unit": "[1] tech: 'טיפוס gen_depositpercent אינו מופיע בקבצים; אם הוא מספר שלם, החילוק ב-100 הוא חילוק שלם.'",
+       "problem": "The type does appear in the supplied files. 0015_TransferIn.dtsx 'Get FIelds To CoursePartition' (OLE DB source on [CRM] = ALTSHULER_MSCRM) selects CP.gen_depositpercent where cp = gen_coursepartition, and its output and external metadata column gen_depositpercent are numeric, precision 23, scale 10.",
+       "correct": "gen_coursepartition.gen_depositpercent is numeric(23,10) per the DB metadata in 0015 (0015_TransferIn.dtsx:42638, 42644, 42676, 42693), so isnull(gen_depositpercent,100)/100 is a decimal division, not an integer division.",
+       "evidence": "0015_TransferIn.dtsx:42623, 42638, 42644, 42676, 42693"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "package": "0027_AutomatedJoining",
+   "claims": 29,
+   "verified": 29,
+   "foreign": [],
+   "open": []
+  },
+  {
+   "package": "0028_Fund Enrolment",
+   "claims": 54,
+   "verified": 53,
+   "stale": 1,
+   "foreign": [],
+   "open": [
+    {
+     "id": "L|Package\\Create FundEnrolment For Transfer Request|decisions",
+     "state": "stale",
+     "detail": "Rows [1] and [3] match.\n- [1]: DTS:Disabled=True is at DTSX:8160.\n- [3]: the CASE and the top 1 without ORDER BY are at DTSX:10019-10027. The referent isnull(...) is at 9998, and the systemuser lookup is written at 8558-8560.\n- Row [2]'s condition column is quoted exactly (DTSX:10039-10042). Its meaning_he attributions are correct: 'בין מסלולים' from 0005 DTSX:70706, and 'נכשלה' as השערה.\nTwo outcomes are not exact.\n1. Row [2]'s outcome describes tc as 'מסלול שגיאה פעיל'. That is not the condition. tc is defined at DTSX:10031-10037 as gen_transfercourses with gen_errordetails LIKE '%11879018%' AND statecode = 0. It is not any active course that has an error. Two cases show the difference:\n   - A request whose active course has a different error, and whose gen_feedbackstatus is NULL, IS selected, because tc is NULL and NOT(FALSE) = TRUE.\n   - The NULL rule stated there applies only to requests that have an active course whose error details contain 11879018.\n   The specific value 11879018 is missing from the stated condition.\n2. Row [4]'s outcome is 'מקור נתוני הכתובת', but the branch decides more than the address. Per main.cs:145-223 it also selects the source of three more values:\n   - gen_contactname: TR.gen_contactnameName or TR.gen_accountnameName.\n   - gen_email: Contact.emailaddress1 or Account.emailaddress2.\n   - gen_mobilephone: Contact.mobilephone or Account.gen_primaryphone.\n   gen_city is written only in the account branch: the contact-branch city is commented out at main.cs:148-149, and the account branch writes it at 186-188. When both names are NULL, none of these attributes is written. The outcome under-states which CRM values this branch decides.",
+     "wrongUnits": [
+      {
+       "unit": "[2] outcome_he",
+       "problem": "'בקשה עם מסלול שגיאה פעיל ו-gen_feedbackstatus NULL לא נשלפת' generalises tc to any active error course. The exclusion applies only to an active course whose error details contain 11879018.",
+       "correct": "tc = gen_transfercourses with gen_errordetails LIKE '%11879018%' and statecode = 0. A request that has such a course is excluded when gen_feedbackstatus is 3 or 4, and also when it is NULL (NOT(UNKNOWN) = UNKNOWN). A request without such a course passes this clause whatever its gen_feedbackstatus.",
+       "evidence": "DTSX:10031-10037, 10039"
+      },
+      {
+       "unit": "[4] outcome_he",
+       "problem": "'מקור נתוני הכתובת' omits the other CRM attributes whose source this branch decides.",
+       "correct": "The branch is chosen by whether TR.gen_contactnameName or TR.gen_accountnameName is filled. It decides the source of the address fields (gen_street, gen_house_number, gen_index, gen_post_box, and gen_city in the account branch only), and also of gen_email, gen_contactname and gen_mobilephone (Contact vs Account). If both names are NULL, none of these is written.",
+       "evidence": "main.cs:145-223 (DTSX:8166 component)"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "package": "0029_POA",
+   "claims": 88,
+   "stale": 8,
+   "verified": 80,
+   "foreign": [],
+   "open": [
+    {
+     "id": "L|summary",
+     "state": "stale",
+     "detail": "Re-derived and correct:\n- 14 pipelines, 10 disabled (DTSX 79, 2555, 4992, 7356, 10195, 13047, 15775, 18634, 37781, 43174). The active ones are AJ, PJ, Get Organization Variables and End ETL Process record.\n- [CRM] = Psql/ALTSHULER_MSCRM at design time, with the config-file caveat (DTSX:6, 11).\n- Direct SQL: Update Pension Joining (gen_pensionjoiningbase, DTSX:36944) and, in a disabled flow, Update TransferRequest (DTSX:40560).\n- POAMainMonthsToAdd comes from gen_etlvariable (DTSX:42346) via Set Organization Variables.\n- AJ marking and non-marking paths match the paths and Create POA Main main.cs:317-330. Create's Success output is sync.\n- PJ: a failed create gets no Success row (main.cs:267-283). The no-agent/agency rule depends on the path (Guid.Empty on the Match path, main.cs:52-53; guard main.cs:327). One joining per ID, with eviction (main.cs:47-84).\n- 'ביטול' is supported by the 0031 code constant CANCELED = 2 for gen_powerofattorney.gen_currentstate (0031:21822).\nOne wrong unit (see wrongUnits).\nNote, not flagged: 'כפילות ב'1 באותה ריצה' is short for the duplicate check. Only one B1 row per ID can reach Create (ROW_NUMBER is unique per ID and the split keeps rowNumber == 1). So the check can in practice only stop a B2 joining that arrives after a collected B1 of the same member and agent/agency.",
+     "wrongUnits": [
+      {
+       "unit": "[1] 'הצטרפויות ממוכנות בסטטוס 8 (\"הסתיימו\" לפי שם הרכיב Get Finished Automated Joining בלבד — השערה)'",
+       "problem": "The component name is not the only support. A supplied package has an SQL comment on this exact condition: 0037_MeetTheCustomerGemel 'Where gen_automatedjoining.gen_joiningstatus = 8   --> Finish' (0037:4762, also 0037:3232). The scopeNote of this same claim cites 0037:4762 as ownership evidence. So 'בלבד' is false.",
+       "correct": "\"הסתיימו\" לפי הערת SQL בחבילה 0037 (gen_automatedjoining.gen_joiningstatus = 8 --> Finish, 0037:4762) ושם הרכיב Get Finished Automated Joining",
+       "evidence": "0037_MeetTheCustomerGemel.dtsx:4762, 3232"
+      }
+     ]
+    },
+    {
+     "id": "L|Package\\Create POA Main For Automated Joining|title",
+     "state": "stale",
+     "detail": "Verified:\n- flow_he[1]-[5] against the SQL (DTSX:26929-26990) and the paths. Check If POA Of Customer Account Exists Match has no path. Check Type of POA ==1 / ==2 / else. Check Signature rowNumber == 1. B1 full-cache latest-B1 lookup, then Bet 1 ±7, then period merge. B2: Is Exists, then Bet 2.\n- Ownership arguments are present.\nTwo wrong units (see wrongUnits).",
+     "wrongUnits": [
+      {
+       "unit": "short_he '(\"הסתיימו\" לפי שם הרכיב Get Finished Automated Joining בלבד — השערה)'",
+       "problem": "False 'בלבד'. The supplied package 0037 has the SQL comment '--> Finish' on gen_automatedjoining.gen_joiningstatus = 8.",
+       "correct": "Attribute it to the 0037 SQL comment (0037:4762) and the component name.",
+       "evidence": "0037_MeetTheCustomerGemel.dtsx:4762"
+      },
+      {
+       "unit": "flow_he[6] 'כך ששורות ממאגרים מוקדמים מסומנות לפני שהיצירה נוסתה'",
+       "problem": "This is runtime buffer behaviour stated as a definite fact, and it is not shown in the files. Create's Success output is sync, but it feeds Union All Automated Joining Id For Update, which has an async output. Its rows reach Update Automated Joining only when its output buffer is passed on (buffer size and thread timing). With few rows, every row reaches marking only after CreatePOA has run at EndOfRowset. So rows marked before creation is possible, not certain.",
+       "correct": "Keep 'הסימון אינו ממתין ליצירה'. Phrase the rest as possible and labelled: 'שורות ממאגרים מוקדמים עשויות להיות מסומנות לפני שהיצירה נוסתה (לפי התנהגות SSIS המתועדת, לא מוצג בקבצים)'.",
+       "evidence": "Create POA Main main.cs:446-455; Union All Automated Joining Id For Update output async (DTSX list); path Union All ... -> Update Automated Joining"
+      }
+     ]
+    },
+    {
+     "id": "L|Package\\Create POA Main For Automated Joining|short",
+     "state": "stale",
+     "detail": "Verified:\n- [2]-[22] structure against the paths.\n- Period merge [17] against main.cs:117-136, with the existing POA being the Check If Exists POA Main row (Gen_signaturedate, gen_agencyidentity).\n- [23] end state, with failure behaviour excluded.\n- Ownership statement in [1].\nOne wrong unit (see wrongUnits). Note on [23]: the 'B1 previous or same' duplicate can in practice only stop a B2 joining (one rank-1 B1 row per ID). The text as worded is literally correct.",
+     "wrongUnits": [
+      {
+       "unit": "[1] '(\"הסתיימו\" לפי שם הרכיב Get Finished Automated Joining בלבד — השערה)'",
+       "problem": "False 'בלבד'. 0037:4762 has the SQL comment 'gen_automatedjoining.gen_joiningstatus = 8 --> Finish'.",
+       "correct": "Attribute it to the 0037 SQL comment and the component name.",
+       "evidence": "0037_MeetTheCustomerGemel.dtsx:4762"
+      }
+     ]
+    },
+    {
+     "id": "L|Package\\Create POA Main For Automated Joining|detailed",
+     "state": "stale",
+     "detail": "Verified:\n- [1] SQL and ownership argument; [2] ROW_NUMBER on the base column, NULL last, partition across types, Validity3Months ISNULL (DTSX:26973).\n- [3]-[7] customer-account POA lookup: partial cache, OR condition, Match has no path.\n- [8]-[12] split; [14] full-cache latest active B1 per ID by createdon (DTSX:21938-21980; keys ID INT, agent identity, agency identity).\n- [18] Bet 1 SQL and the 11 parameters (DTSX:21620); [22] main.cs:117-136; [28]-[36] Is Exists (full cache) and Bet 2 (13 parameters, DTSX:21816).\n- [39]-[43] main.cs:319-335; [44]-[51] main.cs:167-305, monthsToAdd TryParse else 3 (main.cs:137-140), PostExecute throw (DTSX:43144 main.cs:103-110), Get Organization Variables is the first executable (constraints DTSX:45650-45663, all Success).\n- [52] Update Automated Joining main.cs:67-72.\nThree wrong units (see wrongUnits).",
+     "wrongUnits": [
+      {
+       "unit": "[1] '(\"הסתיימו\" לפי שם הרכיב Get Finished Automated Joining בלבד — השערה)'",
+       "problem": "False 'בלבד'. 0037:4762 has the SQL comment 'gen_automatedjoining.gen_joiningstatus = 8 --> Finish'.",
+       "correct": "Attribute it to the 0037 SQL comment (0037:4762) and the component name.",
+       "evidence": "0037_MeetTheCustomerGemel.dtsx:4762"
+      },
+      {
+       "unit": "[44] '\"כולל פנסיה\" וההחרגות מההצטרפות' (and [32] tech 'ExcludeProvidentFunds=gen_excludeprovidentfunds (ערך גולמי מההצטרפות)')",
+       "problem": "OWN. gen_includepension, gen_exclludetrainingfunds and gen_excludeprovidentfunds are unqualified in the 6-source query (DTSX:26952-26956). This claim argues ownership for the filter columns and states 'unknown' for gen_typeofpowerofattorney, but these value columns are attributed to the joining without argument. No supplied file qualifies them on gen_automatedjoining. The only qualified uses are Gen_powerofattorneymain.* in 0029 and 0031.",
+       "correct": "Give the ambiguity argument with evidence that the columns exist on gen_automatedjoining, or state that their source table is unknown. Example: 'כולל פנסיה וההחרגות מהשורה שנשלפה (טבלת המקור לא ידועה)'.",
+       "evidence": "DTSX:26952-26956, 26977-26982; grep across source/DailyProcess for qualified uses"
+      },
+      {
+       "unit": "[52] 'כך ששורות ממאגרים מוקדמים מסומנות לפני שהיצירה נוסתה'",
+       "problem": "This is runtime buffer timing stated as definite and not shown in the files. Rows pass the sync Success output into Union All Automated Joining Id For Update, whose output is async. They reach Update Automated Joining only when that buffer is passed on. With small volumes, all marking happens after CreatePOA at EndOfRowset.",
+       "correct": "'עשויות להיות מסומנות לפני שהיצירה נוסתה (לפי התנהגות SSIS המתועדת, לא מוצג בקבצים)'.",
+       "evidence": "Create POA Main main.cs:446-455; Union All Automated Joining Id For Update [async]"
+      }
+     ]
+    },
+    {
+     "id": "L|Package\\Create POA Main For Automated Joining|decisions",
+     "state": "stale",
+     "detail": "Verified:\n- Conditions [1]-[10] against the SQL WHERE (DTSX:26929-26990), lookup SQL and parameter maps (DTSX:22205, 22026, 21620, 21816, 27982), split expressions (DTSX:22253, 22286), main.cs:117-136 and 256-264.\n- Outcomes match the paths: [5] NoMatch goes directly to Union All To Create; [6] NoMatch goes to the period merge.\n- The [7] meaning is labelled השערה.\nOne wrong unit (see wrongUnits).",
+     "wrongUnits": [
+      {
+       "unit": "[1] meaning_he '(\"הסתיימו\" לפי שם הרכיב Get Finished Automated Joining בלבד — השערה)'",
+       "problem": "False 'בלבד'. 0037:4762 has the SQL comment 'gen_automatedjoining.gen_joiningstatus = 8 --> Finish'.",
+       "correct": "Attribute it to the 0037 SQL comment and the component name.",
+       "evidence": "0037_MeetTheCustomerGemel.dtsx:4762"
+      }
+     ]
+    },
+    {
+     "id": "L|Package\\Create POA Main For Pension Joining|detailed",
+     "state": "stale",
+     "detail": "Verified:\n- [1] SQL and ownership argument; [2] agentcyIdentityNumber ISNULL.\n- [3]-[11] Get POA Main (statecode = 0, partial cache) and Check If Poa Attached incl. SDK mark and eviction.\n- [12] path-dependent NULL handling for the exclusions (type == 2 via const B2 = 2) and for the three match fields: Match path NULL -> false (main.cs:56, 60); NoMatch path raw NULL to parameters 1-3 and 8-9 (DTSX:31273), so no match, then written false/2 (Create main.cs:201-217, 254-258).\n- 'סוג הנספח בהצטרפות' is supported by the code comment 'סוג נספח בהצטרפות פנסיה' (Create main.cs:150).\n- [13] Derived Column (DTSX:35357); [14] Check If Exist POA SQL and the 12 parameters.\n- [19]-[23] guard main.cs:327 vs Guid.Empty (Create inputs lineage from Union All, DTSX:35314-35315).\n- [26] attributes (main.cs:146-265); [27] Success row before CreateAnnotation (main.cs:269-275); [28] Union All 2 and Update Pension Joining SQL; wstr(50) overflow is labelled.\nOne wrong unit (see wrongUnits).",
+     "wrongUnits": [
+      {
+       "unit": "[26] '\"תאריך סיום פחות מ-10 שנים\" (כשהוא מסומן בהצטרפות)'",
+       "problem": "OWN. gen_isenddatelessthan10years is unqualified in the 4-source query (gen_pensionjoining, Gen_agencie, gen_agents, Contact; DTSX:36375). The text attributes it to the joining without the ambiguity argument and without evidence. No supplied file qualifies it on gen_pensionjoining; the only other mentions are in 0029.",
+       "correct": "'(כשהשדה gen_isenddatelessthan10years בשורה שנשלפה מסומן; טבלת המקור לא ידועה)', or add the ambiguity argument with evidence that the column exists on gen_pensionjoining.",
+       "evidence": "DTSX:36375; grep source/DailyProcess for gen_isenddatelessthan10years (0029 only)"
+      }
+     ]
+    },
+    {
+     "id": "L|Package\\Create POA Main For Pension Joining|detail",
+     "state": "stale",
+     "detail": "Verified:\n- [1] population and ownership argument.\n- [2] matching levels.\n- [3] appendix mapping (Derived Column; code comments main.cs:150-151), exclusion defaults by path, one candidate per ID with eviction, NULL match fields by path, the no-agent rule by path, and the labelled NULL-read failure.\n- [4] five writes.\n- [5] outcome with labelled runtime parts.\n- [6] 0028 'Upate Pension Joining' update gen_pensionjoiningBase set gen_fundenrolmentid (0028:8053-8058).\nOne wrong unit (see wrongUnits).",
+     "wrongUnits": [
+      {
+       "unit": "[3] 'כשאין לת\"ז ייפוי כוח ראשי פעיל: כל הצטרפות נבדקת ונוצרת בנפרד'",
+       "problem": "Not every such joining is created. NoMatch rows go through the same ±7 lookup (Check If Exist POA, gen_currentstate = 1, 9-digit padded ID). On Match they are linked (Update POA Main), not created. Get POA Main uses exact Gen_identitynumber and statecode = 0, so its NoMatch does not exclude a Check If Exist POA match. Rows without agent and agency are also not created (main.cs:327). The [5] unit of the detailed claim words this correctly ('נבדקת בנפרד, ויכולה ליצור').",
+       "correct": "'כל הצטרפות נבדקת בנפרד (אין צמצום לת\"ז): קישור לייפוי כוח ראשי תואם ±7 ימים אם נמצא, אחרת יצירה'.",
+       "evidence": "DTSX:36495-36518 (Get POA Main), 31223-31273 (Check If Exist POA); paths in data flow Create POA Main For Pension Joining"
+      }
+     ]
+    },
+    {
+     "id": "L|Package\\Create POA Main For Pension Joining|decisions",
+     "state": "stale",
+     "detail": "Verified:\n- [1] condition (DTSX:36380-36388); [3] main.cs:47/67; [4] Derived Column; [5] Check If Exist POA; [6] main.cs:327 with the Guid.Empty explanation.\nTwo wrong units (see wrongUnits).",
+     "wrongUnits": [
+      {
+       "unit": "[1] meaning_he 'הצטרפות שהסתיימה ונדרש לה ייפוי כוח ראשי'",
+       "problem": "OWN. gen_joiningstatus and gen_createpoamain are unqualified in a 4-source query. This unit attributes them to the joining without the ambiguity argument. The AJ decisions [1] and the other PJ claims include the argument; this one does not.",
+       "correct": "Add: gen_joiningstatus ו-gen_createpoamain שייכות להצטרפות לפי כלל העמימות (...), עם pj.gen_joiningstatus (0028:915) ועדכון SDK של gen_createpoamain על gen_pensionjoining (Check If Poa Attached main.cs:71-74).",
+       "evidence": "DTSX:36380-36388"
+      },
+      {
+       "unit": "[2] outcome_he 'NoMatch → יצירה'",
+       "problem": "Get POA Main NoMatch does not go to creation. It goes to Union All Input 3, then Derived Column, then Check If Exist POA (±7). On Match the joining is linked (Update POA Main), not created. Creation happens only on Check If Exist POA NoMatch, and only if agent or agency is present.",
+       "correct": "'NoMatch → מועמד (ללא צמצום לת\"ז) → Check If Exist POA'",
+       "evidence": "paths in DTSX data flow Create POA Main For Pension Joining (Get POA Main NoMatch -> Union All Input 3)"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "package": "0030_PoaAccountUpdateDailyTest",
+   "claims": 23,
+   "verified": 23,
+   "foreign": [],
+   "open": []
+  },
+  {
+   "package": "0031_PoaAccountUpdateDaily",
+   "claims": 62,
+   "stale": 18,
+   "verified": 44,
+   "foreign": [],
+   "open": [
+    {
+     "id": "L|summary",
+     "state": "stale",
+     "detail": "Verified: the state-3 meaning is attributed (0029_POA.dtsx:3889 'where waiting.Gen_currentstate = 3 -- waiting'). The +3h / appendix 2/3/5 / NULL rule is verified (DTSX:31302-31306, Param_0 = Gen_receivingdatePoa). Cancellation sets CANCELED=2 and WAITING_SENDING_TO_BANK=2. The JSON is not read by this package, and the pass-through is marked. The Send Poa Emails stop and route logic and the PostExecute mail are correct, with the no-rows case marked. 'ב'1' and 'פעיל' are attributed, and the ownership pointer and the pension one-per-main logic with its conditional later runs are correct. scopeNote is correct. WRONG: (a) 'הערת הסריקה' says the moved annotation is the scan. The 0031 query takes any annotation whose ObjectId is the POA Main (DTSX:3323-3324, 7618-7619), and nothing in 0031 shows its content. In 0029 the notes created on POA Main read 'יפוי כח נסרק לחשבון …' / 'הסריקה נמצאת בישות חשבון פנסיה - …' (0029_POA.dtsx:22882, 34138). Those are notes about a scan, not the scan, and they are not attributed here. This must be labelled השערה or attributed. INCOMPLETE parts (business row filters) for the account creation: (b) the product and exclusion condition is missing. Only products 4 with gen_exclludetrainingfunds = 2, or products 1/2/5 with gen_excludeprovidentfunds = 2, qualify (DTSX:3329-3333). Accounts that already have any gen_powerofattorney are skipped (Check If POA Account Agent Exist, DTSX:858; only No Match is connected). (c) For pension, the inclusion flag (gen_includingcomprehensivepension / gen_includinggeneralpension = 1 for 200003 / 200004, DTSX:7624-7628) is missing. Precision note: 'שנפתחו' is the CRM record CreatedOn > DATEADD(dd,-2,GETDATE()), not a business opening date. The detailed claims correctly say 'שנוצרו'.",
+     "wrongUnits": [
+      {
+       "unit": "[1] 'בשתי הזרימות הערת הסריקה מועברת מייפוי הכוח הראשי לחשבון או לתוכנית (SDK)'",
+       "problem": "Unproven meaning: the annotation is called the scan. It is any annotation on the POA Main.",
+       "correct": "The annotation (note) of the POA Main is moved (annotation.objectid). What it contains is not shown in 0031. השערה: these are the notes 0029 creates on POA Main ('יפוי כח נסרק לחשבון …', 0029_POA.dtsx:22882; 'הסריקה נמצאת בישות חשבון פנסיה - …', 0029_POA.dtsx:34138).",
+       "evidence": "DTSX:3323-3324, 3684-3690, 7618-7619; 0029_POA.dtsx:22882, 34138"
+      },
+      {
+       "unit": "[1] 'לחשבונות לקוח שנפתחו ביומיים האחרונים נוצרים ייפויי כוח מכוח ייפוי כוח ראשי מסוג נספח 2 ... במצב 1'",
+       "problem": "Missing row-selection conditions: the product code with the POA Main exclusion flag, and the skip when the account already has a POA.",
+       "correct": "Only accounts with product 4 and gen_exclludetrainingfunds = 2, or product 1/2/5 and gen_excludeprovidentfunds = 2, and with no existing gen_powerofattorney for the account. The record is the one created in CRM (CreatedOn) in the last 2 days.",
+       "evidence": "DTSX:3326-3333, 858-870"
+      },
+      {
+       "unit": "[1] 'לתוכניות פנסיה שנפתחו ביומיים האחרונים – תוכנית אחת לכל ייפוי כוח ראשי בכל ריצה'",
+       "problem": "Missing the inclusion condition.",
+       "correct": "Only product 200003 with gen_includingcomprehensivepension = 1, or 200004 with gen_includinggeneralpension = 1.",
+       "evidence": "DTSX:7624-7628"
+      }
+     ]
+    },
+    {
+     "id": "L|finding#3",
+     "state": "stale",
+     "detail": "All four agent-email script components (Email - Start Date Poa, ... With Commission Appointment, Email - Cancel Poa To Perform Actions, ... With Commission Appointment) have their Input0_ProcessInput body inside a commented region 'In Comment due to 13366'; their sync Output 0 still passes rows on. The JSON in staging is written by Set Data For ... Poa Emails; 'replacement mechanism' is correctly labelled as hypothesis.",
+     "wrongUnits": []
+    },
+    {
+     "id": "L|finding#9",
+     "state": "stale",
+     "detail": "Move Annotation scripts update annotation.objectid for every row with AnnotationId (no check if already moved) and run before Remove Duplicates; source queries have no ORDER BY; Annotation left join is inside the ROW_NUMBER subquery filtered rowNumber = 1, so one annotation per account/program.",
+     "wrongUnits": []
+    },
+    {
+     "id": "L|Package\\Handle Wait Status|title",
+     "state": "stale",
+     "detail": "The structure is correct: source WHERE (DTSX:27226), the lookup on active state 1, Is Renewal, Update NeedToSendMailBit (CASE 2/3/5 THEN ? END, Param_0 = Gen_receivingdatePoa, Param_1 = PowerOfAttorneyIdPa), AppendixType on the new POA, Update Json (isProcessed = 0 and emailDetailsJson is null), and the SDK activation. The state-3 meaning is attributed. WRONG (unmarked runtime behaviour, the same issue fixed in the sibling detailed/detail/summary claims): for rows whose new appendix is 2/3/5, both the JSON and the activation are reached only through 'Email - Start Date Poa' / '... With Commission Appointment'. In those components Input0_ProcessInput is commented out (DTSX:23130, 24705). That the sync Output 0 (DTSX:24525, 26065) still passes every row on is SSIS behaviour not shown in the files. short_he ('נשמרים נתוני מכתב (JSON)'), flow_he[4] ('→ JSON למכתב ב-staging') and flow_he[5] state it without the mark 'לפי התנהגות SSIS המתועדת, לא מוצג בקבצים'.",
+     "wrongUnits": [
+      {
+       "unit": "short_he 'נשמרים נתוני מכתב (JSON) בשורה קיימת ...'; flow_he[4] 'נספח החדש 2/3/5 → JSON למכתב ב-staging'; flow_he[5] 'הפעלה'",
+       "problem": "Depends on rows passing through the commented-out mail scripts (sync output). This is runtime behaviour and it is not marked.",
+       "correct": "Add: the rows reach the JSON build and the activation through the mail components, whose code is commented out; לפי התנהגות SSIS המתועדת, לא מוצג בקבצים, their synchronous output passes every row on.",
+       "evidence": "DTSX:23130, 24525, 24705, 26065"
+      }
+     ]
+    },
+    {
+     "id": "L|Package\\Handle Wait Status|short",
+     "state": "stale",
+     "detail": "Branches [2]-[8] match the paths: No Match goes to Union All Data To Update Status (input 3), Renewal goes to the Union (input 1), and Not Renewal goes to Update NeedToSendMailBit and then AppendixType. The SQL write rule in [8] is exact. WRONG (unmarked runtime behaviour): [8] second sentence (JSON when the new appendix is 2/3/5), [9] (activation, which for 2/3/5 rows runs via the mail scripts) and [10] state outcomes that depend on the sync pass-through of the commented-out mail scripts, with no mark.",
+     "wrongUnits": [
+      {
+       "unit": "[8] 'אם הנספח של ייפוי הכוח החדש הוא 2, 3 או 5, נשמרים נתוני מכתב'; [9]; [10]",
+       "problem": "Pass-through of the commented-out mail components is runtime behaviour, and it is not marked.",
+       "correct": "Mark it as 'לפי התנהגות SSIS המתועדת, לא מוצג בקבצים' (as in the detailed claim [15]/[18]/[26]).",
+       "evidence": "DTSX:23130, 24525, 24705, 26065"
+      }
+     ]
+    },
+    {
+     "id": "L|Package\\Handle Wait Status|decisions",
+     "state": "stale",
+     "detail": "[1]-[4] and [6]-[8] quote the conditions exactly. [5]'s condition is exact, but its outcome 'אחרת → נתוני מכתב' (and the following activation) is reached only through the commented-out mail scripts. That sync-output pass-through is runtime behaviour not shown in the files, and it is not marked. Note only: [2] quotes the unqualified gen_customerprogram and its meaning says 'באותו חשבון'; the key is account OR program. The ownership argument is in the detailed/detail claims.",
+     "wrongUnits": [
+      {
+       "unit": "[5] outcome_he 'אחרת → נתוני מכתב'",
+       "problem": "Unmarked runtime behaviour: this depends on the commented-out mail scripts passing rows through their sync output.",
+       "correct": "'אחרת → Check Format → רכיבי המייל (קוד בהערה; לפי התנהגות SSIS המתועדת, לא מוצג בקבצים, הפלט הסינכרוני מעביר את השורות) → נתוני מכתב → הפעלה'",
+       "evidence": "DTSX:23130, 24525, 24705, 26065"
+      }
+     ]
+    },
+    {
+     "id": "L|Package\\Handle Wait Status|crm",
+     "state": "stale",
+     "detail": "Entities, verbs and mechanisms are correct. SDK proxy.Update gen_currentstate = 1. SQL UPDATE Gen_powerofattorneyBase on [CRM] (Unsupported), targeting the old active POA with the 2/3/5 → +3h else NULL rule. The staging UPDATE is on SQL.GENERIX_STAGING. WRONG (unmarked runtime behaviour): [1] when_he '(כל הענפים)' and [3] when_he 'נספח 2/3/5 של סוכן אחר' include the 2/3/5 branch. That branch reaches Set Data and Update ACTIVE only through the commented-out mail scripts (sync output pass-through), and this is not marked. Note only: [3] also omits that the JSON is written only on the first POA row per POA Main, and only if that staging row exists with isProcessed = 0 and emailDetailsJson NULL. This is a staging write, not CRM.",
+     "wrongUnits": [
+      {
+       "unit": "[1] when_he '(כל הענפים)'; [3] when_he",
+       "problem": "For the 2/3/5 branch, the write depends on the unmarked pass-through of the commented-out mail scripts.",
+       "correct": "Mark it: for appendix 2/3/5 rows of another agent, the rows reach the JSON and the activation through the mail components, whose code is commented out (לפי התנהגות SSIS המתועדת, לא מוצג בקבצים).",
+       "evidence": "DTSX:23130, 24525, 24705, 26065"
+      }
+     ]
+    },
+    {
+     "id": "L|Package\\Handle Active Status|title",
+     "state": "stale",
+     "detail": "Source WHERE Gen_enddate <= GETDATE() and Gen_currentstate = 1; NoMail = ISNULL(gen_receivingdateofcancelpoa); formats 3/8 (emails commented out); JSON update in staging; SDK update gen_currentstate=2 and gen_statustransfertobank=2 (consts CANCELED, WAITING_SENDING_TO_BANK).",
+     "wrongUnits": []
+    },
+    {
+     "id": "L|Package\\Handle Active Status|short",
+     "state": "stale",
+     "detail": "Branching on gen_receivingdateofcancelpoa, JSON in staging without sending, and cancellation + waiting-to-bank status match the flow.",
+     "wrongUnits": []
+    },
+    {
+     "id": "L|Package\\Handle Active Status|decisions",
+     "state": "stale",
+     "detail": "Conditions exact: source WHERE, ISNULL(gen_receivingdateofcancelpoa), !ISNULL(gen_appointmentofagent) && == TRUE -> EmailFormatTrue (With Commission Appointment, error label 'נוסח 3'), else 8; main.cs:69 and 75.",
+     "wrongUnits": []
+    },
+    {
+     "id": "L|Package\\Handle Active Status|crm",
+     "state": "stale",
+     "detail": "SDK update of gen_powerofattorney (currentstate 2, statustransfertobank 2 when not already 2) and staging JSON update when gen_receivingdateofcancelpoa is set. No other writes.",
+     "wrongUnits": []
+    },
+    {
+     "id": "L|Package\\Create Power Of Attorney|title",
+     "state": "stale",
+     "detail": "ב'1, פעיל, the product codes and the 2-day window are attributed or correct, and flow_he[1]-[5] are structurally correct. WRONG: (a) short_he 'שאינו מחריג את סוג המוצר' and flow_he[1] 'שאינו מחריג את המוצר' give the value 2 of gen_exclludetrainingfunds / gen_excludeprovidentfunds (DTSX:3330, 3332) the meaning 'not excluded'. Nothing in 0031 proves that. The proof exists only in another package and is not attributed: 0029_POA.dtsx:34045/34054 '//כן = 1, לא = 2' and 22780/22785 '//no', on new Entity(\"gen_powerofattorneymain\") (0029:33988, 22758). (b) short_he 'הערת הסריקה מועברת' calls the annotation the scan, which is unproven (see the summary result).",
+     "wrongUnits": [
+      {
+       "unit": "short_he / flow_he[1] 'שאינו מחריג את (סוג) המוצר'",
+       "problem": "The meaning of option value 2 is stated as fact without attribution.",
+       "correct": "gen_exclludetrainingfunds / gen_excludeprovidentfunds = 2 ('לא' according to the code comment '//כן = 1, לא = 2' in 0029_POA.dtsx:34045, 34054 for gen_powerofattorneymain).",
+       "evidence": "DTSX:3330, 3332; 0029_POA.dtsx:34045, 34054"
+      },
+      {
+       "unit": "short_he 'הערת הסריקה מועברת מייפוי הכוח הראשי לחשבון'",
+       "problem": "Unproven meaning (the annotation content is not shown).",
+       "correct": "'ההערה (annotation) של ייפוי הכוח הראשי מועברת לחשבון' (meaning as a scan note: השערה, cf. 0029_POA.dtsx:22882).",
+       "evidence": "DTSX:3323-3324, 3684-3690"
+      }
+     ]
+    },
+    {
+     "id": "L|Package\\Create Power Of Attorney|short",
+     "state": "stale",
+     "detail": "Steps and branches are correct: lookup Match unconnected (skip), No Match → Move Annotation → Remove Duplicates → Create. WRONG: [1] 'שאינו מחריג את המוצר' (meaning of value 2, unattributed; proof only in 0029_POA.dtsx:34045/34054). [6] 'הערת הסריקה' (annotation called the scan, unproven).",
+     "wrongUnits": [
+      {
+       "unit": "[1] 'שאינו מחריג את המוצר'",
+       "problem": "The meaning of exclude-flag value 2 is not attributed.",
+       "correct": "Attribute it to 0029_POA.dtsx:34045/34054 ('//כן = 1, לא = 2'), or label it השערה.",
+       "evidence": "DTSX:3330, 3332"
+      },
+      {
+       "unit": "[6] 'הערת הסריקה של ייפוי הכוח הראשי מועברת אל החשבון'",
+       "problem": "The annotation is called the scan without proof.",
+       "correct": "'ההערה (annotation) של ייפוי הכוח הראשי מועברת אל החשבון'",
+       "evidence": "DTSX:3323-3324, 3684-3690"
+      }
+     ]
+    },
+    {
+     "id": "L|Package\\Create Power Of Attorney|detailed",
+     "state": "stale",
+     "detail": "Verified: the SQL (DTSX:3295-3340: ROW_NUMBER per account by Gen_signaturedate desc with the Annotation join inside the subquery, the 2-day CreatedOn window, appendix 2, state 1). The ownership argument for gen_currentstate checks out (DTSX:40447-40449), and so does the one for ObjectId (annotation[\"objectid\"] DTSX:3687), with AnnotationId stated as unknown. The lookup is partial cache on Gen_customeraccount with Match unconnected. Move Annotation main.cs:122-143 runs per row with no check. Remove Duplicates keys are gen_customeraccountid(1) + Gen_powerofattorneymainId(2) with EliminateDuplicates=true. The create code main.cs:131-231 sets ACTIVE(1), the valid-option checks, WaitingTransferToBank(2), +3h dates, end date fallback receiving+3h+10y, start = DateTime.Now, and product != 2 ('//gemel to invest') gates the advisory fields. The warnings are verified. WRONG: [1] 'בלי החרגת השתלמות' / 'בלי החרגת גמל' give exclude-flag value 2 the meaning 'not excluded' without attribution (proof only in 0029_POA.dtsx:34045/34054). [7] 'הערה (סריקה)' and [21] 'וסריקת ייפוי הכוח מוצמדת אליו' call the annotation the scan without proof. Note only: the warning text is 'Error Creating POA Account  Agent' with a double space (DTSX:843).",
+     "wrongUnits": [
+      {
+       "unit": "[1] 'בלי החרגת השתלמות' / 'בלי החרגת גמל'",
+       "problem": "The meaning of value 2 is not attributed.",
+       "correct": "'gen_exclludetrainingfunds = 2' / 'gen_excludeprovidentfunds = 2' (2 = 'לא' according to the code comment in 0029_POA.dtsx:34045, 34054).",
+       "evidence": "DTSX:3330, 3332"
+      },
+      {
+       "unit": "[7] 'האם לייפוי הכוח הראשי יש הערה (סריקה)?'; [21] 'וסריקת ייפוי הכוח מוצמדת אליו'",
+       "problem": "The annotation is called the scan without proof.",
+       "correct": "'יש הערה (annotation)'; '…וההערה (annotation) של ייפוי הכוח הראשי הועברה לחשבון' (scan meaning: השערה).",
+       "evidence": "DTSX:3318-3324, 3684-3690; 0029_POA.dtsx:22882"
+      }
+     ]
+    },
+    {
+     "id": "L|Package\\Create Power Of Attorney|detail",
+     "state": "stale",
+     "detail": "[2], [4] and [6] are correct. In [6], the 0005 creator lines and the 0029 POA Main creation (0029_POA.dtsx:22758, new Entity(\"gen_powerofattorneymain\")) are verified. The gen_currentstate ownership argument in [1] is verified. WRONG: [1] 'שאינו מחריג את המוצר', [3] 'השתלמות/גמל לפי החרגה' and [5] 'שאינו מחריג את סוג המוצר של החשבון' rely on exclude-flag value 2 meaning 'not excluded'. That meaning is not attributed (proof only in 0029_POA.dtsx:34045/34054 '//כן = 1, לא = 2').",
+     "wrongUnits": [
+      {
+       "unit": "[1], [3], [5] (exclusion wording)",
+       "problem": "The meaning of exclude-flag value 2 is not attributed.",
+       "correct": "Attribute it to 0029_POA.dtsx:34045/34054 ('//כן = 1, לא = 2' on gen_powerofattorneymain), or label it השערה.",
+       "evidence": "DTSX:3330, 3332"
+      }
+     ]
+    },
+    {
+     "id": "L|Package\\Create Power Of Attorney - Pension|title",
+     "state": "stale",
+     "detail": "Attributions (ב'1, פעיל, mekifa/clalit), the ownership pointer, the one-per-main dedupe (Remove Duplicates key Gen_powerofattorneymainId only, EliminateDuplicates=true) and the SDK create are correct. WRONG: (a) short_he 'תוכנית אחת לכל ייפוי כוח ראשי בכל ריצה; השאר בריצות הבאות' is unconditional. The other programs are handled in later runs only if they are still within CreatedOn > DATEADD(dd,-2,GETDATE()) and still have no POA (DTSX:7620, 5184-5194). This depends on data and timing; the detail claim states it correctly. (b) short_he 'הערת הסריקה' calls the annotation the scan without proof.",
+     "wrongUnits": [
+      {
+       "unit": "short_he 'השאר בריצות הבאות'",
+       "problem": "Unconditional; it is true only while the program is inside the 2-day CreatedOn window and still has no POA.",
+       "correct": "'תוכניות נוספות של אותו ייפוי כוח ראשי מטופלות רק בריצות הבאות, אם עדיין בטווח היומיים ועדיין אין להן ייפוי כוח'",
+       "evidence": "DTSX:7620, 5184-5194, 9066-9068"
+      },
+      {
+       "unit": "short_he 'הערת הסריקה מועברת מייפוי הכוח הראשי לתוכנית'",
+       "problem": "The annotation is called the scan without proof.",
+       "correct": "'ההערה (annotation) של ייפוי הכוח הראשי מועברת לתוכנית'",
+       "evidence": "DTSX:7618-7619, 7976-7980"
+      }
+     ]
+    },
+    {
+     "id": "L|Package\\Create Power Of Attorney - Pension|short",
+     "state": "stale",
+     "detail": "[1]-[5] are correct: the lookup is on gen_customerprogram with Match unconnected. WRONG: [6] 'הערת הסריקה' calls the annotation the scan without proof. [7] 'תוכניות נוספות שלו מטופלות בריצות הבאות' is unconditional; it holds only if the program is still within the 2-day CreatedOn window and still has no POA.",
+     "wrongUnits": [
+      {
+       "unit": "[6] 'הערת הסריקה של ייפוי הכוח הראשי מועברת אל התוכנית'",
+       "problem": "Unproven meaning.",
+       "correct": "'ההערה (annotation) של ייפוי הכוח הראשי מועברת אל התוכנית'",
+       "evidence": "DTSX:7618-7619, 7976-7980"
+      },
+      {
+       "unit": "[7] 'תוכניות נוספות שלו מטופלות בריצות הבאות'",
+       "problem": "Unconditional; it depends on the 2-day window and on run timing.",
+       "correct": "'… מטופלות רק בריצות הבאות, אם עדיין בטווח היומיים ועדיין אין להן ייפוי כוח'",
+       "evidence": "DTSX:7620, 5184-5194"
+      }
+     ]
+    },
+    {
+     "id": "L|Package\\Create Power Of Attorney - Pension|detailed",
+     "state": "stale",
+     "detail": "Verified: the Get Policies SQL (DTSX:7589-7634) with the attributions and the gen_currentstate ownership argument, and the ObjectId ownership (annotation[\"objectid\"] DTSX:7979) with AnnotationId unknown. The lookup is partial cache on gen_customerprogram. Move Annotation To Policies sets EntityReference(\"gen_policies\"). The dedupe is by main only. The create code main.cs:131-229 has +3h dates, the end-date fallback, and advisory data always copied (198-217). WRONG: (a) [7] 'הערה (סריקה)' and [17] 'וסריקת ייפוי הכוח מוצמדת אליו' call the annotation the scan without proof. (b) [16] quotes the warning texts as 'Error Creating POA Account Agent' / 'Error Updating Annotation ObjectId'. In this flow they are 'Error Creating POA Account  Agent (Pension)' and 'Error Updating Annotation ObjectId (Pension)' (DTSX:5140, 5167).",
+     "wrongUnits": [
+      {
+       "unit": "[7] '(סריקה)'; [17] 'וסריקת ייפוי הכוח מוצמדת אליו'",
+       "problem": "The annotation is called the scan without proof.",
+       "correct": "'הערה (annotation)'; scan meaning only as השערה (cf. 0029_POA.dtsx:34138 'הסריקה נמצאת בישות חשבון פנסיה - …').",
+       "evidence": "DTSX:7611-7619, 7976-7980"
+      },
+      {
+       "unit": "[16] warning texts",
+       "problem": "The literal text is wrong for the Pension flow.",
+       "correct": "'Error Creating POA Account  Agent (Pension)' / 'Error Updating Annotation ObjectId (Pension)'",
+       "evidence": "DTSX:5140, 5167"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "package": "0032_POAOperator",
+   "claims": 54,
+   "stale": 3,
+   "verified": 51,
+   "foreign": [],
+   "open": [
+    {
+     "id": "L|summary",
+     "state": "stale",
+     "detail": "Re-derived: order from the 9 PrecedenceConstraints (DTSX:18794-18802; all Success, LogicalAnd, no expressions, no DTS:Disabled): Out Of Date -> Cancelled by Poa Account (HAVING =6, writes 6, DTSX:13889/13052) -> Invalid by Poa Account (=5, writes 5, DTSX:17699/17739) -> Expired By Poa Account (=4, writes 4, DTSX:15807/15733) -> Cancelled (!=2, writes 6, DTSX:11969/11132) -> account links -> gen_policies links. Inner join gives at least one link; NULL link status is never counted by count(case ...), so count(id) never equals -> blocks every operator update. Creation conditions, Lookup keys, IS All Employees, gen_active = 1, no-prior-link check: correct (DTSX:3081-3109, 6125-6152, 483-553, 3571-3641, 3217, 6257). AccountId ownership is argued with the ambiguity rule plus Account.AccountId at DTSX:3107; for Accountid the case-insensitive match is explicitly labelled an assumption (accepted form). scopeNote verified: 0 DTS:Configuration; [psql] (DTSX:4-6) is referenced by 13 connections, all OLE DB Sources/Lookups (reads); every CRM write is service.Create or ExecuteMultipleExtension(RequestType.Update) on IOrganizationService; ServerName/OrganizationName set from gen_etlvariable (DTSX:8329, script ReadWriteVariables); SQL comments -- valid/not valid/cancelled/expired/invalid at DTSX:10055, 11969, 13889, 15807, 17699; VALID = 2 at DTSX:742, 3803; gen_poaaccountoperatorid selected alone from gen_poaaccountoperator (DTSX:10053) and used as entity.Id at main.cs:122-123 (=DTSX:10339-10340); gen_poaoperatorid used as Id at main.cs:124-126 in the four operator scripts (DTSX:12247-12248, 14166-14167, 16085-16086, 18003-18004). One unit is wrong: the link-expiry condition.",
+     "wrongUnits": [
+      {
+       "unit": "summary_he: 'קישורים בסטטוס 2 (\"valid\" לפי הערת SQL) שתאריך הסיום שלהם עבר מקבלים סטטוס 4'",
+       "problem": "The stated condition is not the DTSX condition. The query is dateadd(HH,3, gen_enddate) < GETDATE(): a link whose end date has passed by less than 3 hours is not selected in that run. The summary drops the +3 hours, so it reads as 'as soon as the end date passes'. Whether the +3 h is a time-zone correction is not shown in the files.",
+       "correct": "קישורים בסטטוס 2 (\"valid\" לפי הערת SQL) שתאריך הסיום שלהם בתוספת 3 שעות מוקדם מזמן הריצה (dateadd(HH,3,gen_enddate) < GETDATE()) מקבלים סטטוס 4",
+       "evidence": "DTSX:10053-10055"
+      }
+     ]
+    },
+    {
+     "id": "L|Package\\Create POA Account Operator|title",
+     "state": "stale",
+     "detail": "Everything else matches: Get Customer Accounts join/WHERE (DTSX:3081-3109), existence Lookup on gen_customeraccount (DTSX:541), IS All Employees !ISNULL(gen_applypoa) && gen_applypoa == 1 (DTSX:3217), Check If Employee Exist gen_active = 1 / gen_identitynumber = Gen_customeridnumber / gen_powerofattorenyoperator = gen_poaoperatorId (DTSX:483-499), Create gen_poaaccountoperator with VALID and the permissions (main.cs:123-220 = DTSX:836-933). The AccountId ownership argument is present and correct. One wrong unit in short_he.",
+     "wrongUnits": [
+      {
+       "unit": "short_he: 'לחשבון לקוח שנפתח ביומיים האחרונים'",
+       "problem": "The filter is Gen_customeraccount.CreatedOn, the CRM record-creation time. The text says the account was 'opened' (נפתח), which is a business account-opening meaning. The files do not show that CreatedOn equals the opening date. An account opened earlier but created in CRM in the last two days is selected. The same claim's flow_he[1] correctly says 'שנוצרו'.",
+       "correct": "לחשבון לקוח שנוצר (CreatedOn) ביומיים האחרונים",
+       "evidence": "DTSX:3108"
+      }
+     ]
+    },
+    {
+     "id": "L|Package\\Create POA Account Operator|short",
+     "state": "stale",
+     "detail": "Steps, branches and the AccountId ownership argument (DTSX:3106 unqualified; DTSX:3107 Account.AccountId; ambiguity rule) are correct. IS All Employees tech line DTSX:3217 is the FriendlyExpression. The paths are No Match -> split; All Employees -> Union All; default -> Check If Employee Exist; Match -> Union All -> Create. One wrong unit.",
+     "wrongUnits": [
+      {
+       "unit": "[1] 'נאספים חשבונות לקוח שנפתחו ביומיים האחרונים'",
+       "problem": "The filter is the CRM record-creation time Gen_customeraccount.CreatedOn > DATEADD(dd,-2,GETDATE()). It is not an account-opening date, and the files do not prove that the two are equal. This claim's tech note does not state the CreatedOn condition either.",
+       "correct": "נאספים חשבונות לקוח שנוצרו (CreatedOn) ביומיים האחרונים",
+       "evidence": "DTSX:3108"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "package": "0033_FundSetMF",
+   "claims": 13,
+   "verified": 13,
+   "foreign": [],
+   "open": []
+  },
+  {
+   "package": "0034_SetMaxRevaluationDate",
+   "claims": 14,
+   "verified": 14,
+   "foreign": [],
+   "open": []
+  },
+  {
+   "package": "0035_UpdateContactFromAutomatedJoining",
+   "claims": 15,
+   "verified": 15,
+   "foreign": [],
+   "open": []
+  },
+  {
+   "package": "0036_TransferRequest",
+   "claims": 19,
+   "verified": 18,
+   "stale": 1,
+   "foreign": [],
+   "open": [
+    {
+     "id": "L|Package\\Update SuspicionAsEmitted Transfer Request|detailed",
+     "state": "stale",
+     "detail": "Units 1, 2 and 4-11 match the DTSX (SQL, parameter = User::LastThreeWorkingDays, Derived Column 11, SDK Update, catch -> DirectRowToError with the Error output unconnected, threshold wording). Unit 3 states \"שום שדה אחר לא משתנה\" (no other field changes). The code only proves that the Entity sent contains gen_tanferinstatus alone (main.cs 118-122). Whether other fields change in CRM is not shown in the files: the platform itself sets modifiedon/modifiedby on every SDK Update (documented CRM behaviour), and plugins/workflows on gen_transferrequest are outside the supplied scope. The absolute statement is therefore an unproven fact.",
+     "wrongUnits": [
+      {
+       "unit": 3,
+       "problem": "\"שום שדה אחר לא משתנה\" asserts a CRM outcome beyond what the files show",
+       "correct": "The package sends only gen_tanferinstatus = 11 in the Update (fields set by the platform, e.g. modifiedon/modifiedby, or by plugins are not shown in the files)",
+       "evidence": "source/DailyProcess/0036_TransferRequest.dtsx:3645 main.cs 118-122"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "package": "0037_MeetTheCustomerGemel",
+   "claims": 43,
+   "verified": 43,
+   "foreign": [],
+   "open": []
+  },
+  {
+   "package": "0038_EmployerEnrolment",
+   "claims": 19,
+   "verified": 19,
+   "foreign": [],
+   "open": []
+  },
+  {
+   "package": "0039_UpdateAgentAppointmentDate",
+   "claims": 16,
+   "verified": 16,
+   "foreign": [],
+   "open": []
+  }
+ ]
+}

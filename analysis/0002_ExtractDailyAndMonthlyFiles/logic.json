@@ -1,0 +1,120 @@
+{
+ "package": "0002_ExtractDailyAndMonthlyFiles",
+ "analyst": "ssis-business-logic",
+ "source": {
+  "file": "source/DailyProcess/0002_ExtractDailyAndMonthlyFiles.dtsx",
+  "sha256": "46E408848FD8B88FD19DB63F6A9DFE38D7996629FC8F72DCBDA921670BD3CAE9",
+  "lines": 6238
+ },
+ "scopeNote_he": "ניתוח קוד המקור (C#) של רכיבי הסקריפט בלבד; ה-DLL המקומפל לא פוענח. ערך התיקייה DailyFilePath ריק בחבילה (DTSX:35-37) ונטען בזמן ריצה מטבלת gen_etlvariable (scope 'global' או 'LeumiFile-IC', DTSX:4480) – הערך עצמו לא ידוע (נתון במסד, מחוץ להיקף). אין קובץ תצורה (configurations ריק). שלושת כותבי ה-SDK שהסקר זיהה (Create ETL Process record, ETL Record Finish, ETL_Warning) ועוד Error ETL Process record הם כולם מסגרת ETL. ההתאמות crm-sdk-create/crm-sdk-delete ב-Extract GZ Fiels הן File.Create/File.Delete על קבצים (GZFilesHelper.cs:20,54) – לא CRM.",
+ "summary_he": "החבילה פורסת קבצי gz שמגיעים לתיקיית הקבצים היומית (לפי VersionComments: \"Bank Leumi Import Daily\"), כך שכל קובץ דחוס הופך לקובץ רגיל באותה תיקייה, ומעבירה את קובץ ה-gz המקורי לתיקיית ארכיון לפי תאריך. אין בחבילה כתיבה עסקית ל-CRM; היא מכינה קבצים לחבילות הקליטה הבאות (השערה: חבילות LeumiFile). למרות שמה, התיקייה החודשית (MonthlyFilePath) אינה מטופלת – השורה הרלוונטית בקוד בהערה.",
+ "executionOrder": [
+  { "step": 1, "refId": "Package\\Get Organization Variables", "title_he": "טעינת משתני ETL (מסגרת)", "trigger": "start (no incoming constraint)" },
+  { "step": 2, "refId": "Package\\Create ETL Process record", "title_he": "רשומת תהליך ETL (מסגרת)", "trigger": "after Get Organization Variables · Success (DTSX:5413)" },
+  { "step": 3, "refId": "Package\\Extract GZ  Fiels", "title_he": "פריסת קבצי gz וארכוב", "trigger": "after Create ETL Process record · Success (DTSX:5414)" },
+  { "step": 4, "refId": "Package\\End ETL Process record", "title_he": "סגירת תהליך ETL (מסגרת)", "trigger": "after Extract GZ  Fiels · Success (DTSX:5415)" },
+  { "step": 5, "refId": "Package.EventHandlers[OnError]\\Error ETL Process record", "title_he": "סימון תהליך ETL כנכשל (מסגרת)", "trigger": "OnError event handler ברמת החבילה (DTSX:5418)" }
+ ],
+ "ignoredAsFramework": [
+  "Package\\Get Organization Variables",
+  "Package\\Get Organization Variables\\Get Etl Variables",
+  "Package\\Get Organization Variables\\Set Variables",
+  "Package\\Create ETL Process record",
+  "Package\\End ETL Process record",
+  "Package\\End ETL Process record\\Get gen_etlprocessid",
+  "Package\\End ETL Process record\\Lookup",
+  "Package\\End ETL Process record\\ETL Record Finish",
+  "Package\\Extract GZ  Fiels\\Set Warning columns",
+  "Package\\Extract GZ  Fiels\\ETL_Warning",
+  "Package.EventHandlers[OnError]",
+  "Package.EventHandlers[OnError]\\Error ETL Process record",
+  "LogProvider: SSIS log provider for SQL Server1 (qsrs.SSIS_Logs)"
+ ],
+ "components": [
+  {
+   "refId": "Package\\Extract GZ  Fiels",
+   "title_he": "פריסת קבצי gz יומיים והעברתם לארכיון",
+   "techName": "Extract GZ  Fiels (Data Flow) → Extract GZ Fiels (Script Component)",
+   "short_he": "כל קובץ gz בתיקייה היומית נפרס לקובץ רגיל באותה תיקייה, וקובץ ה-gz עובר לארכיון של היום. קבצים שנכשלו נשארים במקומם ונרשמת אזהרה.",
+   "flow_he": [
+    "קריאת נתיב התיקייה היומית מהמשתנה DailyFilePath",
+    "איתור קבצים שהסיומת שלהם מכילה .gz",
+    "פריסת כל קובץ לקובץ באותו שם בלי הסיומת, באותה תיקייה",
+    "העתקת קובץ ה-gz ל-Archive GZ\\yyyy-MM-dd ומחיקתו מהתיקייה",
+    "בכשל: שורת שגיאה → אזהרת ETL (מסגרת), והקובץ נשאר"
+   ],
+   "short": {
+    "nodes": [
+     { "type": "step", "text": "החבילה סורקת את תיקיית הקבצים היומית ומאתרת בה קבצים דחוסים מסוג gz." },
+     { "type": "step", "text": "כל קובץ דחוס נפרס לקובץ רגיל באותה תיקייה, באותו שם בלי סיומת ה-gz." },
+     { "type": "decision", "text": "האם הפריסה וההעברה לארכיון הצליחו?",
+       "branches": [
+        { "label": "כן", "nodes": [ { "type": "step", "text": "הקובץ הדחוס עובר לתיקיית ארכיון של היום ונמחק מתיקיית הקבצים." } ] },
+        { "label": "לא", "nodes": [ { "type": "step", "text": "נרשמת אזהרה, והקובץ הדחוס נשאר בתיקייה." } ] }
+       ] },
+     { "type": "end", "text": "בתיקייה היומית נשארים קבצים פרוסים, מוכנים לקליטה בחבילות הבאות (השערה). אין שינוי בנתוני CRM." }
+    ]
+   },
+   "detailed": {
+    "nodes": [
+     { "type": "step", "text": "נתיב התיקייה היומית נלקח ממשתנה שנטען בתחילת הריצה מטבלת משתני ה-ETL במסד; הערך עצמו אינו מופיע בחבילה.", "tech": "ReadOnlyVariables User::DailyFilePath (DTSX:4381); ערך ברירת מחדל ריק (DTSX:35-37); נטען מ-gen_etlvariable where gen_scope = 'global' OR gen_scope = 'LeumiFile-IC' (DTSX:4480)", "evidence": "main.cs:123 (DTSX:3659)" },
+     { "type": "step", "text": "התיקייה החודשית אינה נסרקת: השורה שמוסיפה אותה לרשימה נמצאת בהערה.", "tech": "//Pathlist.Add(ReadOnlyVariables[\"User::MonthlyFilePath\"]...)", "evidence": "main.cs:124 (DTSX:3660)" },
+     { "type": "step", "text": "תיקיית הארכיון של היום נקבעת כתת-תיקייה Archive GZ בתוך התיקייה היומית, ובתוכה תיקייה בשם תאריך היום.", "tech": "Path.Combine(Path.Combine(path, \"Archive GZ\"), DateTime.Now.ToString(\"yyyy-MM-dd\"))", "evidence": "main.cs:119,130 (DTSX:3655,3666)" },
+     { "type": "decision", "text": "האם ניתן לקרוא את רשימת הקבצים בתיקייה?", "tech": "try { Get_GZ_FilesName(path) } catch → addError",
+       "branches": [
+        { "label": "לא", "nodes": [ { "type": "step", "text": "נרשמת אזהרת ETL עם הודעת השגיאה, ואין טיפול בקבצים.", "tech": "addError(ErrorBuffer, ex.Message); continue", "evidence": "main.cs:133-137 (DTSX:3669-3673)" } ] },
+        { "label": "כן", "nodes": [ { "type": "step", "text": "נבחרים כל הקבצים בתיקייה (ללא תתי-תיקיות) שהסיומת שלהם מכילה את הטקסט .gz.", "tech": "directory.GetFiles() where f.Extension.Contains(\".gz\")", "evidence": "GZFilesHelper.cs:43-46 (DTSX:3874-3877)" } ] }
+       ] },
+     { "type": "step", "text": "כל קובץ דחוס נפרס לקובץ באותה תיקייה, בשם הקובץ בלי הסיומת האחרונה. אם קובץ בשם הזה כבר קיים, הוא נדרס.", "tech": "File.Create(Path.Combine(Directory, GetFileNameWithoutExtension(name))); GZipStream Decompress → CopyTo", "evidence": "GZFilesHelper.cs:17-26 (DTSX:3848-3857)" },
+     { "type": "decision", "text": "האם הפריסה הצליחה?", "tech": "Parse_GZ מחזיר true או זורק חריגה (GZFilesHelper.cs:24-32)",
+       "branches": [
+        { "label": "כן", "nodes": [
+          { "type": "step", "text": "קובץ ה-gz מועתק לתיקיית הארכיון של היום (שנוצרת אם חסרה) ונמחק מתיקיית המקור.", "tech": "MoveGZFileToArchive: Directory.CreateDirectory; File.Copy(file, archive) ללא overwrite; File.Delete(file)", "evidence": "GZFilesHelper.cs:49-54 (DTSX:3880-3885)" },
+          { "type": "decision", "text": "האם כבר קיים בארכיון של היום קובץ באותו שם?", "tech": "File.Copy(src, dst) בלי overwrite זורק IOException אם היעד קיים (התנהגות .NET)",
+            "branches": [
+             { "label": "כן", "nodes": [ { "type": "step", "text": "ההעתקה נכשלת, נרשמת אזהרה, וקובץ ה-gz נשאר בתיקיית המקור (הקובץ הפרוס כבר נוצר).", "tech": "catch → addError; continue", "evidence": "main.cs:146-150 (DTSX:3682-3686)" } ] },
+             { "label": "לא", "nodes": [ { "type": "step", "text": "קובץ ה-gz עובר לארכיון." } ] }
+            ] }
+        ] },
+        { "label": "לא", "nodes": [ { "type": "step", "text": "נרשמת אזהרת ETL עם הודעת השגיאה; קובץ ה-gz נשאר בתיקייה, וייתכן שנשאר קובץ פרוס חלקי.", "tech": "catch → addError(ErrorBuffer, ex.Message); continue", "evidence": "main.cs:146-150 (DTSX:3682-3686)" } ] }
+       ] },
+     { "type": "step", "text": "שורות השגיאה עוברות למנגנון אזהרות ה-ETL של המסגרת; אין להן השפעה עסקית נוספת.", "tech": "Error → Set Warning columns → ETL_Warning (gen_etlprocesswarning, מסגרת)" },
+     { "type": "end", "text": "הקבצים היומיים פרוסים וזמינים בתיקייה, וקבצי ה-gz שטופלו בהצלחה נמצאים בארכיון לפי תאריך. אין כתיבה עסקית ל-CRM." }
+    ]
+   },
+   "detail_he": [
+    { "h": "מקור ואוכלוסייה", "t": "כל הקבצים בתיקייה DailyFilePath (רמה עליונה בלבד) שהסיומת שלהם מכילה \".gz\" (GZFilesHelper.cs:43-46). ערך התיקייה נטען מ-gen_etlvariable בזמן ריצה ואינו ידוע מהחבילה. MonthlyFilePath נטען אך לא בשימוש (main.cs:124 בהערה)." },
+    { "h": "התאמה לרשומות קיימות", "t": "אין התאמה לרשומות CRM. ההתאמה היחידה היא לפי שם קובץ: שם הקובץ הפרוס = שם ה-gz בלי הסיומת; בארכיון – אותו שם קובץ." },
+    { "h": "החלטות", "t": "1) כשל בקריאת התיקייה → אזהרה ודילוג (main.cs:133-137). 2) כשל בפריסה → אזהרה, הקובץ נשאר (main.cs:146-150). 3) הצלחה → העתקה לארכיון ומחיקה (main.cs:143-144). 4) קובץ באותו שם כבר בארכיון היום → File.Copy נכשל → אזהרה, הקובץ נשאר." },
+    { "h": "כתיבה ל-CRM", "t": "אין כתיבה עסקית ל-CRM. הכתיבות היחידות ל-CRM הן של מסגרת ה-ETL (gen_etlprocess, gen_etlprocesswarning, annotation ב-OnError)." },
+    { "h": "תוצאה עסקית", "t": "הכנת קבצים יומיים לקליטה: קבצים פרוסים בתיקייה היומית, וקבצי המקור הדחוסים בארכיון Archive GZ\\yyyy-MM-dd. איזו חבילה קולטת את הקבצים – לא מוכח בחבילה זו (השערה: חבילות LeumiFile, לפי VersionComments \"Bank Leumi Import Daily\" ו-scope 'LeumiFile-IC')." }
+   ],
+   "decisions": [
+    { "where": "Extract GZ Fiels · GZFilesHelper.Get_GZ_FilesName (GZFilesHelper.cs:44-46)", "condition": "where f.Extension.Contains(\".gz\")", "meaning_he": "קובץ נחשב דחוס אם הסיומת שלו מכילה .gz.", "outcome_he": "הקובץ נכנס לטיפול (פריסה + ארכוב)." },
+    { "where": "Extract GZ Fiels · main.cs:143-144", "condition": "if (ExtractGzFiles.Parse_GZ(GZfileInfo)) ExtractGzFiles.MoveGZFileToArchive(path, file, ArchivedFolderPath);", "meaning_he": "הקובץ עובר לארכיון רק אם הפריסה הצליחה (בפועל Parse_GZ מחזיר true או זורק חריגה).", "outcome_he": "הצלחה → ארכוב ומחיקה; חריגה → אזהרה והקובץ נשאר." },
+    { "where": "Extract GZ Fiels · main.cs:124", "condition": "//Pathlist.Add(ReadOnlyVariables[\"User::MonthlyFilePath\"].Value.ToString());", "meaning_he": "התיקייה החודשית מושבתת בקוד.", "outcome_he": "רק התיקייה היומית מטופלת." }
+   ],
+   "crmEffects": [],
+   "evidence": [
+    "DTSX:2530 Executable Package\\Extract GZ  Fiels (Microsoft.Pipeline)",
+    "DTSX:3412 Component Extract GZ Fiels (ScriptComponent), ReadOnlyVariables DTSX:4381",
+    "main.cs (sha 552f36b95812, DTSX:3414; main.cs:N ≈ DTSX:N+3536): 119,123,124,130,131,143-150",
+    "GZFilesHelper.cs (sha 9ffd734ffe60; GZFilesHelper.cs:N ≈ DTSX:N+3831): 13-37, 39-48, 49-56",
+    "DTSX:4480 gen_etlvariable scope 'global' OR 'LeumiFile-IC'",
+    "DTSX:5413-5415 Precedence Constraints"
+   ],
+   "openQuestions_he": [
+    "מה הערך של DailyFilePath (ו-MonthlyFilePath) בטבלת gen_etlvariable בייצור?",
+    "האם השבתת התיקייה החודשית (main.cs:124) מכוונת? שם החבילה מתייחס גם לקבצים חודשיים.",
+    "איזו חבילה קולטת את הקבצים הפרוסים? לא מוכח מחבילה זו."
+   ]
+  }
+ ],
+ "findings_he": [
+  { "severity": "medium", "text": "התיקייה החודשית לא מטופלת למרות שם החבילה: השורה שמוסיפה את MonthlyFilePath לרשימה נמצאת בהערה. אם קבצים חודשיים עדיין מגיעים כ-gz, הם לא ייפרסו בחבילה זו.", "evidence": "main.cs:124 (DTSX:3660)" },
+  { "severity": "low", "text": "אם בארכיון של היום כבר קיים קובץ באותו שם (למשל קובץ שהגיע פעמיים באותו יום), File.Copy ללא overwrite נכשל: נרשמת אזהרה, קובץ ה-gz נשאר בתיקיית המקור, והקובץ הפרוס כבר נוצר. בריצה הבאה באותו יום הקובץ ייפרס שוב וייכשל שוב בארכוב.", "evidence": "GZFilesHelper.cs:53-54 (DTSX:3884-3885), main.cs:146-150" },
+  { "severity": "low", "text": "בכשל פריסה הקובץ הפרוס כבר נוצר (File.Create לפני הפריסה) ונשאר חלקי בתיקייה. קליטה בהמשך עלולה לקרוא קובץ חלקי (תלוי בחבילה הקולטת – לא ידוע).", "evidence": "GZFilesHelper.cs:19-32 (DTSX:3850-3863)" },
+  { "severity": "info", "text": "הסקר סימן ב-Extract GZ Fiels התאמות crm-sdk-create / crm-sdk-delete; אלה File.Create ו-File.Delete על קבצים, לא פעולות CRM.", "evidence": "GZFilesHelper.cs:20,54" },
+  { "severity": "info", "text": "התנאי Extension.Contains(\".gz\") תופס גם סיומות כמו .gzip או .gz2, לא רק .gz.", "evidence": "GZFilesHelper.cs:45 (DTSX:3876)" }
+ ]
+}

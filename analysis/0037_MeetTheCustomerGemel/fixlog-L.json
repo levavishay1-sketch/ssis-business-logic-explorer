@@ -1,0 +1,94 @@
+{
+ "changes": [
+  {
+   "claimId": "L|summary",
+   "field": "summary_he",
+   "before": "החבילה מטפלת ברשומות 'הכר את הלקוח' (gen_meetthecustomer) של לקוחות-מראש (gen_precustomer = 1) בסטטוס 1/2 ('חדש/בטיפול' לפי הערה ב-SQL). היא מנסה לקשר כל רשומה לישות קיימת ב-CRM: תוכנית לקוח, או חשבון לקוח (קופת גמל) לפי ת.ז. ומספר חשבון בנק, לפי הצטרפות אוטומטית שהסתיימה, או לפי מספר חשבון מקדים. בהתאמה, הרשומה מקושרת ולעיתים מקבלת סטטוס 3 ('FINISH' לפי שם הקבוע). רשומה בלי התאמה שגילה מעל 180 יום מסומנת בסטטוס 8 ('NO_ACCOUNT' לפי שם הקבוע), אבל רק בשני זרמים. בשני זרמים אחרים יש פער בקוד: הסטטוס 8 לא נכתב, ובמקומו נשלח עדכון ריק או סטטוס 3.",
+   "after": "החבילה מטפלת ברשומות 'הכר את הלקוח' (gen_meetthecustomer) בסטטוס 1/2 ('חדש/בטיפול' לפי הערה ב-SQL). רוב הזרמים בוחרים רק רשומות של לקוחות-מראש (gen_precustomer = 1). הזרם 'לפי מספר חשבון מקדים' לא מסנן לפי gen_precustomer, ולכן מטפל גם ברשומות שאינן של לקוחות-מראש. היא מנסה לקשר כל רשומה לישות קיימת ב-CRM: תוכנית לקוח, או חשבון לקוח (קופת גמל) לפי ת.ז. ומספר חשבון בנק, לפי הצטרפות אוטומטית שהסתיימה, או לפי מספר חשבון מקדים. בהתאמה, הרשומה מקושרת ולעיתים מקבלת סטטוס 3 ('FINISH' לפי שם הקבוע). רשומה בלי התאמה שגילה מעל 180 יום מסומנת בסטטוס 8 ('NO_ACCOUNT' לפי שם הקבוע), אבל רק בשני זרמים. בשני זרמים אחרים יש פער בקוד: הסטטוס 8 לא נכתב, ובמקומו נשלח עדכון ריק או סטטוס 3.",
+   "why": "The Pre Account Number source SQL has no gen_precustomer condition; the other sources filter gen_precustomer = 1.",
+   "evidence": "DTSX:6008 (Pre Account Number source: gen_status in (1,2), gen_preaccountnumber is not null, gen_producttype in (1,4), gen_gemelaccountnumber/gen_automatedjoining/gen_miniautomatedjoining is null; no gen_precustomer); DTSX:9944, 8313, 3179 (gen_precustomer = 1)",
+   "verifierAccepted": true
+  },
+  {
+   "claimId": "L|finding#2",
+   "field": "findings_he[1].text",
+   "before": "בכל ארבעת הסקריפטים הפעילים, תקלות פרטניות מ-ExecuteMultiple נכתבות ל-ErrorBuffer, ולפלט Error אין Path. גם CastingError לא מחובר, ולכן תקלות אלה לא נרשמות בשום מקום. בנוסף יש שתי בעיות: (א) השליחה האחרונה, ExcecuteBulk() ב-Input0_ProcessInput בסוף ה-rowset, נמצאת מחוץ ל-try/catch. תשובה ריקה (ApplicationException 'There was not response from the server...') או חריגה אחרת שם מכשילה את הרכיב ואת זרימת הנתונים, ושלב End ETL Proccess record לא רץ. כלומר אין הבטחה שהתהליך יסתיים בהצלחה. (ב) אם ExcecuteBulk נכשל באמצע הזרם, מתוך ה-try של שורה, myEntities.Clear() מדולג. הרשימה נשארת עם 500 ישויות והשורה הולכת ל-CastingError/ErrorBuffer. מאותו רגע התנאי Count == 500 לא יתקיים שוב, כל השורות הבאות מצטברות יחד עם ה-500 שנכשלו, והכול נשלח כ-ExecuteMultiple אחד גדול בסוף. בקשה כזו חורגת ממגבלת הגודל הרגילה של ExecuteMultiple (ידע CRM כללי; התנהגות ה-Proxy החיצוני לא ידועה), וצפויה להכשיל את החבילה.",
+   "after": "בכל ארבעת הסקריפטים הפעילים, תקלות פרטניות שמוחזרות מ-ExecuteMultiple נכתבות ל-ErrorBuffer, ולפלט Error אין Path. גם הפלט CastingError (בזרמים Program, Customer Account ו-Automated Joining) לא מחובר, ולכן תקלות אלה לא נשמרות ביעד כלשהו בחבילה. התנהגות טכנית נוספת: (א) השליחה האחרונה, ExcecuteBulk() ב-Input0_ProcessInput בסוף ה-rowset, נמצאת מחוץ ל-try/catch. אם שם מתקבלת תשובה ריקה (ApplicationException 'There was not response from the server...') או חריגה אחרת, הרכיב וזרימת הנתונים נכשלים, והמשימות שאחריהם בשרשרת ה-Success לא רצות. (ב) אם ExcecuteBulk נכשל באמצע הזרם, מתוך ה-try של שורה, myEntities.Clear() לא מתבצע והשורה מנותבת לפלט השגיאה. מאותו רגע התנאי Count == 500 לא מתקיים שוב, וכל השורות הבאות מצטברות יחד עם 500 הישויות שלא נוקו ונשלחות כ-ExecuteMultiple אחד בסוף ה-rowset. אם הבקשה הזו חורגת ממגבלת ExecuteMultiple של השרת (ידע CRM כללי; המימוש של ExecuteMultipleExtension לא סופק), הקריאה האחרונה נכשלת מחוץ ל-try/catch וזרימת הנתונים נכשלת. אם זה קורה בפועל תלוי בכמות השורות, ולא ניתן לקבוע זאת מהחבילה.",
+   "why": "Final consequence was stated as certain; it depends on row volume and on the unsupplied ExecuteMultipleExtension. Rewritten conditionally, without bug framing (user: production works). Also the next task after a failed data flow is the next Success-chained task, not necessarily End ETL.",
+   "evidence": "Program writer main.cs:160-163 (Add then Count==500), 178-201 (Clear at line 200 after possible throw at 197), 203-212 (final ExcecuteBulk outside try); same pattern in AJ/Pre Account Number/Pre Customer Account writers",
+   "verifierAccepted": true
+  },
+  {
+   "claimId": "L|Package\\Link Pre Meet The Customer To Customer Program|detailed",
+   "field": "detailed.nodes[1].text",
+   "before": "ההתאמה נעשית מול תוכניות לקוח שהמוצר שלהן מסוג 200004 (משמעות הקוד לא ידועה), לפי ת.ז. מרופדת ל-9 ספרות.",
+   "after": "ההתאמה נעשית מול תוכניות לקוח שהמוצר שלהן מסוג 200004 (בחבילה זו הקוד לא מוסבר. בחבילות 0028/0031 הערך מסומן GeneralPension ו-'--clalit'), לפי ת.ז. מרופדת ל-9 ספרות.",
+   "why": "200004 is labelled in other supplied packages (0028 alias GeneralPension; 0031 comment --clalit). Written only as a cross-package label, not as this package's meaning (batch rule).",
+   "evidence": "0028_Fund Enrolment.dtsx:6918-6920; 0031_PoaAccountUpdateDaily.dtsx:7627",
+   "verifierAccepted": true
+  },
+  {
+   "claimId": "L|Package\\Link Pre Meet The Customer To Customer Program|detailed",
+   "field": "detailed.nodes[2] (inserted)",
+   "before": null,
+   "after": "{\"type\":\"step\",\"text\":\"השליפה לא מסננת רשומות בלי ת.ז. אם לרשומה אין ת.ז., וקיימת תוכנית כזו שגם בה אין ת.ז., ה-Lookup עם Full cache מתאים ביניהן (התנהגות SSIS כללית). במקרה כזה הרשומה תקושר לאותה תוכנית ולאיש הקשר שלה, ואם יש לה ציון מחושב היא תקבל סטטוס 3.\",\"tech\":\"get meet the customer detalis: אין תנאי gen_precustomeridnumber is not null (DTSX:9944); ת.ז. NULL נשארת NULL אחרי REPLACE(STR(...)); Get Customer Program Details CacheType=0 (Full cache) DTSX:9880\",\"evidence\":\"DTSX:9944, 9880\"}",
+   "why": "Missing NULL-ID path: source has no NOT NULL filter on the ID and the lookup is full cache. Stated conditionally (depends on data).",
+   "evidence": "DTSX:9944, 9880",
+   "verifierAccepted": true
+  },
+  {
+   "claimId": "L|Package\\Link Pre Meet The Customer To Customer Program|detail",
+   "field": "detail_he['התאמה לרשומות קיימות']",
+   "before": "Lookup עם Full cache מול Gen_programmain join product, where producttypecode = 200004, לפי ת.ז. מרופדת ל-9 (DTSX:9872). אם יש כמה תוכניות לאותה ת.ז., לא ידוע איזו תיבחר.",
+   "after": "Lookup עם Full cache מול Gen_programmain join product, where producttypecode = 200004 (בחבילות 0028/0031 הערך מסומן GeneralPension ו-'--clalit'), לפי ת.ז. מרופדת ל-9 (DTSX:9872). השליפה לא מוציאה רשומות בלי ת.ז. (DTSX:9944). אם קיימת גם תוכנית בלי ת.ז., Full cache מתאים NULL ל-NULL (התנהגות SSIS כללית, DTSX:9880), והרשומה תקושר אליה. אם יש כמה תוכניות לאותה ת.ז., לא ידוע איזו תיבחר.",
+   "why": "Consistency with the corrected detailed tree (rule 2): 200004 cross-package label and NULL-ID path.",
+   "evidence": "DTSX:9944, 9880; 0028_Fund Enrolment.dtsx:6918-6920; 0031_PoaAccountUpdateDaily.dtsx:7627",
+   "verifierAccepted": true
+  },
+  {
+   "claimId": "L|Package\\Link Pre Meet The Customer To Customer Program|open",
+   "field": "openQuestions_he[2]",
+   "before": "משמעות producttypecode = 200004 לא ידועה.",
+   "after": "בחבילה זו אין הסבר ל-producttypecode = 200004. בחבילות אחרות הערך מסומן: ב-0028 'as GeneralPension' (0028_Fund Enrolment.dtsx:6918-6920), וב-0031 בהערה '--clalit' ליד gen_includinggeneralpension (0031_PoaAccountUpdateDaily.dtsx:7627). לא הוכח שזו המשמעות בחבילה זו.",
+   "why": "Verifier is right that supplied files label 200004. Per batch rule the label is stated as a cross-package label only, so the item stays open for this package's meaning.",
+   "evidence": "0028_Fund Enrolment.dtsx:6918-6920; 0031_PoaAccountUpdateDaily.dtsx:7627",
+   "verifierAccepted": true
+  },
+  {
+   "claimId": "L|Package\\Link Meet The Customer To Customer Account By Automated Joining|title",
+   "field": "short_he",
+   "before": "רשומות 'הכר את הלקוח' שמקושרות להצטרפות אוטומטית שהסתיימה מקושרות לחשבון הלקוח שנוצר ממנה, לאיש הקשר ולת.ז. גם כאן הסגירה של רשומות ותיקות בלי התאמה לא נכתבת כמצופה.",
+   "after": "רשומות 'הכר את הלקוח' שמקושרות להצטרפות אוטומטית שהסתיימה מקושרות לחשבון לקוח שמספר חשבון הבנק שלו זהה למספר שבהצטרפות (מרופד ל-12 ספרות), לאיש הקשר ולת.ז. של אותו חשבון. גם כאן הסגירה של רשומות ותיקות בלי התאמה לא נכתבת כמצופה.",
+   "why": "The lookup matches Gen_customeraccount only by bank account number = right(REPLICATE(0,12)+LTRIM(joining bank account),12); no creation relation is shown.",
+   "evidence": "DTSX:3228",
+   "verifierAccepted": true
+  },
+  {
+   "claimId": "L|Package\\Link Meet The Customer To Customer Account By Automated Joining|short",
+   "field": "short.nodes[end].text",
+   "before": "לקוחות שהצטרפו אוטומטית מקושרים לחשבון הקופה שנוצר עבורם.",
+   "after": "רשומות עם הצטרפות אוטומטית שהסתיימה מקושרות לחשבון לקוח שנמצא לפי מספר חשבון הבנק של ההצטרפות בלבד.",
+   "why": "Creation/ownership relation not proven; matching is by bank account number only.",
+   "evidence": "DTSX:3228",
+   "verifierAccepted": true
+  },
+  {
+   "claimId": "L|Package\\Link Meet The Customer To Customer Account By Automated Joining|detail",
+   "field": "detail_he['תוצאה עסקית']",
+   "before": "קישור לקוחות שהצטרפו בהצטרפות אוטומטית שהסתיימה לחשבון הקופה שלהם.",
+   "after": "קישור רשומות עם הצטרפות אוטומטית שהסתיימה לחשבון לקוח שנמצא לפי מספר חשבון הבנק של ההצטרפות בלבד.",
+   "why": "Same unproven ownership wording (\"their fund account\") in the same component; fixed for consistency (rule 2).",
+   "evidence": "DTSX:3228",
+   "verifierAccepted": true
+  },
+  {
+   "claimId": "L|Package\\Link Meet The Customer To Customer Account By Pre Account Number|title",
+   "field": "short_he",
+   "before": "רשומות 'הכר את הלקוח' עם מספר חשבון מקדים מקושרות לחשבון לקוח לפי מספר המעסיק/חשבון ומספר חשבון הבנק, ומסומנות כהסתיימו. רשומות ותיקות בלי התאמה מסומנות 'אין חשבון'.",
+   "after": "רשומות 'הכר את הלקוח' עם מספר חשבון מקדים מקושרות לחשבון לקוח לפי מספר החשבון (accountnumber) של ה-Account שמקושר לחשבון הלקוח ולפי מספר חשבון הבנק. מה מייצג ה-Account הזה לא ידוע (השערה: מעסיק). רשומות שקושרו מסומנות כהסתיימו. רשומות ותיקות בלי התאמה מסומנות 'אין חשבון'.",
+   "why": "Key is Account.accountnumber of the Account referenced by Gen_customeraccount.Gen_accountname; employer meaning is unproven.",
+   "evidence": "DTSX:6067",
+   "verifierAccepted": true
+  }
+ ]
+}

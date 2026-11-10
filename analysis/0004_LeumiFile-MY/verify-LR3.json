@@ -1,0 +1,228 @@
+{
+  "verifier": "ssis-verifier",
+  "package": "0004_LeumiFile-MY",
+  "scope": "logic-claims re-check",
+  "checkedAt": "2026-11-10T06:20:14.557Z",
+  "checked": 23,
+  "results": [
+    {
+      "id": "L|finding#2",
+      "hash": "06bb2577774f",
+      "verdict": "CONFIRMED",
+      "detail": "Re-derived by diffing the UPDATE column list (DTSX:92873) against the INSERT list (DTSX:61788): Gen_AccountBalance, the three portion totals, yearly deposits/transfers (incl. totalDepositCurrentYear/totalTransCurentYear), Gen_FundCurrentYearTotal, Gen_revaluationdate, gen_kibutzname/number and gen_customercategory are INSERT-only; gen_allowancevalue is Param_33 of the UPDATE. Statement is stated as a fact of the column list, with \"elsewhere: unknown\".",
+      "evidence": "source/DailyProcess/0004_LeumiFile-MY.dtsx:92873, 61788",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|finding#21",
+      "hash": "862dbbfbb717",
+      "verdict": "CONFIRMED",
+      "detail": "Update Employer main.cs 200-203: Helpers.CheckIfToUpdate(..., \"bool\") treats the file string as true only for \"1\"/\"true\" (Helpers.cs 46-55); on difference Convert.ToBoolean(Row.genisactiveemplyer) on a wstr(1) value (DTSX:47019 cachedLength=1) always throws FormatException for a non-null value -> catch -> DirectRowToCastingError -> Set CastingError columns -> Union All 1 -> ETL Warning; entity not added. NULL case correctly conditional; Convert.ToBoolean((string)null) = false. Create Employer main.cs 166-171 converts ToInt32 then ToBoolean.",
+      "evidence": "source/DailyProcess/0004_LeumiFile-MY.dtsx:45271, 47019; Update Employer main.cs 124-238; Helpers.cs 46-73; Create Employer main.cs 166-171 @37310",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package (control flow)|detailed",
+      "hash": "eb6f2e02afd2",
+      "verdict": "INCOMPLETE",
+      "detail": "Units 1 and 3-18 match the DTSX (gen_etlvariable load, CalendarRule SQL, GetFiles, isFileExist ExpressionAndConstraint, ascending sort, ADO enumerator, Success-only chain Truncate -> Write -> Create Account For Employers -> ... -> Minhali daily, disabled archive loop). Unit 2 (Get Sytem User Id) is correct for the fund INSERT (Add System Columns: CreatedBy/ModifiedBy/OwnerId = SystemUserId, OwningBusinessUnit, OwnerIdType, TransactionCurrencyId), contact UPDATE ModifiedBy (Param_10 = userId), Accounts For Minhali ModifiedBy (Param_5) and kibbutz Account update ModifiedBy (AdminId). But its enumeration of where these values are written to CRM omits part of the gen_contactlogs INSERT: besides CreatedBy/ModifiedBy (Param_2/3 = userId/modifiedby), the log row also gets OwnerId (Param_4 = User::UserId), OwnerIdType (Param_5 = User::OwnerIdType) and OwningBusinessUnit (Param_6 = User::BusinessUnitIdStr).",
+      "evidence": "source/DailyProcess/0004_LeumiFile-MY.dtsx:26695-26750 (Create ContactLog SQL), 26997-27034 (Derived Column ownerid/owneridtype/businessUnitId), 100697-100702 (Set Varibales)",
+      "wrongUnits": [
+        {
+          "unit": 2,
+          "problem": "Written attributes omitted from the list of uses",
+          "correct": "In gen_contactlogs the system user is written as CreatedBy, ModifiedBy and OwnerId, and the owner type and business unit as OwnerIdType and OwningBusinessUnit",
+          "evidence": "source/DailyProcess/0004_LeumiFile-MY.dtsx:26706-26722, 27015-27034"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Foreach Loop Container\\Create Account For Employers|title",
+      "hash": "cbe64c33b110",
+      "verdict": "CONFIRMED",
+      "detail": "Flow lines 1-10 match: Trim (\"\" -> NULL), Last row split, lookups NoMatchBehavior=0 with IgnoreFailure and outputs not consumed by Create/Update Account, PadLeft of accountnumber (= Customer_Id_Number_6 by externalMetadataColumnId)/Employer_Number_38/Bank_Account_Number_27, employer-funds split, name/address/building expressions, merge, unknown {0,1,18}, HashSet dedupe, Format Dates, lookup with accountsWithFunds (gen_fundmain existinfile=1, no statecode), create/no-update/compare-update. Summary-level wording accepted (the postal-code compare nuance is a detail of the detailed/detail claims).",
+      "evidence": "source/DailyProcess/0004_LeumiFile-MY.dtsx:3255-14041",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Foreach Loop Container\\Create Account For Employers|short",
+      "hash": "c098384daddd",
+      "verdict": "CONFIRMED",
+      "detail": "Units 1-10 match at summary level (population, account number rule, unknown name, active-account lookup, create, no update when a CRM fund with gen_existinfile = 1 exists, otherwise update of changed name/address/returned mail/date of birth).",
+      "evidence": "source/DailyProcess/0004_LeumiFile-MY.dtsx:4093-4218, 4434, 12239",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Foreach Loop Container\\Create Account For Employers|detailed",
+      "hash": "1205ac24dd8a",
+      "verdict": "WRONG",
+      "detail": "Units 1-30, 32 and 34-36 match the DTSX (Trim, Last row, ignored lookups, padding with conditional NULL-read wording, employer-funds condition, Create Additional Columns, merge, unknown name, HashSet dedupe, Format Dates, lookup statecode = 0 with accountsWithFunds, create attributes and constants, batch 1000/100, gen_modifiedbybank, dob else = null, commented-out fax/telephones/accountnumber, end state vs CRM funds). Units 31/33 misstate the change test for the postal code (NULL semantics).",
+      "evidence": "source/DailyProcess/0004_LeumiFile-MY.dtsx:4164-4185 (line ~4173 isnull(Address1_PostalCode,'0000000')); Set null to empty String fileds DTSX:8808 (only \"\" -> NULL); Update Account main.cs 172-176 @DTSX:12241; Extensions.cs IsEqual 12-14, 30-32; Trim String Fields FormatField 41-50",
+      "wrongUnits": [
+        {
+          "unit": "31/33",
+          "problem": "Change test is stated as \"file value differs from CRM value (NULL vs value = change)\". For address1_postalcode the lookup reads isnull(Address1_PostalCode,'0000000'), so a CRM NULL postal code is compared as \"0000000\". A file zip that is empty (Trim String Fields turns \"\" into NULL) against an empty CRM postal code therefore counts as a change, and the code then assigns Row.address1postalcode without a NULL check.",
+          "correct": "Add: CRM postal code NULL is compared as \"0000000\"; so if both file and CRM postal codes are empty, CheckIfToUpdate is true. Then, if reading a missing value throws (documented SSIS behaviour, not shown in the files), the row goes to CastingError and the account is not updated at all; if it returns null, an update is sent (address1_postalcode = null, gen_modifiedbybank = Now, plus any changed fields) although no compared value changed.",
+          "evidence": "source/DailyProcess/0004_LeumiFile-MY.dtsx:4164-4185 (line ~4173 isnull(Address1_PostalCode,'0000000')); Set null to empty String fileds DTSX:8808 (only \"\" -> NULL); Update Account main.cs 172-176 @DTSX:12241; Extensions.cs IsEqual 12-14, 30-32; Trim String Fields FormatField 41-50"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Foreach Loop Container\\Create Account For Employers|detail",
+      "hash": "97bfba537b78",
+      "verdict": "WRONG",
+      "detail": "Units 1, 2, 4 and 5 match (population condition, active account by padded accountnumber, accountsWithFunds, create list and constants, batches, gen_modifiedbybank). Unit 3 says an existing account without such a fund is updated only if one of the seven fields differs from the DB, else DontNeedToUpdate. For address1_postalcode the DB side is isnull(Address1_PostalCode,'0000000'), so an empty file zip against an empty CRM postal code counts as different; the outcome then depends on the NULL read (CastingError and no update, or an update with gen_modifiedbybank although nothing compared changed).",
+      "evidence": "source/DailyProcess/0004_LeumiFile-MY.dtsx:4164-4185 (line ~4173 isnull(Address1_PostalCode,'0000000')); Set null to empty String fileds DTSX:8808 (only \"\" -> NULL); Update Account main.cs 172-176 @DTSX:12241; Extensions.cs IsEqual 12-14, 30-32; Trim String Fields FormatField 41-50",
+      "wrongUnits": [
+        {
+          "unit": 3,
+          "problem": "Change test is stated as \"file value differs from CRM value (NULL vs value = change)\". For address1_postalcode the lookup reads isnull(Address1_PostalCode,'0000000'), so a CRM NULL postal code is compared as \"0000000\". A file zip that is empty (Trim String Fields turns \"\" into NULL) against an empty CRM postal code therefore counts as a change, and the code then assigns Row.address1postalcode without a NULL check.",
+          "correct": "Add: CRM postal code NULL is compared as \"0000000\"; so if both file and CRM postal codes are empty, CheckIfToUpdate is true. Then, if reading a missing value throws (documented SSIS behaviour, not shown in the files), the row goes to CastingError and the account is not updated at all; if it returns null, an update is sent (address1_postalcode = null, gen_modifiedbybank = Now, plus any changed fields) although no compared value changed.",
+          "evidence": "source/DailyProcess/0004_LeumiFile-MY.dtsx:4164-4185 (line ~4173 isnull(Address1_PostalCode,'0000000')); Set null to empty String fileds DTSX:8808 (only \"\" -> NULL); Update Account main.cs 172-176 @DTSX:12241; Extensions.cs IsEqual 12-14, 30-32; Trim String Fields FormatField 41-50"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Foreach Loop Container\\Create Employers|short",
+      "hash": "1a7bf908e0fb",
+      "verdict": "CONFIRMED",
+      "detail": "Units 1-12 match: employer-funds rows with product found (NoMatch -> Derived Column, unconnected), corporate account lookup statecode = 0 (No Match unconnected), employer lookup by agreement number + product in bank 10, create with conditional corporatename (genactivecustomernumber not null) and branch, update of nine CheckIfToUpdate fields + existinfile when NULL/false + gen_modifiedbybank; fax/address/last deposit/product/bank not updated.",
+      "evidence": "source/DailyProcess/0004_LeumiFile-MY.dtsx:36964-37236, 40767-40834; Create Employer main.cs 124-221; Update Employer main.cs 124-238",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Foreach Loop Container\\Create Employers|detailed",
+      "hash": "4e9fd0699076",
+      "verdict": "CONFIRMED",
+      "detail": "All units re-derived: Check for last row; Check for employer funds 1 with gen_bankaccountnumber = Bank_Account_Number_27 and gen_employernumber = Employer_Agreement_Number_35 (externalMetadataColumnId); product lookup; Add 0 on 4 columns; IgnoreFailure lookups (gen_estatetypename not used by the code); Gen_CorporateNumber expression; both dedupes on employer number + product; account lookup; Format Dates; employer lookup; address expression (street NULL -> NULL, otherwise neighbourhood only); create attributes incl. gen_bankid \"10\", gen_estatecodetype, gen_modifiedbybank, gen_inputsource 1, batch 1000; update rules incl. unguarded string assignments and the Convert.ToBoolean outcome stated conditionally; Set inputsource result not used.",
+      "evidence": "source/DailyProcess/0004_LeumiFile-MY.dtsx:36086-47019; Create Employer main.cs 124-221 @37310; Update Employer main.cs 124-238 @45273; Helpers.cs",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Foreach Loop Container\\Create Employers|detail",
+      "hash": "dc35a9d94bb9",
+      "verdict": "CONFIRMED",
+      "detail": "Population now includes the @ row filter and the employer+product dedupe (both components, same key); matching, decisions, create/update attribute lists and gen_modifiedbybank-only-on-update all match.",
+      "evidence": "source/DailyProcess/0004_LeumiFile-MY.dtsx:37000-37018, 41100, 41830, 37098-37236",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Foreach Loop Container\\Create Contacts For Minhali|title",
+      "hash": "137a6496b222",
+      "verdict": "CONFIRMED",
+      "detail": "short_he and flow lines 1-9 match; flow line 6 now states the 10-character \"05\" test after removing \"-\" without digit check (main.cs 61-62, 74-75), with the tel1/tel2 shift.",
+      "evidence": "source/DailyProcess/0004_LeumiFile-MY.dtsx:22842-34792; Set MobilePhone main.cs 54-86 @29831",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Foreach Loop Container\\Create Contacts For Minhali|detailed",
+      "hash": "d13d892a6222",
+      "verdict": "WRONG",
+      "detail": "Most units match (classification, level 1, Add 0 no-op, dedupe, unknown values, Custom Fields, mobile/e-mail rules, create attributes batch 10, UPDATE parameter positions 0-43, log path conditions). Two problems. (a) Unit 35 says that without a fill-in the CRM values are written back. Update Correct Value uses gen_recordsorceDB == 1 && ISNULL(<db>) && !ISNULL(<file>) ? new : DB. If gen_recordsorce is NULL in CRM, the CRM mobile/e-mail is empty and the file has a value, the condition evaluates to NULL and, per documented SSIS expression behaviour (not shown in the files), a NULL condition makes the ?: result NULL; the UPDATE (Param_18-31) then writes NULL into that channel's last-update date, source, transmission status (and transmission date/file/feedback/error) instead of the CRM values. (b) Written values omitted: Create Contact also writes gen_modifiedbybank = DateTime.Now (main.cs 119), and the ContactBase UPDATE also writes gen_modifiedbybank = GETDATE(), ModifiedOn = GETDATE() and ModifiedBy = system user (Param_10). Units 33 and 41 list the written fields without them (the same omission was corrected in Create Accounts For Minhali).",
+      "evidence": "source/DailyProcess/0004_LeumiFile-MY.dtsx:34651-34772 (Update Correct Value expressions), 34278 (UPDATE ContactBase: gen_modifiedbybank, ModifiedOn, ModifiedBy = ? --10), Create Contact main.cs 119 @25113",
+      "wrongUnits": [
+        {
+          "unit": 35,
+          "problem": "\"When there is no fill-in, the CRM values are written\" ignores a NULL gen_recordsorce",
+          "correct": "If gen_recordsorce in CRM is NULL, the CRM field is empty and the file has a value, the condition is NULL; per documented SSIS behaviour (not shown in the files) the result is NULL, so NULL is written to that channel's last-update date, source and transmission status/details",
+          "evidence": "source/DailyProcess/0004_LeumiFile-MY.dtsx:34651-34772; 34278 Param_18-31"
+        },
+        {
+          "unit": "33/41",
+          "problem": "Written attributes omitted",
+          "correct": "Create also writes gen_modifiedbybank = Now; the SQL update also writes gen_modifiedbybank = GETDATE(), ModifiedOn = GETDATE(), ModifiedBy = system user",
+          "evidence": "Create Contact main.cs 119; source/DailyProcess/0004_LeumiFile-MY.dtsx:34278"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Foreach Loop Container\\Create Accounts For Minhali|detailed",
+      "hash": "e4a5c7eef251",
+      "verdict": "CONFIRMED",
+      "detail": "Units 1-28 match. Check customer type (level 3 on the company output; Other Customer uses only 1/5), Add 0 then VB dedupe before unknown replacement, Set columns, Check if account exists without statecode, Create (gen_inputsource 1, gen_isoperate, gen_postalcode = Mailbox_78, gen_modifiedbybank = Now, batch 1000), UPDATE AccountBase (gen_inputsource = 1, gen_isoperate = 1, name, building, city, returned mail, dob, gen_modifiedbybank = getDate(), ModifiedOn = GETDATE(), ModifiedBy = Param_5 userId, gen_postalcode) and CustomerAddressBase (ObjectTypeCode = 1); end state now respects Row_Level_147 == \"3\".",
+      "evidence": "source/DailyProcess/0004_LeumiFile-MY.dtsx:14990-15229, 16121 main.cs 123-205, 20274, 21005, 22695",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Foreach Loop Container\\Create Accounts For Minhali|detail",
+      "hash": "700c851277d2",
+      "verdict": "CONFIRMED",
+      "detail": "Population, matching (no statecode), always-update decision, create/update attribute lists and end state (level 3 only) match.",
+      "evidence": "source/DailyProcess/0004_LeumiFile-MY.dtsx:14990, 15077, 16121, 22695",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Foreach Loop Container\\Create Kibutz|detailed",
+      "hash": "3d89504bef28",
+      "verdict": "CONFIRMED",
+      "detail": "Units 1-33 match: Last Row split, Add 0 with conditional NULL-read wording, Set AccountName And AccountNumber (0149/0743 -> Employer_Number_38/Employer_Name_39; 0197/type 6 -> Customer_Id_Number_6, LastName+FirstName without space; IsNullOrWhiteSpace check), Sort EliminateDuplicates = true on AccountNumber, Is Account Exists / If Kibutz Exsits with Right('000000000'+x,9) and no statecode, RowNumber % 5 split (purpose now השערה), service.Create gen_accountnumber/gen_name, Success-only SQL update gen_kibutz/ModifiedBy/ModifiedOn = GETUTCDATE(), unconnected Error output.",
+      "evidence": "source/DailyProcess/0004_LeumiFile-MY.dtsx:47590-56524, 55436",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Foreach Loop Container\\Create Kibutz|detail",
+      "hash": "9bb0fe949ec1",
+      "verdict": "CONFIRMED",
+      "detail": "Population now includes the @ filter; decisions include the Sort dedupe (kept row not shown); create and SQL update match; Minhali daily link via Get Kibutz on Employer_Number_38 for 0149/0743 new funds.",
+      "evidence": "source/DailyProcess/0004_LeumiFile-MY.dtsx:48430-48448, 55434-55436, 53438-53533, 48520, 56523, 70477-70491",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Foreach Loop Container\\Aggregate Account Balance|detailed",
+      "hash": "f5c1404c7a9e",
+      "verdict": "CONFIRMED",
+      "detail": "Units 1-16 match: Format money fields divides every string input by 100 (incl. the four deposit percentages and the weighted MF), non-numeric/0 -> 0, no unit claimed; DT_CY; balance = three portions; Last row / No product (unconnected); product lookup ProductNumber = gen_fundtypenumber (= Course_Number_22) in bank 10, No Match unconnected; Aggregate GROUP BY bank, bank account, product type SUM balance; INSERT AggregateFunds on SQL.GENERIX_STAGING.",
+      "evidence": "source/DailyProcess/0004_LeumiFile-MY.dtsx:536-2513, 716 main.cs 48-57",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Foreach Loop Container\\Aggregate Account Balance|decisions",
+      "hash": "6ec187eba7b4",
+      "verdict": "CONFIRMED",
+      "detail": "Decisions 1-4 exact; decision 3 meaning no longer claims a unit.",
+      "evidence": "source/DailyProcess/0004_LeumiFile-MY.dtsx:604-631, 2059-2134, 716, 541-561",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Foreach Loop Container\\Minhali daily|title",
+      "hash": "cc20d0c492c1",
+      "verdict": "CONFIRMED",
+      "detail": "Flow lines re-derived; line 8 now separates the dated levels from the undated fund-type level (Set Deposit Mf Percentage main.cs 28-70); line 11 now says same gen_customeraccountname (EntityReference gen_customeraccount per 0005:3274) in any status, and gen_allowancevalue is updated (Param_33).",
+      "evidence": "source/DailyProcess/0004_LeumiFile-MY.dtsx:58548-93489; 0005_Customer Account.dtsx:3274",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Foreach Loop Container\\Minhali daily|short",
+      "hash": "619ec5341ff6",
+      "verdict": "CONFIRMED",
+      "detail": "Units 1-9 match, including create-only/update-only column split (diffed), the 0149/0743 kibbutz drop (Get Kibutz No Match unconnected), and gen_allowancevalue being updated while balances/accumulated totals, revaluation date, customer category, gen_mfratedtotal and kibbutz link are INSERT-only.",
+      "evidence": "source/DailyProcess/0004_LeumiFile-MY.dtsx:61788, 92873, 70477-70527",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Foreach Loop Container\\Minhali daily|detailed",
+      "hash": "2b9870773cc1",
+      "verdict": "CONFIRMED",
+      "detail": "Re-derived the changed units (51, 67, 71, 74-77, 81, 94, 96) and spot-checked the rest: Set Deposit Mf Percentage (dated levels with start <= today and expiry NULL or > today; fund type only >= 0; fund-type winner keeps previous dates; min != 999), \"לא גמל\" input of Union All 3 has no gen_depositmfpercentage mapping (NULL); Set Date Fields try/catch and agent rule; gen_agentappointmentdate input comes from Check if fund exists (DB value kept when no change); UPDATE agentappointmentdate WHERE gen_customeraccountname = ? AND id <> ? (no statecode); Fields From File Or DB rules 31-195 incl. exclusion guard and BENEFITMAIL; INSERT/UPDATE column sets. Note (not counted): AggregateFunds is keyed on the untrimmed, unpadded staging gen_bankaccountnumber while Get Aggregate Fund Balance looks up the trimmed, zero-padded, \".\"-stripped value; if these ever differ the aggregate balance is not found (IgnoreFailure). The file column is fixed width 12 (DTSX:40), so whether this happens depends on the data.",
+      "evidence": "source/DailyProcess/0004_LeumiFile-MY.dtsx:77379-77381, 60716-60767, 75240, 64909, 92818, 92873, 61788, 69950-69962, 40",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Foreach Loop Container\\Minhali daily|detail",
+      "hash": "e8fbe5a89736",
+      "verdict": "CONFIRMED",
+      "detail": "Unit 4 now lists gen_allowancevalue and the links gen_bankname (Param_26), gen_estatetype (Param_32), gen_mftemplate (Param_19), gen_productAtEndOfPeriod (Param_72 = ProductId of Get Product); the INSERT-only and UPDATE-only lists match a mechanical diff of DTSX:61788 vs 92873; units 1-3 and 5 match.",
+      "evidence": "source/DailyProcess/0004_LeumiFile-MY.dtsx:61788, 92873",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Foreach Loop Container\\Minhali daily|decisions",
+      "hash": "b9f1e1ab1be1",
+      "verdict": "CONFIRMED",
+      "detail": "Decisions 1-37 match. Decision 13 now includes the ChangedByAge rewrite (written as gen_compensationbyagemodel/gen_rewardsbyagemodel: UPDATE Param_64/65, INSERT Param_93/94, verified bindings) and the gen_subestatetype = 0 / gen_fundauthenticationindication = NULL defaults; decision 16 states the defaults (gen_sectorstatus = Param_57 from gen_subestatetype; gen_fundestateid unset for unlisted Sector_Code_17); decision 20 excludes the fund-type level from the date check.",
+      "evidence": "source/DailyProcess/0004_LeumiFile-MY.dtsx:78471, 60782 main.vb 16-45, 92873, 61788",
+      "wrongUnits": []
+    }
+  ],
+  "missingWrites": []
+}

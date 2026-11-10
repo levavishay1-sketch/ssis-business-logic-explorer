@@ -1,0 +1,142 @@
+{
+  "package": "0021_Account",
+  "dataFlows": [
+    "Package\\Update internal Agent account",
+    "Package\\Update no Agent account"
+  ],
+  "analyst": "ssis-field-lineage",
+  "source": {
+    "file": "source/DailyProcess/0021_Account.dtsx",
+    "sha256": "BAD3B657F536C5FCCD90C47D9E503EC056323813F4E7577AC1ED5FA2D16213BE"
+  },
+  "scriptOutputs": [],
+  "crmWrites": [
+    {
+      "component": "Package\\Update internal Agent account\\Update Account",
+      "identicalCopies": [],
+      "entity": "account",
+      "verb": "UPDATE",
+      "mechanism": "SQL (OLE DB Command: UPDATE accountbase on [CRM] = Psql/ALTSHULER_MSCRM)",
+      "status": "Unsupported",
+      "recordKey": "WHERE accountid = ? (2nd '?', Param_1) <- input accountid <- Sort (pass-through) <- 'Get Account to update' column accountid (account.accountid)",
+      "recordKeyColumns": [
+        "accountid"
+      ],
+      "declaredRowFilters": [],
+      "condition": "One UPDATE per row of 'Get Account to update': only accounts whose computed flag differs from the stored one (WHERE temp.gen_isfundinternalagent != temp.gen_isfundinternalagentDB, DTSX:3294). Runs after Create ETL Process record (Success, DTSX:3643). Command input errorRowDisposition=FailComponent (DTSX:3397): an SQL error fails the data flow; rows already updated stay committed. NULL handling: the stored value is compared as isnull(gen_isfundinternalagent,0) AS gen_isfundinternalagentDB (DTSX:3298), so an account whose stored gen_isfundinternalagent is NULL and whose computed flag is 0 is never selected and never updated (stays NULL); NULL is replaced only when the computed flag is 1.",
+      "attributes": [
+        {
+          "attribute": "gen_isfundinternalagent",
+          "from": [
+            {
+              "column": "gen_isfundinternalagent",
+              "role": "value"
+            }
+          ],
+          "expression": "SQL 'Update accountbase set gen_isfundinternalagent = ? where accountid = ?' (DTSX:3388): 1st '?' = Param_0 <- input gen_isfundinternalagent (DT_I4). Value computed in source SQL: case when funds.gen_accountname is null then 0 else 1 end, where funds = select gen_fundmain.gen_accountname from gen_fundmain JOIN gen_agentcontract ON gen_fundmain.gen_brokernumber = gen_agentcontract.gen_agentcontractid JOIN gen_agents ON gen_agentcontract.gen_agentname = gen_agents.gen_agentsid join gen_estatecodeid on gen_estatecodeidid = gen_fundmain.gen_estatetype WHERE gen_agents.gen_agenttype = 1 and gen_estatecodeid.gen_estatetypeid not in ('0210','3') group by gen_fundmain.gen_accountname, left-joined on funds.gen_accountname = accountid. I.e. 1 if the account has at least one fund whose broker contract's agent is of type 1 and whose estate type id is not '0210'/'3', else 0. Passed unchanged through Sort (sort key accountid, EliminateDuplicates=false, DTSX:3345). Int 0/1 written into the bit column by implicit conversion.",
+          "fixedValue": null,
+          "condition": null,
+          "evidence": "Update Account DTSX:3385-3400 (SQL 3388, inputs Param_0/Param_1); Get Account to update SQL DTSX:3294; Sort DTSX:3343-3345",
+          "declaredSources": [
+            {
+              "db": "Get Account to update: gen_fundmain.gen_accountname",
+              "role": "condition",
+              "why": "Existence of a qualifying gen_fundmain row for the account (funds.gen_accountname = accountid) decides 1 vs 0",
+              "evidence": "DTSX:3294-3313"
+            },
+            {
+              "db": "Get Account to update: gen_agents.gen_agenttype (via gen_fundmain.gen_brokernumber -> gen_agentcontract.gen_agentcontractid, gen_agentcontract.gen_agentname -> gen_agents.gen_agentsid)",
+              "role": "condition",
+              "why": "Only funds whose agent has gen_agenttype = 1 count",
+              "evidence": "DTSX:3294-3313"
+            },
+            {
+              "db": "Get Account to update: gen_estatecodeid.gen_estatetypeid (via gen_fundmain.gen_estatetype)",
+              "role": "condition",
+              "why": "Funds with estate type id '0210' or '3' are excluded",
+              "evidence": "DTSX:3294-3313"
+            },
+            {
+              "db": "Get Account to update: account.gen_isfundinternalagent (isnull(...,0) AS gen_isfundinternalagentDB)",
+              "role": "condition",
+              "why": "Row written only when the stored flag differs from the computed one",
+              "evidence": "DTSX:3294-3313"
+            }
+          ]
+        }
+      ],
+      "evidence": "Update Account DTSX:3385 (SqlCommand 3388); source DTSX:3289/3294; Sort DTSX:3343; precedence DTSX:3642-3645"
+    },
+    {
+      "component": "Package\\Update no Agent account\\Update accounts",
+      "identicalCopies": [],
+      "entity": "account",
+      "verb": "UPDATE",
+      "mechanism": "SQL (OLE DB Command: UPDATE accountbase on [CRM] = Psql/ALTSHULER_MSCRM)",
+      "status": "Unsupported",
+      "recordKey": "WHERE accountid = ? (2nd '?', Param_1) <- input accountid <- Sort (pass-through) <- 'Get accounts to update' column accountid (account.accountid)",
+      "recordKeyColumns": [
+        "accountid"
+      ],
+      "declaredRowFilters": [],
+      "condition": "One UPDATE per row of 'Get accounts to update': only accounts whose computed flag differs from the stored one (WHERE temp.gen_isfundwithoutagent != temp.gen_isfundwithoutagentDB, DTSX:3486). Runs after 'Update internal Agent account' (Success, DTSX:3644). Command input errorRowDisposition=FailComponent (DTSX:3600). NULL handling: the stored value is compared as isnull(gen_fundwithoutagent,0) AS gen_isfundwithoutagentDB (DTSX:3490), so an account whose stored gen_fundwithoutagent is NULL and whose computed flag is 0 is never selected and never updated (stays NULL); NULL is replaced only when the computed flag is 1.",
+      "attributes": [
+        {
+          "attribute": "gen_fundwithoutagent",
+          "from": [
+            {
+              "column": "gen_isfundwithoutagent",
+              "role": "value"
+            }
+          ],
+          "expression": "SQL 'Update accountbase set gen_fundwithoutagent= ? where accountid = ?' (DTSX:3591): 1st '?' = Param_0 <- input gen_isfundwithoutagent (DT_I4). Value computed in source SQL: case when funds.gen_accountname is null then 0 else 1 end, where funds = select gen_fundmain.gen_accountname from gen_fundmain join Gen_estatecodeid ON Gen_estatecodeid.Gen_estatecodeidId = Gen_fundmain.gen_estatetype WHERE gen_fundmain.gen_brokernumbername = '00000004000' AND Gen_estatecodeid.Gen_EstateTypeID not in ('0210','3') group by gen_fundmain.gen_accountname, left-joined on funds.gen_accountname = accountid. I.e. 1 if the account has at least one fund whose broker number name is '00000004000' and whose estate type id is not '0210'/'3', else 0. Passed unchanged through Sort (sort key accountid, EliminateDuplicates=false, DTSX:3537). The SQL alias is gen_isfundwithoutagent but the CRM column written is gen_fundwithoutagent (binding is positional, proven by Param_0).",
+          "fixedValue": null,
+          "condition": null,
+          "evidence": "Update accounts DTSX:3588-3603 (SQL 3591); Get accounts to update SQL DTSX:3486; Sort DTSX:3535-3537",
+          "declaredSources": [
+            {
+              "db": "Get accounts to update: gen_fundmain.gen_accountname",
+              "role": "condition",
+              "why": "Existence of a qualifying gen_fundmain row for the account decides 1 vs 0",
+              "evidence": "DTSX:3486-3503"
+            },
+            {
+              "db": "Get accounts to update: gen_fundmain.gen_brokernumbername",
+              "role": "condition",
+              "why": "Only funds with gen_brokernumbername = '00000004000' count",
+              "evidence": "DTSX:3486-3503"
+            },
+            {
+              "db": "Get accounts to update: Gen_estatecodeid.Gen_EstateTypeID (via gen_fundmain.gen_estatetype)",
+              "role": "condition",
+              "why": "Funds with estate type id '0210' or '3' are excluded",
+              "evidence": "DTSX:3486-3503"
+            },
+            {
+              "db": "Get accounts to update: account.gen_fundwithoutagent (isnull(...,0) AS gen_isfundwithoutagentDB)",
+              "role": "condition",
+              "why": "Row written only when the stored flag differs from the computed one",
+              "evidence": "DTSX:3486-3503"
+            }
+          ]
+        }
+      ],
+      "evidence": "Update accounts DTSX:3588 (SqlCommand 3591); source DTSX:3481/3486; Sort DTSX:3535; precedence DTSX:3642-3645"
+    }
+  ],
+  "readWriteModifications": [],
+  "lookupBridges": [],
+  "unresolved": [
+    {
+      "where": "Package-level configuration",
+      "reason": "Package loads XML configuration C:\\Generix\\SSISConfigFile.dtsConfig (DTSX:16-18), not supplied (external_unknown). It may override properties such as the [CRM] connection string; the target database shown (Psql/ALTSHULER_MSCRM) is the design-time value."
+    }
+  ],
+  "notes": [
+    "Business CRM writers: 2 OLE DB Commands with direct SQL on accountbase (Unsupported), 1 attribute each. The lineage script writer 'End ETL Process record\\ETL Record Finish' and the script tasks Create/Error ETL Process record are ETL plumbing and are not mapped. No flat files in this package; all values come from CRM DB SQL.",
+    "Positional binding: Update Account SQL 'Update accountbase set gen_isfundinternalagent = ? where accountid = ?' -> Param_0 = gen_isfundinternalagent, Param_1 = accountid; Update accounts SQL 'Update accountbase set gen_fundwithoutagent= ? where accountid = ?' -> Param_0 = gen_isfundwithoutagent, Param_1 = accountid (component.mjs input -> ext:Param_k).",
+    "'Get Account to update' does 'select *' over three columns, but its output metadata exposes only gen_isfundinternalagent and accountid; 'Get accounts to update' exposes gen_isfundwithoutagentDB too, which passes the Sort but is not bound to the command.",
+    "Both flags are recomputed from scratch each run and can be set back to 0 (account with no qualifying fund) as well as to 1.",
+    "Whether the custom columns gen_isfundinternalagent / gen_fundwithoutagent physically exist in AccountBase (vs an extension table) depends on the CRM DB schema, which is not supplied; the DTSX only proves the SQL text."
+  ]
+}

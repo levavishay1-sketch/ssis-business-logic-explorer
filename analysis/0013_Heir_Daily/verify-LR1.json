@@ -1,0 +1,221 @@
+{
+  "verifier": "ssis-verifier",
+  "package": "0013_Heir_Daily",
+  "scope": "logic-claims re-check after fixes",
+  "checkedAt": "2026-11-07T12:07:11Z",
+  "checked": 11,
+  "standardApplied": "SSIS expression-language semantics and the documented meaning of DTSX-declared properties (errorRowDisposition, JoinType, precedence constraints, MaximumErrorCount) are treated as reading the files. Behaviour of runtime APIs called from script code whose implementation is not in the files (ScriptBuffer getter/setter on NULL, default value of Dts.TaskResult, Shell32, CRM.Proxy) is treated as runtime behaviour that must be labelled as unverified / documented SSIS behaviour.",
+  "results": [
+    {
+      "id": "L|finding#4",
+      "hash": "078cf1377240",
+      "verdict": "WRONG",
+      "detail": "Correct parts: Create Heir has no condition on gen_status (main.cs:125-193); gen_status is written only if !Row.genstatus_IsNull (main.cs:173-174); expression (SUG_PEULA == \"U\" || SUG_PEULA == \"C\") ? 1 : 2 gives 1/2 for non-NULL values and NULL for a NULL SUG_PEULA (SSIS expression NULL semantics); the hypothesis is labelled. Problem: the chain 'empty action type -> the cleaning turns it into NULL' is stated as a proven fact, but the files do not prove it. The Heir source has RetainNulls=false (DTSX:6643), so an empty field arrives as \"\"; Trim All Input Columns 1 FormatField returns null for \"\" (main.cs:53-57) and assigns it with p.SetValue(Row, null) (main.cs:45), which calls the generated setter 'set { this[8] = value; }' (DTSX:8565-8575). Whether assigning null through the ScriptBuffer indexer makes the column NULL is SSIS runtime behaviour that the files do not show (the same class of question as the getter on NULL that the package's other claims already label 'לא אומת').",
+      "evidence": "DTSX:6643 (RetainNulls=false); Trim All Input Columns 1 main.cs:45,53-57 @DTSX:8046; BufferWrapper SUGPEULA setter DTSX:8565-8575; Set Heir Columns gen_status DTSX:6903; Create Heir main.cs:173-174 @DTSX:4396",
+      "wrongUnits": [
+        {
+          "unit": 1,
+          "problem": "'אם סוג הפעולה ריק, הניקוי הופך אותו לחסר (NULL)' is presented as fact; it depends on what the generated setter (this[8] = null) does at runtime, which is not in the files.",
+          "correct": "Mark it: the script returns null for an empty value and assigns it through the column setter; that this makes the column NULL is documented SSIS behaviour / not shown in the files (לא אומת). Only if so does the expression return NULL and the heir get created without gen_status.",
+          "evidence": "main.cs:45,53-57 @DTSX:8046; DTSX:8565-8575"
+        }
+      ]
+    },
+    {
+      "id": "L|finding#6",
+      "hash": "5d433f5e55b9",
+      "verdict": "WRONG",
+      "detail": "Correct parts: in Convert Zips Files To Folders the whole foreach is inside try with an empty catch (ScriptMain.cs:98-118), so one failure stops the remaining zips without a report; when the thread is not STA the unzip runs on a separate STA thread (125-135) and an exception there is not caught by that catch. In Move Folder To Archive the variable reads and the date-folder creation (94-102) are outside try; only the exists-check + Directory.Move are in try (104-110) and the catch sets TaskResult=Success (114). Problem: 'והמשימה ממשיכה' is stated as fact, but Convert Zips Main() never assigns Dts.TaskResult on any path (the only occurrence in the script is the template comment at ScriptMain.cs:93), so the task's result, after the empty catch and also on the normal path, is the Script Task's default TaskResult, which is not shown in the files. The same applies to Move Folder To Archive on its normal (no-exception) path: Dts.TaskResult is set only inside the catch. This is not mentioned, though it decides whether Get Heirs Folders runs at all (Success constraint DTSX:14523) and whether the loop continues after each folder.",
+      "evidence": "Convert Zips Files To Folders ScriptMain.cs:96-120 @DTSX:380 (no TaskResult assignment; DTSX:472 is only the comment); Move Folder To Archive ScriptMain.cs:92-116 @DTSX:11556 (TaskResult only at 114, inside catch); DTSX:14523",
+      "wrongUnits": [
+        {
+          "unit": 1,
+          "problem": "'אין דיווח, והמשימה ממשיכה' presented as proven; Main() never sets Dts.TaskResult, so the outcome depends on the runtime default. The normal path of Move Folder To Archive also never sets TaskResult, and the text does not say so.",
+          "correct": "State that Convert Zips Files To Folders never sets Dts.TaskResult (neither in try nor in catch) and Move Folder To Archive sets it only in the catch; whether the task then counts as Success (so that the run/loop continues) depends on the Script Task's default TaskResult, which is not shown in the files (לא אומת).",
+          "evidence": "ScriptMain.cs:96-120 @DTSX:380; ScriptMain.cs:92-116 @DTSX:11556"
+        }
+      ]
+    },
+    {
+      "id": "L|finding#7",
+      "hash": "7177dd0bd8fa",
+      "verdict": "CONFIRMED",
+      "detail": "gen_region = (DT_I4)gen_region_STR_INT with errorRowDisposition=FailComponent (DTSX:6912). Sort/Sort 1 are blocking but Set Heir Columns is after the Merge Join, so earlier buffers can reach Create Heir / Update Heir, which send full batches of 1000 immediately (Create main.cs:191-192, Update main.cs:225-226); partial batches are sent only at EndOfRowset (Create 244-246, Update 282-284). Statement is correctly conditional. No MaximumErrorCount in the package (grep), Create And Update Heir -> Move Folder To Archive is Success (DTSX:13083), Foreach -> End ETL is Success (DTSX:14521) and Constraint 3 (!isFileExist) is false in this branch, so End ETL does not run. A NULL region is not a conversion error, and the text only speaks of a non-convertible value.",
+      "evidence": "DTSX:6912; Create Heir main.cs:191-192,244-246 @DTSX:4396; Update Heir main.cs:225-226,282-284 @DTSX:9184; DTSX:13083, 14521, 14522",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|finding#8",
+      "hash": "5ac308956a65",
+      "verdict": "WRONG",
+      "detail": "Correct parts: Constraint 2 (DTSX:14521), Constraint 3 (14522) and Constraint 5 (14524) have no DTS:LogicalAnd, while Constraint, Constraint 1 and Constraint 4 (14519, 14520, 14523) carry LogicalAnd=\"True\" explicitly; the explicit True confirms that the omitted value is False (OR). Constraint 5 is the only constraint into the loop, so OR/AND does not matter there. Problem: 'End ETL Process record רץ כש... או שלא נמצאו תיקיות' drops the Success part of Constraint 3 (EvalOp=3 ExpressionAndConstraint). Get Heirs Folders sets Dts.TaskResult = Success only inside if (arr.Count > 0) (ScriptMain.cs:51-57); when no folders exist it never sets TaskResult, so whether the Success constraint holds in the no-folder case depends on the Script Task's default TaskResult, which is not shown in the files.",
+      "evidence": "DTSX:14519-14524; Get Heirs Folders ScriptMain.cs:46-59 @DTSX:13239",
+      "wrongUnits": [
+        {
+          "unit": 1,
+          "problem": "The no-folder branch is stated as sufficient ('או שלא נמצאו תיקיות'); the constraint also requires Get Heirs Folders = Success, and the code sets Success only when folders were found.",
+          "correct": "'...או ש-Get Heirs Folders הסתיים ב-Success ו-isFileExist=false. הקוד קובע TaskResult=Success רק כשנמצאו תיקיות; כשאין תיקיות התוצאה היא ברירת המחדל של Script Task (לא מוצג בקבצים, לא אומת).' Impact is still only on closing the ETL record (plumbing).",
+          "evidence": "ScriptMain.cs:51-57 @DTSX:13239; DTSX:14522"
+        }
+      ]
+    },
+    {
+      "id": "L|Package (control flow)|short",
+      "hash": "839b7bd4d8fb",
+      "verdict": "INCOMPLETE",
+      "detail": "Branches and order match DTSX:14519-14524 and 13081-13083, the Get Heirs Folders / Get File From Folder scripts, and Move Folder To Archive's Directory.Exists check. Missing: (a) a folder that was ingested successfully but whose Directory.Move throws (e.g. locked file) is silently left in the source folder (catch -> Success, ScriptMain.cs:111-115) and will be ingested again next run. The end node [17] lists the folders that remain and omits this case, and [14] says the folder is moved unless a same-name folder exists. (b) Continuing to the next folder after a successful folder, and starting the run at all, depend on Move Folder To Archive and Convert Zips Files To Folders, which never set Dts.TaskResult on their normal path (runtime default, not shown in the files). The text presents this as certain.",
+      "evidence": "Move Folder To Archive ScriptMain.cs:104-115 @DTSX:11556; Convert Zips ScriptMain.cs:96-120 @DTSX:380; DTSX:13083, 14523",
+      "wrongUnits": [
+        {
+          "unit": 14,
+          "problem": "Only the same-name case is given as a reason for not moving; a swallowed move exception also leaves the folder in place.",
+          "correct": "'...אלא אם בארכיון של היום כבר יש תיקייה באותו שם, או שההעברה נכשלה בחריגה (נבלעת בלי דיווח).'",
+          "evidence": "ScriptMain.cs:104-115 @DTSX:11556"
+        },
+        {
+          "unit": 17,
+          "problem": "The list of folders that stay in the source is incomplete: it omits folders that were ingested but whose move threw an exception, which are re-ingested on the next run.",
+          "correct": "Add: 'ותיקיות שנקלטו אך ההעברה שלהן נכשלה בחריגה, ולכן ייקלטו שוב בריצה הבאה'.",
+          "evidence": "ScriptMain.cs:104-115 @DTSX:11556"
+        }
+      ]
+    },
+    {
+      "id": "L|Package (control flow)|detailed",
+      "hash": "99d8f1227740",
+      "verdict": "WRONG",
+      "detail": "Verified: Get Variables reads gen_etlvariable (DTSX:13608) and the config caveat is present (DTSX:138); zip handling (Convert Zips ScriptMain.cs:96-160); Rasham* folders sorted (Get Heirs Folders 48-57); isFileExist logic and constraints DTSX:14522/14524; ForEachFromVarEnumerator on User::DirectoriesArray (DTSX:3144-3148); first sorted Rasham*.txt (Get File From Folder 48-58); expression-only constraint DTSX:13082; Success constraints DTSX:13081/13083; archive path and Directory.Exists check (Move 92-110); no MaximumErrorCount; OR on 14521/14522. Wrong or unlabelled: unit [2] states 'והריצה ממשיכה' although Convert Zips never sets Dts.TaskResult (runtime default). Units [4]-[6] and [20]: in the no-folder branch End ETL needs Get Heirs Folders = Success, but TaskResult=Success is set only when folders exist (ScriptMain.cs:51-57). The tech of [4] omits this, and [6] presents the ETL closing as certain. Unit [17]: the Hebrew text gives only the same-name case for not moving; a move exception is also swallowed (catch -> Success) and leaves the folder in place. The normal path of Move Folder To Archive never sets TaskResult, so continuing the loop also relies on the runtime default. Unit [21] omits the 'move threw' folders from the list of folders that remain.",
+      "evidence": "Convert Zips ScriptMain.cs:96-120 @DTSX:380; Get Heirs Folders ScriptMain.cs:46-59 @DTSX:13239; Move Folder To Archive ScriptMain.cs:92-116 @DTSX:11556; DTSX:13081-13083, 14519-14524",
+      "wrongUnits": [
+        {
+          "unit": 2,
+          "problem": "'בלי דיווח, והריצה ממשיכה' is presented as proven; Main() never assigns Dts.TaskResult.",
+          "correct": "Add: 'המשימה אינה קובעת TaskResult בשום מסלול; המשך הריצה (אילוץ Success ל-Get Heirs Folders, DTSX:14523) תלוי בברירת המחדל של Script Task – לא מוצג בקבצים.'",
+          "evidence": "ScriptMain.cs:96-120 @DTSX:380; DTSX:14523"
+        },
+        {
+          "unit": 4,
+          "problem": "The tech omits that Dts.TaskResult = Success is set only inside if (arr.Count > 0); with no folders, the Success part of DTSX:14522 depends on the runtime default.",
+          "correct": "Add to tech: 'TaskResult=Success נקבע רק כש-arr.Count > 0 (שורה 55); בענף 'לא' התוצאה היא ברירת המחדל של Script Task (לא מוצג בקבצים)'.",
+          "evidence": "ScriptMain.cs:51-57 @DTSX:13239"
+        },
+        {
+          "unit": 6,
+          "problem": "'רק סגירת תהליך ה-ETL' is stated as certain in the no-folder branch, but it depends on the unset TaskResult (see unit 4). The no-CRM-update part is correct.",
+          "correct": "'אין עיבוד ואין עדכון ב-CRM. סגירת תהליך ה-ETL רצה רק אם Get Heirs Folders נחשב Success (TaskResult לא נקבע בענף זה; לא אומת).'",
+          "evidence": "ScriptMain.cs:51-57 @DTSX:13239; DTSX:14522"
+        },
+        {
+          "unit": 17,
+          "problem": "The Hebrew text gives only the same-name case; a Directory.Move exception is swallowed (catch sets Success) and the folder stays and is re-ingested next run. The normal path does not set TaskResult, so loop continuation relies on the runtime default.",
+          "correct": "Add the swallowed-exception case to the text, and note that Dts.TaskResult is set only in the catch (114).",
+          "evidence": "ScriptMain.cs:104-115 @DTSX:11556"
+        },
+        {
+          "unit": 21,
+          "problem": "The list of folders that remain omits folders whose move threw an exception.",
+          "correct": "Add 'תיקיות שנקלטו אך ההעברה שלהן נכשלה בחריגה (נבלעת)'.",
+          "evidence": "ScriptMain.cs:104-115 @DTSX:11556"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Foreach Loop Container\\Create And Update Heir|title",
+      "hash": "0ccfb3f868fe",
+      "verdict": "WRONG",
+      "detail": "Units 1-4 and 6-8 match the DTSX: Merge Join JoinType=2, 3 keys (DTSX:6752-6754, sort keys 6941-6953/7093-7105); Lookups DTSX:4070/4254; Create/Update via ExecuteMultipleExtension RequestType.Create/Update. Unit 5 states 'סוג פעולה ריק → ללא סטטוס' as fact; this depends on the null assignment in Trim All Input Columns 1 (p.SetValue(Row,null) -> generated setter this[8]=value) making the column NULL, which is runtime behaviour not shown in the files (see L|finding#4).",
+      "evidence": "Trim All Input Columns 1 main.cs:45,53-57 @DTSX:8046; DTSX:6643, 8565-8575, 6903",
+      "wrongUnits": [
+        {
+          "unit": 5,
+          "problem": "'סוג פעולה ריק → ללא סטטוס' is presented as proven.",
+          "correct": "'סוג פעולה ריק → ללא סטטוס (בהנחה שהשמת null בסקריפט הניקוי הופכת את העמודה ל-NULL; התנהגות SSIS שאינה מוצגת בקבצים)'.",
+          "evidence": "main.cs:45,53-57 @DTSX:8046; DTSX:8565-8575"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Foreach Loop Container\\Create And Update Heir|detailed",
+      "hash": "05fd461ad18a",
+      "verdict": "WRONG",
+      "detail": "Verified: Heir source 12 columns, all RedirectRow -> Derived Column (no path); Contact source 5 columns (MACHOZ, MIS_TIK, MIS_BAKASHA, TAARICH_MATAN_ZAV_RASHAM->gen_issueanceofanorderdate, MIS_ZEHUT_MORISH->gen_customeridentitynumber), FailComponent; Merge Join inner, 3 keys, TreatNullsAsEqual=true; Set Heir Columns expressions and dispositions (status/name RedirectRow -> Derived Column 1; region FailComponent); Append Zeros (strip '.', left-pad '0' to column length 9); Format Dates (8 -> yyyy/MM/dd, 6 -> yyyy/MM/01, else null; TryParse); Lookups (Full cache, NoMatchBehavior=1); change empty strings to null (string DB columns only); IsEqual date compare obj1.Date == obj2.AddHours(3).Date; Create writes 16 attributes, only non-NULL; Update writes the 12 listed attributes; line-162 country bug; no outgoing paths from Create Heir. Problems: (1) Units 1, 3 and 5 state 'ערך ריק נחשב חסר' / empty action type becomes missing as fact. That depends on the null assignment via the generated setter (runtime, not in the files). (2) Unit 6 labels the getter-on-NULL question for IDs but not for the order date. An empty TAARICH_MATAN_ZAV_RASHAM becomes null in Trim All Input Columns, and Format Dates then reads it with p.GetValue (main.cs:45, getter Buffer.GetString). If that throws, Format Dates has no try/catch and the whole data flow fails, so 'תאריך לא תקין נחשב חסר' is not guaranteed for an empty date. The same applies to Append Zeros with a missing ID: no try/catch, so the outcome is a data-flow failure, not a row error, and the text does not say this. (3) Unit 20: for the status, Row.genstatus is Int32 (OptionSetValue(Row.genstatus), main.cs:192), so the getter cannot return an 'empty value'. If it does not throw, OptionSetValue(<int returned>) is sent, not a deletion. The conditional 'אם היא מחזירה ערך ריק, השדה נמחק ב-CRM' is therefore wrong for gen_status.",
+      "evidence": "DTSX:6641-6760, 4325-4372, 6752-6754, 6885-6912; Trim All Input Columns main.cs:48-57 @DTSX:7157; Trim All Input Columns 1 main.cs:45,53-57 @DTSX:8046; Append Zeros main.cs:43-66 @DTSX:3159; Format Dates main.cs:40-80 @DTSX:5853 (input length 50, DTSX:6630); Update Heir main.cs:190-193,209 @DTSX:9182",
+      "wrongUnits": [
+        {
+          "unit": 1,
+          "problem": "'וערך ריק נחשב חסר' stated as fact; relies on the setter making the column NULL (runtime, not shown).",
+          "correct": "Mark it as documented SSIS behaviour / not shown in the files.",
+          "evidence": "main.cs:45,53-57 @DTSX:8046; DTSX:8565-8575"
+        },
+        {
+          "unit": 3,
+          "problem": "Same unlabelled runtime dependency ('וערך ריק נחשב חסר').",
+          "correct": "Mark it as documented SSIS behaviour / not shown in the files.",
+          "evidence": "Trim All Input Columns main.cs:48-57 @DTSX:7157"
+        },
+        {
+          "unit": 5,
+          "problem": "'אם סוג הפעולה ריק, הוא נחשב חסר, והסטטוס נשאר חסר' depends on the same unlabelled setter behaviour.",
+          "correct": "Add the label; the expression-NULL part is fine.",
+          "evidence": "main.cs:53-57 @DTSX:8046; DTSX:6903"
+        },
+        {
+          "unit": 6,
+          "problem": "The unverified getter-on-NULL caveat is given for IDs only. An empty order date (NULL after Trim) is also read by Format Dates via p.GetValue. Neither Format Dates nor Append Zeros has a try/catch, so if the read throws, the data flow fails; it does not just produce a missing value.",
+          "correct": "Extend the 'לא אומת' note to the order date, and state the alternative outcome: if the read throws, the Create And Update Heir data flow fails (no try/catch in Append Zeros / Format Dates).",
+          "evidence": "Format Dates main.cs:40-60 @DTSX:5853; Append Zeros main.cs:43-59 @DTSX:3159"
+        },
+        {
+          "unit": 20,
+          "problem": "'אם היא מחזירה ערך ריק, השדה נמחק ב-CRM' cannot apply to gen_status: Row.genstatus is Int32 and is sent as new OptionSetValue(Row.genstatus).",
+          "correct": "For strings: if the getter returns null, the field is cleared. For gen_status: if the getter does not throw, OptionSetValue(<int returned>) is sent (not a deletion). If it throws, the row goes to CastingError without an update.",
+          "evidence": "Update Heir main.cs:190-193 @DTSX:9182"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Foreach Loop Container\\Create And Update Heir|detail",
+      "hash": "ce69c43ebd5f",
+      "verdict": "WRONG",
+      "detail": "Units 1, 2 and 5 are correct: SUG_REC split; Inner Join; contact lookup on gen_identitynumber; heir lookup on 4 keys, customer ID not part of it; both CacheType=0 (Full). Unit 4 mechanism is correct: SDK ExecuteMultiple Create/Update, batches of 1000, no SQL DML. Problems: unit 3 states 'סוג פעולה ריק → NULL' as fact (unlabelled setter dependency, see L|finding#4). Unit 4 states 'ה-Lookups קוראים מ-[CRM] = Psql/ALTSHULER_MSCRM' as the target, with no caveat. That is the design-time connection string (DTSX:44-46), and the package loads the unsupplied C:\\Generix\\SSISConfigFile.dtsConfig (DTSX:138, ConfigurationType=1), which can override it.",
+      "evidence": "DTSX:44-46, 138, 4070-4118, 4254-4282; Trim All Input Columns 1 main.cs:53-57 @DTSX:8046",
+      "wrongUnits": [
+        {
+          "unit": 3,
+          "problem": "'סוג פעולה ריק → NULL' is presented as proven.",
+          "correct": "Add the label that the null assignment making the column NULL is SSIS runtime behaviour not shown in the files.",
+          "evidence": "main.cs:45,53-57 @DTSX:8046; DTSX:8565-8575"
+        },
+        {
+          "unit": 4,
+          "problem": "Connection target stated as certain without the config-file caveat.",
+          "correct": "'ה-Lookups קוראים מ-[CRM], שמחרוזת החיבור שלו בחבילה היא Psql/ALTSHULER_MSCRM (DTSX:44-46); קובץ התצורה החיצוני (DTSX:138) עשוי לדרוס אותה.'",
+          "evidence": "DTSX:44-46, 138"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Foreach Loop Container\\Create And Update Heir|decisions",
+      "hash": "8624c589cf2f",
+      "verdict": "WRONG",
+      "detail": "Units 1 and 3-6 match the DTSX and code: Merge Join DTSX:6752-6754; Lookup SqlCommandParam/ParameterMap DTSX:4091-4118 and 4265-4282, NoMatchBehavior=1; Update Heir conditions main.cs:131-218 including line 162 using gencity_IsNull; date sent only if parse succeeded (213). Unit 2's outcome 'כש-SUG_PEULA ריק (null אחרי Trim All Input Columns 1)' states the empty -> NULL conversion as fact. It depends on the setter at runtime (see L|finding#4).",
+      "evidence": "DTSX:6752-6754, 6903, 4091-4118, 4265-4282; Update Heir main.cs:131-218 @DTSX:9182; Trim All Input Columns 1 main.cs:45,53-57",
+      "wrongUnits": [
+        {
+          "unit": 2,
+          "problem": "'null אחרי Trim All Input Columns 1' is presented as proven.",
+          "correct": "Add: 'בהנחה שהשמת null דרך ה-setter הופכת את העמודה ל-NULL (התנהגות SSIS שאינה מוצגת בקבצים)'.",
+          "evidence": "main.cs:45,53-57 @DTSX:8046; DTSX:8565-8575"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Foreach Loop Container\\Create And Update Heir|open",
+      "hash": "c5e5754f9541",
+      "verdict": "CONFIRMED",
+      "detail": "[1] meaning of U/C and 1/2 is open and the hypothesis is labelled. [2] is answered correctly from the files and presented as a label from column naming: Source - Contact Details columns MIS_ZEHUT_MORISH/LAST_NAME_MORISH/FIRST_NAME_MORISH/TAARICH_PTIRA_MORISH at DTSX:86-89; MIS_ZEHUT_MORISH -> gen_customeridentitynumber (DTSX:4360 output, external column mapping); KIRVA_EL_MANOCH at DTSX:115. [3] CRM.Proxy is external. [4] lines 133, 162 and 209 match the code and the outcome is correctly unverified. [5] Merge Join many-to-many is open. Note: the same getter-on-NULL question also applies to Format Dates / Append Zeros, where a throw would fail the data flow. This is reported on the detailed claim.",
+      "evidence": "DTSX:86-89, 115, 4360; Update Heir main.cs:133,162,209 @DTSX:9182",
+      "wrongUnits": []
+    }
+  ]
+}

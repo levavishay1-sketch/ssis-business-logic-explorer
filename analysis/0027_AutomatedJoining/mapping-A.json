@@ -1,0 +1,157 @@
+{
+  "package": "0027_AutomatedJoining",
+  "dataFlows": [
+    "Package\\Close Joining processes",
+    "Package\\Update SuspicionAsEmitted Joinings"
+  ],
+  "analyst": "ssis-field-lineage",
+  "source": {
+    "file": "source/DailyProcess/0027_AutomatedJoining.dtsx",
+    "sha256": "5A6CAEB48ACA544F938C452989B8E57F011631CC76A39E10E3A3A8B43938D556"
+  },
+  "scriptOutputs": [],
+  "crmWrites": [
+    {
+      "component": "Package\\Close Joining processes\\Update to close joining",
+      "identicalCopies": [],
+      "entity": "gen_automatedjoining",
+      "verb": "UPDATE",
+      "mechanism": "SDK (IOrganizationService.Update via CrmProxy.GetCrmService)",
+      "status": "Supported",
+      "recordKey": "entity.Id = Row.genautomatedjoiningid = gen_automatedjoining.gen_automatedjoiningid read by OLE DB Source 'Get Joining To Close' on [CRM] (psql/ALTSHULER_MSCRM) WHERE gen_joiningstatus = 7",
+      "recordKeyColumns": [
+        "gen_automatedjoiningid"
+      ],
+      "declaredRowFilters": [],
+      "condition": "One Update per joining with gen_joiningstatus = 7 (source WHERE, DTSX:980-984) whose padded bank account number right('0000000000000' + gen_bankaccountnumbername,12) matches right('0000000000000' + gen_bankaccountnumber,12) of a Gen_customeraccount with non-NULL gen_bankaccountnumber (Lookup 'Get customer accounts', DTSX:914-919). Lookup NoMatchBehavior=1 (redirect to No Match output, DTSX:927) and the No Match output has no path (paths DTSX:1876-1880) -> joinings without a matching customer account are silently dropped (no update, no warning). Rows whose SDK call throws go to the Error output -> 'Set Warning columns 1 2 1' -> ETL Warning (plumbing).",
+      "attributes": [
+        {
+          "attribute": "gen_joiningstatus",
+          "from": [
+            {
+              "column": "gen_joiningstatus",
+              "role": "value"
+            }
+          ],
+          "expression": "entity[\"gen_joiningstatus\"] = new OptionSetValue(Row.genjoiningstatus); Row.genjoiningstatus is Derived Column 'Set columns' output gen_joiningstatus (i4) with Expression literal 8 -> always OptionSetValue(8). Business meaning of option values 7 and 8 is not in the supplied DTSX (CRM metadata not supplied).",
+          "fixedValue": 8,
+          "condition": null,
+          "evidence": "Update to close joining main.cs:72 (code file DTSX:1094, sha 825ce358b9ad); Set columns Expression '8' DTSX:1025-1028",
+          "declaredSources": [
+            {
+              "db": "gen_automatedjoining.gen_joiningstatus",
+              "role": "condition",
+              "why": "Source WHERE gen_joiningstatus = 7: only joinings currently in status 7 are set to 8",
+              "evidence": "Get Joining To Close SqlCommand DTSX:980-984"
+            }
+          ]
+        },
+        {
+          "attribute": "gen_customeraccountid",
+          "from": [
+            {
+              "column": "Gen_customeraccountId",
+              "role": "value"
+            }
+          ],
+          "expression": "entity[\"gen_customeraccountid\"] = new EntityReference(\"gen_customeraccount\", Row.GencustomeraccountId); Gen_customeraccountId is returned by Lookup 'Get customer accounts' from CRM Gen_customeraccount.Gen_customeraccountId, joined on gen_bankaccountnumber = right('0000000000000' + Gen_customeraccount.gen_bankaccountnumber,12) (left-padded with zeros to 12 chars; values longer than 12 chars keep only their last 12 chars) against the source column right('0000000000000' + gen_automatedjoining.gen_bankaccountnumbername,12). Full-cache lookup (CacheType=0): if several customer accounts share the same padded number, SSIS uses one of them (the first cached) - which one is not determined by the package.",
+          "fixedValue": null,
+          "condition": null,
+          "evidence": "Update to close joining main.cs:73 (DTSX:1094); Lookup DTSX:912-955 (SqlCommand 914, SqlCommandParam 919, CacheType 926, NoMatchBehavior 927); source SQL DTSX:980-984",
+          "declaredSources": [
+            {
+              "db": "Gen_customeraccount.Gen_customeraccountId",
+              "role": "value",
+              "why": "The written id is the Gen_customeraccountId column returned by the CRM lookup 'Get customer accounts' (not a value from the source query)",
+              "evidence": "DTSX:914-918, 955"
+            },
+            {
+              "db": "Gen_customeraccount.gen_bankaccountnumber",
+              "role": "key",
+              "why": "Lookup reference side: right('0000000000000' + gen_bankaccountnumber,12), WHERE Gen_bankaccountnumber is not null",
+              "evidence": "DTSX:914-918, 944"
+            },
+            {
+              "db": "gen_automatedjoining.gen_bankaccountnumbername",
+              "role": "key",
+              "why": "Lookup input side: right('0000000000000' + gen_bankaccountnumbername,12) AS gen_bankaccountnumber from the joining row (the name column of the joining's bank-account lookup, as read from the CRM view)",
+              "evidence": "DTSX:980-984, 940-944"
+            },
+            {
+              "db": "gen_automatedjoining.gen_joiningstatus",
+              "role": "condition",
+              "why": "Source WHERE gen_joiningstatus = 7",
+              "evidence": "DTSX:980-984"
+            }
+          ]
+        }
+      ],
+      "evidence": "Update to close joining main.cs:65-90 (DTSX:1094; ReadOnlyVariables DTSX:1846); inputs DTSX:1858-1860; paths DTSX:1876-1880; [CRM] connection DTSX:4"
+    },
+    {
+      "component": "Package\\Update SuspicionAsEmitted Joinings\\Update Joinings",
+      "identicalCopies": [],
+      "entity": "gen_automatedjoining",
+      "verb": "UPDATE",
+      "mechanism": "SDK (IOrganizationService.Update via CrmProxy.GetCrmService)",
+      "status": "Supported",
+      "recordKey": "entity.Id = Row.genautomatedjoiningId = gen_automatedjoining.gen_automatedjoiningId from OLE DB Source 'Get Joinings From DB' on [CRM]",
+      "recordKeyColumns": [
+        "gen_automatedjoiningId"
+      ],
+      "declaredRowFilters": [],
+      "condition": "Runs after 'Close Joining processes' -> 'Get NonWorkingDays' -> 'Update LastThreeWorkingDays Variable' (Success constraints DTSX:6510, 6509, 6511). One Update per joining WHERE gen_joiningstatus = 7 AND gen_sendtobankdate IS NOT NULL AND datediff(day, ?, gen_sendtobankdate) <= 0 (DTSX:5541-5544), ? = User::LastThreeWorkingDays (ParameterMapping DTSX:5549 -> variable DTSX:42). I.e. joinings still in status 7 after the close step (no matching customer account, or SDK update failed) whose send-to-bank date (date part, as stored, no time-zone conversion in the SQL) is on or before LastThreeWorkingDays. LastThreeWorkingDays is computed by Script Task 'Update LastThreeWorkingDays Variable' (ScriptMain.cs:107-134): starting from DateTime.Now.AddDays(-1).Date it walks back day by day, skipping days present in User::NonWorkingDays (CalendarRule starttime of 'Friday'/'Saturday'/'Holiday' rules within the last 21 days, Execute SQL DTSX:4090-4091), and returns the 3rd working day counting yesterday as the 1st.",
+      "attributes": [
+        {
+          "attribute": "gen_joiningstatus",
+          "from": [
+            {
+              "column": "gen_suspicionAsEmitted",
+              "role": "value"
+            }
+          ],
+          "expression": "entity[\"gen_joiningstatus\"] = new OptionSetValue(Row.gensuspicionAsEmitted); Row.gensuspicionAsEmitted is Derived Column 'Set Status As SuspicionAsEmitted' output gen_suspicionAsEmitted (i4) with Expression literal 12 -> always OptionSetValue(12). Meaning of 12 per column name 'suspicionAsEmitted' only (CRM option metadata not supplied).",
+          "fixedValue": 12,
+          "condition": null,
+          "evidence": "Update Joinings main.cs:121 (code file DTSX:5602, sha 4502503e70d0); Derived Column Expression '12' DTSX:5584-5585",
+          "declaredSources": [
+            {
+              "db": "gen_automatedjoining.gen_joiningstatus",
+              "role": "condition",
+              "why": "Source WHERE gen_joiningstatus = 7",
+              "evidence": "Get Joinings From DB SqlCommand DTSX:5541-5544"
+            },
+            {
+              "db": "gen_automatedjoining.gen_sendtobankdate",
+              "role": "condition",
+              "why": "Source WHERE gen_sendtobankdate is not null and datediff(day, User::LastThreeWorkingDays, gen_sendtobankdate) <= 0",
+              "evidence": "DTSX:5541-5544, 5549"
+            },
+            {
+              "db": "CalendarRule.starttime",
+              "role": "condition",
+              "why": "Non-working days (CalendarRule.Name in Friday/Saturday/Holiday, starttime between GetutcDate()-21 and GetutcDate()) are skipped when computing User::LastThreeWorkingDays, the cut-off date of the source WHERE",
+              "evidence": "Get NonWorkingDays DTSX:4090-4091; Update LastThreeWorkingDays Variable ScriptMain.cs:113-133"
+            }
+          ]
+        }
+      ],
+      "evidence": "Update Joinings main.cs:114-134 (DTSX:5602; ReadOnlyVariables DTSX:6469); paths DTSX:6498-6499; source DTSX:5536-5549"
+    }
+  ],
+  "readWriteModifications": [],
+  "lookupBridges": [],
+  "unresolved": [
+    {
+      "where": "Update SuspicionAsEmitted Joinings\\Update Joinings - row selection via User::LastThreeWorkingDays",
+      "reason": "Update LastThreeWorkingDays Variable ScriptMain.cs:121 matches non-working days with dt.Select(\"starttime = '\" + currDate.ToString() + \"'\"): currDate is local midnight formatted with the runtime culture, while CalendarRule.starttime is read as stored (the SQL compares it against GetutcDate()). Whether these strings/values ever match (and therefore whether Fridays/Saturdays/holidays are really skipped) depends on the server culture, time zone and CalendarRule data - not determinable from the DTSX."
+    }
+  ],
+  "notes": [
+    "Writers in lineage (4): 2 business CRM writers mapped here (3 attributes in total: Update to close joining 2, Update Joinings 1). Excluded as ETL plumbing: Close Joining processes\\ETL Warning 1 2 1 (creates gen_etlprocesswarning, main.cs:63-76) and End ETL Process record\\ETL Record Finish (updates gen_etlprocess, main.cs:120-129). Also plumbing (control flow / event handlers, not data-flow writers): Create ETL Process record (gen_etlprocess create), OnError\\Error ETL Process record (gen_etlprocess update + annotation on gen_etlprocess, ScriptMain.cs:49-64), OnPostExecute\\Cancel ETL Process record, Get Variables From Etl Variables.",
+    "Status chain on gen_automatedjoining: 'Close Joining processes' moves status 7 -> 8 for joinings whose bank account number matches a customer account and sets gen_customeraccountid; afterwards 'Update SuspicionAsEmitted Joinings' moves remaining status-7 joinings with gen_sendtobankdate on/before LastThreeWorkingDays -> 12. Order proven by Success constraints DTSX:6506-6511.",
+    "Update LastThreeWorkingDays Variable ScriptMain.cs:96-104: on exception the catch sets TaskResult = Failure but line 104 unconditionally sets Success afterwards, so the package continues and User::LastThreeWorkingDays keeps its previous value (design-time value '10/2/2017 5:29:05 PM', DTSX:42, unless set by configuration - not supplied). In that case the cut-off date of the suspicion update would be 2017-10-02.",
+    "Close Joining processes: rows with NULL gen_bankaccountnumbername produce a NULL key ('0000000000000' + NULL = NULL) and do not match the lookup -> dropped (no-match output unconnected, DTSX:927, 1876-1880). SSIS semantics; stated as such.",
+    "Both writers catch exceptions per row (SoapException -> e.Detail.InnerText, others -> e.Message) and redirect the row to the Error output; only 'Update to close joining' has its Error output connected (to the ETL warning branch, DTSX:1878). 'Update Joinings' Error output has no path (paths DTSX:6498-6499) - failed suspicion updates are silently discarded."
+  ]
+}

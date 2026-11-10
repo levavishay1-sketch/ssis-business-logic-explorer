@@ -1,0 +1,93 @@
+{
+  "verifier": "ssis-verifier",
+  "package": "0039_UpdateAgentAppointmentDate",
+  "scope": "mapping-A.json",
+  "checked": 13,
+  "results": [
+    {
+      "id": "Update agent appointment date|gen_fundmain|UPDATE|gen_agentappointmentdate",
+      "verdict": "CONFIRMED",
+      "detail": "Re-check: the claim now states that Gen_customeraccountname is the guid lookup to the customer account and that funds are matched by the same customer-account id. Both cross-package evidence points were re-opened: 0005_Customer Account.dtsx:2644 has ExternalColumns[Gen_customeraccountname] dataType=\"guid\" on a gen_fundmain source, and 0015_TransferIn.dtsx:75552 has join fm.Gen_customeraccountname = ca.Gen_customeraccountId. The parameter positions are unchanged and correct: ?#0 Param_0 AgentAppointmentDateToInsert, #1 Param_1 ModifiedBy, #2 Param_2 ModifiedOn, #3 Param_3 Gen_fundmainId (key). The mapping note about funds being matched by name was also corrected.",
+      "evidence": "0039 DTSX:3246-3256, 3294-3296, 3303-3311; 0005_Customer Account.dtsx:2644; 0015_TransferIn.dtsx:75552",
+      "previousVerdict": "WRONG"
+    },
+    {
+      "id": "Update agent appointment date|gen_fundmain|UPDATE|modifiedby",
+      "verdict": "CONFIRMED",
+      "detail": "Param_1 <- Create System Variables.Output 0.ModifiedBy (guid) = new Guid(Convert.ToString(ReadOnlyVariables[\"User::CrmAdminId\"].Value)). CrmAdminId is loaded from gen_etlvariable (scope 'global' or PackageName) by 'Get Organization Variables'. Note: an empty or invalid CrmAdminId throws FormatException in the script, so the data flow fails before any UPDATE.",
+      "evidence": "DTSX:2620-2622, 3305, 3360-3373"
+    },
+    {
+      "id": "Update agent appointment date|gen_fundmain|UPDATE|modifiedon",
+      "verdict": "CONFIRMED",
+      "detail": "Param_2 <- ModifiedOn (pipeline DT_DATE, cachedDataType=\"date\") = DateTime.UtcNow per row. The external Param_2 is dbTimeStamp.",
+      "evidence": "DTSX:2621, 3307, 3330-3334"
+    },
+    {
+      "id": "LOGIC scopeNote_he",
+      "verdict": "CONFIRMED",
+      "detail": "There is a single connection [psql] -> ALTSHULER_MSCRM, used by the source, the UPDATE, the org-variables read and the End ETL lookup on gen_etlprocess (DTSX:2319). There is no DTS:Configuration element. The CRM-DB inference is evidenced: the same connection reads the gen_etlprocess record that the package created via the SDK, and the table name is a Base table. The runtime override is correctly labelled external_unknown.",
+      "evidence": "DTSX:4-6, 2319, 3264, 3300, 3376"
+    },
+    {
+      "id": "LOGIC summary_he",
+      "verdict": "CONFIRMED",
+      "detail": "Matches the SQL. Field meanings are labelled as hypotheses. Cross-package evidence shows Gen_customeraccountname is the customer-account lookup id (see claim).",
+      "evidence": "DTSX:3246-3256, 3294-3296"
+    },
+    {
+      "id": "LOGIC executionOrder",
+      "verdict": "CONFIRMED",
+      "detail": "Default Success constraints: Get Organization Variables -> Create ETL -> Get All Funds -> End ETL.",
+      "evidence": "DTSX:4224-4226"
+    },
+    {
+      "id": "LOGIC Get All Funds",
+      "verdict": "CONFIRMED",
+      "detail": "Source -> Create System Variables (sync) -> OLE DB Command, with no other components. The input has errorRowDisposition=FailComponent and the error output has no path. A failure fails the data flow, and because of the Success constraint End ETL does not run. 'select distinct' gives one row per Gen_fundmainId. The detail_he hypothesis 'Gen_customeraccountname = חשבון הלקוח' is supported by cross-package evidence (a GUID lookup to gen_customeraccount).",
+      "evidence": "DTSX:2365-3354, 4226"
+    },
+    {
+      "id": "LOGIC findings_he[0]",
+      "verdict": "CONFIRMED",
+      "detail": "UPDATE Gen_fundmainBase including ModifiedBy/ModifiedOn via [psql]: Unsupported.",
+      "evidence": "DTSX:3294-3296"
+    },
+    {
+      "id": "LOGIC findings_he[1]",
+      "verdict": "CONFIRMED",
+      "detail": "FailComponent is confirmed, and End ETL is skipped through the Success constraint. There is no TransactionOption attribute in the file (defaults); the lack of rollback is labelled as a hypothesis.",
+      "evidence": "DTSX:3303, 4226; grep TransactionOption = 0"
+    },
+    {
+      "id": "LOGIC findings_he[2]",
+      "verdict": "CONFIRMED",
+      "detail": "with (nolock) appears on all three Gen_fundmain references.",
+      "evidence": "DTSX:3248-3253"
+    },
+    {
+      "id": "LOGIC findings_he[3]",
+      "verdict": "CONFIRMED",
+      "detail": "No DTS:Configuration element.",
+      "evidence": "grep '<DTS:Configuration' = 0"
+    },
+    {
+      "id": "LOGIC findings_he[4]",
+      "verdict": "CONFIRMED",
+      "detail": "FileName='reject_reasons_full_22052019' and FilePath='C:\\Test\\RejectReasons' are defined (DTSX:23-28). There are no references to User::FileName/FilePath or Variables.FileName/FilePath in the file.",
+      "evidence": "DTSX:23-28; grep count 0"
+    },
+    {
+      "id": "LOGIC missing",
+      "verdict": "CONFIRMED",
+      "detail": "Re-check: the logic now states that an empty or invalid User::CrmAdminId makes new Guid(...) throw FormatException with no try/catch, so the flow fails before any UPDATE and End ETL does not run. The code is at DTSX:2622 (main.cs:128). The variable default \"\" is confirmed at DTSX:11-12. The summary and Get All Funds text now say the match is by account id (guid lookup) with cross-package evidence.",
+      "evidence": "DTSX:11-12, 2621-2622, 4226",
+      "previousVerdict": "INCOMPLETE"
+    }
+  ],
+  "missingWrites": [],
+  "recheck": {
+    "date": "2026-11-06",
+    "note": "Re-check of previously WRONG/INCOMPLETE items after analyst fixes; previousVerdict kept on changed items."
+  }
+}

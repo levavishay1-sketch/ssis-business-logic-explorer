@@ -1,0 +1,327 @@
+{
+  "verifier": "ssis-verifier",
+  "package": "0005_Customer Account",
+  "scope": "logic-claims re-check after fixes",
+  "checkedAt": "2026-11-07T12:00:00Z",
+  "checked": 24,
+  "results": [
+    {
+      "id": "L|finding#1",
+      "hash": "b197e8d366a4",
+      "verdict": "WRONG",
+      "detail": "The counts are correct: 30 OLE DB Command components, of which 5 are 'insert etl process warning' and 25 are business (5 groups x5), plus 3 Execute SQL tasks (Aggregations, Paragraph14, Currency). The partial absence of ModifiedOn is also correct: Update Customer Account 1-5 and both Update TransferRequest groups set ModifiedOn; Update Customer Account (Unsupported), Update Fund Main and the 3 Execute SQL tasks do not. The claim is wrong that all of this direct SQL runs 'on the Base tables'. The 10 transfer-request markers (Update TransferRequest 1-5 in both consulting data flows) run 'update gen_transferrequest', which is the entity view name, not gen_transferrequestBase. Only Gen_customeraccountBase and Gen_fundmainbase are Base tables here. The writes are still direct SQL and Unsupported.",
+      "evidence": "0005_Customer Account.dtsx:73757,73803,73849,73895,73941,79598,79644,79690,79736,79782 ('update gen_transferrequest'); 40982-42290, 73352-73676 (Gen_customeraccountBase); 79193-79517 (Gen_fundmainbase); 68399, 79889, 79895",
+      "wrongUnits": [
+        {
+          "unit": 1,
+          "problem": "Says all the direct SQL is on CRM Base tables.",
+          "correct": "Gen_customeraccountBase and Gen_fundmainbase are Base tables; the transfer-request marking updates the view gen_transferrequest (still direct SQL, Unsupported).",
+          "evidence": "DTSX:73757, 79598"
+        }
+      ]
+    },
+    {
+      "id": "L|finding#7",
+      "hash": "fa283839e0c4",
+      "verdict": "CONFIRMED",
+      "detail": "Re-derived. Get TRansfer Request does gen_transferrequest LEFT JOIN Gen_fundmain ON tr.gen_customeraccount = fm.gen_customeraccountname. When no fund matches, every fm.* is NULL. The OR condition then reduces to 'tr.X is not null' for at least one of the six fields, so a request with all six NULL is not selected. The row flows with Gen_fundmainId NULL into Update Fund Main ('where Gen_fundmainId = ?' with NULL affects 0 rows and raises no error). Its OLE DB Command Output goes through Union Update All → Multicast 1 → Aggregate (group by gen_transferrequestid, SystemUserId) → Update TransferRequest, which sets gen_dateofcopyingconsultingdetailstofund.",
+      "evidence": "0005_Customer Account.dtsx:77180-77214 (SQL); 79193 (Update Fund Main SQL); paths 79861-79868, 79880, 79847, 79827, 79844; Aggregate 75692-75736",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|finding#11",
+      "hash": "50d77726f0da",
+      "verdict": "CONFIRMED",
+      "detail": "I extracted and compared the code myself, ignoring only whitespace and braces. Update CustomerAccounts x5 (main.cs and Helpers.cs), Update Customer Account Guid in Fund x5 and Set Joining 'Update Customer Account' x5 are equal. Create Customer Account x5 are equal except that in Create Customer Account 4 the single gen_mfratedtotal statement sits after the first gen_managementfeepercentage block. With that statement removed, the code is identical. The OLE DB Command groups (Update Customer Account 1-5, Update Customer Account (Unsupported) 1-5, Update Fund Main 1-5, both Update TransferRequest groups) have identical SQL and identical parameter mappings within each group. The reordering does not change behaviour because the assignments are independent.",
+      "evidence": "0005_Customer Account.dtsx code at 18169/20382/22687/24902/27118, 42614/45510/48408/51304/54200, 3110/4397/5773/7060/8347, 62821/63930/65038/66148/67256; OLE DB Commands 40979-42287, 73349-73938, 79190-79779",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Create or Update Customer Accounts|title",
+      "hash": "93926fac1ba9",
+      "verdict": "WRONG",
+      "detail": "Units 1, 3-5, 7 and 8 match the DTSX. Unit 2 calls the population 'הקופות הפעילות' (active funds). The only filter is gen_existinfile = 1 (DTSX:33252). That this means 'active' is not proven, and the files argue against it. gen_fundmain has a separate field gen_isactiveaccount, which 0004 writes in the same UPDATE that sets gen_existinfile = 1 (0004:92874-92878). No supplied package ever resets gen_fundmain.gen_existinfile to 0: the only '= 0' resets are on gen_ftrequestbase (0009:189416) and gen_warningnotebase (0012:92729). The correct wording is 'funds flagged gen_existinfile = 1 (exist in file)', as detailed unit 1 and short unit 1 say. Minor: unit 6 (flow_he[4]) says creation always includes the awaiting-mail flag. The 5050 exception (main.cs:41) is missing there, although short and detailed include it.",
+      "evidence": "0005_Customer Account.dtsx:33252 (where gen_existinfile = 1); 0004_LeumiFile-MY.dtsx:92874-92878 (Set gen_existinfile = 1, ..., gen_isactiveaccount = ?); 0009_LeumiFile-BY.dtsx:189416; 0012_LeumiFile_CHN_Daily.dtsx:92729; Create Customer Account main.cs:41-44 (DTSX:18343-18346)",
+      "wrongUnits": [
+        {
+          "unit": 2,
+          "problem": "'בקופות הפעילות' presents gen_existinfile = 1 as 'active funds' without proof; a distinct gen_isactiveaccount field exists and no supplied package resets gen_existinfile to 0.",
+          "correct": "Funds flagged gen_existinfile = 1 ('marked as existing in the file'); the meaning 'active' would need a השערה label.",
+          "evidence": "DTSX:33252; 0004:92874-92878"
+        },
+        {
+          "unit": 6,
+          "problem": "Says creation always sets the awaiting-mail flag.",
+          "correct": "gen_joiningmailtoagent = 1 is set only when gen_producttypeid is NULL or not '5050'.",
+          "evidence": "Create Customer Account main.cs:41-44"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Create or Update Customer Accounts|short",
+      "hash": "f913b374884e",
+      "verdict": "CONFIRMED",
+      "detail": "Every unit is correct against the DTSX. Unit 1: the partition by bank + account + product type is equivalent to account type + account because cat is joined on (gen_id = producttypeid, bankname). Unit 2: lookup on gen_IsDepositBlocked = '1' by account + account type. Units 3-4: full-cache Lookup, no match → create. Unit 5: consulting values come from the fund and are overwritten per field by non-NULL automated-joining values. The automated joining is the first one by createdon per (id, document type, account), used only if its status is 7. The awaiting-mail flag is not set for product 5050. Units 7-11 match the Conditional Split (UnSupported → SQL, default → SDK) and the compare components. Note on unit 12: create and update failures are only logged as warnings, so 'every account type + account number has an account' holds only when the writes succeed. The detailed claim states this caveat.",
+      "evidence": "0005_Customer Account.dtsx:33252, 31966-31984, 32121-32262, 32038, 18124-18139, 33700-33705, 18103-18111, 12421-14892, 14893-17313; Create main.cs:39-228; Update CustomerAccounts main.cs:36-121",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Create or Update Customer Accounts|detailed",
+      "hash": "bfbda580e640",
+      "verdict": "WRONG",
+      "detail": "Units 1-28 are correct: the SQL, the CASE mapping, Set gen_name with FailComponent, the block lookup, the full-cache lookup, the automated-joining numbering before the status-7 filter, Convert Product Type 4→2/5→3/2→4, the Left Outer Merge Join on 3 keys, the Dates To Local 1 columns, the Create field list (main.cs:39-228), the 5050 rule, the Conditional Split expression, the compare thresholds (all compared numeric columns are r8, so the 0.001 path applies), the 41 SET columns plus ModifiedBy = systemuser where domainname like '%crmadmin%' and ModifiedOn = GETUTCDATE(), and the Dates To Local columns before Compare 1. Unit 30 is wrong: it uses 'בקופות הפעילות' for gen_existinfile = 1, which is unproven (see the title verdict). Unit 29 is incomplete: 'כולל ניקוי שדה כשהערך בקופה ריק' is not true for every field. gen_lastdepositon and gen_employmentstartedon are written only when the fund value is non-NULL and different, so they are never cleared (main.cs:57-66). gen_depositmfindicator and gen_accrualmfindicator are set to NULL when the fund value is 0, so 0 → NULL (main.cs:110-111). Also, gen_isaccountblockedfordeposits is never NULL here (TRUE/FALSE derived columns) and sets needToUpdate = true. So every row on this branch is sent, and the DontNeedToUpdate output is never used.",
+      "evidence": "0005_Customer Account.dtsx:42795, 42800 (lastdeposit/employmentstartedon only if !IsNull), 42848-42849 (indicator != 0 else null), 42790-42794 (blocked → needToUpdate), 33580-33619 (TRUE/FALSE); 33252 (gen_existinfile = 1); 0004:92874-92878",
+      "wrongUnits": [
+        {
+          "unit": 30,
+          "problem": "'בקופות הפעילות' presents gen_existinfile = 1 as 'active funds' without proof.",
+          "correct": "Funds flagged gen_existinfile = 1 (as unit 1 says); 'active' would need a השערה label.",
+          "evidence": "DTSX:33252; 0004:92874-92878"
+        },
+        {
+          "unit": 29,
+          "problem": "Clearing on an empty fund value is presented as general; exceptions are omitted.",
+          "correct": "Most fields are cleared when the fund value is NULL, but gen_lastdepositon and gen_employmentstartedon are never cleared (written only when non-NULL), and gen_depositmfindicator / gen_accrualmfindicator become NULL when the fund value is 0. Because gen_isaccountblockedfordeposits is always set, every row on this branch is sent.",
+          "evidence": "Update CustomerAccounts main.cs:52-66, 110-111 (DTSX:42790-42804, 42848-42849)"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Create or Update Customer Accounts|detail",
+      "hash": "0e30ad12c220",
+      "verdict": "CONFIRMED",
+      "detail": "Unit 1: the source is CRM tables with gen_existinfile = 1 and one row per bank + account + product type. Upstream: 0004 inserts into Gen_fundmainbase (61789-61900) and runs UPDATE Gen_fundmain Set gen_existinfile = 1 (92874). 0008 and 0009 write gen_fundmain via SDK with gen_existinfile = true (0008:23781-23784, 0009:27019-27026). No supplied package creates gen_automatedjoining: 0027 only updates it (0027:1370-1376, 5935-5939) and 0029 only updates gen_testedtocreatepoa. Units 2-5 match the lookup keys, the Convert Product Type mapping, the Conditional Split and the write mechanisms. Unit 6: 0027 reads status 7 (0027:984) and updates gen_joiningstatus and gen_customeraccountid. The effect on this package's source is correctly stated as depending on run order, which is not in the files.",
+      "evidence": "0005_Customer Account.dtsx:33252, 32038, 18124, 18103; 0004_LeumiFile-MY.dtsx:61789-61900, 92874; 0008_LeumiFile-PY.dtsx:23781-23784; 0009_LeumiFile-BY.dtsx:27019-27026; 0027_AutomatedJoining.dtsx:984, 1370-1376; 0029_POA.dtsx:29686-29691",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Connect Funds to Customer Accounts|detail",
+      "hash": "ef27dfa5c1b4",
+      "verdict": "CONFIRMED",
+      "detail": "SQL (DTSX:2588): gen_fundmain ⋈ product ⋈ gen_customeraccounttype (p.Gen_producttypeid = cat.gen_id AND p.gen_bankname = cat.gen_bankname) ⋈ gen_customeraccount (cat id = ca.gen_customeraccounttype AND f.Gen_BankAccountNumber = ca.Gen_bankaccountnumber). Filter: (f.Gen_customeraccountname is null OR <> ca id) AND Gen_existinfile = 1. Code (Update Customer Account Guid in Fund main.cs): gen_customeraccountname is always set. Each of the 6 consulting fields is set only if the account value is non-NULL and the fund value is NULL or different. Both sides' consulting dates are converted by Dates To Local first. ExecuteMultiple Update runs in batches of 10. Among the supplied packages, only 0005 creates gen_customeraccount (0006 only updates it), so 'accounts come from the previous step' holds within the supplied files. The upstream writers of gen_fundmain are correct.",
+      "evidence": "0005_Customer Account.dtsx:2588 (SQL); 3266-3300 (main.cs ProcessInputRow); 1697-2582 Dates To Local columns; paths 9636-9661; 0006_LeumiFile-MY-Distributor.dtsx:9750-9753 (update only)",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Set Joining email to Agent|title",
+      "hash": "46119691d9c9",
+      "verdict": "INCOMPLETE",
+      "detail": "The facts are correct: source filter gen_joiningmailtoagent = 1; isnull(c.EMailAddress1, a.EMailAddress1) and isnull(c.DoNotEMail, a.DoNotEMail) are taken separately per field; the condition is !email_IsNull && !donotemail_IsNull && donotemail == false → 2, else 4; SDK ExecuteMultiple Update; no mail is sent by the package. Values 2 and 4 are correctly attributed to the code constants. The meaning of value 1 is not attributed. Unit 2 ('שממתינים למייל הצטרפות לסוכן (1)') presents 'awaiting' as fact. That label comes only from the constant AWAITING_EMAIL_SEND = 1 in another component (Create Customer Account main.cs:19, 43). Under the project rule it must be presented as such, as was done for 2 and 4.",
+      "evidence": "0005_Customer Account.dtsx:62354 (SQL); Update Customer Account main.cs:15-17, 41-48; Create Customer Account main.cs:19 (DTSX:18321), 43 (DTSX:18345)",
+      "wrongUnits": [
+        {
+          "unit": 2,
+          "problem": "The label 'ממתינים' for value 1 is not attributed.",
+          "correct": "gen_joiningmailtoagent = 1 (in the code: AWAITING_EMAIL_SEND, Create Customer Account main.cs:19).",
+          "evidence": "DTSX:18321"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Set Joining email to Agent|short",
+      "hash": "f6696ce2cfc4",
+      "verdict": "INCOMPLETE",
+      "detail": "Logic is correct: per-field fallback agent contact → agency account, 2/4 decision, and a failed SDK update leaves the value at 1, so the account is re-selected next run. Unit 1 ('שממתינים') and unit 8 ('ממצב 'ממתין' (1)') give value 1 the meaning 'awaiting' without attribution. The label comes only from the constant AWAITING_EMAIL_SEND in Create Customer Account (main.cs:19). Unit 3 is a simplification: a NULL DoNotEMail also leads to 4. The detailed claim states this, so it is acceptable.",
+      "evidence": "0005_Customer Account.dtsx:62354; Update Customer Account main.cs:41-48; Create Customer Account main.cs:19 (DTSX:18321)",
+      "wrongUnits": [
+        {
+          "unit": 8,
+          "problem": "'ממתין' (1) is not attributed.",
+          "correct": "Value 1 (in the code: AWAITING_EMAIL_SEND).",
+          "evidence": "DTSX:18321"
+        },
+        {
+          "unit": 1,
+          "problem": "'שממתינים' is not attributed.",
+          "correct": "Accounts with gen_joiningmailtoagent = 1 (code constant AWAITING_EMAIL_SEND).",
+          "evidence": "DTSX:18321"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Set Joining email to Agent|detailed",
+      "hash": "bb6c1cc275dc",
+      "verdict": "INCOMPLETE",
+      "detail": "Units 2-9 are correct. I compared the 5 copies myself (1 equals 3 up to whitespace; 2, 4 and 5 differ from them only in braces and whitespace). The batch size is 10 with a final flush at EndOfRowset. Unit 1 has two problems. '1 (ממתין)' is not attributed to the constant AWAITING_EMAIL_SEND. 'בריצה רגילה אלה בעיקר החשבונות שנוצרו בשלב הראשון' is a quantitative inference that the files do not prove and that is not labelled השערה. In the supplied files, only this package sets gen_joiningmailtoagent = 1 (on Create), but how often accounts stay at 1 from earlier runs, or are set to 1 outside these packages, is unknown.",
+      "evidence": "0005_Customer Account.dtsx:62354; Create Customer Account main.cs:19, 41-44 (DTSX:18321, 18343-18346); grep: gen_joiningmailtoagent appears only in 0005",
+      "wrongUnits": [
+        {
+          "unit": 1,
+          "problem": "'(ממתין)' is not attributed, and 'mostly the accounts created in the first step' is an unlabelled inference.",
+          "correct": "Accounts with gen_joiningmailtoagent = 1 (in the code: AWAITING_EMAIL_SEND). Within the supplied files only Create Customer Account sets 1, so these include accounts created in this run and earlier ones whose update failed. The share is unknown (השערה).",
+          "evidence": "DTSX:18321, 62354"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Update Aggrigations on Customer Accounts|short",
+      "hash": "63922f5e1207",
+      "verdict": "WRONG",
+      "detail": "The thresholds and the write are correct: balance diff > 1 OR any of 3 dates diff > 12 h → UPDATE Gen_customeraccountBase. Units 1 and 7 call the funds 'הקופות הפעילות' / 'קופה פעילה'. The SQL filter is only Gen_existinfile = 1. 'Active' is not proven: gen_fundmain has a separate gen_isactiveaccount field (0004:92878), and no supplied package resets gen_existinfile to 0. The detailed claim itself (unit 3) uses 'שמסומנת כקיימת בקובץ'.",
+      "evidence": "0005_Customer Account.dtsx:68399 (where Gen_existinfile = 1); 0004_LeumiFile-MY.dtsx:92874-92878",
+      "wrongUnits": [
+        {
+          "unit": 1,
+          "problem": "'מהקופות הפעילות שלו' is an unproven meaning of Gen_existinfile = 1.",
+          "correct": "From its funds flagged Gen_existinfile = 1.",
+          "evidence": "DTSX:68399"
+        },
+        {
+          "unit": 7,
+          "problem": "'לפי הקופות הפעילות שלו ... בלי קופה פעילה' is the same unproven label.",
+          "correct": "Funds flagged Gen_existinfile = 1; an account with no such fund is not updated.",
+          "evidence": "DTSX:68399"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Update Aggrigations on Customer Accounts|detailed",
+      "hash": "84c183d2ad9b",
+      "verdict": "WRONG",
+      "detail": "Units 2-8 match the SQL exactly: sum(isnull(balance,0)); isnull(min(date),0) and CASE back to NULL; inner join by Gen_customeraccountname (a NULL group matches no account); the WHERE with abs(...) > 1 and datediff(HH, agg.X, isnull(ca.X,0)) > 12 for the three dates; 4 columns set with no ModifiedOn/ModifiedBy; NULL account balance makes the balance test unknown. Units 1 and 9 use 'הקופות הפעילות' / 'קופות פעילות' for Gen_existinfile = 1, which is unproven (gen_isactiveaccount exists separately; no supplied reset of gen_existinfile to 0).",
+      "evidence": "0005_Customer Account.dtsx:68399; 0004_LeumiFile-MY.dtsx:92874-92878",
+      "wrongUnits": [
+        {
+          "unit": 1,
+          "problem": "'יתרות הקופות הפעילות' is an unproven label.",
+          "correct": "Balances of the funds flagged Gen_existinfile = 1 linked to the account.",
+          "evidence": "DTSX:68399"
+        },
+        {
+          "unit": 9,
+          "problem": "'שיש להם קופות פעילות ... בלי קופה פעילה' is an unproven label.",
+          "correct": "Accounts with at least one fund flagged Gen_existinfile = 1.",
+          "evidence": "DTSX:68399"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Update Aggrigations on Customer Accounts|detail",
+      "hash": "9895d24bd2d1",
+      "verdict": "CONFIRMED",
+      "detail": "Source, inner-join consequence, match key (gen_fundmain.Gen_customeraccountname = ca.Gen_customeraccountId), thresholds, and the Unsupported UPDATE without ModifiedOn are all correct. Within the supplied files, the fund-to-account link is written only by Connect Funds in this package (no other package sets gen_fundmain.gen_customeraccountname). The upstream writers of gen_fundmain are correct. Unit 5 is a summary and leaves out the release date (gen_endexperiencereleasedate), but it does not misstate anything.",
+      "evidence": "0005_Customer Account.dtsx:68399; 3274 (Connect Funds main.cs sets gen_customeraccountname); 0004:61789-61900, 92874; 0008:23781-23784; 0009:27019-27026",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Update Paragraph14 and Employer Confirmation fields|detail",
+      "hash": "b4b562ea7001",
+      "verdict": "CONFIRMED",
+      "detail": "SQL (DTSX:79889): update Gen_customeraccountBase set gen_paragraph14, gen_employerconfirmation from Gen_fundmain join gen_customeraccountbase ca on Gen_fundmain.Gen_customeraccountname = ca.Gen_customeraccountId where both fund fields are not null. There is no change check, no ModifiedOn and no existinfile filter. A grep of all supplied DTSX finds gen_paragraph14 / gen_employerconfirmation only in 0004 and 0005. 0004 writes them in the insert (61879-61880) and the UPDATE (92935-92936). finding#6 covers the non-deterministic choice when an account has several funds.",
+      "evidence": "0005_Customer Account.dtsx:79889; 0004_LeumiFile-MY.dtsx:61879-61880, 92935-92936",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Update Consulting Field  In Customer Account From Transfer Request|short",
+      "hash": "f135b604f07f",
+      "verdict": "INCOMPLETE",
+      "detail": "Units 2-5 are correct: ISNULL(tr_X) ? ca_X : tr_X; direct SQL to Gen_customeraccountBase; marking via 'update gen_transferrequest' only on the OLE DB Command Output; no ORDER BY with 5 parallel commands. Unit 1 states the meanings of Gen_transferType = 5 ('בין מסלולים') and gen_tanferinstatus = 8 ('הסתיימו') as fact. Both come only from SQL comments (DTSX:70706-70707). The project rule, applied in this package's own fixes ('status send to the bank'), requires such labels to be attributed to the comment.",
+      "evidence": "0005_Customer Account.dtsx:70686-70716 (SQL with comments at 70706-70707); 71222-71265; 73349-73938; paths 73986-74027",
+      "wrongUnits": [
+        {
+          "unit": 1,
+          "problem": "Code meanings taken from SQL comments are presented as fact.",
+          "correct": "Requests with Gen_transferType = 5 and gen_tanferinstatus = 8 (in the SQL comments: 'בין מסלולים', 'הסתיים').",
+          "evidence": "DTSX:70706-70707"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Update Consulting Field  In Customer Account From Transfer Request|detailed",
+      "hash": "ebd25b2eb9fa",
+      "verdict": "CONFIRMED",
+      "detail": "Every unit matches. Unit 1's tech line shows that the labels come from the SQL comments. The six-field difference condition and field pairing match the SQL. The derived columns replace ca_* in place (readWrite), and the Unsupported 1-5 parameters map to those replaced columns (Param_0..5) plus Gen_customeraccountId (Param_6). The OLE DB Command Output goes through Multicast n to Update TransferRequest n, which sets dateofcopyingconsultingdetails, ModifiedOn and ModifiedBy = SystemUserId. The error output goes to Union All Error and the ETL warning, so the request is not marked. There is no ORDER BY and rows are split 5 ways. The 5 copies have identical SQL and mappings.",
+      "evidence": "0005_Customer Account.dtsx:70686-70716; 71222-71265; 73349-73676, 73754-73938; paths 73986-74027",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Update Consulting Field  In Customer Account From Transfer Request|detail",
+      "hash": "13f3b17ec181",
+      "verdict": "INCOMPLETE",
+      "detail": "Units 1-4 and 6 are correct. The numeric filters are correct. No supplied package creates gen_transferrequest: 0028 and 0029 only update gen_fundenrolmentid and gen_powerofattorneymainexistence, and 0036 updates gen_tanferinstatus for status 7 with gen_SendToBankDate not null (0036:3586, 3886-3888). The marking happens only after a successful account update. Unit 5 states 'אחרי העברה בין מסלולים שהסתיימה' as fact. These labels come only from SQL comments (DTSX:70706-70707) and are not attributed anywhere in this claim.",
+      "evidence": "0005_Customer Account.dtsx:70706-70707; 0036_TransferRequest.dtsx:3586, 3886-3888; 0028_Fund Enrolment.dtsx:11114-11116; 0029_POA.dtsx:40559-40561",
+      "wrongUnits": [
+        {
+          "unit": 5,
+          "problem": "The SQL-comment meanings of type 5 and status 8 are stated as fact.",
+          "correct": "After a transfer request with type 5 and status 8 (SQL comments: 'בין מסלולים', 'הסתיים').",
+          "evidence": "DTSX:70706-70707"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Update Consulting Field  In Fund Main From Transfer Request|detailed",
+      "hash": "dad60dfedec2",
+      "verdict": "INCOMPLETE",
+      "detail": "Units 2-7 and 10 match: the LEFT JOIN on all of the account's funds (no existinfile filter), the six-field condition, the ISNULL derived columns (readWrite), Update Fund Main 1-5 to Gen_fundmainbase with no ModifiedOn, and the no-fund case. Unit 1 states 'בין מסלולים' / 'הסתיים' as fact, and its tech line drops the SQL-comment origin (DTSX:77202-77203). Units 8-9 leave out a business consequence. The request is marked when at least one of its fund rows updated successfully. Failed fund rows go only to Union Error All and the ETL warning, not to the Aggregate. So if a request has several funds and one fund update fails, the request is still marked 'copied to fund' and the failed fund is never retried, because the source requires gen_dateofcopyingconsultingdetailstofund IS NULL. Unit 11 ('the account's funds are synchronised') is therefore not guaranteed.",
+      "evidence": "0005_Customer Account.dtsx:77180-77214 (SQL; comments 77202-77203); paths 79850-79858 (errors → Union Error All), 79861-79868 (success → Union Update All), 79880, 79847 (→ Aggregate), 79827, 79844; Aggregate 75692-75736",
+      "wrongUnits": [
+        {
+          "unit": 1,
+          "problem": "The SQL-comment meanings of type 5 and status 8 are stated as fact.",
+          "correct": "Gen_transferType = 5 and gen_tanferinstatus = 8 (SQL comments: 'בין מסלולים', 'הסתיים').",
+          "evidence": "DTSX:77202-77203"
+        },
+        {
+          "unit": 9,
+          "problem": "Does not state that a request is marked even when some of its fund updates failed.",
+          "correct": "A request is marked if at least one of its fund rows updated successfully; fund rows whose update failed are only logged and are not retried, because the request is no longer selected.",
+          "evidence": "paths 79850-79868, 79847; SQL 77180"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Update Consulting Field  In Fund Main From Transfer Request|detail",
+      "hash": "cc147bcc1854",
+      "verdict": "INCOMPLETE",
+      "detail": "Units 1, 2, 4 and 6 are correct. In unit 3, 'סימון הבקשה רק לשורות קופה שעודכנו בלי שגיאה' is literally true, but it omits the consequence that a request with a mix of failed and successful fund rows is marked, so the failed funds are never retried. Unit 5 ('מופיעים בכל קופות החשבון') overstates the outcome. It does not hold when a fund update fails, and it does not hold in the no-fund case (finding#7). Unit 5 also uses the comment-derived label 'בין מסלולים' without attribution.",
+      "evidence": "0005_Customer Account.dtsx:77180-77214; paths 79850-79868, 79847, 79827; 77202-77203",
+      "wrongUnits": [
+        {
+          "unit": 3,
+          "problem": "The partial-failure consequence is missing.",
+          "correct": "A request is marked if at least one fund row updated successfully, even if other fund rows of the same request failed; those funds are not retried.",
+          "evidence": "paths 79850-79868, 79847"
+        },
+        {
+          "unit": 5,
+          "problem": "The outcome is stated as guaranteed, and the type label is not attributed.",
+          "correct": "The consulting details are written to the account's funds whose update succeeded (type 5 / status 8 requests; labels from SQL comments).",
+          "evidence": "DTSX:77202-77203"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Update Consulting Field  In Fund Main From Transfer Request|open",
+      "hash": "6206a4843268",
+      "verdict": "CONFIRMED",
+      "detail": "Both open questions are real and correctly framed: the LEFT JOIN on all funds of the account, and marking with no fund updated (0-row update followed by the Aggregate and the marker). They do not contradict the other claims. The partial-failure marking reported on the detailed/detail claims could be added as a further open question, but its absence does not make these questions wrong.",
+      "evidence": "0005_Customer Account.dtsx:77180-77214; 79193; paths 79861-79868, 79847",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Update TransactionCurrencyId And ExchangeRate|short",
+      "hash": "504761fe07ab",
+      "verdict": "CONFIRMED",
+      "detail": "SQL: update Gen_customeraccountBase set TransactionCurrencyId = (select top 1 ... where CurrencyName = ?), ExchangeRate = 1.00000 where TransactionCurrencyId is null. Parameter 0 is User::CurrencyName = 'שקל חדש'. Accounts that already have a currency are untouched. The conditional '(if such a currency exists)' is correct.",
+      "evidence": "0005_Customer Account.dtsx:79895-79896; variable DTSX:29-30",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Update TransactionCurrencyId And ExchangeRate|detailed",
+      "hash": "a8d3c2842b9a",
+      "verdict": "CONFIRMED",
+      "detail": "All units are correct. CurrencyName has a design-time value and no expression. Set Variables' ReadWriteVariables are only CrmMinimumDate, OrganizationName and ServerName, and no other component references CurrencyName, so nothing in the package overrides it. There is no package configuration; a runtime /SET override cannot be seen in the files. The sub-select returns NULL when no currency has that name, and ExchangeRate is still set to 1. Precedence: Write To ETLProcessCounter 4 → this task → End ETL Process record (framework), so it is the last business step.",
+      "evidence": "0005_Customer Account.dtsx:29-30, 79895-79896, 59958-60766 (ReadWriteVariables), 82414, 82419",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Update TransactionCurrencyId And ExchangeRate|detail",
+      "hash": "119f3ea93bc9",
+      "verdict": "CONFIRMED",
+      "detail": "Source, decision, Unsupported UPDATE, and ExchangeRate = 1.00000 as a proven literal are correct. The Money/shekel meaning is correctly labelled השערה.",
+      "evidence": "0005_Customer Account.dtsx:79895-79896",
+      "wrongUnits": []
+    }
+  ]
+}

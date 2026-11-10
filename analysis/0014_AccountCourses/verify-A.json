@@ -1,0 +1,105 @@
+{
+  "verifier": "ssis-verifier",
+  "package": "0014_AccountCourses",
+  "scope": "mapping-A.json",
+  "checked": 16,
+  "results": [
+    {
+      "id": "Update AccountCourcess|gen_accountcourses|UPDATE|gen_isconfiscate",
+      "verdict": "CONFIRMED",
+      "detail": "main.cs:132: if (CheckIfToUpdate2(ref Row, \"genisconfiscate\")) entity[\"gen_isconfiscate\"] = Row.genisconfiscate (else null). CheckIfToUpdate2 uses PropertyType.Name of genisconfiscateDB = \"Boolean\" (BufferWrapper 'public Boolean genisconfiscateDB'); IsEqual's switch has only case \"bool\" -> default: return true. Only the null checks (Helpers.cs:10-12) can return 'not equal'. Source value ISNULL(f.Gen_isConfiscate,0) is never NULL, so write happens only when ac.gen_isconfiscate IS NULL; the '= null' branch is unreachable. Record key entity.Id = Row.genaccountcoursesId. Population SQL, batch of 10 + final flush, Success constraint (DTSX 5506) verified.",
+      "evidence": "0014_AccountCourses.dtsx:3884-3902 (SQL), 4141-4194 (IsEqual), 4211-4226 (CheckIfToUpdate2, PropertyType.Name at 4223), 4364-4370, 4480, 4495"
+    },
+    {
+      "id": "Update AccountCourcess|gen_accountcourses|UPDATE|gen_iswarning",
+      "verdict": "CONFIRMED",
+      "detail": "Same pattern (main.cs:133); geniswarningDB is Boolean (BufferWrapper DTSX 4555); source ISNULL(f.Gen_isWarning,0); written only when ac.gen_iswarning IS NULL.",
+      "evidence": "0014_AccountCourses.dtsx:3891, 3894, 4371, 4555"
+    },
+    {
+      "id": "Update AccountCourcess|gen_accountcourses|UPDATE|gen_ismortgaged",
+      "verdict": "CONFIRMED",
+      "detail": "Same pattern (main.cs:134); genismortgagedDB Boolean (DTSX 4525); source ISNULL(f.Gen_isMortgaged,0); written only when ac.gen_ismortgaged IS NULL.",
+      "evidence": "0014_AccountCourses.dtsx:3889, 3895, 4372, 4525"
+    },
+    {
+      "id": "Update AccountCourcess|gen_accountcourses|UPDATE|gen_isreceivership",
+      "verdict": "CONFIRMED",
+      "detail": "Same pattern (main.cs:135); genisreceivershipDB Boolean (DTSX 4615); source ISNULL(f.Gen_isreceivership,0); written only when ac.gen_isreceivership IS NULL.",
+      "evidence": "0014_AccountCourses.dtsx:3890, 3896, 4373, 4615"
+    },
+    {
+      "id": "Update AccountCourcess|gen_accountcourses|UPDATE|gen_accountbalance",
+      "verdict": "CONFIRMED",
+      "detail": "main.cs:146: entity[\"gen_accountbalance\"] = new Money(Row.genaccountbalance) or null. genaccountbalanceDB is Decimal (DTSX 4600) -> case \"Decimal\": equal when |a-b| < 0.01; one NULL -> not equal; both NULL -> equal. Source f.Gen_AccountBalance without ISNULL, so a NULL fund balance clears a non-NULL course balance. No other attribute is set in the writer (gen_transactionpercent is read but unused).",
+      "evidence": "0014_AccountCourses.dtsx:3886, 3892, 4179-4180, 4384, 4600, 4630"
+    },
+    {
+      "id": "LOGIC F1",
+      "verdict": "CONFIRMED",
+      "detail": "Boolean vs \"bool\" defect proven from source: PropertyType.Name of a C# 'Boolean' property is \"Boolean\"; switch cases are DateTime/String/string/Guid/Int32/int/Decimal/decimal/bool; default returns true. Flags are written only when the course value is NULL. Correctly scoped to source (DLL not checked).",
+      "evidence": "0014_AccountCourses.dtsx:4147-4194, 4223, 4480, 4495, 4370-4373"
+    },
+    {
+      "id": "LOGIC F9",
+      "verdict": "CONFIRMED",
+      "detail": "ExcecuteBulk() is called inside the per-row try (main.cs:155-156); an exception (e.g. ApplicationException at main.cs:199) is caught for the current row only (CastingError with an unrelated message), myEntities.Clear() (main.cs:202) is skipped, Count passes 10 and '== 10' never fires again; everything (incl. the failed batch and the current row's entity, already added) is flushed at EndOfRowset (main.cs:211-214) outside any try, so a failure there fails the component. Caveat: 'one request' = one ExecuteMultipleExtension call; whether the external CRM.Proxy splits it is external_unknown.",
+      "evidence": "0014_AccountCourses.dtsx:4389-4409, 4437, 4440, 4449-4452"
+    },
+    {
+      "id": "LOGIC F10",
+      "verdict": "CONFIRMED",
+      "detail": "f.Gen_AccountBalance selected without ISNULL; one-side NULL -> IsEqual false -> entity[\"gen_accountbalance\"] = null.",
+      "evidence": "0014_AccountCourses.dtsx:3892, 4143-4145, 4384"
+    },
+    {
+      "id": "LOGIC F2",
+      "verdict": "CONFIRMED",
+      "detail": "ErrorBuffer.ErrorText = resultItem.Fault.Message only; Set Warning columns RecordKey expression is \"\".",
+      "evidence": "0014_AccountCourses.dtsx:4428-4432, 3980-3985"
+    },
+    {
+      "id": "LOGIC F3",
+      "verdict": "CONFIRMED",
+      "detail": "gen_transactionpercent is selected and bound (Row.gentransactionpercent) but referenced only in the generated BufferWrapper, never in user code.",
+      "evidence": "0014_AccountCourses.dtsx:3887, 4585-4592"
+    },
+    {
+      "id": "LOGIC F4",
+      "verdict": "CONFIRMED",
+      "detail": "DontNeedToUpdate output has no path; Union All Input 3 is dangling=\"true\".",
+      "evidence": "0014_AccountCourses.dtsx:5481, 4094; paths of 'Update Account courses'"
+    },
+    {
+      "id": "LOGIC F6",
+      "verdict": "CONFIRMED",
+      "detail": "DTS:Configuration ConfigurationString=C:\\Generix\\SSISConfigFile.dtsConfig (not supplied) may override the [CRM] connection string.",
+      "evidence": "0014_AccountCourses.dtsx:6, 17"
+    },
+    {
+      "id": "LOGIC pilot re-check note",
+      "verdict": "CONFIRMED",
+      "detail": "F1, F2, F3, F4, F9, F10 independently re-verified here against the raw DTSX. Wording: 'אושרו' must mean technical verification only, not user approval (CLAUDE.md rule 6).",
+      "evidence": "see items above"
+    },
+    {
+      "id": "LOGIC summary / scopeNote / crmEffects",
+      "verdict": "CONFIRMED",
+      "detail": "Only business CRM write is the gen_accountcourses ExecuteMultiple Update with up to 5 attributes. Other CRM calls are ETL plumbing: gen_etlprocess Create (DTSX 275), gen_etlprocess Update (816), gen_etlprocesswarning Create (3338), OnError gen_etlprocess Update + annotation Create (5709, 5718). [CRM] connection is read-only (no DML).",
+      "evidence": "0014_AccountCourses.dtsx:269-275, 807-816, 3325-3338, 4364-4414, 5702-5718"
+    },
+    {
+      "id": "LOGIC executionOrder",
+      "verdict": "CONFIRMED",
+      "detail": "Constraints 5505 (Get Organization Variables -> Create ETL), 5506 (Create ETL -> Update Account courses), 5507 (-> End ETL), all Success; OnError handler at 5510.",
+      "evidence": "0014_AccountCourses.dtsx:5505-5510"
+    },
+    {
+      "id": "LOGIC detailed nodes (population, two value sets, decisions, batch of 10, fault handling)",
+      "verdict": "CONFIRMED",
+      "detail": "All nodes match the SQL and script; BufferWrapper line references (4480, 4495, 4510, 4525, 4540, 4555, 4600, 4615, 4630, 4645) are exact.",
+      "evidence": "0014_AccountCourses.dtsx:3884-3902, 4364-4452, 4470-4660"
+    }
+  ],
+  "missingWrites": []
+}

@@ -1,0 +1,118 @@
+{
+  "verifier": "ssis-verifier",
+  "package": "0016_TransferOut",
+  "scope": "mapping-A.json",
+  "checked": 18,
+  "results": [
+    {
+      "id": "LOGIC detailed node 'האם תאריך הערך מאוחר מתאריך המסירה (ביום קלנדרי אחד לפחות)?' (IsDeliveryDelay)",
+      "verdict": "CONFIRMED",
+      "detail": "Re-checked after fix: node now asks whether at least one whole day elapsed between delivery date and value date; tech quotes DateAndTime.DateDiff(DateInterval.Day, deliveryDate, valuedate) > 0, computed only when both dates are non-NULL, on raw DB values, and labels the elapsed-whole-days semantics as general .NET knowledge, not package evidence. Matches DTSX 391 (null guards, raw values) and 448-454 (IsDeliveryDelay). detail_he item 5 and the decision meaning_he use the same wording. Previous issue (unproven calendar-day wording) resolved.",
+      "evidence": "0016_TransferOut.dtsx:391, 448-454 (main.cs:83, 140-146)",
+      "previousVerdict": "INCOMPLETE"
+    },
+    {
+      "id": "Close Transfer Out|gen_customercare|UPDATE|gen_fundreleasedate",
+      "verdict": "CONFIRMED",
+      "detail": "customerCareEntity[\"gen_fundreleasedate\"] = Row.genvaluedate.ToLocalTime() only when !genvaluedate_IsNull. Row.genvaluedate is bound to input column gen_valuedate (BufferColumnIndexes[2]) <- Aggregate output gen_valuedate AggregationType 6 (= Minimum; consistent with the enum order elsewhere in the repo: 2 on 'Count all', 4 on gen_accountbalance sum) <- Union All <- OLE DB Source ft.gen_valuedate. Write condition (SQL population, IsFull/transferCount>0 vs Not full/Sums Are Equal, unconnected 'Has not thansactions' and 'Sums Are Not Equal') verified against paths. Note (covered in mapping-A notes, not in the claim text): MIN is per (care, delivery date, appendix date) group; a care with several appendix dates (incl. NULL) gets several Update requests, last one wins (order undefined).",
+      "evidence": "0016_TransferOut.dtsx:130-135 (AggregationType 6 at 133), 382-383, 735-743 (BufferWrapper), 2119-2145 (SQL), 2412-2422 (paths)"
+    },
+    {
+      "id": "Close Transfer Out|gen_customercare|UPDATE|gen_rejectreason",
+      "verdict": "CONFIRMED",
+      "detail": "new OptionSetValue(REJECT_REASON_PROPER), const int REJECT_REASON_PROPER = 34 -> literal fixed value 34, set unconditionally for every row reaching the script.",
+      "evidence": "0016_TransferOut.dtsx:341, 385"
+    },
+    {
+      "id": "Close Transfer Out|gen_customercare|UPDATE|gen_currentstate",
+      "verdict": "CONFIRMED",
+      "detail": "new OptionSetValue(CURRENT_STATE_FINISHED), const int CURRENT_STATE_FINISHED = 3 -> literal fixed value 3, unconditional.",
+      "evidence": "0016_TransferOut.dtsx:342, 386"
+    },
+    {
+      "id": "Close Transfer Out|gen_customercare|UPDATE|gen_appendixghissuingdate",
+      "verdict": "CONFIRMED",
+      "detail": "= Row.genappendixghissuingdate.ToLocalTime() when not NULL; input bound to BufferColumnIndexes[3] = gen_appendixghissuingdate; Aggregate GROUP BY (AggregationType 0 at DTSX 141) of ft.gen_appendixghissuingdate (also a SQL GROUP BY key). Multi-row overwrite per care covered in mapping-A notes.",
+      "evidence": "0016_TransferOut.dtsx:138-143, 388-389, 2128, 2145"
+    },
+    {
+      "id": "Close Transfer Out|gen_customercare|UPDATE|gen_deliverydelay",
+      "verdict": "CONFIRMED",
+      "detail": "= IsDeliveryDelay(Row.Gendeliverydate, Row.genvaluedate) only when both non-NULL; IsDeliveryDelay returns DateDiff(Day, deliveryDate, entryDate) > 0; entryDate is MIN(ft.gen_valuedate), deliveryDate is Tout.Gen_deliverydate (Aggregate GROUP BY). Raw DB values, no ToLocalTime. See the INCOMPLETE logic item for the exact DateDiff(Day) semantics (elapsed days, not calendar days).",
+      "evidence": "0016_TransferOut.dtsx:122-127, 391, 448-454, 2122"
+    },
+    {
+      "id": "LOGIC finding#1 (expected amount multiplied by number of ft rows in the group)",
+      "verdict": "CONFIRMED",
+      "detail": "GROUP BY includes ac.gen_accountcoursesId, ft.gen_valuedate, ft.gen_appendixghissuingdate; within a group there is one ac row joined to N ft rows (ftt joined on its PK), so sum(ISNULL(ac.gen_transactionamount,0)) = N x amount while actual = sum of N ft amounts; equality <=> average of ft amounts = course amount. Business intent unknown - correctly stated.",
+      "evidence": "0016_TransferOut.dtsx:2126-2132, 2139-2145; Compare sums 1289"
+    },
+    {
+      "id": "LOGIC finding#2 (not-full request closed if one group matches)",
+      "verdict": "CONFIRMED",
+      "detail": "Compare sums is evaluated per SQL group; passing rows are unioned and aggregated by care id, so one matching group suffices to close the request.",
+      "evidence": "0016_TransferOut.dtsx:1289, 2412-2422, 88-141"
+    },
+    {
+      "id": "LOGIC finding#3 (NULL Gen_isfulltransfer fails the data flow)",
+      "verdict": "CONFIRMED",
+      "detail": "IsFull output errorRowDisposition=FailComponent; expression 'Gen_isfulltransfer ==  TRUE'; a NULL condition result in a Conditional Split is an evaluation error handled by the disposition (SSIS behaviour). Whether NULLs occur is correctly left conditional.",
+      "evidence": "0016_TransferOut.dtsx:2091, 2094"
+    },
+    {
+      "id": "LOGIC finding#4 (no filter on request type)",
+      "verdict": "CONFIRMED",
+      "detail": "WHERE has only ftt.gen_transgrouptype = 2, ft.Gen_EntryDate > Tout.CreatedOn, Tout.Gen_currentstate = 1; no type/category column of Gen_customercare is filtered.",
+      "evidence": "0016_TransferOut.dtsx:2130-2137"
+    },
+    {
+      "id": "LOGIC finding#5 (batch failure pattern)",
+      "verdict": "CONFIRMED",
+      "detail": "ExcecuteBulk() is called inside the per-row try (Count == 1000); an exception skips myEntities.Clear(), current row goes to CastingError, Count never equals 1000 again; final flush in Input0_ProcessInput is outside any try so an exception there fails the component. Caveat: 'sent in one request' means one ExecuteMultipleExtension call; whether the external CRM.Proxy splits it is external_unknown.",
+      "evidence": "0016_TransferOut.dtsx:393-408, 411-434, 436-445"
+    },
+    {
+      "id": "LOGIC finding#6 (several appendix dates -> several updates of the same care)",
+      "verdict": "CONFIRMED",
+      "detail": "Aggregate groups by Gen_customercareId, Gen_deliverydate, gen_appendixghissuingdate (all AggregationType 0); each output row becomes a separate Update; order not determined by the package.",
+      "evidence": "0016_TransferOut.dtsx:117, 125, 141"
+    },
+    {
+      "id": "LOGIC finding#7 (warning title 'שגיאה בעדכון ניד נכנס', no record id)",
+      "verdict": "CONFIRMED",
+      "detail": "WarningTitle literal at DTSX 2231, RecordKey \"\" at DTSX 2219; ErrorBuffer.Description = resultItem.Fault.Message only.",
+      "evidence": "0016_TransferOut.dtsx:2219, 2231, 421-425"
+    },
+    {
+      "id": "LOGIC finding#8 (transferCount > 0 always true)",
+      "verdict": "CONFIRMED",
+      "detail": "count(ft.Gen_ftCurrentYearId) over an inner join; hedged on the id being non-NULL.",
+      "evidence": "0016_TransferOut.dtsx:2127, 2132, 164"
+    },
+    {
+      "id": "LOGIC finding#9 (AggregationType 6 read as Minimum)",
+      "verdict": "CONFIRMED",
+      "detail": "AggregationType 6 on gen_valuedate; Minimum per the SSIS enum (GroupBy 0, Count 1, CountAll 2, CountDistinct 3, Sum 4, Avg 5, Min 6, Max 7); consistent with other packages (2 on a column named 'Count all', 4 on gen_accountbalance) and the code comment 'min entry date'. Correctly labelled as from Microsoft documentation, not from the package.",
+      "evidence": "0016_TransferOut.dtsx:133, 383; 0009_LeumiFile-BY.dtsx / 0004_LeumiFile-MY.dtsx Aggregate columns"
+    },
+    {
+      "id": "LOGIC finding#10 (record identified via gen_customercareid attribute, not Entity.Id)",
+      "verdict": "CONFIRMED",
+      "detail": "Only customerCareEntity[\"gen_customercareid\"] = Row.GencustomercareId; Entity.Id never set; proxy behaviour external_unknown - correctly hedged.",
+      "evidence": "0016_TransferOut.dtsx:379-380"
+    },
+    {
+      "id": "LOGIC executionOrder / scopeNote (single business writer, others ETL plumbing)",
+      "verdict": "CONFIRMED",
+      "detail": "Constraints: Get Variables -> Create ETL (5476), Create ETL -> Close Transfer Out (5478), Close Transfer Out -> End ETL (5477), all Success (no Value attribute). No event handlers. CRM write calls in the DTSX: gen_customercare ExecuteMultiple Update (business), gen_etlprocesswarning Create (1509), gen_etlprocess Create (2593), gen_etlprocess Update (3155) - plumbing. [psql] used for reads only; no SQL DML.",
+      "evidence": "0016_TransferOut.dtsx:5476-5478, 413, 1496-1509, 2587-2593, 3146-3155"
+    },
+    {
+      "id": "LOGIC detailed nodes (population, splits, Aggregate, ToLocalTime writes, batch of 1000, fault handling)",
+      "verdict": "CONFIRMED",
+      "detail": "All other detailed nodes match the SQL, split expressions, paths, Aggregate settings and script code (except the DateDiff wording, reported separately).",
+      "evidence": "0016_TransferOut.dtsx:88-164, 379-454, 1286-1289, 2091-2094, 2119-2145, 2412-2422"
+    }
+  ],
+  "missingWrites": []
+}

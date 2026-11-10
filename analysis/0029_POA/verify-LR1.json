@@ -1,0 +1,310 @@
+{
+ "verifier": "ssis-verifier",
+ "package": "0029_POA",
+ "scope": "logic-claims re-check after fixes",
+ "checkedAt": "2026-11-07T12:02:02.703Z",
+ "checked": 22,
+ "results": [
+  {
+   "id": "L|summary",
+   "hash": "29006b0d7042",
+   "verdict": "INCOMPLETE",
+   "detail": "Scope note verified: 14 pipelines, 10 disabled (Active POA, Cancel Active, Cancel Duplicate, Canncel POA main, 4 future-funds, Transfer Request, Out of Date); only DML via SQL: Update Pension Joining (gen_pensionjoiningbase) and disabled Update TransferRequest; [CRM]=Psql/ALTSHULER_MSCRM; config file DTSX:11. POAMainMonthsToAdd from gen_etlvariable via [CRM] verified. But the path list in [1] is not complete/conditional: (a) AJ \"creation failed -> still marked\" holds only if the CRM error message fits wstr(50); (b) in Pension Joining a failed link attempt never marks the joining but fails the data flow; (c) every SQL-marked pension joining is routed to an ETL Warning script that throws on NULL columns, failing the PJ data flow and the package; (d) the PJ \"additional joining\" rule misses the eviction case. Standard SSIS runtime behaviour (not visible in the DTSX itself): a generated typed getter (Buffer.GetString/GetGuid/GetInt32) on a NULL column throws ColumnIsNullException; assigning a string longer than the declared column length to an output buffer column throws DoesNotFitBufferException.",
+   "evidence": "DTSX 4, 11, 79, 2555, 4992, 7356, 10195, 13047, 15775, 18634, 37781, 43174, 36944, 40559, 42346, 43144; 22866/24454; 37175/37752; 36886-36888, 35738; 31626",
+   "wrongUnits": [
+    {
+     "unit": 1,
+     "problem": "States unconditionally that AJ joinings are marked when creation failed, and omits PJ failure behaviours (failed link -> data-flow failure, ETL Warning NULL-read failure after SQL marking, eviction of an earlier-read joining).",
+     "correct": "AJ Create POA Main catch (main.cs:271-276, DTSX 22866; annotation catch DTSX 22891) assigns ex.Message to ErrorBuffer.ErrorMessage declared wstr(50) (DTSX 24454). If the CRM exception message is longer than 50 characters the assignment itself throws inside the catch, the component fails and the data flow fails; creation is deferred to EndOfRowset (main.cs:452-455) while Success is synchronous, so rows of the last buffer are then not passed to Update Automated Joining. \"Marked even when creation failed\" is therefore conditional on the message length (data not in the files). PJ Update POA Main catch writes \"Pension Joining Id: \" (20 chars) + guid (36) + ... into ErrorDescription declared wstr(50) (DTSX 37175, 37752) - always longer than 50, so a failed link throws inside the catch, the component fails and the data flow fails; the row is not passed via Output 0 to Union All 2 and is NOT marked 3. Update Pension Joining OLE DB Command Output -> Union All 1 Input 2, which has no input columns (DTSX 36886-36888), so every successfully SQL-marked row reaches ETL Warning with WarningTitle/RecordKey/WarningDescription NULL; ETL Warning main.cs:65 (DTSX 35738) reads Row.WarningTitle without an IsNull check (getter DTSX 35848-35853) -> ColumnIsNullException, no try/catch -> the ETL Warning component fails, the Create POA Main For Pension Joining data flow fails on the first marked row, and (all constraints are Success) End ETL Process record does not run and the package fails. Which joinings are created/marked before the failure depends on buffer timing and data volume. Eviction case (main.cs:67-84, DTSX 31626): when the ID's POA Main points to joining J1 and another joining J2 of the same ID is read BEFORE J1, J2 first becomes the candidate and is then replaced by the IsOther marker when J1 is read; J2 is neither created nor marked although it was the first one read.",
+     "evidence": "DTSX 22866, 24454, 37175, 37752, 36886-36888, 35738, 31626"
+    }
+   ]
+  },
+  {
+   "id": "L|exec",
+   "hash": "5001dd74a628",
+   "verdict": "CONFIRMED",
+   "detail": "All 14 precedence constraints (DTSX 45650-45663) are Success (no Value attribute) and form the stated chain; disabled flags at DTSX 79, 2555, 4992, 7356, 10195, 13047, 15775, 18634, 37781, 43174 match. Get Organization Variables has no incoming constraint and loads gen_etlvariable incl. POAMainMonthsToAdd (ReadWriteVariables DTSX 43144).",
+   "evidence": "DTSX 45650-45663; executables listed above; 42346, 43144",
+   "wrongUnits": []
+  },
+  {
+   "id": "L|ignored",
+   "hash": "0d800caef05f",
+   "verdict": "CONFIRMED",
+   "detail": "Every listed item is ETL plumbing: Create/End ETL Process record (gen_etlprocess), OnError handlers (9 event handlers exist, all listed), ETL Warning scripts (gen_etlprocesswarning), Set Warning columns / Failed* derived columns / warning Union Alls. Get Organization Variables is no longer listed and its business role is described elsewhere. No business write is hidden in the list. (The failure side effect of the PJ ETL Warning is reported on the PJ claims, not here.)",
+   "evidence": "DTSX 9731, 40609, event handlers grep; ETL Warning main.cs:63-76 (e.g. DTSX 35738); 42335",
+   "wrongUnits": []
+  },
+  {
+   "id": "L|Package\\Create POA Main For Automated Joining|short",
+   "hash": "88708998c771",
+   "verdict": "INCOMPLETE",
+   "detail": "Flow structure verified against paths (Check If POA Of Customer Account Exists Match unconnected; Other Signature Date -> Input 4; Not B1/B2 -> Input 2; period-merge Output 0 unconnected; Create POA Main Success sync -> Input 1; Update POA Main Output 0 sync -> Input 3). But the end state [19] is unconditional where the files make it conditional: marking after a failed creation depends on the error message fitting wstr(50); a failed marking update always fails the data flow; the period-merge script can throw. Standard SSIS runtime behaviour (not visible in the DTSX itself): a generated typed getter (Buffer.GetString/GetGuid/GetInt32) on a NULL column throws ColumnIsNullException; assigning a string longer than the declared column length to an output buffer column throws DoesNotFitBufferException.",
+   "evidence": "DTSX 22176, 22253, 22286, 27154/27441, 22327 main.cs:271-276/317-330/446-455, 24454, 29696, 30368, 31147",
+   "wrongUnits": [
+    {
+     "unit": 19,
+     "problem": "Says the joining is marked when creation failed, unconditionally; omits failure behaviours.",
+     "correct": "AJ Create POA Main catch (main.cs:271-276, DTSX 22866; annotation catch DTSX 22891) assigns ex.Message to ErrorBuffer.ErrorMessage declared wstr(50) (DTSX 24454). If the CRM exception message is longer than 50 characters the assignment itself throws inside the catch, the component fails and the data flow fails; creation is deferred to EndOfRowset (main.cs:452-455) while Success is synchronous, so rows of the last buffer are then not passed to Update Automated Joining. \"Marked even when creation failed\" is therefore conditional on the message length (data not in the files). Update Automated Joining catch writes \"Automated Joining Id: \" + guid + ... (always > 50 chars) into ErrorDescription wstr(50) (DTSX 29696, 30368): any failure of the marking update makes the component throw and fails the data flow (not stated). If POA period merge (DTSX 27154, main.cs:128-134, DTSX 27441): in the agent branch the stop condition is genagentidentity not NULL AND genagentlicensenumber == genagencyidentity, i.e. the agent licence is compared with the existing POA Main's AGENCY identifier (Account.AccountNumber), not the agent identifier; and Row.genagencyidentity is read without an IsNull check, so when it is NULL (possible: Check If Exists POA Main is a Full-cache lookup on gen_agencyidentity = agencyPoaIdNumberJoining, and full cache matches NULL to NULL) the script throws and the data flow fails. Reached only when the existing POA Main signature is the same as or later than the joining signature.",
+     "evidence": "DTSX 22866, 24454, 29696, 30368, 27441"
+    }
+   ]
+  },
+  {
+   "id": "L|Package\\Create POA Main For Automated Joining|detailed",
+   "hash": "bb91686afabf",
+   "verdict": "INCOMPLETE",
+   "detail": "Verified: source SQL and filters (DTSX 26929-26990), ROW_NUMBER, lookups (customer-account POA partial cache with OR, Check If Exists POA Main full cache on ID/agent/agency, Bet 1 / Bet 2 partial-cache SQL with ±7 days and the parameter orders at DTSX 21620/21816), Check Type / Check Signature splits, Create POA Main attributes main.cs:159-264, monthsToAdd TryParse (main.cs:137-140), Set Organization Variables throw (main.cs:103-110), annotation text, Update POA Main / Update Automated Joining. Problems: [22] the agent branch does not compare the agent licence with the existing POA's agent identifier but with its agency identifier, and can throw; [52]/[53] marking after failed creation is conditional; marking failure fails the flow. Standard SSIS runtime behaviour (not visible in the DTSX itself): a generated typed getter (Buffer.GetString/GetGuid/GetInt32) on a NULL column throws ColumnIsNullException; assigning a string longer than the declared column length to an output buffer column throws DoesNotFitBufferException.",
+   "evidence": "DTSX 26929, 21936-22026, 21545-21620, 21740-21816, 27154/27441, 22327, 24454, 29486/29696/30368, 30374/31147, 42346, 43144",
+   "wrongUnits": [
+    {
+     "unit": 22,
+     "problem": "\"licence of the agency or agent equals the identifier in the existing POA\" - imprecise for the agent branch and omits the NULL-read failure.",
+     "correct": "If POA period merge (DTSX 27154, main.cs:128-134, DTSX 27441): in the agent branch the stop condition is genagentidentity not NULL AND genagentlicensenumber == genagencyidentity, i.e. the agent licence is compared with the existing POA Main's AGENCY identifier (Account.AccountNumber), not the agent identifier; and Row.genagencyidentity is read without an IsNull check, so when it is NULL (possible: Check If Exists POA Main is a Full-cache lookup on gen_agencyidentity = agencyPoaIdNumberJoining, and full cache matches NULL to NULL) the script throws and the data flow fails. Reached only when the existing POA Main signature is the same as or later than the joining signature.",
+     "evidence": "DTSX 27441; main.cs:115-137"
+    },
+    {
+     "unit": 52,
+     "problem": "States the joining is marked \"also when creation failed\" unconditionally.",
+     "correct": "AJ Create POA Main catch (main.cs:271-276, DTSX 22866; annotation catch DTSX 22891) assigns ex.Message to ErrorBuffer.ErrorMessage declared wstr(50) (DTSX 24454). If the CRM exception message is longer than 50 characters the assignment itself throws inside the catch, the component fails and the data flow fails; creation is deferred to EndOfRowset (main.cs:452-455) while Success is synchronous, so rows of the last buffer are then not passed to Update Automated Joining. \"Marked even when creation failed\" is therefore conditional on the message length (data not in the files).",
+     "evidence": "DTSX 22866, 22891, 24454"
+    },
+    {
+     "unit": 53,
+     "problem": "Same unconditional end state; omits that a failed marking update fails the data flow.",
+     "correct": "AJ Create POA Main catch (main.cs:271-276, DTSX 22866; annotation catch DTSX 22891) assigns ex.Message to ErrorBuffer.ErrorMessage declared wstr(50) (DTSX 24454). If the CRM exception message is longer than 50 characters the assignment itself throws inside the catch, the component fails and the data flow fails; creation is deferred to EndOfRowset (main.cs:452-455) while Success is synchronous, so rows of the last buffer are then not passed to Update Automated Joining. \"Marked even when creation failed\" is therefore conditional on the message length (data not in the files). Update Automated Joining catch writes \"Automated Joining Id: \" + guid + ... (always > 50 chars) into ErrorDescription wstr(50) (DTSX 29696, 30368): any failure of the marking update makes the component throw and fails the data flow (not stated).",
+     "evidence": "DTSX 24454, 29696, 30368"
+    }
+   ]
+  },
+  {
+   "id": "L|Package\\Create POA Main For Automated Joining|detail",
+   "hash": "6e645077443d",
+   "verdict": "INCOMPLETE",
+   "detail": "[1],[2],[4],[5] verified. [3] repeats the imprecise \"licence = identifier\" rule for period merge. [6] sourceTables: 0027 updates gen_automatedjoining (0027 DTSX 1371, 5936) and no creator found - correct; 0005 writes gen_customeraccount - correct; but the POA tables entry (\"created in this package and in 0031 (gen_powerofattorney)\", proven:true) omits that 0031 also updates gen_powerofattorneymain.gen_currentstate (the attribute every POA Main lookup here filters on) and that 0030/0031 update Gen_powerofattorneyBase by direct SQL.",
+   "evidence": "DTSX 27441; 0027 DTSX 1371, 5936; 0031 DTSX 40252, 40447-40453, 31302; 0030 DTSX 6661",
+   "wrongUnits": [
+    {
+     "unit": 3,
+     "problem": "Period-merge rule stated as \"licence = identifier\".",
+     "correct": "If POA period merge (DTSX 27154, main.cs:128-134, DTSX 27441): in the agent branch the stop condition is genagentidentity not NULL AND genagentlicensenumber == genagencyidentity, i.e. the agent licence is compared with the existing POA Main's AGENCY identifier (Account.AccountNumber), not the agent identifier; and Row.genagencyidentity is read without an IsNull check, so when it is NULL (possible: Check If Exists POA Main is a Full-cache lookup on gen_agencyidentity = agencyPoaIdNumberJoining, and full cache matches NULL to NULL) the script throws and the data flow fails. Reached only when the existing POA Main signature is the same as or later than the joining signature.",
+     "evidence": "DTSX 27441"
+    },
+    {
+     "unit": 6,
+     "problem": "Writer list of the looked-up POA tables incomplete.",
+     "correct": "sourceTables omit other supplied writers of the tables read: 0031_PoaAccountUpdateDaily updates gen_powerofattorneymain.gen_currentstate via SDK (0031 DTSX 40252 component Update Current State Poa Main, 40447-40453) - the attribute the population filter uses - and updates Gen_powerofattorneyBase by direct SQL (0031 DTSX 31302; also 0030 DTSX 6661); gen_customeraccount is also written by 0006 (DTSX 9752), 0012 (SQL, DTSX 100193 ff.) and 0033 (SQL).",
+     "evidence": "0031 DTSX 40447-40453, 31302; 0030 DTSX 6661"
+    }
+   ]
+  },
+  {
+   "id": "L|Package\\Create POA Main For Automated Joining|decisions",
+   "hash": "59224b9cc1a2",
+   "verdict": "INCOMPLETE",
+   "detail": "Conditions [1]-[6], [8]-[10] match the DTSX (SQL, lookup parameter maps, split expressions, main.cs:256-264). [7] condition text correctly notes the agent branch compares genagentlicensenumber to genagencyidentity, but its meaning \"the existing POA covers the period\" is an interpretation not proven by the files (only the component name \"If POA period merge\" supports it) and is not labelled as a hypothesis, and the outcome omits that the script can throw on a NULL agency identity. Standard SSIS runtime behaviour (not visible in the DTSX itself): a generated typed getter (Buffer.GetString/GetGuid/GetInt32) on a NULL column throws ColumnIsNullException; assigning a string longer than the declared column length to an output buffer column throws DoesNotFitBufferException.",
+   "evidence": "DTSX 27154, 27441; main.cs:115-137",
+   "wrongUnits": [
+    {
+     "unit": 7,
+     "problem": "Unlabelled interpretation as meaning; NULL-read failure outcome missing.",
+     "correct": "Label \"covers the period\" as השערה (based on component name). Outcome: agent branch with existing POA Main agency identity NULL -> ColumnIsNullException -> data flow fails. If POA period merge (DTSX 27154, main.cs:128-134, DTSX 27441): in the agent branch the stop condition is genagentidentity not NULL AND genagentlicensenumber == genagencyidentity, i.e. the agent licence is compared with the existing POA Main's AGENCY identifier (Account.AccountNumber), not the agent identifier; and Row.genagencyidentity is read without an IsNull check, so when it is NULL (possible: Check If Exists POA Main is a Full-cache lookup on gen_agencyidentity = agencyPoaIdNumberJoining, and full cache matches NULL to NULL) the script throws and the data flow fails. Reached only when the existing POA Main signature is the same as or later than the joining signature.",
+     "evidence": "DTSX 27154, 27441"
+    }
+   ]
+  },
+  {
+   "id": "L|Package\\Create POA Main For Pension Joining|title",
+   "hash": "dece4a4bfec1",
+   "verdict": "INCOMPLETE",
+   "detail": "flow_he[1], [2], [4], [5] verified (DTSX 36352-36391, 36495, 31387 main.cs:67-75, 31194, 33566, 36941-36944). flow_he[3] \"one candidate per ID (the first read) when the ID has an active POA Main that does not point to the joining\" is not exact: if the ID's POA Main points to another joining of the same ID that is also in the run, no joining of that ID becomes a candidate, even the first one read. short_he omits that the flow fails after marking (ETL Warning NULL read) and on failed links.",
+   "evidence": "DTSX 31387 main.cs:47-84 (31626); 36886-36888; 35738; 37175/37752",
+   "wrongUnits": [
+    {
+     "unit": 5,
+     "problem": "Candidate rule misses the eviction case.",
+     "correct": "Eviction case (main.cs:67-84, DTSX 31626): when the ID's POA Main points to joining J1 and another joining J2 of the same ID is read BEFORE J1, J2 first becomes the candidate and is then replaced by the IsOther marker when J1 is read; J2 is neither created nor marked although it was the first one read.",
+     "evidence": "DTSX 31626"
+    },
+    {
+     "unit": 2,
+     "problem": "Outcome stated as an orderly marking; omits that the data flow fails after SQL marking and on failed links.",
+     "correct": "Update Pension Joining OLE DB Command Output -> Union All 1 Input 2, which has no input columns (DTSX 36886-36888), so every successfully SQL-marked row reaches ETL Warning with WarningTitle/RecordKey/WarningDescription NULL; ETL Warning main.cs:65 (DTSX 35738) reads Row.WarningTitle without an IsNull check (getter DTSX 35848-35853) -> ColumnIsNullException, no try/catch -> the ETL Warning component fails, the Create POA Main For Pension Joining data flow fails on the first marked row, and (all constraints are Success) End ETL Process record does not run and the package fails. Which joinings are created/marked before the failure depends on buffer timing and data volume. PJ Update POA Main catch writes \"Pension Joining Id: \" (20 chars) + guid (36) + ... into ErrorDescription declared wstr(50) (DTSX 37175, 37752) - always longer than 50, so a failed link throws inside the catch, the component fails and the data flow fails; the row is not passed via Output 0 to Union All 2 and is NOT marked 3.",
+     "evidence": "DTSX 36886-36888, 35738, 37175, 37752"
+    }
+   ]
+  },
+  {
+   "id": "L|Package\\Create POA Main For Pension Joining|short",
+   "hash": "f4c584464e64",
+   "verdict": "WRONG",
+   "detail": "Steps [1]-[12] structurally match the paths. [13] is wrong for failed link attempts: a failed link never leads to marking (the catch overflows wstr(50) and fails the data flow). It also omits the eviction case, the NULL-read failure of joinings without agent/agency on the attached path, and the ETL Warning failure on every SQL-marked row. Standard SSIS runtime behaviour (not visible in the DTSX itself): a generated typed getter (Buffer.GetString/GetGuid/GetInt32) on a NULL column throws ColumnIsNullException; assigning a string longer than the declared column length to an output buffer column throws DoesNotFitBufferException.",
+   "evidence": "DTSX 37175, 37752, 31595, 31605, 31626, 36886-36888, 35738",
+   "wrongUnits": [
+    {
+     "unit": 13,
+     "problem": "\"A joining that went through a link attempt is marked created\" and \"joinings without agent/agency stay required\" are not what the files do in all cases.",
+     "correct": "PJ Update POA Main catch writes \"Pension Joining Id: \" (20 chars) + guid (36) + ... into ErrorDescription declared wstr(50) (DTSX 37175, 37752) - always longer than 50, so a failed link throws inside the catch, the component fails and the data flow fails; the row is not passed via Output 0 to Union All 2 and is NOT marked 3. Check If Poa Attached To Pension Joining (DTSX 31387, main.cs:52 and :62 = DTSX 31595/31605) reads Row.dbgenagenttypeofattachment and Row.agentcyIdentityNumber without IsNull checks and without try/catch. agentcyIdentityNumber = ISNULL(agent licence, agency licence) is NULL for a joining with neither agent nor agency (or no licences). On the path where the ID has an active POA Main that does not point to the joining and the ID is not yet in the dictionary, such a joining makes the script throw and fails the data flow, instead of \"no creation, stays required\". Eviction case (main.cs:67-84, DTSX 31626): when the ID's POA Main points to joining J1 and another joining J2 of the same ID is read BEFORE J1, J2 first becomes the candidate and is then replaced by the IsOther marker when J1 is read; J2 is neither created nor marked although it was the first one read. Update Pension Joining OLE DB Command Output -> Union All 1 Input 2, which has no input columns (DTSX 36886-36888), so every successfully SQL-marked row reaches ETL Warning with WarningTitle/RecordKey/WarningDescription NULL; ETL Warning main.cs:65 (DTSX 35738) reads Row.WarningTitle without an IsNull check (getter DTSX 35848-35853) -> ColumnIsNullException, no try/catch -> the ETL Warning component fails, the Create POA Main For Pension Joining data flow fails on the first marked row, and (all constraints are Success) End ETL Process record does not run and the package fails. Which joinings are created/marked before the failure depends on buffer timing and data volume.",
+     "evidence": "DTSX 37175, 37752, 31595, 31605, 31626, 35738"
+    }
+   ]
+  },
+  {
+   "id": "L|Package\\Create POA Main For Pension Joining|detailed",
+   "hash": "061c1727789c",
+   "verdict": "WRONG",
+   "detail": "Verified: source SQL (DTSX 36352-36391), Get POA Main partial lookup (statecode = 0), Check If Poa Attached logic incl. SDK mark and IsOther marker, exclusion defaults main.cs:49-50 only on the attached path and NULL -> Derived Column NULL -> no lookup match / 2 on create, Derived Column expressions (DTSX 35357), Check If Exist POA SQL and parameter order (DTSX 31223-31273), Create POA Main attributes (main.cs:142-267) incl. includepension only when != 0 and isenddatelessthan10years only when true, annotation text, Union All 2 (async Success + sync Update POA Main Output 0). Wrong/missing: [26] \"even if the link failed\" is wrong; [27] omits that the ETL Warning then fails the data flow; [19]-[21]/[28] omit the attached-path NULL-read failure and the eviction case. Minor: [12] equates \"ב'2\" with gen_agenttypeofattachment == 2, while the Derived Column maps every value other than 1 to appendix 3. Standard SSIS runtime behaviour (not visible in the DTSX itself): a generated typed getter (Buffer.GetString/GetGuid/GetInt32) on a NULL column throws ColumnIsNullException; assigning a string longer than the declared column length to an output buffer column throws DoesNotFitBufferException.",
+   "evidence": "DTSX 37175, 37752, 36886-36888, 35738, 31595, 31605, 31626, 35357",
+   "wrongUnits": [
+    {
+     "unit": 26,
+     "problem": "\"also after a link attempt - even if the link failed\" is wrong.",
+     "correct": "PJ Update POA Main catch writes \"Pension Joining Id: \" (20 chars) + guid (36) + ... into ErrorDescription declared wstr(50) (DTSX 37175, 37752) - always longer than 50, so a failed link throws inside the catch, the component fails and the data flow fails; the row is not passed via Output 0 to Union All 2 and is NOT marked 3.",
+     "evidence": "DTSX 37175, 37752"
+    },
+    {
+     "unit": 27,
+     "problem": "Routing of SQL-marked rows to ETL Warning is described but its effect is omitted.",
+     "correct": "Update Pension Joining OLE DB Command Output -> Union All 1 Input 2, which has no input columns (DTSX 36886-36888), so every successfully SQL-marked row reaches ETL Warning with WarningTitle/RecordKey/WarningDescription NULL; ETL Warning main.cs:65 (DTSX 35738) reads Row.WarningTitle without an IsNull check (getter DTSX 35848-35853) -> ColumnIsNullException, no try/catch -> the ETL Warning component fails, the Create POA Main For Pension Joining data flow fails on the first marked row, and (all constraints are Success) End ETL Process record does not run and the package fails. Which joinings are created/marked before the failure depends on buffer timing and data volume.",
+     "evidence": "DTSX 36886-36888, 35738, 35848-35853"
+    },
+    {
+     "unit": 21,
+     "problem": "\"No agent and no agency -> no creation, no marking, fetched again\" is not true on the attached path.",
+     "correct": "Check If Poa Attached To Pension Joining (DTSX 31387, main.cs:52 and :62 = DTSX 31595/31605) reads Row.dbgenagenttypeofattachment and Row.agentcyIdentityNumber without IsNull checks and without try/catch. agentcyIdentityNumber = ISNULL(agent licence, agency licence) is NULL for a joining with neither agent nor agency (or no licences). On the path where the ID has an active POA Main that does not point to the joining and the ID is not yet in the dictionary, such a joining makes the script throw and fails the data flow, instead of \"no creation, stays required\".",
+     "evidence": "DTSX 31595, 31605"
+    },
+    {
+     "unit": 28,
+     "problem": "End state wrong for failed link attempts and incomplete (eviction, NULL-read failure, ETL Warning failure).",
+     "correct": "PJ Update POA Main catch writes \"Pension Joining Id: \" (20 chars) + guid (36) + ... into ErrorDescription declared wstr(50) (DTSX 37175, 37752) - always longer than 50, so a failed link throws inside the catch, the component fails and the data flow fails; the row is not passed via Output 0 to Union All 2 and is NOT marked 3. Eviction case (main.cs:67-84, DTSX 31626): when the ID's POA Main points to joining J1 and another joining J2 of the same ID is read BEFORE J1, J2 first becomes the candidate and is then replaced by the IsOther marker when J1 is read; J2 is neither created nor marked although it was the first one read. Check If Poa Attached To Pension Joining (DTSX 31387, main.cs:52 and :62 = DTSX 31595/31605) reads Row.dbgenagenttypeofattachment and Row.agentcyIdentityNumber without IsNull checks and without try/catch. agentcyIdentityNumber = ISNULL(agent licence, agency licence) is NULL for a joining with neither agent nor agency (or no licences). On the path where the ID has an active POA Main that does not point to the joining and the ID is not yet in the dictionary, such a joining makes the script throw and fails the data flow, instead of \"no creation, stays required\".",
+     "evidence": "DTSX 37175, 37752, 31626, 31605"
+    }
+   ]
+  },
+  {
+   "id": "L|Package\\Create POA Main For Pension Joining|detail",
+   "hash": "00d00c410618",
+   "verdict": "WRONG",
+   "detail": "[1]-[4] verified. [5] says a joining that reaches a link attempt is marked handled - wrong when the link fails (data flow fails, not marked); also omits the ETL Warning failure after marking. [6] sourceTables omits that 0028_Fund Enrolment updates gen_pensionjoiningBase.gen_fundenrolmentid by direct SQL (0028 DTSX 8053-8058).",
+   "evidence": "DTSX 37175, 37752, 35738; 0028 DTSX 8053-8058",
+   "wrongUnits": [
+    {
+     "unit": 5,
+     "problem": "Failed link attempt is not marked; the flow fails.",
+     "correct": "PJ Update POA Main catch writes \"Pension Joining Id: \" (20 chars) + guid (36) + ... into ErrorDescription declared wstr(50) (DTSX 37175, 37752) - always longer than 50, so a failed link throws inside the catch, the component fails and the data flow fails; the row is not passed via Output 0 to Union All 2 and is NOT marked 3. Update Pension Joining OLE DB Command Output -> Union All 1 Input 2, which has no input columns (DTSX 36886-36888), so every successfully SQL-marked row reaches ETL Warning with WarningTitle/RecordKey/WarningDescription NULL; ETL Warning main.cs:65 (DTSX 35738) reads Row.WarningTitle without an IsNull check (getter DTSX 35848-35853) -> ColumnIsNullException, no try/catch -> the ETL Warning component fails, the Create POA Main For Pension Joining data flow fails on the first marked row, and (all constraints are Success) End ETL Process record does not run and the package fails. Which joinings are created/marked before the failure depends on buffer timing and data volume.",
+     "evidence": "DTSX 37175, 37752, 35738"
+    },
+    {
+     "unit": 6,
+     "problem": "Writer list incomplete.",
+     "correct": "0028_Fund Enrolment \"Upate Pension Joining\" OLE DB Command: update gen_pensionjoiningBase set gen_fundenrolmentid = ? where gen_pensionjoiningid = ? on [CRM] (active flow).",
+     "evidence": "0028 DTSX 8053-8058"
+    }
+   ]
+  },
+  {
+   "id": "L|Package\\Canncel POA main|detailed",
+   "hash": "042f022a319a",
+   "verdict": "CONFIRMED",
+   "detail": "Disabled (DTSX 7356), incoming Success constraint from Active POA (45659). Get POA Main SQL (DTSX 8657-8667) as stated; Set columns gen_currentstate = 3, gen_iscancellationemailsenttoagent = TRUE; Update POAM RequestType.Update via ExecuteMultipleExtension batches of 300 (main.cs:45, 83, 96); Fault -> ErrorBuffer.Description (main.cs:110-115) -> Union All -> Set Warning columns -> ETL Warning (paths verified). States 1/3 of gen_powerofattorney = active/waiting per SQL comments (DTSX 3878, 3889); \"cancelled\" for POA Main state 3 rests on the executable name and the cancellation-email flag.",
+   "evidence": "DTSX 7356, 45659, 8657-8667, 8696, 8802 main.cs:45-135, 3878, 3889",
+   "wrongUnits": []
+  },
+  {
+   "id": "L|Package\\Create POA for future funds providant - allow action|title",
+   "hash": "eeac02ea996a",
+   "verdict": "CONFIRMED",
+   "detail": "Disabled (DTSX 10195). SQL (DTSX 12827-12861): active, isfuturefundvalid=1, IsAllowAction=1, appendix <> 4, excludeprovidentfunds isnull 2, account type 1, startdate < getdate(), no gen_powerofattorney for the account; row_number partitioned by contact only, ordered by POA Main createdon desc; Conditional Split POAMainOrder == 1 (DTSX 10719) -> at most one gen_powerofattorney per customer per run, account among ties undefined.",
+   "evidence": "DTSX 10195, 12827-12861, 10719, 10752, 10982",
+   "wrongUnits": []
+  },
+  {
+   "id": "L|Package\\Create POA for future funds providant - allow action|short",
+   "hash": "11dab36df333",
+   "verdict": "CONFIRMED",
+   "detail": "Matches the disabled flow: one provident account without POA per customer per run, account-level POA creation.",
+   "evidence": "DTSX 10195, 12827, 10719, 10752",
+   "wrongUnits": []
+  },
+  {
+   "id": "L|Package\\Create POA for future funds providant - allow action|detailed",
+   "hash": "730367d1944a",
+   "verdict": "CONFIRMED",
+   "detail": "Constraint Canncel POA main -> (Success, 45660); SQL, split, Default output unconnected, Set columns gen_currentstate = 1 (DTSX 12935), Create POA 1 sets LogicalName gen_powerofattorney (DTSX 10982), RequestType.Create, batch of 10, attributes as listed (main.cs:77-98).",
+   "evidence": "DTSX 10195, 45660, 12827, 10719, 12935, 10752, 10982",
+   "wrongUnits": []
+  },
+  {
+   "id": "L|Package\\Create POA for future funds providant - allow action|detail",
+   "hash": "7e2d2115b494",
+   "verdict": "INCOMPLETE",
+   "detail": "[1]-[5] verified. [6] sourceTables (proven:true) lists only \"POA Main created in this package\" and \"gen_customeraccount written in 0005\".",
+   "evidence": "0031 DTSX 40447-40453, 31302; 0006 DTSX 9752; 0012 DTSX 100193",
+   "wrongUnits": [
+    {
+     "unit": 6,
+     "problem": "Writer list incomplete.",
+     "correct": "sourceTables omit other supplied writers of the tables read: 0031_PoaAccountUpdateDaily updates gen_powerofattorneymain.gen_currentstate via SDK (0031 DTSX 40252 component Update Current State Poa Main, 40447-40453) - the attribute the population filter uses - and updates Gen_powerofattorneyBase by direct SQL (0031 DTSX 31302; also 0030 DTSX 6661); gen_customeraccount is also written by 0006 (DTSX 9752), 0012 (SQL, DTSX 100193 ff.) and 0033 (SQL).",
+     "evidence": "0031 DTSX 40447-40453; 0006 DTSX 9752; 0012 DTSX 100193"
+    }
+   ]
+  },
+  {
+   "id": "L|Package\\Create POA for future funds providant - allow action|decisions",
+   "hash": "20911b2405dd",
+   "verdict": "CONFIRMED",
+   "detail": "Disabled flag, population SQL and POAMainOrder == 1 split verified; Default output has no path.",
+   "evidence": "DTSX 10195, 12827, 10719",
+   "wrongUnits": []
+  },
+  {
+   "id": "L|Package\\Create POA for future funds studing - allow action|title",
+   "hash": "5659941b3db8",
+   "verdict": "CONFIRMED",
+   "detail": "Disabled (DTSX 15775). SQL (DTSX 18415-18448): same as provident but exclludetrainingfunds isnull 2, account type 2, no startdate filter; POAMainOrder == 1 (DTSX 16299).",
+   "evidence": "DTSX 15775, 18415-18448, 16299, 16332",
+   "wrongUnits": []
+  },
+  {
+   "id": "L|Package\\Create POA for future funds studing - allow action|short",
+   "hash": "a83717763a38",
+   "verdict": "CONFIRMED",
+   "detail": "Matches the disabled flow.",
+   "evidence": "DTSX 15775, 18415, 16299, 16332",
+   "wrongUnits": []
+  },
+  {
+   "id": "L|Package\\Create POA for future funds studing - allow action|detailed",
+   "hash": "d84f5562c919",
+   "verdict": "CONFIRMED",
+   "detail": "Constraint (Success, 45661); SQL, split, Default unconnected, Set columns = 1 (DTSX 18522), Create POA new Entity(\"gen_powerofattorney\"), RequestType.Create, batch 1000, attributes as listed.",
+   "evidence": "DTSX 15775, 45661, 18415, 16299, 18522, 16332",
+   "wrongUnits": []
+  },
+  {
+   "id": "L|Package\\Create POA for future funds studing - allow action|detail",
+   "hash": "d1d0a2a475ad",
+   "verdict": "INCOMPLETE",
+   "detail": "[1]-[5] verified. [6] sourceTables (proven:true) writer list incomplete, as for the provident flow.",
+   "evidence": "0031 DTSX 40447-40453, 31302; 0006 DTSX 9752; 0012 DTSX 100193",
+   "wrongUnits": [
+    {
+     "unit": 6,
+     "problem": "Writer list incomplete.",
+     "correct": "sourceTables omit other supplied writers of the tables read: 0031_PoaAccountUpdateDaily updates gen_powerofattorneymain.gen_currentstate via SDK (0031 DTSX 40252 component Update Current State Poa Main, 40447-40453) - the attribute the population filter uses - and updates Gen_powerofattorneyBase by direct SQL (0031 DTSX 31302; also 0030 DTSX 6661); gen_customeraccount is also written by 0006 (DTSX 9752), 0012 (SQL, DTSX 100193 ff.) and 0033 (SQL).",
+     "evidence": "0031 DTSX 40447-40453; 0006 DTSX 9752; 0012 DTSX 100193"
+    }
+   ]
+  },
+  {
+   "id": "L|Package\\Create POA for future funds studing - allow action|decisions",
+   "hash": "9353e82cbc50",
+   "verdict": "CONFIRMED",
+   "detail": "Disabled flag, population SQL and split verified.",
+   "evidence": "DTSX 15775, 18415, 16299",
+   "wrongUnits": []
+  }
+ ]
+}

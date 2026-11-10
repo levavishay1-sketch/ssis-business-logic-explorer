@@ -1,0 +1,110 @@
+{
+  "verifier": "ssis-verifier",
+  "package": "0021_Account",
+  "scope": "logic-claims re-check round 2",
+  "checkedAt": "2026-11-07",
+  "source": "source/DailyProcess/0021_Account.dtsx sha256 BAD3B657F536C5FCCD90C47D9E503EC056323813F4E7577AC1ED5FA2D16213BE",
+  "checked": 9,
+  "results": [
+    {
+      "id": "L|summary",
+      "hash": "34678b60ff3c",
+      "verdict": "INCOMPLETE",
+      "detail": "scopeNote_he re-derived and correct: [CRM] OLEDB Psql/ALTSHULER_MSCRM (DTSX:6), config C:\\Generix\\SSISConfigFile.dtsConfig (DTSX:17), Lookup NoMatchBehavior=0 (DTSX:2367) with errorRowDisposition=RedirectRow on the match output (DTSX:2393) and Lookup Error Output -> Derived Column with no further path (DTSX:2417-2419), SDK target ServerName/OrganizationName loaded from gen_etlvariable via [CRM] (DTSX:2435-2447, 2531-2536), three framework SDK writers (DTSX:311-319, 970-983, 3815-3834). summary_he is correct in what it states, but it omits a row-selection condition that the package's own detailed/detail/decisions claims now state: for BOTH flags a fund counts only if it has a matching gen_estatecodeid row AND gen_estatetypeid is not NULL (INNER JOIN + NOT IN on NULL -> UNKNOWN). As written ('לא כולל קודי gen_estatetypeid 0210 ו-3' / 'באותה החרגה') a fund with no estate-code row or a NULL estate type would appear to count, while the SQL excludes it. For gen_isfundinternalagent the fund must also have a matching gen_agentcontract and gen_agents row (INNER JOINs).",
+      "evidence": "0021_Account.dtsx:3294-3310 (join 3306, NOT IN 3308), 3486-3500 (join 3496, NOT IN 3498)",
+      "wrongUnits": [
+        {
+          "unit": 1,
+          "problem": "Estate-type exclusion described only as 'not 0210/3'; the NULL / missing-estate-code-row exclusion (and, for the internal-agent flag, missing agent-contract/agent rows) is not stated.",
+          "correct": "A fund counts only if a matching gen_estatecodeid row exists and its gen_estatetypeid is non-NULL and not in ('0210','3'); for gen_isfundinternalagent also a matching gen_agentcontract and gen_agents row with gen_agenttype = 1.",
+          "evidence": "0021_Account.dtsx:3303-3308, 3496-3498"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Update internal Agent account|detailed",
+      "hash": "7dea3dc8ea7f",
+      "verdict": "CONFIRMED",
+      "detail": "Re-derived from the raw SQL: account LEFT JOIN funds subquery (gen_fundmain JOIN gen_agentcontract ON gen_brokernumber = gen_agentcontractid JOIN gen_agents ON gen_agentname = gen_agentsid JOIN gen_estatecodeid ON gen_estatecodeidid = gen_fundmain.gen_estatetype WHERE gen_agenttype = 1 AND gen_estatetypeid NOT IN ('0210','3') GROUP BY gen_accountname); flag = case funds.gen_accountname is null then 0 else 1; stored isnull(gen_isfundinternalagent,0); filter computed != stored; Sort key accountid (NewSortKeyPosition 1), EliminateDuplicates=false; OLE DB Command 'Update accountbase set gen_isfundinternalagent = ? where accountid = ?' Param_0 <- gen_isfundinternalagent, Param_1 <- accountid on [CRM]; input errorRowDisposition FailComponent; Constraint 3 Success-only to 'Update no Agent account'. Ownership argument for the unqualified gen_estatecodeidid follows the accepted form (ambiguity rule + explicit Gen_estatecodeid.Gen_estatecodeidId at DTSX:3496). NULL / INNER JOIN exclusions correct. Note (not a defect): 'כל החשבונות' means all rows returned by the object 'account'; its definition is not supplied.",
+      "evidence": "0021_Account.dtsx:3294-3310, 3343-3360, 3385-3402, 3496, 3644",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Update internal Agent account|detail",
+      "hash": "4c7cc7234637",
+      "verdict": "CONFIRMED",
+      "detail": "Population, path gen_brokernumber -> gen_agentcontract -> gen_agents, gen_agenttype = 1, estate-code exclusion incl. NULL and INNER JOIN exclusions, no state filter on account/gen_fundmain, matching by accountid, case/isnull comparison, direct UPDATE accountbase via [CRM] (Unsupported), FailComponent + Success-only constraint, conditional outcome: all match the DTSX.",
+      "evidence": "0021_Account.dtsx:3294-3310, 3388-3397, 3496, 3644",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Update internal Agent account|decisions",
+      "hash": "a2ce5725a472",
+      "verdict": "CONFIRMED",
+      "detail": "Condition [1] quoted exactly (DTSX:3307-3308); meaning states NULL exclusion, ownership argument and that code meanings are unknown. Condition [2] exact (DTSX:3310) with isnull(...,0) semantics.",
+      "evidence": "0021_Account.dtsx:3294-3310, 3496",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Update internal Agent account|open",
+      "hash": "cd37d8d77066",
+      "verdict": "CONFIRMED",
+      "detail": "[1],[2] are genuine open questions (no code labels or state filter in any supplied package). [3] conclusion is correct. The case-insensitivity point is in fact proven more strongly than the text argues: inside the second query itself the FROM names 'gen_fundmain' and the ON clause binds 'Gen_fundmain.gen_estatetype' (DTSX:3495-3496), which can only bind under a case-insensitive collation; suggested to cite that.",
+      "evidence": "0021_Account.dtsx:3306, 3495-3496",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Update no Agent account|title",
+      "hash": "da54da008561",
+      "verdict": "INCOMPLETE",
+      "detail": "flow_he[1]-[3] match the SQL and the UPDATE (DTSX:3486-3500, 3591-3593). title_he is a label for setting gen_fundwithoutagent and is accepted as such. short_he states the exclusion only as 'לא כולל סוגי עיזבון 0210 ו-3'; the SQL also excludes funds without a matching Gen_estatecodeid row (INNER JOIN) and funds whose Gen_EstateTypeID is NULL (NOT IN). The package's detailed and decisions claims state this; the short text does not.",
+      "evidence": "0021_Account.dtsx:3496-3498",
+      "wrongUnits": [
+        {
+          "unit": 2,
+          "problem": "Row-selection condition omitted: missing estate-code row / NULL Gen_EstateTypeID also exclude the fund.",
+          "correct": "Fund counts only if gen_brokernumbername = '00000004000' and a matching Gen_estatecodeid row exists whose Gen_EstateTypeID is non-NULL and not in ('0210','3').",
+          "evidence": "0021_Account.dtsx:3496-3498"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Update no Agent account|short",
+      "hash": "dbcc37754b07",
+      "verdict": "WRONG",
+      "detail": "Steps [1],[4]-[11] match. [12] states as an unconditional fact that the flag in every account matches its funds; this holds only if the flow ran and all updates succeeded. 'Update no Agent account' runs only after Success of 'Update internal Agent account' (DTSX:3644), and its OLE DB Command input is FailComponent (DTSX:3600). The package's own detailed claim conditions the outcome ('אם כל העדכונים הצליחו ... אם עדכון נכשל ... לא כל החשבונות מעודכנים'), so the short end-state contradicts it. [2] also omits that a fund with no matching Gen_estatecodeid row or a NULL Gen_EstateTypeID is not counted, so as written such a fund would satisfy 'אינה מסוג עיזבון 0210 או 3'.",
+      "evidence": "0021_Account.dtsx:3496-3498, 3600, 3644",
+      "wrongUnits": [
+        {
+          "unit": 12,
+          "problem": "Unconditional end-state; contradicts the conditional outcome in the same package's detailed claim.",
+          "correct": "אם הזרימה רצה וכל העדכונים הצליחו, הדגל בכל חשבון שווה לערך המחושב מהקופות שלו נכון לזמן הריצה; אם עדכון נכשל (או אם הזרימה הקודמת נכשלה) לא כל החשבונות מעודכנים.",
+          "evidence": "0021_Account.dtsx:3600, 3644"
+        },
+        {
+          "unit": 2,
+          "problem": "Decision omits NULL / missing-row semantics of the estate-type filter.",
+          "correct": "קופה נספרת רק אם יש לה רשומת Gen_estatecodeid תואמת שקוד הסוג שלה אינו ריק ואינו 0210 או 3.",
+          "evidence": "0021_Account.dtsx:3496-3498"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Update no Agent account|detailed",
+      "hash": "ee420c671070",
+      "verdict": "CONFIRMED",
+      "detail": "Re-derived: funds subquery gen_fundmain JOIN Gen_estatecodeid ON Gen_estatecodeid.Gen_estatecodeidId = Gen_fundmain.gen_estatetype WHERE gen_fundmain.gen_brokernumbername = '00000004000' AND Gen_estatecodeid.Gen_EstateTypeID NOT IN ('0210','3'); case ... 0/1; isnull(gen_fundwithoutagent,0); filter !=; Sort accountid key 1, EliminateDuplicates=false (DTSX:3537); 'Update accountbase set gen_fundwithoutagent= ? where accountid = ?' Param_0 <- gen_isfundwithoutagent, Param_1 <- accountid (DTSX:3602-3603); FailComponent (DTSX:3600); Constraint 4 Success to End ETL (DTSX:3645). NULL/INNER JOIN exclusions and conditional outcome correct.",
+      "evidence": "0021_Account.dtsx:3486-3500, 3535-3603, 3645",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Update no Agent account|decisions",
+      "hash": "e9efebeeb1c1",
+      "verdict": "CONFIRMED",
+      "detail": "Both conditions quoted exactly; meaning states string comparison, NULL exclusion, hypothesis label for 'ללא סוכן', and isnull(...,0) for the stored value.",
+      "evidence": "0021_Account.dtsx:3486-3500",
+      "wrongUnits": []
+    }
+  ],
+  "missingWrites": []
+}

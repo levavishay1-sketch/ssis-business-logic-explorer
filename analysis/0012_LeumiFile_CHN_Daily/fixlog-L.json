@@ -1,0 +1,1353 @@
+{
+ "changes": [
+  {
+   "claimId": "L|summary",
+   "field": "summary_he",
+   "before": "החבילה קולטת את קובץ ה-CHN היומי של בנק לאומי (מוטבים, מורשים, קישורי הורה-ילד, טלפונים והערות אזהרה לחשבונות), טוענת אותו ל-Staging ומסנכרנת לפיו את CRM: מוחקת (בכפוף לשאלה פתוחה בצירוף) ויוצרת/מעדכנת מוטבים דרך CRM SDK; יוצרת אנשי קשר הורים ומקשרת הורה-ילד-חשבון בקופה 5015, ומבטלת קישורים שלא הופיעו; מעדכנת טלפון נייד של עובד, הוראות מורשים וסימון \"חשבון בסיכון\"; ויוצרת/מאשרת הערות אזהרה וסוגרת הערות שלא הופיעו בקובץ. רוב הכתיבות מבוצעות ב-SQL ישיר על מסד CRM (Unsupported); מוטבים ויצירת אנשי קשר – ב-SDK.",
+   "after": "החבילה קולטת את קובץ ה-CHN היומי של בנק לאומי (מוטבים, מורשים, קישורי הורה-ילד, טלפונים והערות אזהרה לחשבונות), טוענת אותו ל-Staging ומסנכרנת לפיו את CRM: מוחקת (בכפוף לשאלה פתוחה בצירוף) ויוצרת/מעדכנת מוטבים דרך CRM SDK; יוצרת אנשי קשר הורים (SDK), מעדכנת ב-SQL ישיר פרטי הורים קיימים עם gen_fileorigion = 2 (Update Contact), ומקשרת הורה-ילד-חשבון בקופה 5015; קישורים שלא סומנו \"קיים בקובץ\" בריצה מקבלים gen_Status = 2; מעדכנת טלפון נייד של עובד, הוראות מורשים וסימון \"חשבון בסיכון\"; יוצרת סוגי הערת אזהרה חדשים (gen_warningnotetype) כשהקוד והנושא לא קיימים, יוצרת/מאשרת הערות אזהרה ומסמנת את איש הקשר של החשבון gen_loaneligibilitycalculationrequired = 1 (ContactBase), וממלאת gen_closedate בהערות שלא סומנו \"קיימת בקובץ\" בריצה. רוב הכתיבות מבוצעות ב-SQL ישיר על מסד CRM (Unsupported); מוטבים ויצירת אנשי קשר – ב-SDK.",
+   "why": "הסיכום השמיט כתיבות עסקיות ל-CRM: עדכון הורים קיימים ב-SQL, סימון ContactBase.gen_loaneligibilitycalculationrequired = 1, ויצירת gen_warningnotetype. בנוסף 'מבטלת' / 'שלא הופיעו' הוחלפו בתנאי המדויק (gen_existsinfile/gen_existinfile = 0 כולל שורות שנפלו בדרך) לעקביות עם תיקון Disabled contactlink.",
+   "evidence": "source/DailyProcess/0012_LeumiFile_CHN_Daily.dtsx:50070 (update Contact), 78730 + 78768 (update ContactBase set gen_loaneligibilitycalculationrequired =1), 69907 (insert into gen_warningnotetypebase), 87344, 92723, 92729, 92741",
+   "verifierAccepted": true
+  },
+  {
+   "claimId": "L|finding#3",
+   "field": "findings_he[2].text",
+   "before": "רוב הכתיבות ל-CRM בחבילה הן SQL ישיר על מסד CRM (Unsupported): עדכון contact, INSERT/UPDATE ל-gen_contactlinkBase, INSERT/UPDATE ל-gen_instructionprovisionBase, UPDATE ל-Gen_customeraccountBase (טלפון, סיכון), INSERT ל-gen_warningnotetypebase, INSERT/UPDATE ל-gen_warningnotebase, UPDATE ל-ContactBase, ושלוש פקודות Execute SQL גורפות. רק מוטבים ויצירת אנשי קשר עוברים דרך SDK.",
+   "after": "רוב הכתיבות ל-CRM בחבילה הן SQL ישיר על מסד CRM (Unsupported): עדכון contact, INSERT ל-gen_contactlinkBase ו-UPDATE ל-gen_contactlink (View), INSERT/UPDATE ל-gen_instructionprovisionBase, UPDATE ל-Gen_customeraccountBase (טלפון, סיכון), INSERT ל-gen_warningnotetypebase, INSERT/UPDATE ל-gen_warningnotebase, UPDATE ל-ContactBase, וארבע פקודות Execute SQL גורפות: gen_contactlinkBase SET gen_existsinfile = 0; gen_contactlinkBase SET gen_Status = 2 WHERE gen_existsinfile = 0; gen_warningnotebase SET gen_existinfile = 0 WHERE gen_existinfile = 1; gen_warningnotebase SET gen_closedate = ? WHERE gen_existinfile = 0 AND gen_closedate IS NULL. רק מוטבים ויצירת אנשי קשר עוברים דרך SDK.",
+   "why": "המנגנון נכון, אבל יש ארבע (לא שלוש) משימות Execute SQL גורפות על חיבור CRM; ועדכון הקישורים בזרימה פונה ל-View gen_contactlink ולא ל-gen_contactlinkBase.",
+   "evidence": "source/DailyProcess/0012_LeumiFile_CHN_Daily.dtsx:87344, 92723, 92729, 92741 (Connection {4DF7FE1A…} = CM [CRM], DTSX:95-97); 50700 (update gen_contactlink); 92735 (truncate CHN_FileData על Staging – מסגרת)",
+   "verifierAccepted": true
+  },
+  {
+   "claimId": "L|finding#9",
+   "field": "findings_he[8].text",
+   "before": "(השערה) הוראת מורשה עם קוד תפקיד ריק עלולה להיווצר מחדש בכל ריצה: התפקיד המתורגם נשאר NULL בעוד שבצד CRM ההשוואה היא ל-isnull(gen_authorizedroletoact,0).",
+   "after": "אם בשלב הוראות המורשים מגיעה שורה תקינה שבה Action_Allowed_Role_30 ריק או אינו מספרי, אז התפקיד המתורגם נשאר NULL (Convert PL לא מציב ערך), אינו מותאם להוראה קיימת (בצד CRM המפתח הוא isnull(gen_authorizedroletoact,0)), והשורה עוברת ל-Add Fields. שם הקוד קורא את העמודה בלי בדיקת NULL (if (Row.genauthorizedroletoactMAP == 0), דרך Buffer.GetInt32). לפי התנהגות SSIS מתועדת (ידע כללי, לא ראיה מהחבילה) קריאה כזו זורקת חריגה; במקרה כזה זרימת הנתונים נכשלת, ההוראה לא נוצרת, וכל השלבים שאחריה בשרשרת (Success בלבד) אינם רצים. לא ידוע אם שורות כאלה מגיעות בקבצים בפועל.",
+   "why": "ההשערה 'נוצרת מחדש בכל ריצה' אינה נובעת מהקוד: שורה עם תפקיד NULL מגיעה ל-Add Fields שקורא את העמודה ללא בדיקת NULL. נוסח כהתנהגות מותנית בנתונים, לא כתקלה.",
+   "evidence": "Convert PL main.cs:147 (if (!Row.ActionAllowedRole30_IsNull && int.TryParse…)); Is Instruction provision exist SQL DTSX:60285 (isnull(gen_authorizedroletoact,0)), JoinToReferenceColumn genauthorizedroletoactMAP→gen_authorizedroletoact; path No Match → Add Fields; Add Fields DTSX:51332 (main.cs:70), getter DTSX:51643 Buffer.GetInt32; PCs DTSX:108903-108930",
+   "verifierAccepted": true
+  },
+  {
+   "claimId": "L|Package\\Check File Existence|title",
+   "field": "short_he",
+   "before": "פורס קובצי GZ שהגיעו לתיקייה היומית ומעביר אותם לארכיון GZ; לאחר מכן בוחר את קובץ ה-CHN שעודכן אחרון לעיבוד ומעביר את השאר ל-NotProccessed. אם אין קובץ – שאר החבילה לא רצה.",
+   "after": "פורס קובצי GZ בתיקייה היומית ששמם מכיל את שם הקובץ (FileName) ומעביר אותם לארכיון GZ; לאחר מכן בוחר את קובץ ה-CHN שעודכן אחרון לעיבוד ומעביר את השאר ל-NotProccessed. אם אין קובץ – שאר החבילה לא רצה.",
+   "why": "רק קבצים התואמים *FileName* נבדקים; קובצי GZ בשמות אחרים אינם נפרסים.",
+   "evidence": "source/DailyProcess/0012_LeumiFile_CHN_Daily.dtsx:441 (GetFiles(\"*\" + FileName + \"*\") = ScriptMain.cs:51), 445 (Extension.Contains(\".gz\") = ScriptMain.cs:55)",
+   "verifierAccepted": true
+  },
+  {
+   "claimId": "L|Package\\Check File Existence|title",
+   "field": "flow_he[1]",
+   "before": "קבצי *.gz → פריסה לאותה תיקייה → העברה ל-\"Archive GZ\\yyyy-MM-dd\"",
+   "after": "קבצים התואמים *FileName* שהסיומת שלהם מכילה .gz → פריסה לאותה תיקייה → העברה ל-\"Archive GZ\\yyyy-MM-dd\"",
+   "why": "'קבצי *.gz' מרמז שכל קובץ GZ בתיקייה נפרס; בפועל רק קבצים התואמים *FileName*.",
+   "evidence": "source/DailyProcess/0012_LeumiFile_CHN_Daily.dtsx:441, 445",
+   "verifierAccepted": true
+  },
+  {
+   "claimId": "L|Package\\Check File Existence|short",
+   "field": "short.nodes[0].text",
+   "before": "קבצים דחוסים (GZ) שהגיעו מהבנק נפרסים ומועברים לארכיון.",
+   "after": "קבצים דחוסים (GZ) בתיקייה היומית ששמם מכיל את שם הקובץ נפרסים ומועברים לארכיון.",
+   "why": "עקביות עם תיקון flow_he: רק קבצים התואמים *FileName*; המקור 'מהבנק' אינו מוכח מהקוד.",
+   "evidence": "source/DailyProcess/0012_LeumiFile_CHN_Daily.dtsx:441, 445",
+   "verifierAccepted": true
+  },
+  {
+   "claimId": "L|Package\\Check File Existence|detailed",
+   "field": "detailed.nodes (insert at 2)",
+   "before": null,
+   "after": {
+    "type": "step",
+    "text": "אם הפריסה נכשלת, או שבתיקיית Archive GZ של היום כבר יש קובץ באותו שם, נזרקת חריגה שאינה נתפסת: המשימה נכשלת, האילוץ שאחריה אינו מתקיים ושאר החבילה אינה רצה (ייתכן שיישאר בתיקייה קובץ פרוס חלקית).",
+    "tech": "Parse_GZ: catch { IsParse = false; throw; } (ScriptMain.cs:117-121); MoveGZFileToArchive: File.Copy ללא overwrite (ScriptMain.cs:97); Main ללא try/catch; PC DTSX:108916 (Success AND @[User::isFileExist] == TRUE)",
+    "evidence": "DTSX:487, 499, 507-511, 424-480, 108916"
+   },
+   "why": "חסר ענף הכשל של שלב ה-GZ. אומת בקוד: throw מחדש בפריסה, File.Copy בלי overwrite, אין try/catch ב-Main.",
+   "evidence": "source/DailyProcess/0012_LeumiFile_CHN_Daily.dtsx:487 (File.Copy), 499 (File.Create), 507-511 (catch/throw), 424-480 (Main), 108916",
+   "verifierAccepted": true
+  },
+  {
+   "claimId": "L|Package\\Create and update Beneficiaries|title",
+   "field": "flow_he[2]",
+   "before": "מקרה ספציפי (גוף מנהל 9844/9845/9846, או ריק/0000 עם קופה 5015) → חשבון לפי מספר חשבון + סוג מוצר; אחרת → לפי מספר חשבון + גוף מנהל",
+   "after": "מקרה ספציפי (FinanceNumber_11 = 9844/9845/9846, או ריק/0000 עם קופה 5015) → חשבון לפי מספר חשבון + Gen_producttypeid; אחרת → לפי מספר חשבון + Product.Gen_fundfinanceid = FinanceNumber_11",
+   "why": "'גוף מנהל' אינו מוכח בקבצים; התווית היחידה שסופקה (הערת SQL ב-0015) מתארת את gen_fundfinanceid כ'מספר אישור מ\"ה'. נכתב התנאי הגולמי.",
+   "evidence": "source/DailyProcess/0012_LeumiFile_CHN_Daily.dtsx:13035, 13071-13090; source/DailyProcess/0015_TransferIn.dtsx:42637",
+   "verifierAccepted": true
+  },
+  {
+   "claimId": "L|Package\\Create and update Beneficiaries|short",
+   "field": "short.nodes[0].text",
+   "before": "נבחרים מהקובץ מוטבים תקינים (נושא 01, אחוז חלוקה שונה מאפס, ת.ז. קיימת, סוג זיהוי 1, סוג רישיון 1).",
+   "after": "נבחרים מהקובץ מוטבים תקינים (נושא 01, אחוז חלוקה לא ריק ושונה מאפס, ת.ז. מוטב קיימת, סוג הזיהוי של בעל החשבון 1 או ריק, סוג רישיון 1).",
+   "why": "מסנן סוג הזיהוי פוסל רק ערך לא ריק ושונה מ-\"1\" (ריק עובר), והעמודה היא של בעל החשבון (Account_Owner_Identifiaction_Type_7); גם אחוז ריק נפסל.",
+   "evidence": "source/DailyProcess/0012_LeumiFile_CHN_Daily.dtsx:13552-13593 (Is Valid  Beneficiary FriendlyExpression)",
+   "verifierAccepted": true
+  },
+  {
+   "claimId": "L|Package\\Create and update Beneficiaries|detailed",
+   "field": "detailed.nodes[0].text",
+   "before": "מהקובץ נקראים חשבון, סוג קופה, גוף מנהל, נושא, תאריך הוראה, ת.ז. מוטב, תאריך לידה, שם, תאריך פטירה, אחוז חלוקה, כתובת, סוג זיהוי וסוג רישיון.",
+   "after": "מהקובץ נקראים חשבון, סוג קופה, FinanceNumber_11 (קוד בן 4 תווים; משמעותו העסקית לא מוגדרת בחבילה), נושא, תאריך הוראה, ת.ז. מוטב, תאריך לידה, שם, תאריך פטירה, אחוז חלוקה, כתובת, סוג הזיהוי של בעל החשבון וסוג רישיון.",
+   "why": "'גוף מנהל' – משמעות לא מוכחת (בקובץ יש עמודה נפרדת Manager_Entity_2; הערה ב-0015 מתארת את gen_fundfinanceid התואם כ'מספר אישור מ\"ה').",
+   "evidence": "source/DailyProcess/0012_LeumiFile_CHN_Daily.dtsx:10, 19 (FlatFileColumn Manager_Entity_2 / FinanceNumber_11), 13658-13666; source/DailyProcess/0015_TransferIn.dtsx:42637",
+   "verifierAccepted": true
+  },
+  {
+   "claimId": "L|Package\\Create and update Beneficiaries|detailed",
+   "field": "detailed.nodes[3].branches[1].nodes[0].text",
+   "before": "חשבון הלקוח מאותר לפי מספר חשבון ומספר הגוף המנהל של המוצר שמספרו כקוד סוג החשבון (חשבונות פעילים בבנק 10).",
+   "after": "חשבון הלקוח מאותר לפי מספר חשבון ולפי Product.Gen_fundfinanceid = FinanceNumber_11, כאשר המוצר הוא זה שמספרו (ProductNumber) שווה לקוד סוג החשבון (gen_customeraccounttype.gen_id); רק חשבונות עם StateCode 0 בבנק 10. לפי הערה ב-0015, gen_fundfinanceid הוא 'מספר אישור מ\"ה'.",
+   "why": "'מספר הגוף המנהל של המוצר' – משמעות לא מוכחת של Product.Gen_fundfinanceid.",
+   "evidence": "source/DailyProcess/0012_LeumiFile_CHN_Daily.dtsx:13071-13090; source/DailyProcess/0015_TransferIn.dtsx:42637",
+   "verifierAccepted": true
+  },
+  {
+   "claimId": "L|Package\\Create and update Beneficiaries|detail",
+   "field": "detail_he[1].t",
+   "before": "חשבון לקוח פעיל בבנק 10: במקרה ספציפי לפי חשבון + Gen_producttypeid; אחרת לפי חשבון + גוף מנהל של המוצר. מוטב: gen_beneficiaries לפי ת.ז. + חשבון לקוח (ללא סינון סטטוס).",
+   "after": "חשבון לקוח פעיל בבנק 10: במקרה ספציפי לפי חשבון + Gen_producttypeid; אחרת לפי חשבון + Product.Gen_fundfinanceid = FinanceNumber_11 (Product מצורף לפי gen_id = ProductNumber). מוטב: gen_beneficiaries לפי ת.ז. + חשבון לקוח (ללא סינון סטטוס).",
+   "why": "'גוף מנהל של המוצר' – משמעות לא מוכחת.",
+   "evidence": "source/DailyProcess/0012_LeumiFile_CHN_Daily.dtsx:13071-13090",
+   "verifierAccepted": true
+  },
+  {
+   "claimId": "L|Package\\Create and update contactlink|title",
+   "field": "short_he",
+   "before": "לשורות נושא 03 בקופה 5015: כשהילד (בעל החשבון) קיים ב-CRM – מאתרת את ההורה; הורה קיים שנוצר מהקובץ מתעדכן (SQL), הורה חסר נוצר (SDK); לאחר מכן הקישור הורה-ילד-חשבון מאושר (SQL Update) או נוצר (SQL Insert). להורה שנוצר בריצה זו הקישור אינו נוצר באותה ריצה.",
+   "after": "לשורות נושא 03 בקופה 5015: כשהילד (בעל החשבון) קיים ב-CRM – מאתרת את ההורה; הורה קיים עם gen_fileorigion = 2 (הערך שהחבילה עצמה מציבה ביצירת הורה; 'נוצר מקובץ זה' – השערה) מתעדכן (SQL) כשזוהה שינוי, הורה חסר נוצר (SDK); לאחר מכן הקישור הורה-ילד-חשבון מאושר (SQL Update) או נוצר (SQL Insert). להורה שנוצר בריצה זו הקישור אינו נוצר באותה ריצה.",
+   "why": "משמעות gen_fileorigion = 2 הוצגה כעובדה; הקוד בודק רק את הערך 2, ואין תווית OptionSet בקבצים.",
+   "evidence": "source/DailyProcess/0012_LeumiFile_CHN_Daily.dtsx:30947 (Conditional Split), 31263 (Create Contact: contact[\"gen_fileorigion\"] = new OptionSetValue(2))",
+   "verifierAccepted": true
+  },
+  {
+   "claimId": "L|Package\\Create and update contactlink|short",
+   "field": "short.nodes[2].branches[0].nodes[0].text",
+   "before": "אם ההורה נוצר בעבר מקובץ זה ופרטיו השתנו – פרטיו מתעדכנים.",
+   "after": "אם להורה gen_fileorigion = 2 (הערך שהחבילה מציבה ביצירה; משמעות 'נוצר מקובץ זה' – השערה) ופרטיו השתנו – פרטיו מתעדכנים.",
+   "why": "משמעות gen_fileorigion = 2 הוצגה כעובדה.",
+   "evidence": "source/DailyProcess/0012_LeumiFile_CHN_Daily.dtsx:30947, 31263",
+   "verifierAccepted": true
+  },
+  {
+   "claimId": "L|Package\\Create and update contactlink|short",
+   "field": "short.nodes[2].branches[1].nodes[0].text",
+   "before": "נוצר איש קשר חדש להורה, פעם אחת לכל ת.ז.",
+   "after": "נוצר איש קשר חדש להורה, פעם אחת לכל ת.ז. אם Type_20 ריק או אינו מספר שלם, איש הקשר לא נוצר והשורה נרשמת כאזהרת ETL.",
+   "why": "המאמת ציין שהיצירה תלויה ב-int.Parse(Row.Type20); אומת בקוד (החריגה נתפסת ומנותבת לפלט השגיאה → אזהרת ETL).",
+   "evidence": "source/DailyProcess/0012_LeumiFile_CHN_Daily.dtsx:31246 (int.Parse(Row.Type20)), 31302-31314 (catch → ErrorBuffer), paths DTSX:50968-50969, 51056, 51040, 50957, 51053",
+   "verifierAccepted": true
+  },
+  {
+   "claimId": "L|Package\\Create and update contactlink|detailed",
+   "field": "detailed.nodes[6].branches[0].nodes[0].text",
+   "before": "האם ההורה נוצר בעבר מקובץ זה (מקור קובץ = 2)?",
+   "after": "האם להורה gen_fileorigion = 2? (זה הערך שהחבילה מציבה ביצירת הורה; משמעות 'נוצר מקובץ זה' – השערה)",
+   "why": "משמעות gen_fileorigion = 2 הוצגה כעובדה.",
+   "evidence": "source/DailyProcess/0012_LeumiFile_CHN_Daily.dtsx:30947, 31263",
+   "verifierAccepted": true
+  },
+  {
+   "claimId": "L|Package\\Create and update contactlink|detailed",
+   "field": "detailed.nodes[6].branches[0].nodes[0].branches[1].nodes[0].text",
+   "before": "טלפון ומייל לחיסכון לילד מהקובץ (כשאינם ריקים) מחליפים את הערכים ב-CRM ומקבלים תאריך עדכון; שם פרטי, שם משפחה ותאריך לידה ריקים בקובץ נלקחים מ-CRM.",
+   "after": "טלפון ומייל לחיסכון לילד מהקובץ (כשאינם ריקים) מחליפים את הערכים ב-CRM ומקבלים תאריך עדכון; שם פרטי, שם משפחה, תאריך לידה, מזהה לקוח בבנק ות.ז. ההורה שריקים בקובץ נלקחים מ-CRM, וערכי הטקסט מהקובץ נחתכים מרווחים.",
+   "why": "Derived Column 1 גם משלים מ-CRM את gen_bankCustomerID ואת ת.ז. ההורה כשהם NULL בקובץ, ומבצע TRIM.",
+   "evidence": "source/DailyProcess/0012_LeumiFile_CHN_Daily.dtsx:40079-40124 (Derived Column 1: ISNULL(gen_bankCustomerID) ? Parentbankcustomeridnumber : TRIM(gen_bankCustomerID); ISNULL(gen_Parentidentitynumber_9) ? gen_identitynumber : TRIM(...))",
+   "verifierAccepted": true
+  },
+  {
+   "claimId": "L|Package\\Create and update contactlink|detailed",
+   "field": "detailed.nodes[6].branches[0].nodes[0].branches[1].nodes[1].branches[0].nodes[0].text",
+   "before": "פרטי ההורה מתעדכנים: שם משפחה, שם פרטי, שם מלא, ת.ז., מזהה לקוח בבנק, תאריך לידה, טלפון ומייל לחיסכון לילד ותאריכי עדכונם, סוג זיהוי (נלקח מאיש הקשר של הילד – ראה ממצא), מקור קליטה = 1, פעיל = כן, לאומי = כן, מעדכן ותאריך עדכון.",
+   "after": "פרטי ההורה מתעדכנים: שם משפחה, שם פרטי, שם מלא, ת.ז., מזהה לקוח בבנק, תאריך לידה, טלפון ומייל לחיסכון לילד ותאריכי עדכונם, סוג זיהוי (נלקח מאיש הקשר של הילד – ראה ממצא), מקור קליטה = 1, פעיל = כן, לאומי = כן, תאריך עדכון בנק (Gen_modifiedbybank = getutcdate()), מעדכן ותאריך עדכון.",
+   "why": "רשימת השדות השמיטה את Gen_modifiedbybank = getutcdate().",
+   "evidence": "source/DailyProcess/0012_LeumiFile_CHN_Daily.dtsx:50070-50087",
+   "verifierAccepted": true
+  },
+  {
+   "claimId": "L|Package\\Create and update contactlink|detailed",
+   "field": "detailed.nodes[6].branches[1].nodes[0].branches[0].nodes[0].text",
+   "before": "נוצר איש קשר להורה: ת.ז., סוג זיהוי לפי Type_20, שם פרטי, שם משפחה, שם מלא, מזהה לקוח בבנק, תאריך לידה, טלפון ומייל לחיסכון לילד, מקור קליטה = 1, מקור קובץ = 2, פעיל = כן, לאומי = כן.",
+   "after": "נוצר איש קשר להורה: ת.ז., סוג זיהוי לפי Type_20, שם פרטי, שם משפחה, שם מלא, מזהה לקוח בבנק, תאריך לידה, טלפון ומייל לחיסכון לילד ותאריכי עדכונם (DateTime.Now, כשהם קיימים), מקור קליטה = 1, gen_fileorigion = 2, פעיל = כן, לאומי = כן, תאריך עדכון בנק (gen_modifiedbybank = DateTime.Now).",
+   "why": "היצירה מציבה גם gen_modifiedbybank ואת gen_childsavingphoneupdatedon / gen_childsavingemailupdatedon; 'מקור קובץ' הוחלף בשם השדה (משמעות לא מוכחת).",
+   "evidence": "source/DailyProcess/0012_LeumiFile_CHN_Daily.dtsx:31263, 31282, 31288, 31297",
+   "verifierAccepted": true
+  },
+  {
+   "claimId": "L|Package\\Create and update contactlink|detailed",
+   "field": "detailed.nodes[6].branches[1].nodes[0].branches[0].nodes (insert at 1)",
+   "before": null,
+   "after": {
+    "type": "step",
+    "text": "היצירה מתבצעת רק אם Type_20 הוא מספר שלם. אם Type_20 ריק או אינו מספרי (וכן אם CRM דוחה את היצירה), נזרקת חריגה, איש הקשר לא נוצר והשורה נרשמת כאזהרת ETL.",
+    "tech": "Create Contact: new OptionSetValue(int.Parse(Row.Type20)) בתוך try; catch → ErrorBuffer (Error) → Union All error Create → … → insert etl process warning",
+    "evidence": "DTSX:31246, 31302-31314; paths DTSX:50968-50969, 51056, 51040, 50957, 51053"
+   },
+   "why": "תנאי יצירה מובלע (int.Parse) לא תואר. אומת בקוד ובנתיבים.",
+   "evidence": "source/DailyProcess/0012_LeumiFile_CHN_Daily.dtsx:31246, 31302-31314",
+   "verifierAccepted": true
+  },
+  {
+   "claimId": "L|Package\\Create and update contactlink|decisions",
+   "field": "decisions[3].meaning_he",
+   "before": "ההורה נוצר מקובץ זה",
+   "after": "gen_fileorigion = 2 (הערך שהחבילה מציבה ביצירת הורה; 'נוצר מקובץ זה' – השערה)",
+   "why": "meaning_he קבע משמעות עסקית לקוד 2 ללא הוכחה.",
+   "evidence": "source/DailyProcess/0012_LeumiFile_CHN_Daily.dtsx:30947, 31263",
+   "verifierAccepted": true
+  },
+  {
+   "claimId": "L|Package\\Create and update contactlink|crm",
+   "field": "crmEffects[0].verb",
+   "before": "Update (שמות, ת.ז., מזהה לקוח בבנק, תאריך לידה, טלפון/מייל חיסכון לילד, סוג זיהוי, דגלים)",
+   "after": "Update (שמות, ת.ז., מזהה לקוח בבנק, תאריך לידה, טלפון/מייל חיסכון לילד, סוג זיהוי, דגלים, Gen_modifiedbybank = getutcdate())",
+   "why": "gen_modifiedbybank הושמט.",
+   "evidence": "source/DailyProcess/0012_LeumiFile_CHN_Daily.dtsx:50070-50087",
+   "verifierAccepted": true
+  },
+  {
+   "claimId": "L|Package\\Create and update contactlink|crm",
+   "field": "crmEffects[1].verb",
+   "before": "Create",
+   "after": "Create (כולל gen_fileorigion = 2, gen_modifiedbybank = DateTime.Now)",
+   "why": "gen_modifiedbybank הושמט ביצירה.",
+   "evidence": "source/DailyProcess/0012_LeumiFile_CHN_Daily.dtsx:31263, 31297",
+   "verifierAccepted": true
+  },
+  {
+   "claimId": "L|Package\\Create and update contactlink|crm",
+   "field": "crmEffects[1].when_he",
+   "before": "ההורה אינו קיים (פעיל) – פעם אחת לכל ת.ז. בריצה",
+   "after": "ההורה אינו קיים (פעיל) – פעם אחת לכל ת.ז. בריצה, ורק אם Type_20 הוא מספר שלם (int.Parse); אחרת השורה נרשמת כאזהרת ETL",
+   "why": "תנאי יצירה מובלע חסר.",
+   "evidence": "source/DailyProcess/0012_LeumiFile_CHN_Daily.dtsx:31246, 31302-31314",
+   "verifierAccepted": true
+  },
+  {
+   "claimId": "L|Package\\Disabled contactlink|short",
+   "field": "short.nodes[2].text",
+   "before": "קישורים שהוסרו בבנק אינם פעילים עוד ב-CRM.",
+   "after": "כל קישור שלא סומן מחדש \"קיים בקובץ\" בריצה זו (כולל קישורים ששורתם בקובץ נפלה בדרך) מקבל gen_Status = 2 (שם המשימה \"Disabled\"; השערה: לא פעיל – תווית ה-OptionSet לא סופקה).",
+   "why": "האוכלוסייה היא כל קישור עם gen_existsinfile = 0 אחרי האיפוס הגורף, לא רק 'קישורים שהוסרו בבנק'; ומשמעות סטטוס 2 היא השערה (כפי שנכתב ב-hypotheses_he).",
+   "evidence": "source/DailyProcess/0012_LeumiFile_CHN_Daily.dtsx:92723 (update gen_contactlinkBase set gen_existsinfile = 0), 87344 (set gen_Status = 2 where gen_existsinfile = 0)",
+   "verifierAccepted": true
+  },
+  {
+   "claimId": "L|Package\\Disabled contactlink|detailed",
+   "field": "detailed.nodes[5].text",
+   "before": "קישורים שלא הופיעו בקובץ היומי מבוטלים.",
+   "after": "כל קישור שלא סומן מחדש בריצה זו – בין שלא הופיע בקובץ ובין ששורתו נפלה בדרך – מקבל gen_Status = 2 (שם המשימה: Disabled).",
+   "why": "עקביות עם תיקון short: 'מבוטלים' מניח את משמעות סטטוס 2, והאוכלוסייה רחבה מ'לא הופיעו בקובץ'.",
+   "evidence": "source/DailyProcess/0012_LeumiFile_CHN_Daily.dtsx:92723, 87344",
+   "verifierAccepted": true
+  },
+  {
+   "claimId": "L|Package\\Create and update Instruction provision|open",
+   "field": "hypotheses_he[0]",
+   "before": "כאשר Action_Allowed_Role_30 ריק או לא מספרי, התפקיד המתורגם נשאר ריק (NULL) ואילו בצד CRM ההשוואה היא ל-isnull(...,0) = 0, ולכן ההוראה עלולה שלא להימצא ולהיווצר מחדש בכל ריצה – השערה תלוית נתונים.",
+   "after": "אם Action_Allowed_Role_30 ריק או לא מספרי, התפקיד המתורגם נשאר NULL ואינו מותאם להוראה קיימת (בצד CRM isnull(...,0)), והשורה מגיעה ל-Add Fields, שקורא את העמודה בלי בדיקת NULL (main.cs:70). לפי התנהגות SSIS מתועדת (ידע כללי) הקריאה זורקת חריגה, זרימת הנתונים נכשלת וכל השלבים שאחריה אינם רצים; ההוראה לא נוצרת. תלוי בקיום נתונים כאלה – לא ידוע.",
+   "why": "ההשערה 'נוצרת מחדש בכל ריצה' נסתרת בקוד: Add Fields קורא את העמודה ללא בדיקת _IsNull.",
+   "evidence": "Convert PL main.cs:147; Add Fields DTSX:51332 (main.cs:70-71), getter DTSX:51643 (Buffer.GetInt32); path Is Instruction provision exist No Match → Add Fields",
+   "verifierAccepted": true
+  },
+  {
+   "claimId": "L|Package\\Update Customer Accounts At Rist|title",
+   "field": "flow_he[2]",
+   "before": "gen_customeraccount לפי מספר חשבון מרופד ל-12 (ללא סינון בנק/סטטוס)",
+   "after": "gen_customeraccount: מספר החשבון מהקובץ (חתוך מרווחים, לא מרופד) = מספר החשבון ב-CRM מרופד באפסים ל-12 (ללא סינון בנק/סטטוס)",
+   "why": "רק צד ה-CRM מרופד (RIGHT('000000000000'+…,12)); צד הקובץ עובר TRIM בלבד בזרימה זו.",
+   "evidence": "source/DailyProcess/0012_LeumiFile_CHN_Daily.dtsx:93742 (Lookup SQL), 98569 (TRIM script – Trim בלבד), Set Updates For Accounts main.cs:52-88 (ללא ריפוד)",
+   "verifierAccepted": true
+  },
+  {
+   "claimId": "L|Package\\Update Customer Accounts At Rist|short",
+   "field": "short.nodes[2].text",
+   "before": "האם מצב הסיכון השתנה?",
+   "after": "האם מצב הסיכון השתנה, או שאין ב-CRM ערך לסימון הסיכון?",
+   "why": "חסר מקרה כתיבה: ערך ריק ב-CRM וקוד שאינו 8217 מתעדכן גם הוא.",
+   "evidence": "source/DailyProcess/0012_LeumiFile_CHN_Daily.dtsx:93548 (Update New Account: ISNULL(gen_accountatriskDB)); Set Fields To Update main.cs:142-147",
+   "verifierAccepted": true
+  },
+  {
+   "claimId": "L|Package\\Update Customer Accounts At Rist|short",
+   "field": "short.nodes[2].branches[0].nodes[0].text",
+   "before": "החשבון מסומן \"בסיכון\" עם תאריך עדכון.",
+   "after": "החשבון מסומן \"בסיכון\" עם תאריך עדכון (גם כשב-CRM לא היה ערך).",
+   "why": "ענף 8217 כולל גם ערך ריק ב-CRM (Set Fields To Update שורה 120).",
+   "evidence": "Set Fields To Update main.cs:120-130",
+   "verifierAccepted": true
+  },
+  {
+   "claimId": "L|Package\\Update Customer Accounts At Rist|short",
+   "field": "short.nodes[2].branches (insert at 2)",
+   "before": null,
+   "after": {
+    "label": "אין ערך ב-CRM והקוד אינו 8217",
+    "nodes": [
+     {
+      "type": "write",
+      "text": "החשבון מסומן \"לא בסיכון\", ותאריכי עדכון הסיכון והסרתו מתרוקנים.",
+      "tech": "gen_customeraccount · Update · SQL"
+     }
+    ]
+   },
+   "why": "מקרה כתיבה שלישי חסר: gen_accountatriskDB ריק וקוד ≠ 8217 → gen_accountatrisk = false ושני התאריכים NULL, והשורה תמיד נכתבת.",
+   "evidence": "source/DailyProcess/0012_LeumiFile_CHN_Daily.dtsx:93548; Set Fields To Update main.cs:142-147; Need To Update main.cs:50",
+   "verifierAccepted": true
+  },
+  {
+   "claimId": "L|Package\\Update Customer Accounts At Rist|short",
+   "field": "short.nodes[2].branches[3].label (was [2])",
+   "before": "ללא שינוי",
+   "after": "ללא שינוי (המצב ב-CRM תואם לקובץ)",
+   "why": "הבהרה: 'ללא שינוי' כולל רק ערך קיים ב-CRM שתואם לקוד בקובץ; ערך ריק מטופל בענף החדש.",
+   "evidence": "source/DailyProcess/0012_LeumiFile_CHN_Daily.dtsx:93548 (Not To Update = default)",
+   "verifierAccepted": true
+  },
+  {
+   "claimId": "L|Package\\Update Customer Accounts At Rist|detailed",
+   "field": "detailed.nodes[2].text",
+   "before": "האם קיים חשבון לקוח עם מספר החשבון (מרופד ל-12 ספרות)?",
+   "after": "האם קיים חשבון לקוח שמספר החשבון שלו ב-CRM, מרופד באפסים ל-12 ספרות, שווה למספר החשבון מהקובץ (חתוך מרווחים, ללא ריפוד)? מספר בקובץ שקצר מ-12 תווים לא יותאם.",
+   "why": "רק צד ה-CRM מרופד; צד הקובץ עובר TRIM בלבד.",
+   "evidence": "source/DailyProcess/0012_LeumiFile_CHN_Daily.dtsx:93742, 98569",
+   "verifierAccepted": true
+  },
+  {
+   "claimId": "L|Package\\Update Customer Accounts At Rist|detailed",
+   "field": "detailed.nodes[5].text",
+   "before": "האם הערכים החדשים שונים מהשמורים?",
+   "after": "האם הערכים החדשים שונים מהשמורים? בשלושת המקרים שמגיעים לכאן התשובה לפי הקוד היא תמיד \"כן\": ערך \"חשבון בסיכון\" המחושב שונה מהערך ב-CRM, או שהערך ב-CRM ריק.",
+   "why": "Need To Update שורה 50 מחזירה true לכל שורה שמנותבת לכאן, ולכן ענף 'לא' אינו מתממש.",
+   "evidence": "Need To Update main.cs:50 (DTSX:93955 component); Set Fields To Update main.cs:120-147; DTSX:93548",
+   "verifierAccepted": true
+  },
+  {
+   "claimId": "L|Package\\Update Customer Accounts At Rist|detailed",
+   "field": "detailed.nodes[5].branches[1].nodes[0].text",
+   "before": "אין עדכון.",
+   "after": "ענף זה אינו מתממש בשלושת המקרים שמנותבים לכאן (לפי קוד המקור), ולכן כל חשבון שהגיע לשלב זה מתעדכן.",
+   "why": "ענף NoNeedToUpdate אינו ניתן להשגה עבור השורות המנותבות.",
+   "evidence": "Need To Update main.cs:50",
+   "verifierAccepted": true
+  },
+  {
+   "claimId": "L|Package\\Update Customer Accounts At Rist|detail",
+   "field": "detail_he[1].t",
+   "before": "gen_customeraccount לפי מספר חשבון מרופד ל-12 בלבד, ללא סינון בנק או סטטוס.",
+   "after": "gen_customeraccount לפי מספר חשבון בלבד: מספר החשבון מהקובץ (חתוך מרווחים, לא מרופד) מול RIGHT('000000000000'+ISNULL(gen_bankaccountnumber,''),12) ב-CRM, ללא סינון בנק או סטטוס.",
+   "why": "הריפוד חל רק על צד ה-CRM.",
+   "evidence": "source/DailyProcess/0012_LeumiFile_CHN_Daily.dtsx:93742, 98569",
+   "verifierAccepted": true
+  },
+  {
+   "claimId": "L|Package\\Update Customer Accounts At Rist|decisions",
+   "field": "decisions[4].outcome_he",
+   "before": "NeedToUpdate",
+   "after": "NeedToUpdate – לפי שורה 50, תמיד בשלושת המקרים המנותבים (NoNeedToUpdate אינו מתממש)",
+   "why": "עקביות עם תיקון detailed (הטענה עצמה אומתה).",
+   "evidence": "Need To Update main.cs:50",
+   "verifierAccepted": true
+  },
+  {
+   "claimId": "L|Package\\Update Customer Accounts At Rist|open",
+   "field": "hypotheses_he[0]",
+   "before": "8217 = קוד \"חשבון בסיכון\" – לפי שם הקבוע AT_RISK_WARNING בקוד.",
+   "after": "לא השערה – מוכח בקוד: 8217 מוגדר כקבוע AT_RISK_WARNING בשני הסקריפטים, והוא הקוד היחיד שמציב gen_accountatrisk = true (הערה בקוד: \"Update Customer Account At Risk\").",
+   "why": "הקבוע AT_RISK_WARNING = \"8217\" ושימושו להצבת gen_accountatrisk = true מוכיחים את התווית בקוד; לכן אין זו השערה.",
+   "evidence": "Set Updates For Accounts main.cs:25; Set Fields To Update main.cs:78, 119-122",
+   "verifierAccepted": true
+  },
+  {
+   "claimId": "L|Package\\Create And Update Warning Notes|detailed",
+   "field": "detailed.nodes[0].text",
+   "before": "מהקובץ נקראים מספר בעל החשבון, טקסט ההערה, גוף מנהל, מספר חשבון, נושא וקוד הודעת האזהרה.",
+   "after": "מהקובץ נקראים מספר בעל החשבון, טקסט ההערה, FinanceNumber_11 (משמש רק כמפתח קיבוץ ב-Aggregate; משמעותו לא מוגדרת בחבילה), מספר חשבון, נושא וקוד הודעת האזהרה.",
+   "why": "'גוף מנהל' – משמעות לא מוכחת (בקובץ יש עמודה נפרדת Manager_Entity_2); FinanceNumber_11 משמש רק כ-GroupBy.",
+   "evidence": "source/DailyProcess/0012_LeumiFile_CHN_Daily.dtsx:10, 19 (FlatFileColumns), 70813-70819 (SQL), 69338-69346 (Aggregate AggregationType 0 = GroupBy)",
+   "verifierAccepted": true
+  },
+  {
+   "claimId": "L|summary",
+   "field": "summary_he",
+   "before": "החבילה קולטת את קובץ ה-CHN היומי של בנק לאומי (מוטבים, מורשים, קישורי הורה-ילד, טלפונים והערות אזהרה לחשבונות), טוענת אותו ל-Staging ומסנכרנת לפיו את CRM: מוחקת (בכפוף לשאלה פתוחה בצירוף) ויוצרת/מעדכנת מוטבים דרך CRM SDK; יוצרת אנשי קשר הורים (SDK), מעדכנת ב-SQL ישיר פרטי הורים קיימים עם gen_fileorigion = 2 (Update Contact), ומקשרת הורה-ילד-חשבון בקופה 5015; קישורים שלא סומנו \"קיים בקובץ\" בריצה מקבלים gen_Status = 2; מעדכנת טלפון נייד של עובד, הוראות מורשים וסימון \"חשבון בסיכון\"; יוצרת סוגי הערת אזהרה חדשים (gen_warningnotetype) כשהקוד והנושא לא קיימים, יוצרת/מאשרת הערות אזהרה ומסמנת את איש הקשר של החשבון gen_loaneligibilitycalculationrequired = 1 (ContactBase), וממלאת gen_closedate בהערות שלא סומנו \"קיימת בקובץ\" בריצה. רוב הכתיבות מבוצעות ב-SQL ישיר על מסד CRM (Unsupported); מוטבים ויצירת אנשי קשר – ב-SDK.",
+   "after": "החבילה מעבדת רק אם נמצא קובץ: ההמשך אחרי Check File Existence מותנה באילוץ Success AND @[User::isFileExist] == TRUE; הדגל (ברירת מחדל false) מוצב true רק כשבתיקייה נמצא קובץ ששמו מכיל את FileName, ואז נבחר הקובץ שעודכן אחרון; בלי קובץ אף שלב עסקי אינו רץ. כשנמצא קובץ, החבילה קולטת את קובץ ה-CHN היומי של בנק לאומי (מוטבים, מורשים, קישורי הורה-ילד, טלפונים והערות אזהרה לחשבונות), טוענת אותו ל-Staging ומסנכרנת לפיו את CRM: מוחקת (בכפוף לשאלה פתוחה בצירוף) ויוצרת/מעדכנת מוטבים דרך CRM SDK; יוצרת אנשי קשר הורים (SDK), מעדכנת ב-SQL ישיר פרטי הורים קיימים עם gen_fileorigion = 2 (Update Contact), ומקשרת הורה-ילד-חשבון בקופה 5015; קישורים שלא סומנו \"קיים בקובץ\" בריצה מקבלים gen_Status = 2; מעדכנת טלפון נייד של עובד, הוראות מורשים וסימון \"חשבון בסיכון\"; יוצרת סוגי הערת אזהרה חדשים (gen_warningnotetype) כשהקוד והנושא לא קיימים, יוצרת/מאשרת הערות אזהרה ומסמנת את איש הקשר של החשבון gen_loaneligibilitycalculationrequired = 1 (ContactBase), וממלאת gen_closedate בהערות שלא סומנו \"קיימת בקובץ\" בריצה. רוב הכתיבות מבוצעות ב-SQL ישיר על מסד CRM (Unsupported); מוטבים ויצירת אנשי קשר – ב-SDK.",
+   "why": "שער עסקי חסר: האילוץ עם הביטוי isFileExist עוצר את כל החבילה כשאין קובץ.",
+   "evidence": "source/DailyProcess/0012_LeumiFile_CHN_Daily.dtsx:108916 (EvalOp=3, Expression @[User::isFileExist] == TRUE); DTSX:167-168 (ברירת מחדל 0/false); DTSX:441, 467-471 (GetFiles, Sort לפי LastWriteTime, isFileExist = true)",
+   "round": 2
+  },
+  {
+   "claimId": "L|summary",
+   "field": "summary_he",
+   "before": "החבילה מעבדת רק אם נמצא קובץ: ההמשך אחרי Check File Existence מותנה באילוץ Success AND @[User::isFileExist] == TRUE; הדגל (ברירת מחדל false) מוצב true רק כשבתיקייה נמצא קובץ ששמו מכיל את FileName, ואז נבחר הקובץ שעודכן אחרון; בלי קובץ אף שלב עסקי אינו רץ. כשנמצא קובץ, החבילה קולטת את קובץ ה-CHN היומי של בנק לאומי (מוטבים, מורשים, קישורי הורה-ילד, טלפונים והערות אזהרה לחשבונות), טוענת אותו ל-Staging ומסנכרנת לפיו את CRM: מוחקת (בכפוף לשאלה פתוחה בצירוף) ויוצרת/מעדכנת מוטבים דרך CRM SDK; יוצרת אנשי קשר הורים (SDK), מעדכנת ב-SQL ישיר פרטי הורים קיימים עם gen_fileorigion = 2 (Update Contact), ומקשרת הורה-ילד-חשבון בקופה 5015; קישורים שלא סומנו \"קיים בקובץ\" בריצה מקבלים gen_Status = 2; מעדכנת טלפון נייד של עובד, הוראות מורשים וסימון \"חשבון בסיכון\"; יוצרת סוגי הערת אזהרה חדשים (gen_warningnotetype) כשהקוד והנושא לא קיימים, יוצרת/מאשרת הערות אזהרה ומסמנת את איש הקשר של החשבון gen_loaneligibilitycalculationrequired = 1 (ContactBase), וממלאת gen_closedate בהערות שלא סומנו \"קיימת בקובץ\" בריצה. רוב הכתיבות מבוצעות ב-SQL ישיר על מסד CRM (Unsupported); מוטבים ויצירת אנשי קשר – ב-SDK.",
+   "after": "החבילה מעבדת רק אם נמצא קובץ: ההמשך אחרי Check File Existence מותנה באילוץ Success AND @[User::isFileExist] == TRUE; הדגל (ברירת מחדל false) מוצב true רק כשבתיקייה נמצא קובץ ששמו מכיל את FileName, ואז נבחר הקובץ שעודכן אחרון; בלי קובץ אף שלב עסקי אינו רץ. כשנמצא קובץ, החבילה קולטת את קובץ ה-CHN היומי של בנק לאומי (מוטבים, מורשים, קישורי הורה-ילד, טלפונים והערות אזהרה לחשבונות), טוענת אותו ל-Staging ומסנכרנת לפיו את CRM: מוחקת (בכפוף לשאלה פתוחה בצירוף) ויוצרת/מעדכנת מוטבים דרך CRM SDK; יוצרת אנשי קשר הורים (SDK), מעדכנת ב-SQL ישיר פרטי הורים קיימים עם gen_fileorigion = 2 (Update Contact), ומקשרת הורה-ילד-חשבון בקופה 5015; קישורים שלא סומנו \"קיים בקובץ\" בריצה מקבלים gen_Status = 2; מעדכנת טלפון נייד של עובד, הוראות מורשים וסימון \"חשבון בסיכון\"; יוצרת סוגי הערת אזהרה חדשים (gen_warningnotetype) כשהקוד והנושא לא קיימים, יוצרת/מאשרת הערות אזהרה ומסמנת את איש הקשר של החשבון gen_loaneligibilitycalculationrequired = 1 (ContactBase), וממלאת gen_closedate (יום העסקים האחרון) בהערות ללא תאריך סגירה שסימון gen_existinfile שלהן 0, כלומר שלא סומנו מחדש בריצה; אם קיימת הערה שהסימון שלה NULL, היא אינה מאופסת (האיפוס חל רק על 1) ואינה נסגרת. רוב הכתיבות מבוצעות ב-SQL ישיר על מסד CRM (Unsupported); מוטבים ויצירת אנשי קשר – ב-SDK.",
+   "why": "התנאי המדויק: האיפוס רק WHERE gen_existinfile = 1 והסגירה רק WHERE gen_existinfile = 0 AND gen_closedate IS NULL.",
+   "evidence": "DTSX:92729, 92741",
+   "round": 2
+  },
+  {
+   "claimId": "L|summary",
+   "field": "executionNotes_he[0]",
+   "before": "כל 28 האילוצים הם Success עם LogicalAnd – שרשרת סדרתית אחת; כשל של שלב עוצר את כל השלבים שאחריו (DTSX:108903–108930). למשל כשל בעיבוד הקישורים מונע את ביטול הקישורים, אך האיפוס כבר בוצע.",
+   "after": "28 אילוצים, כולם LogicalAnd – שרשרת סדרתית אחת: 27 מסוג Success בלבד, ואחד (Check File Existence → Create ETL Process record With File Name, DTSX:108916) מסוג Success AND @[User::isFileExist] == TRUE – כשלא נמצא קובץ החבילה נעצרת אחרי בדיקת הקובץ. כשל של שלב עוצר את כל השלבים שאחריו (DTSX:108903–108930). למשל כשל בעיבוד הקישורים מונע את ביטול הקישורים, אך האיפוס כבר בוצע.",
+   "why": "האילוץ עם הביטוי הושמט.",
+   "evidence": "DTSX:108916 (EvalOp=3); 28 PrecedenceConstraint, רק אחד עם EvalOp",
+   "round": 2
+  },
+  {
+   "claimId": "L|summary",
+   "field": "executionNotes_he[1]",
+   "before": "דפוס \"איפוס → עיבוד → ביטול/סגירה\" מופיע פעמיים: קישורי הורה-ילד (שלבים 14→15→16) והערות אזהרה (24→25→26). האיפוס והביטול/סגירה גורפים לכל הרשומות בטבלה.",
+   "after": "דפוס \"איפוס → עיבוד → ביטול/סגירה\" מופיע פעמיים: קישורי הורה-ילד (שלבים 14→15→16) והערות אזהרה (24→25→26). בקישורים האיפוס גורף (update gen_contactlinkBase set gen_existsinfile = 0, ללא WHERE) והביטול חל על gen_existsinfile = 0. בהערות האזהרה האיפוס חל רק על gen_existinfile = 1 והסגירה רק על gen_existinfile = 0 AND gen_closedate IS NULL – הערה שהסימון שלה NULL אינה מאופסת ואינה נסגרת. בשני המקרים אין סינון לפי בנק או מקור.",
+   "why": "'גורפים לכל הרשומות' אינו מדויק להערות האזהרה.",
+   "evidence": "DTSX:92723, 87344, 92729, 92741",
+   "round": 2
+  },
+  {
+   "claimId": "L|finding#3",
+   "field": "findings_he[2].text",
+   "before": "רוב הכתיבות ל-CRM בחבילה הן SQL ישיר על מסד CRM (Unsupported): עדכון contact, INSERT ל-gen_contactlinkBase ו-UPDATE ל-gen_contactlink (View), INSERT/UPDATE ל-gen_instructionprovisionBase, UPDATE ל-Gen_customeraccountBase (טלפון, סיכון), INSERT ל-gen_warningnotetypebase, INSERT/UPDATE ל-gen_warningnotebase, UPDATE ל-ContactBase, וארבע פקודות Execute SQL גורפות: gen_contactlinkBase SET gen_existsinfile = 0; gen_contactlinkBase SET gen_Status = 2 WHERE gen_existsinfile = 0; gen_warningnotebase SET gen_existinfile = 0 WHERE gen_existinfile = 1; gen_warningnotebase SET gen_closedate = ? WHERE gen_existinfile = 0 AND gen_closedate IS NULL. רק מוטבים ויצירת אנשי קשר עוברים דרך SDK.",
+   "after": "רוב הכתיבות ל-CRM בחבילה הן SQL ישיר על מסד CRM (Unsupported): עדכון contact, INSERT ל-gen_contactlinkBase ו-UPDATE ל-gen_contactlink (שם ללא Base; לפי מוסכמת CRM זהו View – סוג האובייקט אינו מוצג בקבצים), INSERT/UPDATE ל-gen_instructionprovisionBase, UPDATE ל-Gen_customeraccountBase (טלפון, סיכון), INSERT ל-gen_warningnotetypebase, INSERT/UPDATE ל-gen_warningnotebase, UPDATE ל-ContactBase, וארבע פקודות Execute SQL גורפות: gen_contactlinkBase SET gen_existsinfile = 0; gen_contactlinkBase SET gen_Status = 2 WHERE gen_existsinfile = 0; gen_warningnotebase SET gen_existinfile = 0 WHERE gen_existinfile = 1; gen_warningnotebase SET gen_closedate = ? WHERE gen_existinfile = 0 AND gen_closedate IS NULL. רק מוטבים ויצירת אנשי קשר עוברים דרך SDK.",
+   "why": "סוג האובייקט אינו מוכח מהקבצים; סומן כמוסכמת CRM.",
+   "evidence": "DTSX:50700 (update gen_contactlink)",
+   "round": 2
+  },
+  {
+   "claimId": "L|finding#6",
+   "field": "findings_he[5].text",
+   "before": "האיפוס והביטול/סגירה גורפים: כל gen_contactlink שלא אושר היום מקבל סטטוס 2, וכל הערת אזהרה פתוחה שלא אושרה נסגרת – כולל רשומות שנוצרו ממקורות אחרים, ורשומות שלא אושרו בגלל כשל בשורה (ילד/חשבון לא נמצא, כשל עדכון הורה, שגיאת כתיבה).",
+   "after": "האיפוס והביטול/סגירה גורפים: כל gen_contactlink שלא אושר היום מקבל סטטוס 2, וכל הערת אזהרה ללא תאריך סגירה שסימון gen_existinfile שלה 0 (לא סומנה מחדש בריצה) נסגרת; אם קיימת הערה שהסימון שלה NULL, היא אינה מאופסת ואינה נסגרת – כולל רשומות שנוצרו ממקורות אחרים, ורשומות שלא אושרו בגלל כשל בשורה (ילד/חשבון לא נמצא, כשל עדכון הורה, שגיאת כתיבה).",
+   "why": "אותה עובדה (NULL אינו נסגר) – תיקון בכל מקום.",
+   "evidence": "DTSX:92729, 92741",
+   "round": 2
+  },
+  {
+   "claimId": "L|Package\\Get Last Business Date|title",
+   "field": "components[1].short_he",
+   "before": "מחשב את יום העסקים האחרון: מתחיל מאתמול וחוזר אחורה כל עוד התאריך מסומן בלוח של CRM כשישי, שבת או חג. התאריך משמש כתאריך הסגירה של הערות אזהרה שלא הופיעו בקובץ.",
+   "after": "מחשב את יום העסקים האחרון: מתחיל מאתמול וחוזר אחורה כל עוד התאריך מסומן בלוח של CRM כשישי, שבת או חג. התאריך משמש כתאריך הסגירה של הערות אזהרה ללא תאריך סגירה שסימון \"קיימת בקובץ\" שלהן 0 (לא סומנו מחדש בריצה).",
+   "why": "אותה עובדה – הניסוח 'שלא הופיעו בקובץ' שונה מהתנאי בפועל.",
+   "evidence": "DTSX:92741",
+   "round": 2
+  },
+  {
+   "claimId": "L|Package\\Get Last Business Date|short",
+   "field": "components[1].short.nodes[2].text",
+   "before": "נקבע יום העסקים האחרון, שישמש כתאריך סגירה להערות אזהרה שלא הופיעו בקובץ.",
+   "after": "נקבע יום העסקים האחרון, שישמש כתאריך סגירה להערות אזהרה ללא תאריך סגירה שלא סומנו מחדש \"קיימת בקובץ\" בריצה (סימון 0).",
+   "why": "אותה עובדה – הניסוח 'שלא הופיעו בקובץ' שונה מהתנאי בפועל.",
+   "evidence": "DTSX:92741",
+   "round": 2
+  },
+  {
+   "claimId": "L|Package\\Create and update Beneficiaries|short",
+   "field": "components[5].short.nodes[3].text",
+   "before": "רשימת המוטבים ב-CRM תואמת לנתוני הבנק בקובץ.",
+   "after": "מוטבים תקינים שנמצא להם חשבון לקוח פעיל בבנק 10 נוצרים ב-CRM, או מתעדכנים בשדות שהשתנו; שורות שנפסלו, שלא נמצא להן חשבון או שהן כפולות אינן נקלטות. רכיב זה אינו מוחק מוטבים.",
+   "why": "הטענה על התאמה מלאה של רשימת CRM לקובץ אינה נכונה: הרכיב רק יוצר ומעדכן.",
+   "evidence": "DTSX:13552 (Is Valid Beneficiary), 13069/13189 (Lookups, No Match לא מחובר), Check Duplicate beneficiaries main.cs:58-66, Create/Update beneficiary",
+   "round": 2
+  },
+  {
+   "claimId": "L|Package\\Create and update Beneficiaries|detailed",
+   "field": "components[5].detailed.nodes[3].branches[1].nodes[0].text",
+   "before": "חשבון הלקוח מאותר לפי מספר חשבון ולפי Product.Gen_fundfinanceid = FinanceNumber_11, כאשר המוצר הוא זה שמספרו (ProductNumber) שווה לקוד סוג החשבון (gen_customeraccounttype.gen_id); רק חשבונות עם StateCode 0 בבנק 10. לפי הערה ב-0015, gen_fundfinanceid הוא 'מספר אישור מ\"ה'.",
+   "after": "חשבון הלקוח מאותר לפי מספר חשבון ולפי Product.Gen_fundfinanceid = FinanceNumber_11, כאשר המוצר הוא זה שמספרו (ProductNumber) שווה לקוד סוג החשבון (gen_customeraccounttype.gen_id); רק חשבונות עם StateCode 0 בבנק 10. משמעות Gen_fundfinanceid במוצר לא מוגדרת בחבילה (ב-0015 יש הערת SQL 'מסםר אישור מ\"ה' על CP.gen_fundfinanceid של gen_coursepartition, לא של Product – השערה בלבד).",
+   "why": "ההערה ב-0015 שייכת ל-gen_coursepartition; העברתה ל-Product לפי שם בלבד אסורה (כלל 3).",
+   "evidence": "source/DailyProcess/0015_TransferIn.dtsx:42637 (CP.gen_fundfinanceid,--מסםר אישור מ\"ה), 42644 (join gen_coursepartition cp)",
+   "round": 2
+  },
+  {
+   "claimId": "L|Package\\Create and update Beneficiaries|detailed",
+   "field": "components[5].detailed.nodes[1].branches[0].nodes[0].text",
+   "before": "השורה אינה מטופלת (יציאות הפסילה לא מחוברות), ללא אזהרה.",
+   "after": "שורה שהתנאים מנתבים ליציאת פסילה אינה מטופלת (יציאות הפסילה לא מחוברות), ללא אזהרה.",
+   "why": "צמצום הטענה לשורות שנותבו ליציאת פסילה בלבד (טיפול בשגיאות הערכה הוא מנגנון ETL ואינו מתואר).",
+   "evidence": "DTSX:13552",
+   "round": 2
+  },
+  {
+   "claimId": "L|Package\\Create and update Beneficiaries|detailed",
+   "field": "components[5].detailed.nodes[8].text",
+   "before": "המוטבים שבקובץ קיימים ב-CRM עם הנתונים העדכניים מהבנק.",
+   "after": "מוטבים תקינים שנמצא להם חשבון לקוח פעיל בבנק 10 נוצרים ב-CRM, או מתעדכנים בשדות שהשתנו; שורות שנפסלו, שלא נמצא להן חשבון או שהן כפולות אינן נקלטות.",
+   "why": "עקביות עם short: הרכיב אינו מבטיח שכל מוטבי הקובץ קיימים ב-CRM.",
+   "evidence": "DTSX:13552, 13069, 13189; Check Duplicate beneficiaries main.cs:58-66",
+   "round": 2
+  },
+  {
+   "claimId": "L|Package\\Create and update contactlink|short",
+   "field": "components[7].short.nodes[2].branches[0].nodes[0].text",
+   "before": "אם להורה gen_fileorigion = 2 (הערך שהחבילה מציבה ביצירה; משמעות 'נוצר מקובץ זה' – השערה) ופרטיו השתנו – פרטיו מתעדכנים.",
+   "after": "אם להורה gen_fileorigion = 2 (הערך שהחבילה מציבה ביצירה; משמעות 'נוצר מקובץ זה' – השערה), פרטיו מתעדכנים כאשר מתקיים לפחות אחד מאלה: שם פרטי, שם משפחה, שם מלא, ת.ז., מזהה לקוח בבנק או תאריך לידה שונים מהערך ב-CRM (כולל ערך שקיים רק בצד אחד); בקובץ התקבלו טלפון או מייל לחיסכון לילד; או שב-CRM Gen_inputsource ריק או שונה מ-1, או Gen_IsOperate או Gen_leumi ריקים או שונים מ-true.",
+   "why": "תנאי העדכון צומצם ל'פרטיו השתנו'; הקוד מעדכן גם כשהתקבל טלפון/מייל או כשהדגלים ב-CRM אינם 1/true.",
+   "evidence": "compare befor update main.cs:119-152",
+   "round": 2
+  },
+  {
+   "claimId": "L|Package\\Create and update contactlink|short",
+   "field": "components[7].short.nodes[3].branches[0].nodes[0].text",
+   "before": "הקישור מסומן \"קיים בקובץ\" ופעיל.",
+   "after": "הקישור מסומן \"קיים בקובץ\" = 1 ו-gen_status = 1 (משמעות הערך 1 – השערה; תווית ה-OptionSet לא סופקה).",
+   "why": "'פעיל' עבור gen_status = 1 אינו מוכח וסותר את ההסתייגות בשלב Disabled contactlink.",
+   "evidence": "DTSX:50700-50704 (set gen_existsinfile = 1, gen_status = 1)",
+   "round": 2
+  },
+  {
+   "claimId": "L|Package\\Create and update contactlink|short",
+   "field": "components[7].short.nodes[3].branches[1].nodes[0].text",
+   "before": "נוצר קישור הורה-ילד חדש, פעיל ומסומן \"קיים בקובץ\".",
+   "after": "נוצר קישור הורה-ילד חדש, מסומן \"קיים בקובץ\" = 1 ו-gen_status = 1, עם statecode 0 / statuscode 1.",
+   "why": "'פעיל' הוחלף בערכים הנכתבים בפועל.",
+   "evidence": "DTSX:37068 (Create Contact link 1 SQL)",
+   "round": 2
+  },
+  {
+   "claimId": "L|Package\\Create and update contactlink|short",
+   "field": "components[7].short.nodes[4].text",
+   "before": "קישורי ההורה-ילד שבקובץ פעילים ב-CRM; קישורים שלא סומנו יבוטלו בשלב הבא.",
+   "after": "קישורי ההורה-ילד שאושרו או נוצרו בריצה מסומנים gen_existsinfile = 1 ו-gen_status = 1; קישורים שלא סומנו יקבלו gen_Status = 2 בשלב Disabled contactlink.",
+   "why": "'פעילים' אינו מוכח; תיאור לפי הערכים הנכתבים.",
+   "evidence": "DTSX:50700, 37068, 87344",
+   "round": 2
+  },
+  {
+   "claimId": "L|Package\\Create and update contactlink|detailed",
+   "field": "components[7].detailed.nodes[6].branches[0].nodes[0].branches[1].nodes[0].text",
+   "before": "טלפון ומייל לחיסכון לילד מהקובץ (כשאינם ריקים) מחליפים את הערכים ב-CRM ומקבלים תאריך עדכון; שם פרטי, שם משפחה, תאריך לידה, מזהה לקוח בבנק ות.ז. ההורה שריקים בקובץ נלקחים מ-CRM, וערכי הטקסט מהקובץ נחתכים מרווחים.",
+   "after": "טלפון ומייל לחיסכון לילד מהקובץ (כשאינם ריקים) מחליפים את הערכים ב-CRM ומקבלים תאריך עדכון; שם פרטי, שם משפחה ותאריך לידה שריקים בקובץ נלקחים מ-CRM, וערכי הטקסט מהקובץ נחתכים מרווחים. למזהה לקוח בבנק ולת.ז. ההורה אין בפועל השלמה מ-CRM: הם מרופדים באפסים כבר בשלב Add 0, ולכן אינם ריקים כשהם מגיעים לכאן; מזהה לקוח בבנק ריק בקובץ מגיע להשוואה ולעדכון כמחרוזת אפסים.",
+   "why": "Add 0 רץ לפני Derived Column 1 והופך ערך ריק למחרוזת אפסים, ולכן ה-ISNULL של שתי העמודות אינו מתקיים.",
+   "evidence": "Add 0 (DTSX:25010) main.cs:54-58; paths DTSX:51028 (Trim String Fields → Add 0), 51026 (Add 0 → Derived Column); Derived Column 1 (DTSX:40072)",
+   "round": 2
+  },
+  {
+   "claimId": "L|Package\\Create and update contactlink|detailed",
+   "field": "components[7].detailed.nodes[6].branches[0].nodes[0].branches[1].nodes[0].tech",
+   "before": "Set child saving fields main.cs:24–34; Derived Column 1 (DTSX:40072)",
+   "after": "Set child saving fields main.cs:24–34; Derived Column 1 (DTSX:40072): ISNULL(gen_bankCustomerID) ? Parentbankcustomeridnumber : TRIM(...), ISNULL(gen_Parentidentitynumber_9) ? gen_identitynumber : TRIM(...) – אינם מתקיימים אחרי Add 0 (DTSX:25010 main.cs:54: String.IsNullOrEmpty → \"\" → PadLeft)",
+   "why": "ראיה טכנית לתיקון.",
+   "evidence": "DTSX:25010, 40072",
+   "round": 2
+  },
+  {
+   "claimId": "L|Package\\Create and update contactlink|detailed",
+   "field": "components[7].detailed.nodes[6].branches[0].nodes[0].branches[1].nodes[1].text",
+   "before": "האם השתנה שם פרטי/משפחה/מלא, ת.ז., מזהה לקוח בבנק או תאריך לידה, או שהתקבל טלפון/מייל, או שדגלי מקור קליטה=1 / פעיל / לאומי אינם מוגדרים?",
+   "after": "האם השתנה שם פרטי/משפחה/מלא, ת.ז., מזהה לקוח בבנק או תאריך לידה, או שהתקבל טלפון/מייל לחיסכון לילד, או שב-CRM Gen_inputsource ריק או שונה מ-1, או Gen_IsOperate / Gen_leumi ריקים או שונים מ-true?",
+   "why": "עקביות עם short: 'אינם מוגדרים' אינו התנאי המדויק (ריק או שונה מהערך).",
+   "evidence": "compare befor update main.cs:145-149",
+   "round": 2
+  },
+  {
+   "claimId": "L|Package\\Create and update contactlink|detailed",
+   "field": "components[7].detailed.nodes[6].branches[0].nodes[0].branches[1].nodes[2].text",
+   "before": "אם עדכון ההורה נכשל, השורה נרשמת כאזהרת ETL ואינה ממשיכה לבדיקת הקישור, ולכן קישור קיים לא יאושר ויבוטל בהמשך.",
+   "after": "אם עדכון ההורה נכשל, השורה נרשמת כאזהרת ETL ואינה ממשיכה לבדיקת הקישור, ולכן קישור קיים לא יאושר ויקבל gen_Status = 2 בהמשך.",
+   "why": "עקביות: ערך במקום התווית 'יבוטל'.",
+   "evidence": "DTSX:87344",
+   "round": 2
+  },
+  {
+   "claimId": "L|Package\\Create and update contactlink|detailed",
+   "field": "components[7].detailed.nodes[8].text",
+   "before": "קישורי ההורה-ילד שבקובץ פעילים ומסומנים; קישורים שלא סומנו יבוטלו בשלב Disabled contactlink.",
+   "after": "קישורי ההורה-ילד שאושרו או נוצרו בריצה מסומנים gen_existsinfile = 1 ו-gen_status = 1 (משמעות הערך 1 – השערה); קישורים שלא סומנו יקבלו gen_Status = 2 בשלב Disabled contactlink.",
+   "why": "'פעילים' עבור gen_status = 1 אינו מוכח.",
+   "evidence": "DTSX:50700, 37068, 87344",
+   "round": 2
+  },
+  {
+   "claimId": "L|Package\\Set Warning Note existinfile false|title",
+   "field": "components[12].short_he",
+   "before": "לפני עיבוד הערות האזהרה, כל הערה המסומנת \"קיימת בקובץ\" מסומנת \"לא קיימת\" ב-SQL ישיר; הערות שיופיעו בקובץ יסומנו מחדש, והשאר ייסגרו.",
+   "after": "לפני עיבוד הערות האזהרה, כל הערה המסומנת \"קיימת בקובץ\" מסומנת \"לא קיימת\" ב-SQL ישיר; הערות שיופיעו בקובץ יסומנו מחדש, והערות ללא תאריך סגירה שסימונן יישאר 0 ייסגרו (הערה שהסימון שלה NULL אינה מאופסת כאן ואינה נסגרת).",
+   "why": "אותה עובדה (NULL) – תיקון בכל מקום.",
+   "evidence": "DTSX:92729, 92741",
+   "round": 2
+  },
+  {
+   "claimId": "L|Package\\Set Warning Note existinfile false|short",
+   "field": "components[12].short.nodes[2].text",
+   "before": "הערות שלא יסומנו מחדש ייסגרו בהמשך.",
+   "after": "הערות ללא תאריך סגירה שסימונן יישאר 0 ייסגרו בהמשך; הערה שהסימון שלה NULL אינה מאופסת כאן ואינה נסגרת.",
+   "why": "אותה עובדה (NULL) – תיקון בכל מקום.",
+   "evidence": "DTSX:92729, 92741",
+   "round": 2
+  },
+  {
+   "claimId": "L|Package\\Set Warning Note existinfile false|detailed",
+   "field": "components[12].detailed.nodes[5].text",
+   "before": "הסימון מאפשר לזהות אילו הערות לא הופיעו בקובץ היום.",
+   "after": "סימון 0 מזהה הערות שלא סומנו מחדש בריצה זו (כולל הערות שהופיעו בקובץ אך עיבודן נכשל); הערות עם סימון NULL אינן נכללות.",
+   "why": "'לא הופיעו בקובץ' שונה מהתנאי בפועל.",
+   "evidence": "DTSX:92729, 92741",
+   "round": 2
+  },
+  {
+   "claimId": "L|Package\\Create And Update Warning Notes|short",
+   "field": "components[13].short.nodes[4].text",
+   "before": "הערות האזהרה שבקובץ פתוחות ב-CRM; הערות שלא הופיעו ייסגרו בשלב הבא.",
+   "after": "הערות האזהרה שבקובץ פתוחות ב-CRM; הערות ללא תאריך סגירה שלא סומנו מחדש \"קיימת בקובץ\" בריצה (סימון 0) ייסגרו בשלב הבא.",
+   "why": "אותה עובדה – תיקון בכל מקום.",
+   "evidence": "DTSX:92741",
+   "round": 2
+  },
+  {
+   "claimId": "L|Package\\Update close date where not exist in file|title",
+   "field": "components[14].short_he",
+   "before": "כל הערת אזהרה פתוחה שלא סומנה היום \"קיימת בקובץ\" נסגרת בתאריך יום העסקים האחרון, ב-SQL ישיר.",
+   "after": "כל הערת אזהרה ללא תאריך סגירה שסימון \"קיימת בקובץ\" שלה 0 (לא סומנה מחדש בריצה) מקבלת תאריך סגירה = יום העסקים האחרון, ב-SQL ישיר; הערה שהסימון שלה NULL אינה נסגרת.",
+   "why": "התנאי המדויק הוא gen_existinfile = 0 AND gen_closedate IS NULL; NULL אינו מאופס ואינו נסגר.",
+   "evidence": "DTSX:92729, 92741",
+   "round": 2
+  },
+  {
+   "claimId": "L|Package\\Update close date where not exist in file|short",
+   "field": "components[14].short.nodes[0].text",
+   "before": "מאותרות הערות אזהרה פתוחות שלא הופיעו בקובץ היום.",
+   "after": "מאותרות הערות אזהרה ללא תאריך סגירה שסימון \"קיימת בקובץ\" שלהן 0, כלומר שלא סומנו מחדש בריצה זו (הערה שהסימון שלה NULL אינה נכללת).",
+   "why": "'שלא הופיעו בקובץ' שונה מהתנאי בפועל.",
+   "evidence": "DTSX:92729, 92741",
+   "round": 2
+  },
+  {
+   "claimId": "L|Package\\Update close date where not exist in file|short",
+   "field": "components[14].short.nodes[2].text",
+   "before": "הערות אזהרה שהוסרו בבנק סגורות ב-CRM.",
+   "after": "הערות אלה סגורות ב-CRM, בלי סינון לפי בנק או מקור; הפירוש 'הוסרו בבנק' – השערה.",
+   "why": "'הוסרו בבנק' אינו מוכח מהקבצים.",
+   "evidence": "DTSX:92741",
+   "round": 2
+  },
+  {
+   "claimId": "L|Package\\Update close date where not exist in file|detailed",
+   "field": "components[14].detailed.nodes[1].text",
+   "before": "האוכלוסייה היא כל הערה שסימון \"קיים בקובץ\" שלה 0 ושאין לה תאריך סגירה – ללא סינון לפי בנק או מקור.",
+   "after": "האוכלוסייה היא כל הערה שסימון \"קיים בקובץ\" שלה 0 ושאין לה תאריך סגירה – ללא סינון לפי בנק או מקור. הערה שהסימון שלה NULL אינה עומדת בתנאי ואינה נסגרת (האיפוס בשלב הקודם חל רק על ערך 1).",
+   "why": "השלמת מקרה NULL.",
+   "evidence": "DTSX:92729, 92741",
+   "round": 2
+  },
+  {
+   "claimId": "L|Package\\Update close date where not exist in file|detailed",
+   "field": "components[14].detailed.nodes[2].text",
+   "before": "האם ההערה פתוחה ולא אושרה היום?",
+   "after": "האם אין להערה תאריך סגירה וסימון \"קיים בקובץ\" שלה 0?",
+   "why": "ניסוח לפי התנאי המדויק.",
+   "evidence": "DTSX:92741",
+   "round": 2
+  },
+  {
+   "claimId": "L|Package\\Update close date where not exist in file|detailed",
+   "field": "components[14].detailed.nodes[5].text",
+   "before": "הערות אזהרה שלא הופיעו בקובץ היומי נסגרות.",
+   "after": "הערות ללא תאריך סגירה שסימון \"קיים בקובץ\" שלהן 0 (לא אושרו בריצה זו) נסגרות בתאריך יום העסקים האחרון; הערות עם סימון NULL נשארות פתוחות.",
+   "why": "הסיום הכליל מעבר לתנאי וסתר את צעדים 2 ו-8.",
+   "evidence": "DTSX:92741",
+   "round": 2
+  },
+  {
+   "claimId": "L|Package\\Update close date where not exist in file|detail",
+   "field": "components[14].detail_he[4].t",
+   "before": "סגירת הערות שהוסרו בבנק.",
+   "after": "מילוי תאריך סגירה להערות ללא תאריך סגירה שלא אושרו בריצה (gen_existinfile = 0); הפירוש 'הוסרו בבנק' – השערה. הערות עם gen_existinfile NULL אינן נסגרות.",
+   "why": "'הוסרו בבנק' אינו מוכח.",
+   "evidence": "DTSX:92741",
+   "round": 2
+  },
+  {
+   "claimId": "L|Package\\Update close date where not exist in file|crm",
+   "field": "components[14].crmEffects[0].when_he",
+   "before": "כל הערה פתוחה שלא סומנה היום \"קיימת בקובץ\"",
+   "after": "gen_existinfile = 0 AND gen_closedate IS NULL – הערה שלא סומנה מחדש בריצה; הערה עם gen_existinfile NULL אינה מתעדכנת",
+   "why": "when_he היה רחב מהתנאי.",
+   "evidence": "DTSX:92741",
+   "round": 2
+  },
+  {
+   "claimId": "L|Package\\Create and update contactlink|decisions",
+   "field": "decisions[4]",
+   "outOfScope": true,
+   "before": null,
+   "after": null,
+   "why": "הערת המאמת עוסקת רק ב-int.Parse(Type_20) ללא הגנה (כשל זרימה) – מנגנון כשל/ETL, מחוץ לתחום לפי reports/logic-verify-standard.md. לא נוסף. נבדק שאין בטקסט טענה הסותרת זאת (התנאי מצוטט ללא טענה על תוצאת כשל).",
+   "evidence": "compare befor update main.cs:154-157",
+   "round": 2
+  },
+  {
+   "claimId": "L|Package\\Create And Update Warning Notes|detailed",
+   "field": "detailed.nodes",
+   "outOfScope": true,
+   "before": null,
+   "after": null,
+   "why": "הערת המאמת עוסקת רק ב-int.Parse(warningNoticeType) ללא הגנה – מנגנון כשל, מחוץ לתחום. לא נוסף. נבדק שאין בטקסט טענה הסותרת זאת.",
+   "evidence": "Set Warning Note Type Subject main.cs:120 (DTSX:74011)",
+   "round": 2
+  },
+  {
+   "claimId": "L|Package\\Create and update contactlink|detailed",
+   "field": "detailed (unit 22)",
+   "outOfScope": true,
+   "before": null,
+   "after": null,
+   "why": "int.Parse(Type_20) ללא הגנה ב-compare befor update – מנגנון כשל, מחוץ לתחום; לא נוסף (יחידות 21 ו-43 תוקנו).",
+   "evidence": "compare befor update main.cs:154-157",
+   "round": 2
+  },
+  {
+   "claimId": "L|Package\\Create and update Beneficiaries|detailed",
+   "field": "detailed (unit 4)",
+   "outOfScope": true,
+   "before": null,
+   "after": null,
+   "why": "FailComponent/IgnoreFailure ביציאות Is Valid Beneficiary ו-Set Fields – מנגנון כשל, מחוץ לתחום; לא נוסף. הטענה 'ללא אזהרה' צומצמה לשורות שנותבו ליציאת פסילה (יחידה 12 תוקנה).",
+   "evidence": "DTSX:13552-13600, 13772",
+   "round": 2
+  },
+  {
+   "claimId": "L|Package\\Update close date where not exist in file|title",
+   "field": "components[14].title_he",
+   "before": "סגירת הערות אזהרה שלא הופיעו בקובץ",
+   "after": "סגירת הערות אזהרה שלא סומנו \"קיימת בקובץ\" בריצה (gen_existinfile = 0)",
+   "why": "'שלא הופיעו בקובץ' שונה מהתנאי בפועל (הערות שהופיעו ועיבודן נכשל נסגרות; NULL אינו נסגר).",
+   "evidence": "DTSX:92729, 92741",
+   "round": 2
+  },
+  {
+   "claimId": "L|exec",
+   "field": "executionOrder[25].title_he",
+   "before": "סגירת הערות שלא בקובץ",
+   "after": "סגירת הערות שלא סומנו \"קיימת בקובץ\" בריצה",
+   "why": "אותה עובדה – תיקון בכל מקום.",
+   "evidence": "DTSX:92741",
+   "round": 2
+  },
+  {
+   "claimId": "L|finding#6",
+   "field": "findings_he[5].text",
+   "before": "האיפוס והביטול/סגירה גורפים: כל gen_contactlink שלא אושר היום מקבל סטטוס 2, וכל הערת אזהרה ללא תאריך סגירה שסימון gen_existinfile שלה 0 (לא סומנה מחדש בריצה) נסגרת; אם קיימת הערה שהסימון שלה NULL, היא אינה מאופסת ואינה נסגרת – כולל רשומות שנוצרו ממקורות אחרים, ורשומות שלא אושרו בגלל כשל בשורה (ילד/חשבון לא נמצא, כשל עדכון הורה, שגיאת כתיבה).",
+   "after": "האיפוס והביטול/סגירה אינם מסוננים לפי בנק או מקור: כל gen_contactlink שלא אושר היום מקבל סטטוס 2, וכל הערת אזהרה ללא תאריך סגירה שסימון gen_existinfile שלה 0 (לא סומנה מחדש בריצה) נסגרת; אם קיימת הערה שהסימון שלה NULL, היא אינה מאופסת ואינה נסגרת – כולל רשומות שנוצרו ממקורות אחרים, ורשומות שלא אושרו בגלל כשל בשורה (ילד/חשבון לא נמצא, כשל עדכון הורה, שגיאת כתיבה).",
+   "why": "איפוס הערות האזהרה אינו גורף (רק gen_existinfile = 1); הניסוח הותאם.",
+   "evidence": "DTSX:92723, 87344, 92729, 92741",
+   "round": 2
+  },
+  {
+   "claimId": "L|summary",
+   "field": "summary_he",
+   "before": "החבילה מעבדת רק אם נמצא קובץ: ההמשך אחרי Check File Existence מותנה באילוץ Success AND @[User::isFileExist] == TRUE; הדגל (ברירת מחדל false) מוצב true רק כשבתיקייה נמצא קובץ ששמו מכיל את FileName, ואז נבחר הקובץ שעודכן אחרון; בלי קובץ אף שלב עסקי אינו רץ. כשנמצא קובץ, החבילה קולטת את קובץ ה-CHN היומי של בנק לאומי (מוטבים, מורשים, קישורי הורה-ילד, טלפונים והערות אזהרה לחשבונות), טוענת אותו ל-Staging ומסנכרנת לפיו את CRM: מוחקת (בכפוף לשאלה פתוחה בצירוף) ויוצרת/מעדכנת מוטבים דרך CRM SDK; יוצרת אנשי קשר הורים (SDK), מעדכנת ב-SQL ישיר פרטי הורים קיימים עם gen_fileorigion = 2 (Update Contact), ומקשרת הורה-ילד-חשבון בקופה 5015; קישורים שלא סומנו \"קיים בקובץ\" בריצה מקבלים gen_Status = 2; מעדכנת טלפון נייד של עובד, הוראות מורשים וסימון \"חשבון בסיכון\"; יוצרת סוגי הערת אזהרה חדשים (gen_warningnotetype) כשהקוד והנושא לא קיימים, יוצרת/מאשרת הערות אזהרה ומסמנת את איש הקשר של החשבון gen_loaneligibilitycalculationrequired = 1 (ContactBase), וממלאת gen_closedate (יום העסקים האחרון) בהערות ללא תאריך סגירה שסימון gen_existinfile שלהן 0, כלומר שלא סומנו מחדש בריצה; אם קיימת הערה שהסימון שלה NULL, היא אינה מאופסת (האיפוס חל רק על 1) ואינה נסגרת. רוב הכתיבות מבוצעות ב-SQL ישיר על מסד CRM (Unsupported); מוטבים ויצירת אנשי קשר – ב-SDK.",
+   "after": "החבילה מעבדת רק אם נמצא קובץ: ההמשך אחרי Check File Existence מותנה באילוץ Success AND @[User::isFileExist] == TRUE; הדגל (ברירת מחדל false) מוצב true רק כשבתיקייה נמצא קובץ ששמו מכיל את FileName, ואז נבחר הקובץ שעודכן אחרון; בלי קובץ אף שלב עסקי אינו רץ. כשנמצא קובץ, החבילה קולטת את קובץ ה-CHN (\"יומי\" ו\"בנק לאומי\" – לפי שם החבילה LeumiFile_CHN_Daily בלבד, השערה; (מוטבים, מורשים, קישורי הורה-ילד, טלפונים והערות אזהרה לחשבונות), טוענת אותו ל-Staging ומסנכרנת לפיו את CRM: מוחקת (בכפוף לשאלה פתוחה בצירוף) ויוצרת/מעדכנת מוטבים דרך CRM SDK; יוצרת אנשי קשר הורים (SDK), מעדכנת ב-SQL ישיר פרטי הורים קיימים עם gen_fileorigion = 2 (Update Contact), ומקשרת הורה-ילד-חשבון בקופה 5015; קישורים שלא סומנו \"קיים בקובץ\" בריצה מקבלים gen_Status = 2; מעדכנת טלפון נייד של עובד, הוראות מורשים וסימון \"חשבון בסיכון\"; יוצרת סוגי הערת אזהרה חדשים (gen_warningnotetype) כשהקוד והנושא לא קיימים, יוצרת/מאשרת הערות אזהרה ומסמנת את איש הקשר של החשבון gen_loaneligibilitycalculationrequired = 1 (ContactBase), וממלאת gen_closedate (יום העסקים האחרון) בהערות ללא תאריך סגירה שסימון gen_existinfile שלהן 0, כלומר שלא סומנו מחדש בריצה; אם קיימת הערה שהסימון שלה NULL, היא אינה מאופסת (האיפוס חל רק על 1) ואינה נסגרת. רוב הכתיבות מבוצעות ב-SQL ישיר על מסד CRM (Unsupported); מוטבים ויצירת אנשי קשר – ב-SDK.",
+   "why": "\"יומי\" ו\"בנק לאומי\" נשענים רק על שם החבילה; סומנו כהשערה לפי השם.",
+   "evidence": "DTSX:1 (שם החבילה); המילה Leumi מופיעה ב-DTSX רק בשם החבילה ובשם התכונה gen_leumi",
+   "round": 3
+  },
+  {
+   "claimId": "L|summary",
+   "field": "summary_he",
+   "before": "החבילה מעבדת רק אם נמצא קובץ: ההמשך אחרי Check File Existence מותנה באילוץ Success AND @[User::isFileExist] == TRUE; הדגל (ברירת מחדל false) מוצב true רק כשבתיקייה נמצא קובץ ששמו מכיל את FileName, ואז נבחר הקובץ שעודכן אחרון; בלי קובץ אף שלב עסקי אינו רץ. כשנמצא קובץ, החבילה קולטת את קובץ ה-CHN (\"יומי\" ו\"בנק לאומי\" – לפי שם החבילה LeumiFile_CHN_Daily בלבד, השערה; (מוטבים, מורשים, קישורי הורה-ילד, טלפונים והערות אזהרה לחשבונות), טוענת אותו ל-Staging ומסנכרנת לפיו את CRM: מוחקת (בכפוף לשאלה פתוחה בצירוף) ויוצרת/מעדכנת מוטבים דרך CRM SDK; יוצרת אנשי קשר הורים (SDK), מעדכנת ב-SQL ישיר פרטי הורים קיימים עם gen_fileorigion = 2 (Update Contact), ומקשרת הורה-ילד-חשבון בקופה 5015; קישורים שלא סומנו \"קיים בקובץ\" בריצה מקבלים gen_Status = 2; מעדכנת טלפון נייד של עובד, הוראות מורשים וסימון \"חשבון בסיכון\"; יוצרת סוגי הערת אזהרה חדשים (gen_warningnotetype) כשהקוד והנושא לא קיימים, יוצרת/מאשרת הערות אזהרה ומסמנת את איש הקשר של החשבון gen_loaneligibilitycalculationrequired = 1 (ContactBase), וממלאת gen_closedate (יום העסקים האחרון) בהערות ללא תאריך סגירה שסימון gen_existinfile שלהן 0, כלומר שלא סומנו מחדש בריצה; אם קיימת הערה שהסימון שלה NULL, היא אינה מאופסת (האיפוס חל רק על 1) ואינה נסגרת. רוב הכתיבות מבוצעות ב-SQL ישיר על מסד CRM (Unsupported); מוטבים ויצירת אנשי קשר – ב-SDK.",
+   "after": "החבילה מעבדת רק אם נמצא קובץ: ההמשך אחרי Check File Existence מותנה באילוץ Success AND @[User::isFileExist] == TRUE; הדגל (ברירת מחדל false) מוצב true רק כשבתיקייה נמצא קובץ ששמו מכיל את FileName, ואז נבחר הקובץ שעודכן אחרון; בלי קובץ אף שלב עסקי אינו רץ. כשנמצא קובץ, החבילה קולטת את קובץ ה-CHN (\"יומי\" ו\"בנק לאומי\" – לפי שם החבילה LeumiFile_CHN_Daily בלבד, השערה; (מוטבים, מורשים, קישורי הורה-ילד, טלפונים והערות אזהרה לחשבונות), טוענת אותו ל-Staging ומסנכרנת לפיו את CRM: מוחקת (בכפוף לשאלה פתוחה בצירוף) ויוצרת/מעדכנת מוטבים דרך CRM SDK; יוצרת אנשי קשר הורים (SDK), מעדכנת ב-SQL ישיר פרטי הורים קיימים עם gen_fileorigion = 2 (Update Contact), ומקשרת הורה-ילד-חשבון בקופה 5015; קישורים שלא סומנו \"קיים בקובץ\" בריצה מקבלים gen_Status = 2; מעדכנת טלפון נייד של עובד, הוראות מורשים וסימון \"חשבון בסיכון\"; יוצרת סוגי הערת אזהרה חדשים (gen_warningnotetype) כשהקוד והנושא לא קיימים (אלא אם כבר נוצר בריצה סוג עם אותו קוד – אז הוא משמש שוב), יוצרת/מאשרת הערות אזהרה ומסמנת את איש הקשר של החשבון gen_loaneligibilitycalculationrequired = 1 (ContactBase), וממלאת gen_closedate (יום העסקים האחרון) בהערות ללא תאריך סגירה שסימון gen_existinfile שלהן 0, כלומר שלא סומנו מחדש בריצה; אם קיימת הערה שהסימון שלה NULL, היא אינה מאופסת (האיפוס חל רק על 1) ואינה נסגרת. רוב הכתיבות מבוצעות ב-SQL ישיר על מסד CRM (Unsupported); מוטבים ויצירת אנשי קשר – ב-SDK.",
+   "why": "השלמת השימוש החוזר בסוג שנוצר בריצה (מילון לפי קוד בלבד), כמו בתיקון של רכיב הערות האזהרה.",
+   "evidence": "set vanila fields 1 DTSX:73066-73076; Split Rows For MultiThread 1 DTSX:75059-75062",
+   "round": 3
+  },
+  {
+   "claimId": "L|summary",
+   "field": "executionNotes_he[0]",
+   "before": "28 אילוצים, כולם LogicalAnd – שרשרת סדרתית אחת: 27 מסוג Success בלבד, ואחד (Check File Existence → Create ETL Process record With File Name, DTSX:108916) מסוג Success AND @[User::isFileExist] == TRUE – כשלא נמצא קובץ החבילה נעצרת אחרי בדיקת הקובץ. כשל של שלב עוצר את כל השלבים שאחריו (DTSX:108903–108930). למשל כשל בעיבוד הקישורים מונע את ביטול הקישורים, אך האיפוס כבר בוצע.",
+   "after": "28 אילוצים, כולם LogicalAnd – שרשרת סדרתית אחת: 27 מסוג Success בלבד, ואחד (Check File Existence → Create ETL Process record With File Name, DTSX:108916) מסוג Success AND @[User::isFileExist] == TRUE – כשלא נמצא קובץ החבילה נעצרת אחרי בדיקת הקובץ. כשל של שלב עוצר את כל השלבים שאחריו (DTSX:108903–108930). למשל כשל בעיבוד הקישורים מונע את עדכון gen_Status = 2 לקישורים (שלב 16), אך האיפוס כבר בוצע.",
+   "why": "\"ביטול\" לקוח משם המשימה בלבד; הוחלף בפעולה עצמה.",
+   "evidence": "SQL DTSX:87344; PC DTSX:108927, 108929",
+   "round": 3
+  },
+  {
+   "claimId": "L|summary",
+   "field": "executionNotes_he[1]",
+   "before": "דפוס \"איפוס → עיבוד → ביטול/סגירה\" מופיע פעמיים: קישורי הורה-ילד (שלבים 14→15→16) והערות אזהרה (24→25→26). בקישורים האיפוס גורף (update gen_contactlinkBase set gen_existsinfile = 0, ללא WHERE) והביטול חל על gen_existsinfile = 0. בהערות האזהרה האיפוס חל רק על gen_existinfile = 1 והסגירה רק על gen_existinfile = 0 AND gen_closedate IS NULL – הערה שהסימון שלה NULL אינה מאופסת ואינה נסגרת. בשני המקרים אין סינון לפי בנק או מקור.",
+   "after": "דפוס \"איפוס → עיבוד → עדכון סטטוס/סגירה\" מופיע פעמיים: קישורי הורה-ילד (שלבים 14→15→16) והערות אזהרה (24→25→26). בקישורים האיפוס גורף (update gen_contactlinkBase set gen_existsinfile = 0, ללא WHERE) והביטול חל על gen_existsinfile = 0. בהערות האזהרה האיפוס חל רק על gen_existinfile = 1 והסגירה רק על gen_existinfile = 0 AND gen_closedate IS NULL – הערה שהסימון שלה NULL אינה מאופסת ואינה נסגרת. בשני המקרים אין סינון לפי בנק או מקור.",
+   "why": "\"ביטול\" לקוח משם המשימה בלבד.",
+   "evidence": "SQL DTSX:87344",
+   "round": 3
+  },
+  {
+   "claimId": "L|summary",
+   "field": "executionNotes_he[1]",
+   "before": "דפוס \"איפוס → עיבוד → עדכון סטטוס/סגירה\" מופיע פעמיים: קישורי הורה-ילד (שלבים 14→15→16) והערות אזהרה (24→25→26). בקישורים האיפוס גורף (update gen_contactlinkBase set gen_existsinfile = 0, ללא WHERE) והביטול חל על gen_existsinfile = 0. בהערות האזהרה האיפוס חל רק על gen_existinfile = 1 והסגירה רק על gen_existinfile = 0 AND gen_closedate IS NULL – הערה שהסימון שלה NULL אינה מאופסת ואינה נסגרת. בשני המקרים אין סינון לפי בנק או מקור.",
+   "after": "דפוס \"איפוס → עיבוד → עדכון סטטוס/סגירה\" מופיע פעמיים: קישורי הורה-ילד (שלבים 14→15→16) והערות אזהרה (24→25→26). בקישורים האיפוס גורף (update gen_contactlinkBase set gen_existsinfile = 0, ללא WHERE) ועדכון gen_Status = 2 חל על gen_existsinfile = 0. בהערות האזהרה האיפוס חל רק על gen_existinfile = 1 והסגירה רק על gen_existinfile = 0 AND gen_closedate IS NULL – הערה שהסימון שלה NULL אינה מאופסת ואינה נסגרת. בשני המקרים אין סינון לפי בנק או מקור.",
+   "why": "\"ביטול\" לקוח משם המשימה בלבד.",
+   "evidence": "SQL DTSX:87344",
+   "round": 3
+  },
+  {
+   "claimId": "L|summary",
+   "field": "executionNotes_he[2]",
+   "before": "מחיקת המוטבים (שלב 10) רצה לפני היצירה/העדכון (שלב 12).",
+   "after": "שלב מחיקת המוטבים (שלב 10) רץ לפני היצירה/העדכון (שלב 12); האם הוא מוחק בפועל מוטבים תלוי בשאלה הפתוחה של הצירוף (Merge Join Left outer).",
+   "why": "המחיקה אינה ודאית (שאלה פתוחה ברכיב Delete Beneficiaries); נוסח כמותנה.",
+   "evidence": "Merge Join DTSX:85205-85222 (JoinType 1); If Exist in DB and Not Exists In File DTSX:85012",
+   "round": 3
+  },
+  {
+   "claimId": "L|exec",
+   "field": "executionOrder[9].title_he",
+   "before": "מחיקת מוטבים שאינם בקובץ",
+   "after": "מחיקת מוטבים שלא נמצאה להם שורה בקובץ (ISNULL(ExistsInFile)) – מותנית: האם ענף המחיקה מקבל שורות היא שאלה פתוחה (Merge Join Left outer)",
+   "why": "המחיקה נוסחה כעובדה, אך החבילה משאירה פתוח אם ענף המחיקה מקבל שורות.",
+   "evidence": "DTSX:85205-85222 (JoinType 1), 79661 (ExistsInFile = 1), 85012 (ISNULL(ExistsInFile))",
+   "round": 3
+  },
+  {
+   "claimId": "L|exec",
+   "field": "executionOrder[15].title_he",
+   "before": "ביטול קישורים שלא בקובץ",
+   "after": "gen_Status = 2 לקישורים שלא סומנו \"קיים בקובץ\" בריצה (gen_existsinfile = 0; \"ביטול\" – לפי שם המשימה, השערה)",
+   "why": "הפרדיקט הוא gen_existsinfile = 0 (כולל קישורים ששורתם נכשלה), ו\"ביטול\" לקוח משם המשימה.",
+   "evidence": "SQL DTSX:87344",
+   "round": 3
+  },
+  {
+   "claimId": "L|finding#6",
+   "field": "findings_he[5].text",
+   "before": "האיפוס והביטול/סגירה אינם מסוננים לפי בנק או מקור: כל gen_contactlink שלא אושר היום מקבל סטטוס 2, וכל הערת אזהרה ללא תאריך סגירה שסימון gen_existinfile שלה 0 (לא סומנה מחדש בריצה) נסגרת; אם קיימת הערה שהסימון שלה NULL, היא אינה מאופסת ואינה נסגרת – כולל רשומות שנוצרו ממקורות אחרים, ורשומות שלא אושרו בגלל כשל בשורה (ילד/חשבון לא נמצא, כשל עדכון הורה, שגיאת כתיבה).",
+   "after": "האיפוס ועדכון הסטטוס/הסגירה אינם מסוננים לפי בנק או מקור: כל gen_contactlink שלא סומן gen_existsinfile = 1 בריצה זו מקבל gen_Status = 2, וכל הערת אזהרה ללא תאריך סגירה שסימון gen_existinfile שלה 0 (לא סומנה מחדש בריצה) נסגרת; אם קיימת הערה שהסימון שלה NULL, היא אינה מאופסת ואינה נסגרת. אם קיימות ב-CRM רשומות כאלה שנוצרו ממקורות אחרים, או רשומות שלא אושרו בריצה בגלל כשל בשורה (ילד/חשבון לא נמצא, כשל עדכון הורה, שגיאת כתיבה), גם הן נכללות.",
+   "why": "התנאי הוא לפי ריצה (איפוס בתחילת הריצה ו-gen_existsinfile = 0), לא לפי יום; ההיקף נוסח כמותנה בנתונים.",
+   "evidence": "SQL DTSX:92723 (ללא WHERE), 87344, 92729, 92741; PC DTSX:108925, 108927, 108929",
+   "round": 3
+  },
+  {
+   "claimId": "L|Package\\Get Last Business Date|title",
+   "field": "components[1].short_he",
+   "before": "מחשב את יום העסקים האחרון: מתחיל מאתמול וחוזר אחורה כל עוד התאריך מסומן בלוח של CRM כשישי, שבת או חג. התאריך משמש כתאריך הסגירה של הערות אזהרה ללא תאריך סגירה שסימון \"קיימת בקובץ\" שלהן 0 (לא סומנו מחדש בריצה).",
+   "after": "מחשב את \"יום העסקים האחרון\" (LastBusinessDate – לפי שם המשתנה בקוד): מתחיל מאתמול בשעה 00:00 וחוזר יום אחורה כל עוד ברשימת כללי CalendarRule בשם Friday/Saturday/Holiday יש שורה ש-starttime שלה שווה בדיוק לתאריך המועמד בשעה 00:00 (השוואה מלאה של תאריך ושעה). לכן התוצאה מותנית באופן שבו CRM שומר את starttime, שלא סופק: אם starttime של יום כזה כולל שעה אחרת (למשל חצות שנשמר ב-UTC), היום אינו מדולג. התאריך משמש כתאריך הסגירה של הערות אזהרה ללא תאריך סגירה שסימון \"קיימת בקובץ\" שלהן 0 (לא סומנו מחדש בריצה).",
+   "why": "הקוד דורש שוויון מלא של starttime לתאריך ב-00:00 (DataTable.Select), לא התאמה ברמת יום; התוצאה תלויה בנתוני CRM שלא סופקו.",
+   "evidence": "Get Last Business Date ScriptMain.cs (DTSX:89143 DateTime.Today.AddDays(-1); 89151, 89163 dt.Select(\"starttime = '\" + lastWorkingDate.ToString() + \"'\"); 89148-89160 loop); SQL DTSX:89094",
+   "round": 3
+  },
+  {
+   "claimId": "L|Package\\Get Last Business Date|title",
+   "field": "components[1].flow_he[1]",
+   "before": "אתמול → אחורה כל עוד ברשימה",
+   "after": "אתמול 00:00 → יום אחורה כל עוד יש ברשימה starttime השווה בדיוק לתאריך ב-00:00 (תלוי באופן שמירת starttime ב-CRM)",
+   "why": "כנ\"ל – שוויון מלא של תאריך ושעה.",
+   "evidence": "Get Last Business Date ScriptMain.cs (DTSX:89143 DateTime.Today.AddDays(-1); 89151, 89163 dt.Select(\"starttime = '\" + lastWorkingDate.ToString() + \"'\"); 89148-89160 loop); SQL DTSX:89094",
+   "round": 3
+  },
+  {
+   "claimId": "L|Package\\Get Last Business Date|short",
+   "field": "components[1].short.nodes[0].text",
+   "before": "נשלפת מ-CRM רשימת ימי שישי, שבת וחגים.",
+   "after": "נשלפים מלוח CalendarRule ב-CRM תאריכי ההתחלה (starttime) של כללים בשם Friday, Saturday או Holiday.",
+   "why": "דיוק מקור הרשימה (starttime של כללים לפי שם) לקראת תנאי ההשוואה.",
+   "evidence": "SQL DTSX:89094",
+   "round": 3
+  },
+  {
+   "claimId": "L|Package\\Get Last Business Date|short",
+   "field": "components[1].short.nodes[1].text",
+   "before": "החל מאתמול, המערכת חוזרת יום אחורה כל עוד התאריך אינו יום עסקים.",
+   "after": "החל מאתמול בשעה 00:00, חוזרים יום אחורה כל עוד ברשימה קיימת שורה ש-starttime שלה שווה בדיוק לתאריך המועמד בשעה 00:00. ההשוואה היא של תאריך ושעה, ולכן התוצאה תלויה באופן שבו CRM שומר את starttime, שלא סופק: אם נשמרה שעה אחרת (למשל חצות שנשמר ב-UTC), היום אינו מדולג.",
+   "why": "התנאי נוסח כבדיקת יום עסקים; בקוד – שוויון מלא של starttime לתאריך ב-00:00.",
+   "evidence": "Get Last Business Date ScriptMain.cs (DTSX:89143 DateTime.Today.AddDays(-1); 89151, 89163 dt.Select(\"starttime = '\" + lastWorkingDate.ToString() + \"'\"); 89148-89160 loop); SQL DTSX:89094",
+   "round": 3
+  },
+  {
+   "claimId": "L|Package\\Get Last Business Date|short",
+   "field": "components[1].short.nodes[2].text",
+   "before": "נקבע יום העסקים האחרון, שישמש כתאריך סגירה להערות אזהרה ללא תאריך סגירה שלא סומנו מחדש \"קיימת בקובץ\" בריצה (סימון 0).",
+   "after": "נקבע התאריך LastBusinessDate (\"יום העסקים האחרון\" – לפי שם המשתנה בקוד), שישמש כתאריך סגירה להערות אזהרה ללא תאריך סגירה שלא סומנו מחדש \"קיימת בקובץ\" בריצה (סימון 0).",
+   "why": "\"יום עסקים\" הוא שם המשתנה בקוד, לא בדיקת לוח מוכחת.",
+   "evidence": "ScriptMain.cs DTSX:89157; param DTSX:92742",
+   "round": 3
+  },
+  {
+   "claimId": "L|Package\\Get Last Business Date|detailed",
+   "field": "components[1].detailed.nodes[1].text",
+   "before": "נקודת המוצא לחישוב היא תאריך אתמול.",
+   "after": "נקודת המוצא לחישוב היא תאריך אתמול בשעה 00:00 (לפי שעון שרת הריצה).",
+   "why": "DateTime.Today.AddDays(-1) – תאריך בשעה 00:00 מקומית; נדרש לתנאי ההשוואה.",
+   "evidence": "ScriptMain.cs DTSX:89143",
+   "round": 3
+  },
+  {
+   "claimId": "L|Package\\Get Last Business Date|detailed",
+   "field": "components[1].detailed.nodes[2].text",
+   "before": "האם התאריך מופיע ברשימת הימים שאינם ימי עסקים?",
+   "after": "האם ברשימה יש שורה ש-starttime שלה שווה בדיוק לתאריך המועמד בשעה 00:00?",
+   "why": "ההשוואה היא שוויון מלא של תאריך ושעה, לא התאמת יום.",
+   "evidence": "Get Last Business Date ScriptMain.cs (DTSX:89143 DateTime.Today.AddDays(-1); 89151, 89163 dt.Select(\"starttime = '\" + lastWorkingDate.ToString() + \"'\"); 89148-89160 loop); SQL DTSX:89094",
+   "round": 3
+  },
+  {
+   "claimId": "L|Package\\Get Last Business Date|detailed",
+   "field": "components[1].detailed.nodes[2].tech",
+   "before": "main.cs:49–62: dt.Select(\"starttime = '\" + date.ToString() + \"'\")",
+   "after": "main.cs:49–62 (DTSX:89151-89163): dt.Select(\"starttime = '\" + lastWorkingDate.ToString() + \"'\") – השוואת DateTime מלאה דרך מחרוזת בפורמט תרבות השרת",
+   "why": "פירוט הטכני של ההשוואה.",
+   "evidence": "Get Last Business Date ScriptMain.cs (DTSX:89143 DateTime.Today.AddDays(-1); 89151, 89163 dt.Select(\"starttime = '\" + lastWorkingDate.ToString() + \"'\"); 89148-89160 loop); SQL DTSX:89094",
+   "round": 3
+  },
+  {
+   "claimId": "L|Package\\Get Last Business Date|detailed",
+   "field": "components[1].detailed.nodes[3]",
+   "before": "(חדש)",
+   "after": "{\"type\":\"step\",\"text\":\"התוצאה מותנית באופן שבו CRM שומר את starttime בכללים אלה, שלא סופק: רק כלל ש-starttime שלו הוא בדיוק 00:00 של התאריך גורם לדילוג על היום; כלל עם שעה אחרת (למשל חצות שנשמר ב-UTC) אינו גורם לדילוג, והתאריך ייבחר.\",\"tech\":\"השוואה מלאה של תאריך+שעה (DataTable.Select); נתוני CalendarRule לא סופקו\",\"evidence\":\"ScriptMain.cs DTSX:89148-89160; SQL DTSX:89094\"}",
+   "why": "הוספת התנאי המדויק והתלות בנתונים שלא סופקו.",
+   "evidence": "Get Last Business Date ScriptMain.cs (DTSX:89143 DateTime.Today.AddDays(-1); 89151, 89163 dt.Select(\"starttime = '\" + lastWorkingDate.ToString() + \"'\"); 89148-89160 loop); SQL DTSX:89094",
+   "round": 3
+  },
+  {
+   "claimId": "L|Package\\Get Last Business Date|detail",
+   "field": "components[1].detail_he[1].t",
+   "before": "השוואת מחרוזת התאריך ל-starttime.",
+   "after": "השוואת מחרוזת התאריך (ToString) ל-starttime – שוויון מלא של תאריך ושעה (00:00); תלוי באופן שמירת starttime ב-CRM, שלא סופק.",
+   "why": "דיוק תנאי ההשוואה.",
+   "evidence": "Get Last Business Date ScriptMain.cs (DTSX:89143 DateTime.Today.AddDays(-1); 89151, 89163 dt.Select(\"starttime = '\" + lastWorkingDate.ToString() + \"'\"); 89148-89160 loop); SQL DTSX:89094",
+   "round": 3
+  },
+  {
+   "claimId": "L|Package\\Get Last Business Date|detail",
+   "field": "components[1].detail_he[2].t",
+   "before": "תאריך ברשימה → יום אחורה.",
+   "after": "יש ברשימה starttime השווה בדיוק לתאריך המועמד ב-00:00 → יום אחורה; אחרת התאריך נבחר.",
+   "why": "דיוק תנאי ההשוואה.",
+   "evidence": "Get Last Business Date ScriptMain.cs (DTSX:89143 DateTime.Today.AddDays(-1); 89151, 89163 dt.Select(\"starttime = '\" + lastWorkingDate.ToString() + \"'\"); 89148-89160 loop); SQL DTSX:89094",
+   "round": 3
+  },
+  {
+   "claimId": "L|Package\\Get Last Business Date|decisions",
+   "field": "components[1].decisions[0].meaning_he",
+   "before": "האם התאריך יום עסקים",
+   "after": "אין ברשימה starttime השווה בדיוק לתאריך המועמד ב-00:00 (\"יום עסקים\" – לפי שמות המשתנים בקוד)",
+   "why": "\"יום עסקים\" הוא שם המשתנה בקוד; התנאי הוא שוויון מלא.",
+   "evidence": "Get Last Business Date ScriptMain.cs (DTSX:89143 DateTime.Today.AddDays(-1); 89151, 89163 dt.Select(\"starttime = '\" + lastWorkingDate.ToString() + \"'\"); 89148-89160 loop); SQL DTSX:89094",
+   "round": 3
+  },
+  {
+   "claimId": "L|Package\\Delete Beneficiaries|title",
+   "field": "components[4].title_he",
+   "before": "מחיקת מוטבים שאינם בקובץ (gen_beneficiaries)",
+   "after": "מחיקת מוטבים שאינם בקובץ (gen_beneficiaries) – מותנית: האם ענף המחיקה מקבל שורות היא שאלה פתוחה",
+   "why": "יישור לשלב 10 בסדר הביצוע: המחיקה אינה ודאית.",
+   "evidence": "DTSX:85205-85222, 79661, 85012",
+   "round": 3
+  },
+  {
+   "claimId": "L|Package\\Delete Beneficiaries|detailed",
+   "field": "components[4].detailed.nodes[8].text",
+   "before": "בכוונה (השערה): מוטבים פעילים ב-CRM שאינם מופיעים בקובץ היומי נמחקים לפני קליטת המוטבים; בפועל – תלוי באימות סוג הצירוף.",
+   "after": "בכוונה (השערה): מוטבים פעילים ב-CRM שאינם מופיעים בקובץ נמחקים לפני קליטת המוטבים; בפועל – תלוי באימות סוג הצירוף.",
+   "why": "\"יומי\" לקוח משם החבילה בלבד.",
+   "evidence": "DTSX:1 (שם החבילה)",
+   "round": 3
+  },
+  {
+   "claimId": "L|Package\\Create and update Beneficiaries|detailed",
+   "field": "components[5].detailed.nodes[3].branches[1].nodes[0].text",
+   "before": "חשבון הלקוח מאותר לפי מספר חשבון ולפי Product.Gen_fundfinanceid = FinanceNumber_11, כאשר המוצר הוא זה שמספרו (ProductNumber) שווה לקוד סוג החשבון (gen_customeraccounttype.gen_id); רק חשבונות עם StateCode 0 בבנק 10. משמעות Gen_fundfinanceid במוצר לא מוגדרת בחבילה (ב-0015 יש הערת SQL 'מסםר אישור מ\"ה' על CP.gen_fundfinanceid של gen_coursepartition, לא של Product – השערה בלבד).",
+   "after": "חשבון הלקוח מאותר לפי מספר חשבון ולפי Gen_fundfinanceid = FinanceNumber_11, כאשר Product מצורף לפי gen_id = Product.ProductNumber; רק חשבונות עם StateCode 0 בבנק 10. בשאילתה Gen_fundfinanceid ו-gen_id אינן מוסמכות, והשיוך שלהן מוסק: אילו העמודה הייתה קיימת ביותר מטבלה אחת בשאילתה, השאילתה הייתה נכשלת; לפי המשתמש החבילה רצה בפרודקשן. Gen_FundFinanceID מופיעה ב-Product (0008, Product.Gen_FundFinanceID) ו-gen_id מופיעה ב-gen_customeraccounttype (cat.gen_id בחבילה זו), ולכן Gen_fundfinanceid היא של המוצר ו-gen_id היא קוד סוג החשבון. משמעות Gen_fundfinanceid במוצר לא מוגדרת בחבילה (ב-0015 יש הערת SQL 'מסםר אישור מ\"ה' על CP.gen_fundfinanceid של gen_coursepartition, לא של Product – השערה בלבד).",
+   "why": "שיוך עמודות לא מוסמכות הוצג כעובדה; נוסף טיעון העמימות עם ראיות לטבלה שבה קיימת כל עמודה.",
+   "evidence": "Get General Customer Account SQL DTSX:13071-13088 (Gen_fundfinanceid 13079, gen_id 13078, join Product 13085); 0008_LeumiFile-PY.dtsx (sha 52e0d3302757):57316 Product.Gen_FundFinanceID; 0012 DTSX:84970 cat.gen_id",
+   "round": 3
+  },
+  {
+   "claimId": "L|Package\\Create and update Beneficiaries|detailed",
+   "field": "components[5].detailed.nodes[3].branches[1].nodes[0].tech",
+   "before": "Get General Customer Account (DTSX:13069, No cache): Product.Gen_fundfinanceid = FinanceNumber, Product.ProductNumber = gen_customeraccounttype.gen_id",
+   "after": "Get General Customer Account (DTSX:13069, No cache): Gen_fundfinanceid (לא מוסמך; Product לפי טיעון העמימות) = FinanceNumber; inner Join Product on gen_id (לא מוסמך; gen_customeraccounttype לפי טיעון העמימות) = Product.ProductNumber; bank.Gen_BankNumber = 10 (DTSX:13088)",
+   "why": "הטכני הציג שיוך מוסמך שלא קיים בשאילתה.",
+   "evidence": "DTSX:13071-13088",
+   "round": 3
+  },
+  {
+   "claimId": "L|Package\\Create and update Beneficiaries|detailed",
+   "field": "components[5].detailed.nodes[4].branches[1].nodes[0].text",
+   "before": "נשלפים חשבון הלקוח, איש הקשר, שם פרטי ושם משפחה של הלקוח, ת.ז. הלקוח ושם החשבון.",
+   "after": "נשלפים חשבון הלקוח, איש הקשר, שם פרטי ושם משפחה של הלקוח, ת.ז. הלקוח ושם החשבון. העמודות ContactId, firstname, lastname, Gen_Identitynumber ו-Gen_customeraccountId אינן מוסמכות בשאילתה; אילו העמודה הייתה קיימת ביותר מטבלה אחת בשאילתה, השאילתה הייתה נכשלת; לפי המשתמש החבילה רצה בפרודקשן. ל-Contact יש ContactId, FirstName, LastName ו-Gen_Identitynumber, ול-Gen_customeraccount יש Gen_customeraccountId (ראו בחבילה זו), ולכן הן של איש הקשר (הלקוח) ושל חשבון הלקוח.",
+   "why": "שיוך עמודות לא מוסמכות לאיש הקשר הוצג ללא טיעון.",
+   "evidence": "SQL DTSX:13072-13076 (ללא כינוי טבלה); Contact.ContactId DTSX:40346; update Contact set LastName/FirstName/Gen_Identitynumber DTSX:50070-50077; Gen_customeraccount.Gen_customeraccountId DTSX:40338",
+   "round": 3
+  },
+  {
+   "claimId": "L|Package\\Create and update Beneficiaries|title",
+   "field": "components[5].flow_he[1]",
+   "before": "מקרה ספציפי (FinanceNumber_11 = 9844/9845/9846, או ריק/0000 עם קופה 5015) → חשבון לפי מספר חשבון + Gen_producttypeid; אחרת → לפי מספר חשבון + Product.Gen_fundfinanceid = FinanceNumber_11",
+   "after": "מקרה ספציפי (FinanceNumber_11 = 9844/9845/9846, או ריק/0000 עם קופה 5015) → חשבון לפי מספר חשבון + Gen_producttypeid; אחרת → לפי מספר חשבון + Gen_fundfinanceid (לא מוסמך; של Product לפי טיעון העמימות) = FinanceNumber_11",
+   "why": "אותו שיוך לא מוסמך – יישור לתיאור המפורט.",
+   "evidence": "DTSX:13079; 0008:57316",
+   "round": 3
+  },
+  {
+   "claimId": "L|Package\\Create and update Beneficiaries|detail",
+   "field": "components[5].detail_he[1].t",
+   "before": "חשבון לקוח פעיל בבנק 10: במקרה ספציפי לפי חשבון + Gen_producttypeid; אחרת לפי חשבון + Product.Gen_fundfinanceid = FinanceNumber_11 (Product מצורף לפי gen_id = ProductNumber). מוטב: gen_beneficiaries לפי ת.ז. + חשבון לקוח (ללא סינון סטטוס).",
+   "after": "חשבון לקוח פעיל בבנק 10: במקרה ספציפי לפי חשבון + Gen_producttypeid; אחרת לפי חשבון + Gen_fundfinanceid = FinanceNumber_11 (Product מצורף לפי gen_id = ProductNumber; שתי העמודות לא מוסמכות – Gen_fundfinanceid של Product ו-gen_id של gen_customeraccounttype לפי טיעון העמימות, ראו התיאור המפורט). מוטב: gen_beneficiaries לפי ת.ז. + חשבון לקוח (ללא סינון סטטוס).",
+   "why": "אותו שיוך לא מוסמך – יישור לתיאור המפורט.",
+   "evidence": "DTSX:13071-13088; 0008:57316; DTSX:84970",
+   "round": 3
+  },
+  {
+   "claimId": "L|Package\\Set contactlink existinfile false|title",
+   "field": "components[6].short_he",
+   "before": "לפני עיבוד קישורי ההורה-ילד, כל רשומות gen_contactlink מסומנות \"לא קיים בקובץ\" ב-SQL ישיר; קישורים שיופיעו בקובץ יסומנו מחדש, והשאר יבוטלו.",
+   "after": "לפני עיבוד קישורי ההורה-ילד, כל רשומות gen_contactlink מסומנות \"לא קיים בקובץ\" ב-SQL ישיר; קישורים ששורתם בקובץ תעובד בהצלחה יסומנו מחדש, והשאר יקבלו gen_Status = 2 (\"ביטול\" – לפי שם המשימה, השערה).",
+   "why": "יישור לפרדיקט gen_existsinfile = 0 ולתווית \"ביטול\" שמקורה בשם המשימה.",
+   "evidence": "SQL DTSX:92723, 87344",
+   "round": 3
+  },
+  {
+   "claimId": "L|Package\\Set contactlink existinfile false|short",
+   "field": "components[6].short.nodes[1].text",
+   "before": "הקישורים שיופיעו בקובץ יסומנו מחדש בשלב הבא.",
+   "after": "קישורים ששורתם בקובץ תעובד בהצלחה יסומנו מחדש בשלב הבא.",
+   "why": "רק קישור ששורתו עברה את העיבוד מסומן מחדש.",
+   "evidence": "Update ContactLink DTSX:50700; Create Contact link DTSX:37068",
+   "round": 3
+  },
+  {
+   "claimId": "L|Package\\Set contactlink existinfile false|short",
+   "field": "components[6].short.nodes[2].text",
+   "before": "קישורים שלא יסומנו מחדש יבוטלו בהמשך.",
+   "after": "קישורים שלא יסומנו מחדש בריצה יקבלו gen_Status = 2 בהמשך (\"ביטול\" – לפי שם המשימה, השערה).",
+   "why": "\"ביטול\" לקוח משם המשימה בלבד.",
+   "evidence": "SQL DTSX:87344",
+   "round": 3
+  },
+  {
+   "claimId": "L|Package\\Set contactlink existinfile false|detailed",
+   "field": "components[6].detailed.nodes[3].text",
+   "before": "בשלב הבא קישורים שנמצאים בקובץ מסומנים מחדש \"קיים בקובץ\" = 1.",
+   "after": "בשלב הבא קישורים ששורתם בקובץ עובדה בהצלחה מסומנים מחדש \"קיים בקובץ\" = 1.",
+   "why": "רק קישור ששורתו עברה את העיבוד מסומן מחדש.",
+   "evidence": "Update ContactLink DTSX:50700; Create Contact link DTSX:37068",
+   "round": 3
+  },
+  {
+   "claimId": "L|Package\\Set contactlink existinfile false|detailed",
+   "field": "components[6].detailed.nodes[5].text",
+   "before": "הסימון מאפשר לזהות אילו קישורים לא הופיעו בקובץ היום.",
+   "after": "בסוף העיבוד, סימון 0 מציין קישור שלא סומן מחדש בריצה זו – בין שלא הופיע בקובץ ובין ששורתו נפלה בדרך.",
+   "why": "התנאי הוא לפי ריצה, לא לפי יום, וכולל קישורים ששורתם נכשלה.",
+   "evidence": "SQL DTSX:92723, 87344",
+   "round": 3
+  },
+  {
+   "claimId": "L|Package\\Create and update contactlink|detailed",
+   "field": "components[7].detailed.nodes[5].tech",
+   "before": "Is Child Exists (DTSX:40334): Contact ⨝ Gen_customeraccount WHERE Contact.StatusCode = 1 AND Gen_customeraccount.StatusCode = 1; gen_identitynumber = gen_Childidentitynumber_9 AND gen_bankaccountnumber",
+   "after": "Is Child Exists (DTSX:40334; SQL 40336-40347): Contact ⨝ Gen_customeraccount WHERE Contact.StatusCode = 1 AND Gen_customeraccount.StatusCode = 1; [gen_identitynumber] = gen_Childidentitynumber_9 AND [gen_bankaccountnumber] = gen_bankaccountnumber. gen_identitynumber, gen_bankaccountnumber ו-gen_identificationtype אינן מוסמכות; אילו העמודה הייתה קיימת ביותר מטבלה אחת בשאילתה, השאילתה הייתה נכשלת; לפי המשתמש החבילה רצה בפרודקשן. ל-Contact יש Gen_Identitynumber ו-gen_identificationtype (update Contact, DTSX:50077, 50087) ול-gen_customeraccount יש gen_bankaccountnumber (ca.gen_bankaccountnumber, DTSX:13077) – ומכאן השיוך.",
+   "why": "שיוך עמודות לא מוסמכות הוצג ללא טיעון; נוסף טיעון העמימות עם ראיות.",
+   "evidence": "DTSX:40336-40347; 50077; 50087; 13077",
+   "round": 3
+  },
+  {
+   "claimId": "L|Package\\Create and update contactlink|detailed",
+   "field": "components[7].detailed.nodes[5].text",
+   "before": "האם קיים איש קשר פעיל לילד עם חשבון לקוח פעיל באותו מספר חשבון?",
+   "after": "האם קיים איש קשר פעיל לילד (לפי ת.ז. של איש הקשר) עם חשבון לקוח פעיל באותו מספר חשבון (של חשבון הלקוח)? העמודות אינן מוסמכות בשאילתה, והשיוך מוסק מטיעון העמימות: אילו עמודה הייתה קיימת בשתי הטבלאות השאילתה הייתה נכשלת, והחבילה רצה בפרודקשן (לפי המשתמש).",
+   "why": "שיוך עמודות לא מוסמכות הוצג ללא טיעון.",
+   "evidence": "DTSX:40336-40347; 50077; 13077",
+   "round": 3
+  },
+  {
+   "claimId": "L|Package\\Create and update contactlink|detailed",
+   "field": "components[7].detailed.nodes[5].branches[1].nodes[0].text",
+   "before": "נשמרים איש הקשר של הילד, חשבון הלקוח וסוג הזיהוי של הילד.",
+   "after": "נשמרים איש הקשר של הילד, חשבון הלקוח וסוג הזיהוי של הילד (gen_identificationtype – לא מוסמך בשאילתה; של איש הקשר לפי טיעון העמימות, כי ל-Contact יש gen_identificationtype).",
+   "why": "שיוך gen_identificationtype לאיש הקשר של הילד הוצג ללא טיעון.",
+   "evidence": "DTSX:40341; update Contact gen_identificationtype DTSX:50087",
+   "round": 3
+  },
+  {
+   "claimId": "L|Package\\Create and update contactlink|detailed",
+   "field": "components[7].detailed.nodes[6].branches[0].nodes[0].branches[1].nodes[1].branches[0].nodes[0].text",
+   "before": "פרטי ההורה מתעדכנים: שם משפחה, שם פרטי, שם מלא, ת.ז., מזהה לקוח בבנק, תאריך לידה, טלפון ומייל לחיסכון לילד ותאריכי עדכונם, סוג זיהוי (נלקח מאיש הקשר של הילד – ראה ממצא), מקור קליטה = 1, פעיל = כן, לאומי = כן, תאריך עדכון בנק (Gen_modifiedbybank = getutcdate()), מעדכן ותאריך עדכון.",
+   "after": "פרטי ההורה מתעדכנים: שם משפחה, שם פרטי, שם מלא, ת.ז., מזהה לקוח בבנק, תאריך לידה, טלפון ומייל לחיסכון לילד ותאריכי עדכונם, סוג זיהוי – הערך של איש הקשר של הילד (Is Child Exists), אלא אם Type_20 בקובץ אינו ריק וסוג הזיהוי של הילד ריק – אז נכתב Type_20 (int.Parse); התנאי בקוד כולל גם מקרה שבו סוג הילד 10 ושווה ל-Type_20, ושם הערך הנכתב זהה; ההחלפה אינה משפיעה על ההחלטה אם לעדכן (ראה גם ממצא), מקור קליטה = 1, פעיל = כן, לאומי = כן, תאריך עדכון בנק (Gen_modifiedbybank = getutcdate()), מעדכן ותאריך עדכון.",
+   "why": "חסר הכלל שבו Type_20 מחליף את סוג הזיהוי כשסוג הזיהוי של הילד ריק.",
+   "evidence": "compare befor update main.cs:154-157 (DTSX:30021-30024); Update Contact 1 Param gen_identificationtype DTSX:50087",
+   "round": 3
+  },
+  {
+   "claimId": "L|Package\\Create and update contactlink|detailed",
+   "field": "components[7].detailed.nodes[6].branches[0].nodes[0].branches[1].nodes[1].branches[0].nodes[0].tech",
+   "before": "contact · Update · SQL (Update Contact 1–5, SQL DTSX:50070; ×5 זהים פונקציונלית)",
+   "after": "contact · Update · SQL (Update Contact 1–5, SQL DTSX:50070; ×5 זהים פונקציונלית); gen_identificationtype ← compare befor update main.cs:154-157 (DTSX:30021-30024)",
+   "why": "הפניה למקור כלל סוג הזיהוי.",
+   "evidence": "DTSX:30021-30024",
+   "round": 3
+  },
+  {
+   "claimId": "L|Package\\Create and update contactlink|detail",
+   "field": "components[7].detail_he[1].t",
+   "before": "ילד: Contact (StatusCode 1) + Gen_customeraccount (StatusCode 1) לפי ת.ז. 9 ספרות + מספר חשבון. הורה: Contact (StatusCode 1, StateCode 0) לפי ת.ז. 9 ספרות. קישור: gen_contactlink לפי הורה + ילד + חשבון לקוח.",
+   "after": "ילד: Contact (StatusCode 1) + Gen_customeraccount (StatusCode 1) לפי ת.ז. 9 ספרות + מספר חשבון (העמודות לא מוסמכות; ת.ז. של איש הקשר ומספר חשבון של חשבון הלקוח לפי טיעון העמימות). הורה: Contact (StatusCode 1, StateCode 0) לפי ת.ז. 9 ספרות. קישור: gen_contactlink לפי הורה + ילד + חשבון לקוח.",
+   "why": "אותו שיוך לא מוסמך – יישור לתיאור המפורט.",
+   "evidence": "DTSX:40336-40347; 50077; 13077",
+   "round": 3
+  },
+  {
+   "claimId": "L|Package\\Disabled contactlink|title",
+   "field": "components[8].title_he",
+   "before": "ביטול קישורי הורה-ילד שלא הופיעו בקובץ",
+   "after": "gen_Status = 2 לקישורי הורה-ילד שלא סומנו מחדש בריצה (\"ביטול\" – לפי שם המשימה, השערה)",
+   "why": "\"ביטול\" לקוח משם המשימה, ו\"שלא הופיעו בקובץ\" צר מהפרדיקט gen_existsinfile = 0.",
+   "evidence": "SQL DTSX:87344",
+   "round": 3
+  },
+  {
+   "claimId": "L|Package\\Disabled contactlink|title",
+   "field": "components[8].short_he",
+   "before": "כל קישור הורה-ילד שלא סומן היום \"קיים בקובץ\" מקבל סטטוס 2 ב-SQL ישיר.",
+   "after": "כל קישור הורה-ילד שלא סומן בריצה זו \"קיים בקובץ\" מקבל סטטוס 2 ב-SQL ישיר.",
+   "why": "התנאי הוא לפי ריצה, לא לפי יום.",
+   "evidence": "SQL DTSX:92723, 87344",
+   "round": 3
+  },
+  {
+   "claimId": "L|Package\\Disabled contactlink|short",
+   "field": "components[8].short.nodes[0].text",
+   "before": "מאותרים קישורי הורה-ילד שלא סומנו היום כקיימים בקובץ.",
+   "after": "מאותרים קישורי הורה-ילד שלא סומנו בריצה זו כקיימים בקובץ.",
+   "why": "התנאי הוא לפי ריצה, לא לפי יום.",
+   "evidence": "SQL DTSX:92723, 87344",
+   "round": 3
+  },
+  {
+   "claimId": "L|Package\\Disabled contactlink|detailed",
+   "field": "components[8].detailed.nodes[2].text",
+   "before": "האם הקישור סומן היום כקיים בקובץ?",
+   "after": "האם הקישור סומן מחדש בריצה זו כקיים בקובץ?",
+   "why": "התנאי הוא לפי ריצה, לא לפי יום.",
+   "evidence": "SQL DTSX:92723, 87344",
+   "round": 3
+  },
+  {
+   "claimId": "L|Package\\Disabled contactlink|detailed",
+   "field": "components[8].detailed.nodes[3].text",
+   "before": "קישור שבוטל יחזור לסטטוס 1 אם יופיע בקובץ בריצה עתידית.",
+   "after": "קישור שקיבל gen_Status = 2 יחזור לסטטוס 1 אם יופיע בקובץ בריצה עתידית.",
+   "why": "\"ביטול\" לקוח משם המשימה בלבד.",
+   "evidence": "SQL DTSX:87344; Update ContactLink DTSX:50700",
+   "round": 3
+  },
+  {
+   "claimId": "L|Package\\Disabled contactlink|detailed",
+   "field": "components[8].detailed.nodes[4].text",
+   "before": "קישורים שלא אושרו בגלל כשל (ילד לא נמצא, עדכון הורה נכשל, הורה חדש) מבוטלים גם הם.",
+   "after": "קישורים שלא אושרו בגלל כשל (ילד לא נמצא, עדכון הורה נכשל, הורה חדש) מקבלים גם הם gen_Status = 2.",
+   "why": "\"ביטול\" לקוח משם המשימה בלבד.",
+   "evidence": "SQL DTSX:87344",
+   "round": 3
+  },
+  {
+   "claimId": "L|Package\\Disabled contactlink|detail",
+   "field": "components[8].detail_he[4].t",
+   "before": "ביטול קישורים שלא בקובץ.",
+   "after": "gen_Status = 2 לקישורים שלא סומנו מחדש בריצה (\"ביטול\" – לפי שם המשימה, השערה).",
+   "why": "\"ביטול\" לקוח משם המשימה; \"שלא בקובץ\" צר מהפרדיקט.",
+   "evidence": "SQL DTSX:87344",
+   "round": 3
+  },
+  {
+   "claimId": "L|Package\\Disabled contactlink|decisions",
+   "field": "components[8].decisions[0].meaning_he",
+   "before": "הקישור לא אושר היום",
+   "after": "הקישור לא סומן מחדש בריצה זו",
+   "why": "התנאי הוא לפי ריצה, לא לפי יום.",
+   "evidence": "SQL DTSX:92723, 87344",
+   "round": 3
+  },
+  {
+   "claimId": "L|Package\\Disabled contactlink|crm",
+   "field": "components[8].crmEffects[0].when_he",
+   "before": "כל קישור שלא סומן היום \"קיים בקובץ\"",
+   "after": "כל קישור שלא סומן מחדש \"קיים בקובץ\" בריצה זו (gen_existsinfile = 0)",
+   "why": "התנאי הוא לפי ריצה, לא לפי יום.",
+   "evidence": "SQL DTSX:92723, 87344",
+   "round": 3
+  },
+  {
+   "claimId": "L|Package\\Create And Update Warning Notes|short",
+   "field": "components[13].short.nodes[2].text",
+   "before": "האם סוג ההערה מוכר ב-CRM?",
+   "after": "האם קיים ב-CRM סוג הערת אזהרה עם אותו קוד ואותו נושא?",
+   "why": "דיוק השאלה (קוד + נושא) לקראת פיצול ענף \"לא\".",
+   "evidence": "get warning note type SQL DTSX:70631",
+   "round": 3
+  },
+  {
+   "claimId": "L|Package\\Create And Update Warning Notes|short",
+   "field": "components[13].short.nodes[2].branches[0].nodes",
+   "before": "[{\"type\":\"write\",\"text\":\"נוצר סוג הערת אזהרה חדש בשם \\\"לא ידוע\\\".\",\"tech\":\"gen_warningnotetype · Insert · SQL\"},{\"type\":\"write\",\"text\":\"נוצרת הערת אזהרה חדשה מהסוג החדש.\",\"tech\":\"gen_warningnote · Insert · SQL\"}]",
+   "after": "[{\"type\":\"decision\",\"text\":\"האם כבר נוצר בריצה זו סוג עם אותו קוד הודעה?\",\"tech\":\"set vanila fields 1 main.cs:64–74 (מילון לפי קוד הודעה בלבד); Split Rows For MultiThread 1: IsNoteTypeAlreadyExists == TRUE\",\"branches\":[{\"label\":\"כן\",\"nodes\":[{\"type\":\"step\",\"text\":\"משתמשים בסוג שנוצר קודם בריצה, ולא נוצר סוג נוסף.\"}]},{\"label\":\"לא\",\"nodes\":[{\"type\":\"write\",\"text\":\"נוצר סוג הערת אזהרה חדש בשם \\\"לא ידוע\\\".\",\"tech\":\"gen_warningnotetype · Insert · SQL\"}]}]},{\"type\":\"write\",\"text\":\"נוצרת הערת אזהרה חדשה מהסוג הזה, בלי בדיקת הערה קיימת.\",\"tech\":\"gen_warningnote · Insert · SQL\"}]",
+   "why": "חסר הענף שבו סוג שנוצר קודם בריצה עם אותו קוד משמש שוב, ולא נוצר סוג שני.",
+   "evidence": "set vanila fields 1 DTSX:73066-73076; Split Rows For MultiThread 1 DTSX:75059-75062; path NoteTypeAlreadyExists → Union All ok 1 DTSX:79055",
+   "round": 3
+  },
+  {
+   "claimId": "L|Package\\Create And Update Warning Notes|short",
+   "field": "components[13].short.nodes[4].text",
+   "before": "הערות האזהרה שבקובץ פתוחות ב-CRM; הערות ללא תאריך סגירה שלא סומנו מחדש \"קיימת בקובץ\" בריצה (סימון 0) ייסגרו בשלב הבא.",
+   "after": "הערות האזהרה מהקובץ (נושאים 04/05/06/12) שנמצא להן חשבון לקוח ושנכתבו בהצלחה פתוחות ב-CRM ומסומנות \"קיימת בקובץ\"; שורות בלי חשבון לקוח או עם נושא אחר אינן נקלטות. הערות ללא תאריך סגירה שלא סומנו מחדש \"קיימת בקובץ\" בריצה (סימון 0) ייסגרו בשלב הבא.",
+   "why": "התוצאה הוצגה כאילו כל הערות הקובץ פתוחות, בסתירה לשורות שנזרקות.",
+   "evidence": "Get customeraccountid DTSX:70480 (No Match לא מחובר); Filter Warning Code DTSX:70447",
+   "round": 3
+  },
+  {
+   "claimId": "L|Package\\Create And Update Warning Notes|detailed",
+   "field": "components[13].detailed.nodes[8].text",
+   "before": "הערות האזהרה שבקובץ פתוחות ומסומנות; אנשי הקשר שלהן מסומנים לחישוב זכאות להלוואה.",
+   "after": "הערות האזהרה מהקובץ שנמצא להן חשבון לקוח (נושאים 04/05/06/12) ונכתבו בהצלחה פתוחות ומסומנות gen_existinfile = 1, ואנשי הקשר שלהן מסומנים gen_loaneligibilitycalculationrequired = 1; שורות בלי חשבון לקוח או עם נושא אחר אינן נקלטות.",
+   "why": "התוצאה הוצגה כאילו כל הערות הקובץ פתוחות, בסתירה לשורות שנזרקות.",
+   "evidence": "DTSX:70480, 70447; paths",
+   "round": 3
+  },
+  {
+   "claimId": "L|Package\\Create And Update Warning Notes|title",
+   "field": "components[13].flow_he[3]",
+   "before": "סוג הערה (קוד + נושא) חסר → INSERT gen_warningnotetype \"לא ידוע\" → יצירת הערה",
+   "after": "סוג הערה (קוד + נושא) חסר → אם כבר נוצר בריצה סוג עם אותו קוד – שימוש בו; אחרת INSERT gen_warningnotetype \"לא ידוע\" → יצירת הערה",
+   "why": "יישור לשימוש החוזר בסוג שנוצר בריצה.",
+   "evidence": "set vanila fields 1 DTSX:73066-73076",
+   "round": 3
+  },
+  {
+   "claimId": "L|Package\\Create And Update Warning Notes|detail",
+   "field": "components[13].detail_he[4].t",
+   "before": "הערות אזהרה מהבנק פתוחות ב-CRM ומשפיעות על חישוב זכאות להלוואה.",
+   "after": "הערות אזהרה מהקובץ שנמצא להן חשבון לקוח ושנכתבו בהצלחה פתוחות ב-CRM ומסומנות \"קיימת בקובץ\", ואנשי הקשר שלהן מסומנים gen_loaneligibilitycalculationrequired = 1.",
+   "why": "התוצאה הוצגה לכל הערות הקובץ; המקור \"מהבנק\" אינו מוכח; ההשפעה על זכאות להלוואה נגזרה משם התכונה.",
+   "evidence": "DTSX:70480, 70447; SQL 78730, 78768",
+   "round": 3
+  },
+  {
+   "claimId": "L|Package\\Update close date where not exist in file|decisions",
+   "field": "components[14].decisions[0].meaning_he",
+   "before": "הערה פתוחה שלא אושרה היום",
+   "after": "הערה ללא תאריך סגירה שלא סומנה מחדש בריצה זו (gen_existinfile = 0)",
+   "why": "התנאי הוא לפי ריצה, לא לפי יום.",
+   "evidence": "SQL DTSX:92729, 92741",
+   "round": 3
+  },
+  {
+   "round": 9,
+   "date": "2026-11-10T06:02:52.221Z",
+   "claimId": "L|summary",
+   "field": "summary_he",
+   "before": "החבילה מעבדת רק אם נמצא קובץ: ההמשך אחרי Check File Existence מותנה באילוץ Success AND @[User::isFileExist] == TRUE; הדגל (ברירת מחדל false) מוצב true רק כשבתיקייה נמצא קובץ ששמו מכיל את FileName, ואז נבחר הקובץ שעודכן אחרון; בלי קובץ אף שלב עסקי אינו רץ. כשנמצא קובץ, החבילה קולטת את קובץ ה-CHN (\"יומי\" ו\"בנק לאומי\" – לפי שם החבילה LeumiFile_CHN_Daily בלבד, השערה; (מוטבים, מורשים, קישורי הורה-ילד, טלפונים והערות אזהרה לחשבונות), טוענת אותו ל-Staging ומסנכרנת לפיו את CRM: מוחקת (בכפוף לשאלה פתוחה בצירוף) ויוצרת/מעדכנת מוטבים דרך CRM SDK; יוצרת אנשי קשר הורים (SDK), מעדכנת ב-SQL ישיר פרטי הורים קיימים עם gen_fileorigion = 2 (Update Contact), ומקשרת הורה-ילד-חשבון בקופה 5015; קישורים שלא סומנו \"קיים בקובץ\" בריצה מקבלים gen_Status = 2; מעדכנת טלפון נייד של עובד, הוראות מורשים וסימון \"חשבון בסיכון\"; יוצרת סוגי הערת אזהרה חדשים (gen_warningnotetype) כשהקוד והנושא לא קיימים (אלא אם כבר נוצר בריצה סוג עם אותו קוד – אז הוא משמש שוב), יוצרת/מאשרת הערות אזהרה ומסמנת את איש הקשר של החשבון gen_loaneligibilitycalculationrequired = 1 (ContactBase), וממלאת gen_closedate (יום העסקים האחרון) בהערות ללא תאריך סגירה שסימון gen_existinfile שלהן 0, כלומר שלא סומנו מחדש בריצה; אם קיימת הערה שהסימון שלה NULL, היא אינה מאופסת (האיפוס חל רק על 1) ואינה נסגרת. רוב הכתיבות מבוצעות ב-SQL ישיר על מסד CRM (Unsupported); מוטבים ויצירת אנשי קשר – ב-SDK.",
+   "after": "החבילה מעבדת רק אם נמצא קובץ: ההמשך אחרי Check File Existence מותנה באילוץ Success AND @[User::isFileExist] == TRUE; הדגל (ברירת מחדל false) מוצב true רק כשבתיקייה נמצא קובץ ששמו מכיל את FileName, ואז נבחר הקובץ שעודכן אחרון; בלי קובץ אף שלב עסקי אינו רץ. כשנמצא קובץ, החבילה קולטת את קובץ ה-CHN (\"יומי\" ו\"בנק לאומי\" – לפי שם החבילה LeumiFile_CHN_Daily בלבד, השערה; (מוטבים, מורשים, קישורי הורה-ילד, טלפונים והערות אזהרה לחשבונות), טוענת אותו ל-Staging ומסנכרנת לפיו את CRM: מוחקת (בכפוף לשאלה פתוחה בצירוף) ויוצרת/מעדכנת מוטבים דרך CRM SDK; יוצרת אנשי קשר הורים (SDK), מעדכנת ב-SQL ישיר פרטי הורים קיימים עם gen_fileorigion = 2 (Update Contact), ומקשרת הורה-ילד-חשבון בקופה 5015; קישורים שלא סומנו \"קיים בקובץ\" בריצה מקבלים gen_Status = 2; מעדכנת טלפון נייד של עובד, הוראות מורשים וסימון \"חשבון בסיכון\"; יוצרת סוגי הערת אזהרה חדשים (gen_warningnotetype) כשהקוד והנושא לא קיימים (אלא אם כבר נוצר בריצה סוג עם אותו קוד – אז הוא משמש שוב), יוצרת/מאשרת הערות אזהרה ומסמנת את איש הקשר של החשבון gen_loaneligibilitycalculationrequired = 1 (ContactBase), וממלאת gen_closedate ב-LastBusinessDate (\"יום העסקים האחרון\" – לפי שם המשתנה בקוד; התוצאה מותנית באופן שבו starttime נשמר ב-CalendarRule, שלא סופק) בהערות ללא תאריך סגירה שסימון gen_existinfile שלהן 0, כלומר שלא סומנו מחדש בריצה; אם קיימת הערה שהסימון שלה NULL, היא אינה מאופסת (האיפוס חל רק על 1) ואינה נסגרת. רוב הכתיבות מבוצעות ב-SQL ישיר על מסד CRM (Unsupported); מוטבים ויצירת אנשי קשר – ב-SDK.",
+   "why": "המשמעות 'יום העסקים האחרון' נלקחה משם המשתנה בלבד ותלויה באופן שמירת starttime; מיושר עם טענות Get Last Business Date.",
+   "evidence": "DTSX:92741-92742; DTSX:89094, 89151-89163"
+  },
+  {
+   "round": 9,
+   "date": "2026-11-10T06:02:52.221Z",
+   "claimId": "L|Package\\Get Last Business Date|detailed",
+   "field": "components.1.detailed.nodes.2.branches.1.nodes.0.text",
+   "before": "התאריך נבחר כיום העסקים האחרון.",
+   "after": "התאריך נבחר כ-LastBusinessDate (\"יום העסקים האחרון\" – לפי שם המשתנה בקוד).",
+   "why": "יישור עם התיקון בסיכום: המשמעות משם המשתנה בלבד.",
+   "evidence": "DTSX:89151-89163"
+  },
+  {
+   "round": 9,
+   "date": "2026-11-10T06:02:52.221Z",
+   "claimId": "L|Package\\Get Last Business Date|detailed",
+   "field": "components.1.detailed.nodes.6.text",
+   "before": "יום העסקים האחרון ידוע לשלב סגירת הערות האזהרה.",
+   "after": "LastBusinessDate (\"יום העסקים האחרון\" – לפי שם המשתנה בקוד; נכונותו מותנית באופן שמירת starttime ב-CalendarRule) זמין לשלב סגירת הערות האזהרה.",
+   "why": "יישור עם התיקון בסיכום.",
+   "evidence": "DTSX:89151-89163, 92742"
+  },
+  {
+   "round": 9,
+   "date": "2026-11-10T06:02:52.221Z",
+   "claimId": "L|Package\\Set Warning Note existinfile false|detailed",
+   "field": "components.12.detailed.nodes.4.text",
+   "before": "הערות שיישארו 0 ועדיין פתוחות ייסגרו בתאריך יום העסקים האחרון.",
+   "after": "הערות שיישארו 0 ועדיין פתוחות ייסגרו בתאריך LastBusinessDate (\"יום העסקים האחרון\" – לפי שם המשתנה בקוד; מותנה באופן שמירת starttime ב-CalendarRule, שלא סופק).",
+   "why": "יישור עם התיקון בסיכום.",
+   "evidence": "DTSX:92741-92742; DTSX:89151-89163"
+  },
+  {
+   "round": 9,
+   "date": "2026-11-10T06:02:52.221Z",
+   "claimId": "L|Package\\Update close date where not exist in file|title",
+   "field": "components.14.short_he",
+   "before": "כל הערת אזהרה ללא תאריך סגירה שסימון \"קיימת בקובץ\" שלה 0 (לא סומנה מחדש בריצה) מקבלת תאריך סגירה = יום העסקים האחרון, ב-SQL ישיר; הערה שהסימון שלה NULL אינה נסגרת.",
+   "after": "כל הערת אזהרה ללא תאריך סגירה שסימון \"קיימת בקובץ\" שלה 0 (לא סומנה מחדש בריצה) מקבלת תאריך סגירה = LastBusinessDate (\"יום העסקים האחרון\" – לפי שם המשתנה בקוד; מותנה באופן שמירת starttime ב-CalendarRule, שלא סופק), ב-SQL ישיר; הערה שהסימון שלה NULL אינה נסגרת.",
+   "why": "יישור עם התיקון בסיכום.",
+   "evidence": "DTSX:92741-92742; DTSX:89151-89163"
+  },
+  {
+   "round": 9,
+   "date": "2026-11-10T06:02:52.221Z",
+   "claimId": "L|Package\\Update close date where not exist in file|short",
+   "field": "components.14.short.nodes.1.text",
+   "before": "ההערות נסגרות בתאריך יום העסקים האחרון.",
+   "after": "ההערות נסגרות בתאריך שחושב בשלב חישוב התאריך (\"יום העסקים האחרון\" – לפי שם המשתנה בקוד; נכונותו מותנית באופן שמירת כללי לוח השנה ב-CRM, שלא סופק).",
+   "why": "יישור עם התיקון בסיכום.",
+   "evidence": "DTSX:92741-92742; DTSX:89151-89163"
+  },
+  {
+   "round": 9,
+   "date": "2026-11-10T06:02:52.221Z",
+   "claimId": "L|Package\\Update close date where not exist in file|detailed",
+   "field": "components.14.detailed.nodes.2.branches.0.nodes.0.text",
+   "before": "תאריך הסגירה של ההערה = יום העסקים האחרון (UTC).",
+   "after": "תאריך הסגירה של ההערה = LastBusinessDate (UTC; \"יום העסקים האחרון\" – לפי שם המשתנה בקוד, מותנה באופן שמירת starttime ב-CalendarRule).",
+   "why": "יישור עם התיקון בסיכום.",
+   "evidence": "DTSX:92741-92742; DTSX:89151-89163"
+  },
+  {
+   "round": 9,
+   "date": "2026-11-10T06:02:52.221Z",
+   "claimId": "L|Package\\Update close date where not exist in file|detailed",
+   "field": "components.14.detailed.nodes.5.text",
+   "before": "הערות ללא תאריך סגירה שסימון \"קיים בקובץ\" שלהן 0 (לא אושרו בריצה זו) נסגרות בתאריך יום העסקים האחרון; הערות עם סימון NULL נשארות פתוחות.",
+   "after": "הערות ללא תאריך סגירה שסימון \"קיים בקובץ\" שלהן 0 (לא אושרו בריצה זו) נסגרות בתאריך LastBusinessDate (\"יום העסקים האחרון\" – לפי שם המשתנה בקוד; מותנה באופן שמירת starttime ב-CalendarRule); הערות עם סימון NULL נשארות פתוחות.",
+   "why": "יישור עם התיקון בסיכום.",
+   "evidence": "DTSX:92741-92742; DTSX:89151-89163"
+  },
+  {
+   "round": 9,
+   "date": "2026-11-10T06:02:52.221Z",
+   "claimId": "L|Package\\Create and update contactlink|detailed",
+   "field": "components.7.detailed.nodes.6.branches.0.nodes.0.branches.1.nodes.0.text",
+   "before": "טלפון ומייל לחיסכון לילד מהקובץ (כשאינם ריקים) מחליפים את הערכים ב-CRM ומקבלים תאריך עדכון; שם פרטי, שם משפחה ותאריך לידה שריקים בקובץ נלקחים מ-CRM, וערכי הטקסט מהקובץ נחתכים מרווחים. למזהה לקוח בבנק ולת.ז. ההורה אין בפועל השלמה מ-CRM: הם מרופדים באפסים כבר בשלב Add 0, ולכן אינם ריקים כשהם מגיעים לכאן; מזהה לקוח בבנק ריק בקובץ מגיע להשוואה ולעדכון כמחרוזת אפסים.",
+   "after": "טלפון ומייל לחיסכון לילד מהקובץ (כשאינם ריקים) מחליפים את הערכים ב-CRM ומקבלים תאריך עדכון; שם פרטי, שם משפחה ותאריך לידה שריקים בקובץ נלקחים מ-CRM, וערכי הטקסט מהקובץ נחתכים מרווחים. למזהה לקוח בבנק ולת.ז. ההורה אין בפועל השלמה מ-CRM: כשהעיבוד ממשיך עד כאן הם אינם ריקים, כי עברו את שלב Add 0 (ריפוד באפסים משמאל לאורך השדה). ערך ריק בקובץ הופך ל-NULL כבר בשלב Trim String Fields, ו-Add 0 קורא אותו דרך Buffer.GetString; לפי התנהגות SSIS המתועדת, לא מוצג בקבצים, קריאה כזו של NULL זורקת חריגה ומכשילה את השלב. לכן לא מוכח שערך ריק בקובץ מגיע להשוואה ולעדכון.",
+   "why": "נטען כעובדה שערך ריק מגיע כמחרוזת אפסים; בפועל Trim הופך ריק ל-NULL לפני Add 0, ו-Add 0 קורא ב-Buffer.GetString. התוצאה בזמן ריצה סומנה כהתנהגות SSIS מתועדת שאינה מוצגת בקבצים.",
+   "evidence": "DTSX:44513-44520 (Trim String Fields FormatField: str == \"\" → null), DTSX:51028 (Trim → Add 0), DTSX:25188 (Add 0 FormatField), DTSX:25219-25224 (Buffer.GetString)"
+  },
+  {
+   "round": 9,
+   "date": "2026-11-10T06:02:52.221Z",
+   "claimId": "L|Package\\Create and update contactlink|detailed",
+   "field": "components.7.detailed.nodes.6.branches.0.nodes.0.branches.1.nodes.0.tech",
+   "before": "Set child saving fields main.cs:24–34; Derived Column 1 (DTSX:40072): ISNULL(gen_bankCustomerID) ? Parentbankcustomeridnumber : TRIM(...), ISNULL(gen_Parentidentitynumber_9) ? gen_identitynumber : TRIM(...) – אינם מתקיימים אחרי Add 0 (DTSX:25010 main.cs:54: String.IsNullOrEmpty → \"\" → PadLeft)",
+   "after": "Set child saving fields main.cs:24–34; Derived Column 1 (DTSX:40072): ISNULL(gen_bankCustomerID) ? Parentbankcustomeridnumber : TRIM(...), ISNULL(gen_Parentidentitynumber_9) ? gen_identitynumber : TRIM(...) – אינם מתקיימים כשהעיבוד ממשיך אחרי Add 0 (DTSX:25010; FormatField DTSX:25188: PadLeft(fieldSize,'0')). Trim String Fields (DTSX:44338, FormatField DTSX:44517-44518): \"\" → null, ורץ לפני Add 0 (path DTSX:51028); Add 0 קורא דרך Buffer.GetString(BufferColumnIndexes[0]) (DTSX:25223) – קריאת NULL: לפי התנהגות SSIS המתועדת, לא מוצג בקבצים",
+   "why": "הסרת ההנחה הלא-מסומנת 'NULL → \"\" → PadLeft' מה-tech.",
+   "evidence": "DTSX:25188, 25223, 44517-44518, 51028"
+  },
+  {
+   "round": 9,
+   "date": "2026-11-10T06:02:52.221Z",
+   "claimId": "L|Package\\Disabled contactlink|detailed",
+   "field": "components.8.detailed.nodes.3.text",
+   "before": "קישור שקיבל gen_Status = 2 יחזור לסטטוס 1 אם יופיע בקובץ בריצה עתידית.",
+   "after": "קישור שקיבל gen_Status = 2 יחזור לסטטוס 1 רק אם בריצה עתידית שורת קישור בקובץ (נושא 03, קופה 5015) תעבור בהצלחה עד אישור הקישור: הילד נמצא (איש קשר פעיל עם חשבון פעיל במספר החשבון), ההורה נמצא כאיש קשר קיים, אם להורה gen_fileorigion = 2 והוא דורש עדכון – עדכון ההורה הצליח, נמצא קישור עם אותם הורה, ילד וחשבון לקוח, ועדכון הקישור עצמו הצליח. הופעה בקובץ לבדה אינה מספיקה.",
+   "why": "הופעה בקובץ הוצגה כתנאי מספיק; התנאי האמיתי הוא עיבוד מוצלח עד Update ContactLink. כעת עקבי עם יחידה [9].",
+   "evidence": "DTSX:40692 (Subject_12 == \"03\" && gen_fundtypenumber == \"5015\"), 40336-40347 (Is Child Exists), 40519 (is Parent Exist), 30947 (Conditional Split), 40436 (Is ContactLink Exists), 50700-50705 (Update ContactLink gen_status = 1)"
+  },
+  {
+   "round": 9,
+   "date": "2026-11-10T06:02:52.221Z",
+   "claimId": "L|Package\\Disabled contactlink|detailed",
+   "field": "components.8.detailed.nodes.3.tech",
+   "before": "Update ContactLink: gen_status = 1 (DTSX:50700)",
+   "after": "Is Valid  ContactLink (DTSX:40678/40692): Subject_12 == \"03\" && gen_fundtypenumber == \"5015\"; Is Child Exists (DTSX:40336); is Parent Exist (DTSX:40519); Conditional Split (DTSX:30947) → Update Contact; Is ContactLink Exists (DTSX:40436); Update ContactLink: gen_existsinfile = 1, gen_status = 1 (DTSX:50700)",
+   "why": "תיעוד שרשרת התנאים.",
+   "evidence": "DTSX:40692, 40336, 40519, 30947, 40436, 50700"
+  }
+ ]
+}

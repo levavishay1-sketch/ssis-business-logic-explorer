@@ -1,0 +1,42 @@
+{
+  "verifier": "ssis-verifier",
+  "package": "0009_LeumiFile-BY",
+  "scope": "fieldmap.json rowFilters (inner-join)",
+  "checked": 4,
+  "results": [
+    {
+      "id": "ROWFILTER inner-join Merge Join [Create fundmain for transferin]",
+      "verdict": "CONFIRMED",
+      "detail": "Resolved. A declared Merge Join row filter on Create gen_fundmain 1 now has fileFields [Action_Transfer_Direction_69, Request_ID_74] (BY source 2). Verified: Split Transfer Direction DTSX 40429, expression 40441 Action_Transfer_Direction_69 == \"2\" -> Sort 1 (right); the default output -> Sort (left). Sort 40279 and Sort 1 40332 have EliminateDuplicates=false, so the join is many-to-many (m x n rows; NULL keys pair because TreatNullsAsEqual=true); this is stated in the entry. Output columns gen_bankaccountnumber and Source_Fund_Course_17 come from the left input and gen_fundtypenumber from the right, as the entry says.",
+      "evidence": "DTSX 38584-38590 + output InputColumnIDs, 40429/40441, 40279/40332, paths 42815-42818",
+      "previousVerdict": "INCOMPLETE",
+      "recheckedOn": "2026-11-06 (round 2)"
+    },
+    {
+      "id": "ROWFILTER inner-join Merge Join [Create or update  Fund Trunsaction Request]",
+      "verdict": "CONFIRMED",
+      "detail": "Resolved by suppression. The inner-join entry is no longer in rowFilters for any of the 15 FTR writer components (Create Fund Transaction Request 1-5, update ftrequest,gen_existinfile 1-5, Update Fund Transaction Request 1-5); each carries rowFiltersSuppressed {Merge Join} with a proof that matches the raw DTSX: the left Sort and the Aggregate (GROUP BY, AggregationType 0) read the same lineage Union All 1.identityNumber from Multicast 1; Create Contact 1-5 have a synchronous Output 0 and catch exceptions, so every row passes; Split Rows For MultiThread is exhaustive (Case Last is the default); TreatNullsAsEqual=true. Every left row has exactly one partner, so the join never drops or multiplies rows.",
+      "evidence": "DTSX 56897-56901, 62057, 46816/46827, 62733, 62775, 70494; Create Contact 1 main.cs:121-142; fieldmap.json rowFiltersSuppressed",
+      "previousVerdict": "WRONG",
+      "recheckedOn": "2026-11-06 (round 2)"
+    },
+    {
+      "id": "ROWFILTER inner-join Merge Join [Create transferin Maslulim]",
+      "verdict": "CONFIRMED",
+      "detail": "Resolved. A declared row filter on SDK Create gen_TransferIn 1 now has fileFields [Transaction_Direction_68] (fileKey BY source). Verified: Conditional Split DTSX 123924, expression 123937 Transaction_Direction_68 == \"2\" -> Transfer Direction 2 -> Sort 1 (right); the default Transfer Direction 1 -> Sort (left) (paths 135844/135845/135843/135842). All Merge Join output columns come from the left input (gen_id <- Source_Fund_Type_16, gen_bankaccountnumber <- Source_Account_Number_20). Both Sorts have EliminateDuplicates=true, so there is no multiplication. The 5006->1025 mapping in Childe Saving handel (main.cs:120-129) runs before Trim on both fund-type keys. The tool inner-join entry (keys and pairing) is unchanged and correct.",
+      "evidence": "DTSX 123924/123937, 126537-126541, Merge Join output InputColumnIDs (all Left Input), 133881/133956; Childe Saving handel main.cs:120-129",
+      "previousVerdict": "INCOMPLETE",
+      "recheckedOn": "2026-11-06 (round 2)"
+    },
+    {
+      "id": "ROWFILTER declared If transferin Exists -> Create Annotation [Create transferin from outside source]",
+      "verdict": "CONFIRMED",
+      "detail": "Checked against the raw DTSX: If transferin Exists (ConditionalSplit DTSX 94832) sends !ISNULL(Gen_transferinId) to To Update; To Create is the default. Gen_transferinId comes from the lookup get tranferin from TN ignore failue (DTSX 94543): its only join column is Request_Id_73 = gen_requestidentifier (CRM connection); NoMatchBehavior=0 with errorRowDisposition=IgnoreFailure (94616), so unmatched rows continue with a NULL Gen_transferinId and go to To Create. To Update rows go through Get Contact BirthDate (also IgnoreFailure, so no drop) and Get Transactions (both outputs -> Union All 1), then to Update TransferIn Result / DontNeedToUpdate or No Need To Update, and into Union All Inputs 1/2. Those inputs carry Doc1..Doc4 columns. To Create rows arrive only through Input 3 (ProcessNumber, TransferinID). So only rows whose Request_Id_73 matches an existing CRM gen_transferin can produce an annotation; fileFields [Request_Id_73] is right. Limits outside this claim: update-path rows sent to CastingError (Update TransferIn main.cs:181-189) do not reach the annotation writer, and the Doc-pair non-NULL test (main.cs:68-88) is a per-annotation condition.",
+      "evidence": "DTSX 94832 (split), 94543/94595/94616 (lookup, NoMatchBehavior 0, IgnoreFailure), 94195/94202 (Get Contact BirthDate), 108245 (Union All inputs), 111877 (Union All - result), paths 121452, 121427, 121449, 121450; Create Annotation main.cs:68-88",
+      "recheckedOn": "2026-11-06 (round 2)"
+    }
+  ],
+  "missingWrites": [],
+  "notes": "Scope: INNER Merge Joins (JoinType=2) upstream of CRM writers. Missing-join sweep over 0004, 0005, 0008, 0009, 0012, 0013, 0015, 0028, 0029, 0031, 0032 (grep of contactInfo=\"Merge Join\" in raw DTSX): no INNER Merge Join is missing from rowFilters. Non-inner joins found: 0005 Create or Update Customer Accounts\\Merge Join JoinType=1 (DTSX 33702), 0012 Delete Beneficiaries\\Merge Join JoinType=1 (85207); outside the list 0023 Set MF on employers\\Merge Join JoinType=1 (5732). No Merge Join in 0004, 0015, 0028, 0029, 0031, 0032.",
+  "date": "2026-11-06"
+}

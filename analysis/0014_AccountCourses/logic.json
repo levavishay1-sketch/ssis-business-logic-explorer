@@ -1,0 +1,135 @@
+{
+ "package": "0014_AccountCourses",
+ "analyst": "ssis-business-logic",
+ "source": {
+  "file": "source/DailyProcess/0014_AccountCourses.dtsx",
+  "sha256": "BBB424F202337F9F76966509CACF3D52AA9306C800A09ECC3EA635E44F08DEF1",
+  "lines": 6385
+ },
+ "scopeNote_he": "ניתוח מחדש בפורמט nodes, מול ה-DTSX (לא העתקה מהפיילוט). ניתוח קוד המקור (C#) בלבד; ה-DLL המקומפל לא פוענח. CRM.Proxy / ExecuteMultipleExtension הם אסמבלי חיצוני (CRM2015.Proxy, לא סופק) – external_unknown. קובץ התצורה C:\\Generix\\SSISConfigFile.dtsConfig (DTSX:17) לא סופק (blocked_external_dependency) וייתכן שהוא דורס את מחרוזת החיבור. מנהל החיבור [CRM] = Psql / ALTSHULER_MSCRM משמש לקריאה בלבד; הכתיבה העסקית היחידה (gen_accountcourses) היא דרך SDK ExecuteMultiple (Supported). אין SQL DML בחבילה. ה-Views/טבלאות gen_accountcourses, Gen_fundmain, Gen_transferin, Gen_customercare, Gen_withdrawal לא סופקו.",
+ "summary_he": "החבילה מסנכרנת למסלולי חשבון (gen_accountcourses) את יתרת החשבון ואת ארבעת דגלי ההגבלה (עיקול, אזהרה, שעבוד, כינוס נכסים) מתוך רשומת הקופה/חשבון המקושרת (Gen_fundmain). היא מטפלת רק במסלולים שקשורים לפחות לאחד מאלה במצב 1: ניוד נכנס (Gen_CurrentState = 1, מסומן בהערה בשאילתה \"In Progress\"), טיפול לקוח או משיכה (Gen_currentstate = 1; משמעות – השערה: פתוח). היא שולחת ל-CRM רק את השדות שהשתנו. בפועל, לפי קוד המקור, הדגלים מתעדכנים רק כשהערך במסלול ריק (ראה ממצא F1).",
+ "executionOrder": [
+  { "step": 1, "refId": "Package\\Get Organization Variables", "title_he": "טעינת משתני ETL (מסגרת)", "trigger": "start (no incoming constraint)" },
+  { "step": 2, "refId": "Package\\Create ETL Process record", "title_he": "רשומת תהליך ETL (מסגרת)", "trigger": "after Get Organization Variables · Success (DTSX:5505)" },
+  { "step": 3, "refId": "Package\\Update Account courses", "title_he": "עדכון יתרה ודגלי הגבלה במסלולי חשבון", "trigger": "after Create ETL Process record · Success (DTSX:5506)" },
+  { "step": 4, "refId": "Package\\End ETL Process record", "title_he": "סגירת תהליך ETL (מסגרת)", "trigger": "after Update Account courses · Success (DTSX:5507)" },
+  { "step": 5, "refId": "Package.EventHandlers[OnError]\\Error ETL Process record", "title_he": "סימון תהליך ETL כנכשל (מסגרת)", "trigger": "OnError event handler ברמת החבילה (DTSX:5510)" }
+ ],
+ "ignoredAsFramework": [
+  "Package\\Get Organization Variables",
+  "Package\\Get Organization Variables\\OLE DB Source",
+  "Package\\Get Organization Variables\\Set Organization Variables",
+  "Package\\Create ETL Process record",
+  "Package\\End ETL Process record",
+  "Package\\End ETL Process record\\Get gen_etlprocessid",
+  "Package\\End ETL Process record\\Lookup",
+  "Package\\End ETL Process record\\ETL Record Finish",
+  "Package\\Update Account courses\\Union All",
+  "Package\\Update Account courses\\Set Warning columns",
+  "Package\\Update Account courses\\ETL Warning",
+  "Package.EventHandlers[OnError]",
+  "Package.EventHandlers[OnError]\\Error ETL Process record",
+  "LogProvider: SSIS log provider for SQL Server (SRS.SSIS_Logs, ConnectionString מ-@[User::ConnStringSrsSsis_Logs])"
+ ],
+ "components": [
+  {
+   "refId": "Package\\Update Account courses",
+   "title_he": "עדכון יתרה ודגלי הגבלה במסלולי חשבון",
+   "techName": "Update Account courses (Data Flow): get restrictions and accounts balance → Update AccountCourcess",
+   "short_he": "מסלולי חשבון שקשורים לניוד נכנס, טיפול לקוח או משיכה במצב 1 (השערה: תהליך פתוח) מקבלים את היתרה ואת דגלי ההגבלה של הקופה/חשבון המקושרת. נשלחים רק שדות שהשתנו; הדגלים בפועל נכתבים רק כשהם ריקים במסלול.",
+   "flow_he": [
+    "שליפת מסלולי חשבון המקושרים לניוד נכנס / טיפול לקוח / משיכה במצב 1 (רק לניוד נכנס יש הערה 'In Progress') + ערכי הקופה/חשבון המקושרת",
+    "השוואת 5 שדות: ערך הקופה מול הערך הנוכחי במסלול",
+    "בניית עדכון רק לשדות שהשתנו",
+    "שליחה ל-CRM ב-ExecuteMultiple באצוות של 10",
+    "כשלים → אזהרות ETL (מסגרת)"
+   ],
+   "short": {
+    "nodes": [
+     { "type": "step", "text": "החבילה אוספת מסלולי חשבון שקשורים לניוד נכנס, לטיפול לקוח או למשיכה במצב 1 (השערה: תהליך פתוח; לניוד נכנס יש הערה \"In Progress\"), יחד עם היתרה ודגלי ההגבלה של הקופה/חשבון שאליה הם שייכים." },
+     { "type": "decision", "text": "האם היתרה או אחד מדגלי ההגבלה בקופה שונים מהערך הרשום במסלול?",
+       "branches": [
+        { "label": "כן", "nodes": [ { "type": "write", "text": "המסלול מתעדכן ב-CRM רק בשדות שהשתנו: יתרה ו/או דגלי עיקול, אזהרה, שעבוד וכינוס נכסים." } ] },
+        { "label": "לא", "nodes": [ { "type": "step", "text": "המסלול לא מתעדכן." } ] }
+       ] },
+     { "type": "step", "text": "לפי קוד המקור, דגלי ההגבלה נחשבים \"שונים\" רק כשהערך במסלול ריק; שינוי מ-כן ל-לא או מ-לא ל-כן לא מזוהה ולא מועבר." },
+     { "type": "end", "text": "יתרת המסלול מסונכרנת עם הקופה, ודגלי ההגבלה מתמלאים רק במסלולים שבהם היו ריקים." }
+    ]
+   },
+   "detailed": {
+    "nodes": [
+     { "type": "step", "text": "האוכלוסייה: מסלולי חשבון שמקושרים לקופה/חשבון, ושיש להם לפחות אחד מאלה במצב 1 – ניוד נכנס (מסומן בהערה בשאילתה \"In Progress\"), טיפול לקוח או משיכה (משמעות מצב 1 בשניים האחרונים – השערה: פתוח).", "tech": "from gen_accountcourses ac join Gen_fundmain f on ac.gen_fundnumber = f.Gen_fundmainId; left join Gen_transferin ti … ti.Gen_CurrentState = 1; left join Gen_customercare cc … cc.Gen_currentstate = 1; left join Gen_withdrawal w … w.Gen_currentstate = 1; where ti.Gen_transferinId is not null or cc.Gen_customercareId is not null or w.Gen_withdrawalId is not null", "evidence": "DTSX:3884-3902 (get restrictions and accounts balance, [CRM])" },
+     { "type": "step", "text": "לכל מסלול נשלפים שני סטים של ערכים: הערכים הנוכחיים במסלול, והערכים העדכניים מהקופה/חשבון. בדגלי הקופה ערך ריק הופך ל\"לא\"; ביתרה אין המרה כזו.", "tech": "ac.gen_accountbalance / gen_isconfiscate / gen_ismortgaged / gen_isreceivership / gen_iswarning AS …DB; f.Gen_AccountBalance; ISNULL(f.Gen_isConfiscate,0) / ISNULL(f.Gen_isWarning,0) / ISNULL(f.Gen_isMortgaged,0) / ISNULL(f.Gen_isreceivership,0)", "evidence": "DTSX:3885-3896" },
+     { "type": "step", "text": "המסלול ב-CRM מזוהה לפי המזהה שלו; אין חיפוש נוסף.", "tech": "new Entity(\"gen_accountcourses\") { Id = Row.genaccountcoursesId }", "evidence": "main.cs:126-127 (DTSX:4364-4365)" },
+     { "type": "decision", "text": "האם יתרת הקופה שונה מיתרת המסלול?", "tech": "CheckIfToUpdate2(\"genaccountbalance\"): Decimal → |a−b| < 0.01 נחשב שווה; אם רק אחד ריק → שונה", "evidence": "main.cs:146 (DTSX:4384); Helpers.cs:10-12,46-47 (DTSX:4143-4145,4179-4180); BufferWrapper Decimal (DTSX:4600,4630)",
+       "branches": [
+        { "label": "כן (הפרש 0.01 ומעלה, או רק אחד מהם ריק)", "nodes": [ { "type": "step", "text": "היתרה מהקופה נכנסת לעדכון. אם יתרת הקופה ריקה, יתרת המסלול תימחק (תיכתב ריקה).", "tech": "entity[\"gen_accountbalance\"] = new Money(Row.genaccountbalance) או null" } ] },
+        { "label": "לא", "nodes": [ { "type": "step", "text": "היתרה לא נכללת בעדכון." } ] }
+       ] },
+     { "type": "decision", "text": "האם דגל הגבלה (עיקול, אזהרה, שעבוד, כינוס נכסים) שונה בין הקופה למסלול?", "tech": "CheckIfToUpdate2 לכל דגל: PropertyType.Name = \"Boolean\"; ב-switch יש רק case \"bool\" → default: return true (שווה). רק בדיקת ה-null (Helpers.cs:10-12) יכולה להחזיר \"שונה\"", "evidence": "main.cs:132-135 (DTSX:4370-4373); Helpers.cs:14-61,90 (DTSX:4147-4194,4223); BufferWrapper Boolean (DTSX:4480,4495,4510,4525,4540,4555,4615,4645)",
+       "branches": [
+        { "label": "הדגל במסלול ריק", "nodes": [ { "type": "step", "text": "ערך הדגל מהקופה (כן/לא, ריק הופך ל\"לא\") נכנס לעדכון.", "tech": "entity[\"gen_isconfiscate\" | \"gen_iswarning\" | \"gen_ismortgaged\" | \"gen_isreceivership\"] = Row.<flag>" } ] },
+        { "label": "הדגל במסלול מלא (כן או לא)", "nodes": [ { "type": "step", "text": "הדגל לא נכנס לעדכון, גם אם בקופה הערך הפוך – הקוד מתייחס לשני הערכים כשווים." } ] }
+       ] },
+     { "type": "decision", "text": "האם נמצא לפחות שדה אחד לעדכון?", "tech": "if (needToUpdate)", "evidence": "main.cs:151-160 (DTSX:4389-4398)",
+       "branches": [
+        { "label": "כן", "nodes": [ { "type": "step", "text": "המסלול נכנס לרשימת העדכונים; כשמצטברים 10 מסלולים הם נשלחים יחד.", "tech": "myEntities.Add(entity); if (myEntities.Count == 10) ExcecuteBulk();" } ] },
+        { "label": "לא", "nodes": [ { "type": "step", "text": "המסלול מסומן כ\"לא צריך עדכון\" ולא נשלח.", "tech": "Row.DirectRowToDontNeedToUpdate() – פלט לא מחובר (DTSX:5481)" } ] }
+       ] },
+     { "type": "write", "text": "המסלולים מתעדכנים ב-CRM בשדות שהשתנו בלבד: יתרת חשבון ו/או ארבעת דגלי ההגבלה.", "tech": "gen_accountcourses · Update (gen_accountbalance, gen_isconfiscate, gen_iswarning, gen_ismortgaged, gen_isreceivership) · SDK ExecuteMultipleExtension(RequestType.Update)", "evidence": "main.cs:174-203 (DTSX:4412-4441)" },
+     { "type": "step", "text": "בסוף הקלט נשלחת יתרת הרשימה שלא הגיעה ל-10.", "tech": "if (myEntities.Count > 0 && Buffer.EndOfRowset()) ExcecuteBulk();", "evidence": "main.cs:211-214 (DTSX:4449-4452)" },
+     { "type": "decision", "text": "האם CRM דחה עדכון של מסלול מסוים?", "tech": "resultItem.Fault != null", "evidence": "main.cs:178-195 (DTSX:4416-4433)",
+       "branches": [
+        { "label": "כן", "nodes": [ { "type": "step", "text": "נרשמת אזהרת ETL עם הודעת השגיאה בלבד, בלי לזהות איזה מסלול נכשל.", "tech": "ErrorBuffer.ErrorText = resultItem.Fault.Message → Union All → ETL Warning (gen_recordkey = \"\", DTSX:3985)" } ] },
+        { "label": "לא", "nodes": [ { "type": "step", "text": "העדכון נקלט." } ] }
+       ] },
+     { "type": "step", "text": "אם שליחת אצווה באמצע הקלט נכשלת כולה (למשל אין תשובה מהשרת), רק השורה הנוכחית מסומנת כשגיאה; הרשימה לא מתרוקנת, ומכאן כל העדכונים מצטברים ונשלחים בבקשה אחת בסוף.", "tech": "ExcecuteBulk בתוך try (main.cs:155-156) → catch → CastingError; myEntities.Clear() (main.cs:202) לא מתבצע; Count == 10 לא יתקיים שוב", "evidence": "main.cs:151-171,199,202,211-214 (DTSX:4389-4409,4437,4440,4449-4452)" },
+     { "type": "end", "text": "מסלולי חשבון המקושרים לניוד נכנס, טיפול לקוח או משיכה במצב 1 מחזיקים יתרה עדכנית מהקופה (בדיוק של 0.01). דגלי ההגבלה מתמלאים רק אם היו ריקים, ושינויים בדגלים קיימים לא מועברים." }
+    ]
+   },
+   "detail_he": [
+    { "h": "מקור ואוכלוסייה", "t": "שאילתה על מסד CRM ([CRM] → Psql/ALTSHULER_MSCRM, DTSX:3884-3902): מסלולי חשבון (gen_accountcourses) שמקושרים ל-Gen_fundmain דרך gen_fundnumber, ושיש להם ניוד נכנס (Gen_CurrentState = 1, \"In Progress\" לפי הערה), טיפול לקוח (Gen_currentstate = 1) או משיכה (Gen_currentstate = 1). משמעות מצב 1 בטיפול לקוח ובמשיכה לא מוגדרת בחבילה (השערה: פתוח)." },
+    { "h": "התאמה לרשומות קיימות", "t": "אין חיפוש: המסלול מזוהה ישירות לפי gen_accountcoursesId שנשלף מהמסד (main.cs:127). הקופה/חשבון מזוהה לפי ac.gen_fundnumber = f.Gen_fundmainId (DTSX:3898)." },
+    { "h": "החלטות", "t": "לכל אחד מ-5 השדות: CheckIfToUpdate2 משווה ערך קופה מול ערך מסלול. יתרה (Decimal): שונה אם |הפרש| ≥ 0.01 או אם רק אחד ריק. דגלים (Boolean): ה-switch לא מכיר את \"Boolean\" ולכן מחזיר \"שווה\" – הדגל נחשב שונה רק כשהערך במסלול ריק (ערך הקופה לעולם לא ריק בגלל ISNULL). needToUpdate = לפחות שדה אחד שונה." },
+    { "h": "כתיבה ל-CRM", "t": "Update של gen_accountcourses דרך SDK (ExecuteMultipleExtension, RequestType.Update) באצוות של 10 ובשארית בסוף. נשלחים רק השדות שהשתנו: gen_accountbalance (Money או null), gen_isconfiscate, gen_iswarning, gen_ismortgaged, gen_isreceivership. Supported (דרך Proxy חיצוני שלא נבדק)." },
+    { "h": "תוצאה עסקית", "t": "יתרת מסלולי החשבון המקושרים לניוד נכנס / טיפול לקוח / משיכה במצב 1 מסונכרנת עם הקופה. דגלי ההגבלה – רק מילוי ראשוני של ערך חסר; הסרה או הוספה של עיקול/שעבוד/כינוס/אזהרה בקופה לא תגיע למסלול שכבר יש בו ערך (לפי קוד המקור)." }
+   ],
+   "decisions": [
+    { "where": "get restrictions and accounts balance (DTSX:3899-3902)", "condition": "ti.Gen_CurrentState = 1 / cc.Gen_currentstate = 1 / w.Gen_currentstate = 1; where ti.Gen_transferinId is not null or cc.Gen_customercareId is not null or w.Gen_withdrawalId is not null", "meaning_he": "המסלול קשור לניוד נכנס, לטיפול לקוח או למשיכה במצב 1.", "outcome_he": "המסלול נכנס לבדיקה; אחרת אינו מטופל כלל." },
+    { "where": "Update AccountCourcess · main.cs:146 + Helpers.cs:46-47", "condition": "(double)(Math.Abs((Decimal)obj1 - (Decimal)obj2)) < 0.01 → equal; null vs non-null → not equal", "meaning_he": "יתרת הקופה שונה מיתרת המסלול ב-0.01 לפחות, או שרק אחת מהן ריקה.", "outcome_he": "gen_accountbalance נכתב (Money, או null אם יתרת הקופה ריקה)." },
+    { "where": "Update AccountCourcess · main.cs:132-135 + Helpers.cs:14-61,90", "condition": "AttributeType = PropertyType.Name (\"Boolean\"); switch has case \"bool\" only → default: return true", "meaning_he": "בפועל: הדגל במסלול ריק (null).", "outcome_he": "הדגל נכתב מערך הקופה; אם הדגל במסלול מלא – לא נכתב, גם כשהוא שונה." },
+    { "where": "Update AccountCourcess · main.cs:151-160", "condition": "if (needToUpdate) … else Row.DirectRowToDontNeedToUpdate();", "meaning_he": "לפחות שדה אחד השתנה.", "outcome_he": "המסלול נכנס לאצוות העדכון; אחרת – לא נשלח." },
+    { "where": "Update AccountCourcess · main.cs:184-194", "condition": "resultItem.Fault != null", "meaning_he": "CRM דחה את עדכון המסלול.", "outcome_he": "שורת שגיאה עם הודעת התקלה בלבד → אזהרת ETL (מסגרת)." }
+   ],
+   "crmEffects": [
+    { "entity": "gen_accountcourses", "verb": "Update (gen_accountbalance, gen_isconfiscate, gen_iswarning, gen_ismortgaged, gen_isreceivership – רק שדות שהשתנו)", "mechanism": "SDK", "when_he": "לכל מסלול באוכלוסייה שבו לפחות שדה אחד נמצא שונה; באצוות של 10 דרך ExecuteMultiple." }
+   ],
+   "evidence": [
+    "DTSX:3101 Executable Package\\Update Account courses (Microsoft.Pipeline)",
+    "DTSX:3879-3906 get restrictions and accounts balance, SqlCommand DTSX:3884-3902, Connection [CRM] (DTSX:4-6)",
+    "DTSX:4119 Update AccountCourcess (ScriptComponent), ReadOnlyVariables DTSX:5446",
+    "main.cs (sha 1d9ca32aa4d8; main.cs:N = DTSX:N+4238): 126-171, 174-203, 205-215",
+    "Helpers.cs (sha d58e12261542; Helpers.cs:N = DTSX:N+4133): 8-62, 78-101",
+    "BufferWrapper: Boolean genisconfiscate/…DB (DTSX:4480-4655), Decimal genaccountbalance/DB (DTSX:4600,4630)",
+    "DTSX:5481 פלט DontNeedToUpdate (לא מחובר); DTSX:4094 Union All Input 3 dangling (placeholder)",
+    "DTSX:5505-5507 Precedence Constraints; DTSX:17 Configuration C:\\Generix\\SSISConfigFile.dtsConfig"
+   ],
+   "openQuestions_he": [
+    "האם F1 (דגלים מתעדכנים רק כשהם ריקים) הוא באג ידוע? ייתכן שה-DLL המקומפל בייצור שונה מקוד המקור המוטמע.",
+    "מה משמעות מצב 1 (Gen_currentstate) בטיפול לקוח ובמשיכה? רק בניוד נכנס יש הערה \"In Progress\".",
+    "האם מחיקת יתרת המסלול כשיתרת הקופה ריקה היא התנהגות רצויה?",
+    "gen_transactionpercent נשלף ואינו בשימוש – האם תוכנן לו עדכון?"
+   ]
+  }
+ ],
+ "findings_he": [
+  { "severity": "high", "text": "F1 – דגלי ההגבלה (gen_isconfiscate, gen_iswarning, gen_ismortgaged, gen_isreceivership) מתעדכנים רק כשהערך במסלול ריק. CheckIfToUpdate2 מעביר את PropertyType.Name, שעבור עמודות DT_BOOL הוא \"Boolean\"; ב-switch של IsEqual יש רק case \"bool\", ולכן מגיעים ל-default: return true (\"שווה\"). שינוי בקופה מ-כן ל-לא או להפך לא יועבר למסלול. מבוסס על קוד המקור; ה-DLL לא נבדק.", "evidence": "Helpers.cs:14-61,90 (DTSX:4147-4194,4223); BufferWrapper DTSX:4480,4495; main.cs:132-135 (DTSX:4370-4373)" },
+  { "severity": "high", "text": "F9 – כשל של אצווה שלמה באמצע הקלט (למשל ApplicationException כשאין תשובה מהשרת) נתפס ב-catch של השורה הנוכחית: רק היא מסומנת כשגיאה, עם הודעה שאינה קשורה אליה. myEntities.Clear() לא מתבצע, התנאי Count == 10 לא יתקיים שוב, וכל העדכונים מאותו רגע – כולל האצווה שנכשלה – נשלחים בבקשה אחת בסוף. אם גם היא נכשלת, החריגה שם אינה בתוך try והרכיב נכשל.", "evidence": "main.cs:151-171,199,202,211-214 (DTSX:4389-4409,4437,4440,4449-4452)" },
+  { "severity": "medium", "text": "F10 – יתרת הקופה נשלפת בלי ISNULL. אם f.Gen_AccountBalance ריק ויתרת המסלול מלאה, ההשוואה מחזירה \"שונה\" ויתרת המסלול נכתבת כ-null (נמחקת).", "evidence": "DTSX:3892; Helpers.cs:11-12; main.cs:146 (DTSX:4384)" },
+  { "severity": "medium", "text": "F2 – כשל עדכון של מסלול נרשם כאזהרת ETL עם הודעת השגיאה בלבד; gen_recordkey קבוע \"\" ואין מזהה מסלול בשורת השגיאה. אי אפשר לדעת איזה מסלול לא עודכן.", "evidence": "main.cs:190-194 (DTSX:4428-4432); Set Warning columns DTSX:3985" },
+  { "severity": "low", "text": "F3 – gen_transactionpercent נשלף בשאילתה ומוזן לסקריפט אבל אינו בשימוש.", "evidence": "DTSX:3887; main.cs (אין שימוש ב-gentransactionpercent)" },
+  { "severity": "info", "text": "F4 – הפלט DontNeedToUpdate אינו מחובר, ולכן שורות שלא השתנו פשוט מסתיימות שם. Union All Input 3 מסומן dangling – placeholder רגיל של Union All, לא ממצא.", "evidence": "DTSX:5481, DTSX:4094" },
+  { "severity": "info", "text": "F6 – מחרוזת החיבור [CRM] בחבילה (Psql/ALTSHULER_MSCRM) היא ערך זמן תכנון; קובץ התצורה החיצוני C:\\Generix\\SSISConfigFile.dtsConfig, שלא סופק, עשוי לדרוס אותה.", "evidence": "DTSX:6, DTSX:17" },
+  { "severity": "info", "text": "תיקון/אימות מול הפיילוט: כל ממצאי הפיילוט העסקיים (F1, F2, F3, F4, F9, F10) נבדקו מחדש מול ה-DTSX ונמצאו תקפים – אימות טכני בלבד (technicalVerification), לא אישור משתמש; reviewDecision נשאר pending_user_approval. ממצאי המסגרת (F5 HintPaths, F7 Dictionary.Add, F8 לוג SSIS, F11 OnError) מחוץ להיקף הלוגיקה העסקית ולא נבדקו כאן מחדש.", "evidence": "reports/0014_AccountCourses_pilot.md §6" }
+ ]
+}

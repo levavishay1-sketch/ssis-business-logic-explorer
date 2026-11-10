@@ -1,0 +1,613 @@
+{
+  "schema": "ssis-analysis/0.1",
+  "evidenceFile": "evidence/0014_AccountCourses.json",
+  "source": {
+    "file": "0014_AccountCourses.dtsx",
+    "relativePath": "DailyProcess/0014_AccountCourses.dtsx",
+    "sha256": "BBB424F202337F9F76966509CACF3D52AA9306C800A09ECC3EA635E44F08DEF1"
+  },
+  "scopeBoundary": "Only this DTSX. Not supplied: CRM2015.Proxy.dll (CrmProxy, ExecuteMultipleExtension), C:\\Generix\\SSISConfigFile.dtsConfig, CRM metadata (Hebrew labels/field types), DB view/table definitions. Script analysis is based on embedded C# source; compiled DLLs (BinaryCode) were not decompiled.",
+  "package": {
+    "id": "dailyprocess-0014-accountcourses",
+    "name": "AccountCourses",
+    "folderPath": "DailyProcess",
+    "domainClassification": {
+      "value": null,
+      "status": "pending_user_rule",
+      "signals": [
+        "HintPath of a script reference contains 'GeneriX Product-GEMEL' (weak signal, dev path only)"
+      ]
+    },
+    "summary_he": "מעדכן ברשומות 'מסלולי חשבון' (gen_accountcourses) שיש להן תהליך פתוח (העברה נכנסת, שירות לקוחות או משיכה) את יתרת החשבון לפי הרשומה המקושרת ב-Gen_fundmain, כשיש הפרש של 0.01 לפחות. דגלי ההגבלה (עיקול, אזהרה, שעבוד, כינוס) נכתבים לפי קוד המקור רק כשהערך הקיים במסלול ריק (ראה F1). העדכון נעשה דרך CRM (ExecuteMultiple). החבילה עטופה ברישום תהליך ETL ב-CRM וברישום לוג SSIS ל-SQL Server.",
+    "summaryStatus": "derived_from_evidence; Hebrew entity labels are proposals, not from CRM metadata"
+  },
+  "executionOrder": {
+    "evidence": "DTS:PrecedenceConstraint lines 5505-5507 (all Success, Constraint, LogicalAnd=True)",
+    "steps": [
+      {
+        "step": 1,
+        "refId": "Package\\Get Organization Variables",
+        "trigger": "start (no predecessor)"
+      },
+      {
+        "step": 2,
+        "refId": "Package\\Create ETL Process record",
+        "trigger": "after step 1 · Success"
+      },
+      {
+        "step": 3,
+        "refId": "Package\\Update Account courses",
+        "trigger": "after step 2 · Success"
+      },
+      {
+        "step": 4,
+        "refId": "Package\\End ETL Process record",
+        "trigger": "after step 3 · Success"
+      }
+    ],
+    "eventHandlers": [
+      {
+        "refId": "Package.EventHandlers[OnError]\\Error ETL Process record",
+        "trigger": "OnError event at Package scope (line 5510)"
+      }
+    ],
+    "parallelBranches": "none"
+  },
+  "components": [
+    {
+      "id": "c1",
+      "refId": "Package\\Get Organization Variables",
+      "tech": "Data Flow Task · OLE DB Source → Script Component",
+      "title_he": "טעינת משתני ארגון מ-CRM",
+      "short_he": "קורא מטבלת gen_etlvariable את ההגדרות הגלובליות ואת אלה של החבילה, וממלא את משתני החבילה: שם שרת, שם ארגון ומחרוזת חיבור ללוג.",
+      "reads": [
+        {
+          "kind": "SQL read (CRM DB)",
+          "objects": [
+            "gen_etlvariable"
+          ],
+          "connection": "Package.ConnectionManagers[CRM]",
+          "filter": "gen_scope = 'global' OR gen_scope = System::PackageName",
+          "evidence": "OLE DB Source SqlCommand line 2285; ParameterMapping Parameter0 ← System::PackageName"
+        }
+      ],
+      "variablesWritten": [
+        "User::ConnStringSrsSsis_Logs",
+        "User::OrganizationName",
+        "User::ServerName"
+      ],
+      "logic_he": "כל שורה (gen_key, gen_value) נכנסת למילון. בסיום, כל משתנה ReadWrite מקבל את הערך מהמילון. אם משתנה חסר נזרקת חריגה ('The Variable ... was not found in the system configuration'). אם אותו מפתח מופיע פעמיים (גם global וגם scope של החבילה), Dictionary.Add נכשל.",
+      "logicEvidence": "Set Organization Variables · main.cs:92,103-110,126",
+      "ops": []
+    },
+    {
+      "id": "c2",
+      "refId": "Package\\Create ETL Process record",
+      "tech": "Script Task · CrmProxy.Create",
+      "title_he": "פתיחת רשומת תהליך ETL",
+      "short_he": "יוצר ב-CRM רשומת gen_etlprocess לריצה הנוכחית ושומר את המזהה שלה במשתנה ETLProcessRecordGuid.",
+      "ops": [
+        {
+          "verb": "CREATE",
+          "status": "Supported",
+          "statusVerification": "verified_with_scope_limit",
+          "statusReason": "קריאת CrmProxy.Create (CRM2015.Proxy, לא סופק). מרחב השמות CRM.Proxy.CrmSdk ו-SoapException מצביעים על שירות CRM ולא על SQL, אבל המימוש עצמו לא נבדק.",
+          "entity": "gen_etlprocess",
+          "technicalTarget": "gen_etlprocess",
+          "when": "פעם אחת בכל ריצה, אחרי טעינת המשתנים",
+          "fields": [
+            [
+              "(טרם מ-Metadata)",
+              "gen_name",
+              "",
+              "",
+              "PackageName + \"-\" + DateTime.Now"
+            ],
+            [
+              "(טרם מ-Metadata)",
+              "gen_etlname",
+              "",
+              "",
+              "System::PackageName"
+            ],
+            [
+              "(טרם מ-Metadata)",
+              "gen_etlversion",
+              "",
+              "",
+              "VersionMajor + \"-\" + VersionMinor"
+            ],
+            [
+              "(טרם מ-Metadata)",
+              "gen_runinserver",
+              "",
+              "",
+              "System::MachineName"
+            ]
+          ],
+          "fieldColumns": [
+            "Hebrew",
+            "Schema",
+            "FieldType(metadata)",
+            "FixedValue",
+            "ValueSource"
+          ],
+          "evidence": "Create ETL Process record · ScriptMain.cs:31-37"
+        }
+      ]
+    },
+    {
+      "id": "c3",
+      "refId": "Package\\Update Account courses",
+      "tech": "Data Flow Task · OLE DB Source → Script Component (ExecuteMultiple Update) → Union All → Derived Column → Script Component (Create)",
+      "title_he": "עדכון יתרה ודגלי הגבלה במסלולי חשבון",
+      "short_he": "שולף מסלולי חשבון שיש להם תהליך פתוח, משווה את היתרה ואת דגלי ההגבלה מול רשומת Gen_fundmain המקושרת, ומעדכן ב-CRM שדות שזוהו כשונים. בשל F1, דגל מזוהה כשונה רק כשאחד הצדדים ריק. כשלים נרשמים כאזהרות ETL.",
+      "reads": [
+        {
+          "kind": "SQL read (CRM DB)",
+          "objects": [
+            "gen_accountcourses",
+            "Gen_fundmain",
+            "Gen_transferin",
+            "Gen_customercare",
+            "Gen_withdrawal"
+          ],
+          "connection": "Package.ConnectionManagers[CRM]",
+          "population_he": "gen_accountcourses JOIN Gen_fundmain (ac.gen_fundnumber = f.Gen_fundmainId); נכללות רק רשומות שיש להן לפחות אחד מהבאים: העברה נכנסת עם Gen_CurrentState = 1 ('In Progress' לפי הערה ב-SQL), שירות לקוחות עם Gen_currentstate = 1, משיכה עם Gen_currentstate = 1.",
+          "evidence": "get restrictions and accounts balance · SqlCommand line 3884"
+        }
+      ],
+      "dataflowPaths": [
+        "get restrictions and accounts balance → Update AccountCourcess (Input 0)",
+        "Update AccountCourcess.CastingError → Union All Input 1",
+        "Update AccountCourcess.Error → Union All Input 2",
+        "Union All → Set Warning columns → ETL Warning",
+        "Update AccountCourcess.DontNeedToUpdate → (לא מחובר — השורות מסתיימות)",
+        "Union All Input 3 → (קלט ללא נתיב)"
+      ],
+      "decisionLogic_he": [
+        "לכל שורה נבנה Entity מסוג gen_accountcourses עם Id = gen_accountcoursesId.",
+        "לכל אחד מ-5 השדות: אם Helpers.CheckIfToUpdate2 מחזיר 'שונה', הערך מהשדה בלי סיומת DB (המקור מ-Gen_fundmain) מוצב ב-Entity.",
+        "אם לפחות שדה אחד הוצב, ה-Entity נוסף לאצווה. כל 10 רשומות, ובסוף הקלט, נשלח ExecuteMultiple מסוג Update.",
+        "אם אף שדה לא הוצב, השורה מופנית ל-DontNeedToUpdate, שאינו מחובר.",
+        "חריגה בעיבוד השורה מפנה אותה ל-CastingError עם ErrorText. Fault ברמת פריט ב-ExecuteMultiple יוצר שורה ב-Error עם ErrorText בלבד.",
+        "שליחת אצווה באמצע הקלט (כל 10 רשומות, main.cs:156) נמצאת בתוך ה-try. חריגה בשליחה, כולל תגובה ריקה (ApplicationException), נתפסת בשורה 167. רק השורה הנוכחית מופנית ל-CastingError, עם הודעה שלא קשורה אליה. myEntities.Clear() (שורה 202) לא מתבצע, המונה עובר את 10 והתנאי '== 10' לא יתקיים שוב. כל הרשומות שנצברו, כולל האצווה שנכשלה, נשלחות בבקשה אחת בסוף הקלט (שורה 213).",
+        "שליחת האצווה בסוף הקלט (main.cs:211-214) נמצאת מחוץ ל-try. חריגה שם מכשילה את הרכיב, ו-OnError מופעל."
+      ],
+      "decisionEvidence": "Update AccountCourcess · main.cs:126-172, 174-203, 205-215; Helpers.cs:8-101",
+      "ops": [
+        {
+          "verb": "UPDATE",
+          "status": "Supported",
+          "statusVerification": "verified_with_scope_limit",
+          "statusReason": "ExecuteMultipleExtension(..., RequestType.Update, IOrganizationService) מתוך CRM2015.Proxy, שלא סופק. לא נמצא SQL DML.",
+          "entity": "gen_accountcourses",
+          "technicalTarget": "gen_accountcourses",
+          "recordKey": "Id = gen_accountcoursesId (מזהה רשומה, לא שדה שנכתב)",
+          "when": "רק לשורות שבהן לפחות שדה אחד זוהה כשונה. נשלח באצוות של 10.",
+          "fields": [
+            [
+              "(טרם מ-Metadata)",
+              "gen_isconfiscate",
+              "",
+              "",
+              "ISNULL(Gen_fundmain.Gen_isConfiscate,0)"
+            ],
+            [
+              "(טרם מ-Metadata)",
+              "gen_iswarning",
+              "",
+              "",
+              "ISNULL(Gen_fundmain.Gen_isWarning,0)"
+            ],
+            [
+              "(טרם מ-Metadata)",
+              "gen_ismortgaged",
+              "",
+              "",
+              "ISNULL(Gen_fundmain.Gen_isMortgaged,0)"
+            ],
+            [
+              "(טרם מ-Metadata)",
+              "gen_isreceivership",
+              "",
+              "",
+              "ISNULL(Gen_fundmain.Gen_isreceivership,0)"
+            ],
+            [
+              "(טרם מ-Metadata)",
+              "gen_accountbalance",
+              "",
+              "",
+              "new Money(Gen_fundmain.Gen_AccountBalance); אם המקור NULL והערך הקיים לא ריק, נכתב null (הערך נמחק). אין ISNULL במקור (SQL שורה 100 בשאילתה)"
+            ]
+          ],
+          "fieldColumns": [
+            "Hebrew",
+            "Schema",
+            "FieldType(metadata)",
+            "FixedValue",
+            "ValueSource"
+          ],
+          "evidence": "Update AccountCourcess · main.cs:132-135,146,151-156,176-177"
+        },
+        {
+          "verb": "CREATE",
+          "status": "Supported",
+          "statusVerification": "verified_with_scope_limit",
+          "statusReason": "CrmProxy.Create (CRM2015.Proxy, לא סופק).",
+          "entity": "gen_etlprocesswarning",
+          "technicalTarget": "gen_etlprocesswarning",
+          "sourceComponent": "ETL Warning",
+          "when": "לכל שורת כשל (CastingError או Fault ב-ExecuteMultiple)",
+          "fields": [
+            [
+              "(טרם מ-Metadata)",
+              "gen_name",
+              "",
+              "",
+              "TaskName + ' ' + WarningTitle + ' ' + מונה"
+            ],
+            [
+              "(טרם מ-Metadata)",
+              "gen_etlubprocess",
+              "",
+              "",
+              "System::TaskName"
+            ],
+            [
+              "(טרם מ-Metadata)",
+              "gen_recordkey",
+              "",
+              "\"\" (מחרוזת ריקה)",
+              "Derived Column: RecordKey = \"\""
+            ],
+            [
+              "(טרם מ-Metadata)",
+              "gen_warningdescription",
+              "",
+              "",
+              "\"Error: \" + ErrorText"
+            ],
+            [
+              "(טרם מ-Metadata)",
+              "gen_etlprocessid",
+              "",
+              "",
+              "EntityReference(gen_etlprocess, ETLProcessRecordGuid)"
+            ],
+            [
+              "(טרם מ-Metadata)",
+              "gen_warningtype",
+              "",
+              "1",
+              "Derived Column: WarningType = 1 → OptionSetValue"
+            ]
+          ],
+          "fieldColumns": [
+            "Hebrew",
+            "Schema",
+            "FieldType(metadata)",
+            "FixedValue",
+            "ValueSource"
+          ],
+          "evidence": "ETL Warning · main.cs:63-76; Set Warning columns Derived Column (line 3964)"
+        }
+      ]
+    },
+    {
+      "id": "c4",
+      "refId": "Package\\End ETL Process record",
+      "tech": "Data Flow Task · Script Source → Lookup (CRM DB) → Script Component (CrmProxy.Update)",
+      "title_he": "סגירת רשומת תהליך ETL",
+      "short_he": "בודק אם נרשמו אזהרות לריצה הנוכחית ומעדכן את סטטוס רשומת התהליך ואת משך הריצה.",
+      "reads": [
+        {
+          "kind": "SQL read (CRM DB) via Lookup",
+          "objects": [
+            "gen_etlprocess",
+            "gen_etlprocesswarning"
+          ],
+          "evidence": "CacheType=2 (no cache, line 2217), so the parameterised SqlCommandParam runs (lines 2209-2214, WHERE gen_etlprocessid = ?). NoMatchBehavior=0 treats no-match as an error, and the Lookup Match Output has errorRowDisposition=FailComponent (line 2244). So if the ETL process record is not found, the component fails."
+        }
+      ],
+      "ops": [
+        {
+          "verb": "UPDATE",
+          "status": "Supported",
+          "statusVerification": "verified_with_scope_limit",
+          "statusReason": "CrmProxy.Update (CRM2015.Proxy, לא סופק).",
+          "entity": "gen_etlprocess",
+          "technicalTarget": "gen_etlprocess",
+          "recordKey": "Id = ETLProcessRecordGuid",
+          "when": "פעם אחת בסוף ריצה מוצלחת",
+          "fields": [
+            [
+              "(טרם מ-Metadata)",
+              "statuscode",
+              "",
+              "277880000 כשאין אזהרות / 277880002 כשיש אזהרות",
+              "isWarningExist מה-Lookup"
+            ],
+            [
+              "(טרם מ-Metadata)",
+              "gen_runtime",
+              "",
+              "",
+              "Now - System::StartTime (dd.hh:mm:ss.f)"
+            ]
+          ],
+          "fieldColumns": [
+            "Hebrew",
+            "Schema",
+            "FieldType(metadata)",
+            "FixedValue",
+            "ValueSource"
+          ],
+          "evidence": "ETL Record Finish · main.cs:120-129"
+        }
+      ]
+    },
+    {
+      "id": "eh1",
+      "refId": "Package.EventHandlers[OnError]\\Error ETL Process record",
+      "tech": "OnError Event Handler · Script Task",
+      "title_he": "רישום כשל ריצה",
+      "short_he": "בכל אירוע OnError ברמת החבילה: מסמן את רשומת התהליך כנכשלת ויוצר הערה (annotation) עם תיאור השגיאה.",
+      "ops": [
+        {
+          "verb": "UPDATE",
+          "status": "Supported",
+          "statusVerification": "verified_with_scope_limit",
+          "entity": "gen_etlprocess",
+          "technicalTarget": "gen_etlprocess",
+          "when": "אירוע OnError",
+          "fields": [
+            [
+              "(טרם מ-Metadata)",
+              "statuscode",
+              "",
+              "277880001",
+              "literal"
+            ],
+            [
+              "(טרם מ-Metadata)",
+              "gen_runtime",
+              "",
+              "",
+              "Now - StartTime"
+            ]
+          ],
+          "evidence": "Error ETL Process record · ScriptMain.cs:36-42"
+        },
+        {
+          "verb": "CREATE",
+          "status": "Supported",
+          "statusVerification": "verified_with_scope_limit",
+          "entity": "annotation",
+          "technicalTarget": "annotation",
+          "when": "אירוע OnError, אחרי העדכון",
+          "fields": [
+            [
+              "(טרם מ-Metadata)",
+              "objectid",
+              "",
+              "",
+              "EntityReference(gen_etlprocess, ETLProcessRecordGuid)"
+            ],
+            [
+              "(טרם מ-Metadata)",
+              "objecttypecode",
+              "",
+              "gen_etlprocess",
+              "literal"
+            ],
+            [
+              "(טרם מ-Metadata)",
+              "subject",
+              "",
+              "Error Description",
+              "literal"
+            ],
+            [
+              "(טרם מ-Metadata)",
+              "notetext",
+              "",
+              "",
+              "System::ErrorDescription"
+            ]
+          ],
+          "evidence": "Error ETL Process record · ScriptMain.cs:45-51"
+        }
+      ]
+    }
+  ],
+  "sourceFieldLineage": {
+    "scope": "OLE DB Source 'get restrictions and accounts balance' → Update AccountCourcess. Links proven by lineageId (extractor: 0 unresolved) + generated BufferWrapper property names + main.cs code.",
+    "fields": [
+      {
+        "pipelineField": "gen_accountcoursesId",
+        "sqlOrigin": "ac.gen_accountcoursesId",
+        "disposition": "record_identifier",
+        "detail_he": "משמש כ-Entity.Id לעדכון (main.cs:127). לא נכתב כשדה.",
+        "technicalVerification": "verified_with_scope_limit"
+      },
+      {
+        "pipelineField": "gen_accountbalance",
+        "sqlOrigin": "Gen_fundmain.Gen_AccountBalance",
+        "disposition": "crm_direct_value_write",
+        "target": "gen_accountcourses.gen_accountbalance",
+        "transform_he": "עטיפה ב-Money בלבד, ללא שינוי ערך",
+        "condition_he": "נכתב כשההפרש מול ערך ה-DB הוא לפחות 0.01, או כשרק צד אחד ריק (Helpers.cs:46-47, 10-12)",
+        "technicalVerification": "verified_with_scope_limit"
+      },
+      {
+        "pipelineField": "gen_accountbalanceDB",
+        "sqlOrigin": "gen_accountcourses.gen_accountbalance",
+        "disposition": "control_only",
+        "detail_he": "משמש רק להשוואה",
+        "technicalVerification": "verified_with_scope_limit",
+        "verificationNote": "Embedded source only; BinaryCode not decompiled"
+      },
+      {
+        "pipelineField": "gen_isconfiscate",
+        "sqlOrigin": "ISNULL(Gen_fundmain.Gen_isConfiscate,0)",
+        "disposition": "crm_derived_value_write",
+        "target": "gen_accountcourses.gen_isconfiscate",
+        "transform_he": "ISNULL → 0",
+        "condition_he": "ראה ממצא F1: לפי קוד המקור נכתב רק כשערך ה-DB ריק",
+        "technicalVerification": "verified_with_scope_limit"
+      },
+      {
+        "pipelineField": "gen_isconfiscateDB",
+        "sqlOrigin": "gen_accountcourses.gen_isconfiscate",
+        "disposition": "control_only",
+        "technicalVerification": "verified_with_scope_limit",
+        "verificationNote": "Embedded source only; BinaryCode not decompiled"
+      },
+      {
+        "pipelineField": "gen_iswarning",
+        "sqlOrigin": "ISNULL(Gen_fundmain.Gen_isWarning,0)",
+        "disposition": "crm_derived_value_write",
+        "target": "gen_accountcourses.gen_iswarning",
+        "condition_he": "ראה F1",
+        "technicalVerification": "verified_with_scope_limit"
+      },
+      {
+        "pipelineField": "gen_iswarningDB",
+        "sqlOrigin": "gen_accountcourses.gen_iswarning",
+        "disposition": "control_only",
+        "technicalVerification": "verified_with_scope_limit",
+        "verificationNote": "Embedded source only; BinaryCode not decompiled"
+      },
+      {
+        "pipelineField": "gen_ismortgaged",
+        "sqlOrigin": "ISNULL(Gen_fundmain.Gen_isMortgaged,0)",
+        "disposition": "crm_derived_value_write",
+        "target": "gen_accountcourses.gen_ismortgaged",
+        "condition_he": "ראה F1",
+        "technicalVerification": "verified_with_scope_limit"
+      },
+      {
+        "pipelineField": "gen_ismortgagedDB",
+        "sqlOrigin": "gen_accountcourses.gen_ismortgaged",
+        "disposition": "control_only",
+        "technicalVerification": "verified_with_scope_limit",
+        "verificationNote": "Embedded source only; BinaryCode not decompiled"
+      },
+      {
+        "pipelineField": "gen_isreceivership",
+        "sqlOrigin": "ISNULL(Gen_fundmain.Gen_isreceivership,0)",
+        "disposition": "crm_derived_value_write",
+        "target": "gen_accountcourses.gen_isreceivership",
+        "condition_he": "ראה F1",
+        "technicalVerification": "verified_with_scope_limit"
+      },
+      {
+        "pipelineField": "gen_isreceivershipDB",
+        "sqlOrigin": "gen_accountcourses.gen_isreceivership",
+        "disposition": "control_only",
+        "technicalVerification": "verified_with_scope_limit",
+        "verificationNote": "Embedded source only; BinaryCode not decompiled"
+      },
+      {
+        "pipelineField": "gen_transactionpercent",
+        "sqlOrigin": "gen_accountcourses.gen_transactionpercent",
+        "disposition": "read_no_use_within_scope",
+        "detail_he": "נשלף ומגיע לרכיב, אבל לא מופיע בקוד main.cs ולא ב-Helpers",
+        "technicalVerification": "verified_with_scope_limit",
+        "verificationNote": "Embedded source only; BinaryCode not decompiled"
+      }
+    ]
+  },
+  "findings": [
+    {
+      "id": "F1",
+      "severity": "high",
+      "type": "logic",
+      "text_he": "ב-Helpers.IsEqual סוג השדה נלקח מ-PropertyType.Name. לשדות bool זה 'Boolean' (BufferWrapper.cs:21-193), אבל ב-switch יש רק 'bool'. לכן עוברים ל-default ומוחזר 'שווה'. המשמעות: ארבעת דגלי ההגבלה מתעדכנים רק כשאחד הצדדים ריק. בצד המקור יש ISNULL(...,0), כך שבפועל עדכון קורה רק כשהערך ב-gen_accountcourses ריק. שינוי מ-1 ל-0 או מ-0 ל-1 לא יועבר.",
+      "evidence": "Helpers.cs:14-61,90; BufferWrapper.cs (Boolean); main.cs:132-135",
+      "limit_he": "מבוסס על קוד המקור המוטמע. ה-DLL המהודר לא נבדק."
+    },
+    {
+      "id": "F2",
+      "severity": "medium",
+      "type": "logic",
+      "text_he": "שורות שנכשלו ב-ExecuteMultiple נרשמות כאזהרה רק עם ErrorText. RecordKey מוגדר כמחרוזת ריקה ב-Derived Column, ולכן האזהרה לא מזהה את מסלול החשבון שנכשל.",
+      "evidence": "main.cs:190-194; Set Warning columns: RecordKey = \"\""
+    },
+    {
+      "id": "F3",
+      "severity": "info",
+      "type": "unused",
+      "text_he": "gen_transactionpercent נשלף ולא נעשה בו שימוש.",
+      "evidence": "SQL line 3884; main.cs"
+    },
+    {
+      "id": "F4",
+      "severity": "info",
+      "type": "topology",
+      "text_he": "הפלט DontNeedToUpdate לא מחובר לנתיב, ולכן שורות שלא השתנו מסתיימות שם. Union All Input 3 מסומן dangling=true: זה קלט placeholder רגיל של Union All, לא ממצא.",
+      "evidence": "paths in Update Account courses; DTSX line 4094"
+    },
+    {
+      "id": "F8",
+      "severity": "medium",
+      "type": "side-effect",
+      "text_he": "רישום לוג SSIS: LogProviderSQLServer מופעל ברמת החבילה ל-OnError, OnInformation, OnTaskFailed ו-OnWarning. הוא כותב ל-DB שמחרוזת החיבור שלו נטענת בזמן ריצה מ-gen_etlvariable (User::ConnStringSrsSsis_Logs). ה-DB ויעד הכתיבה לא ידועים בגבולות החבילה. ב-Script Task של ה-OnError ה-Logging מושבת (LoggingMode=2).",
+      "evidence": "DTSX lines 10, 20, 46-47, 84-85, 91, 550, 2276, 3103, 5519",
+      "limit_he": "יעד הלוג תלוי בערך זמן ריצה"
+    },
+    {
+      "id": "F9",
+      "severity": "high",
+      "type": "logic",
+      "text_he": "כשל בשליחת אצווה באמצע הקלט נבלע: רק השורה הנוכחית מסומנת כשגיאה, והאצווה שנכשלה נשלחת שוב בסוף בבקשה אחת גדולה (פירוט ב-decisionLogic).",
+      "evidence": "Update AccountCourcess · main.cs:151-171, 202, 211-214",
+      "limit_he": "מבוסס על קוד המקור המוטמע"
+    },
+    {
+      "id": "F10",
+      "severity": "medium",
+      "type": "logic",
+      "text_he": "gen_accountbalance נשלף מ-Gen_fundmain בלי ISNULL. אם המקור ריק והערך במסלול לא ריק, הקוד כותב null ומוחק את היתרה במסלול.",
+      "evidence": "SQL (DTSX 3892); main.cs:146; Helpers.cs:10-12"
+    },
+    {
+      "id": "F11",
+      "severity": "low",
+      "type": "possible",
+      "text_he": "אפשרות בלבד: ב-OnError יש המרה ל-Guid של ETLProcessRecordGuid, שערך ברירת המחדל שלו ריק (DTSX 30-35). שגיאה לפני יצירת רשומת התהליך (שלבים 1-2) עלולה להכשיל גם את ה-OnError עצמו. OnError עשוי גם לרוץ יותר מפעם אחת בריצה, ולייצר עדכונים והערות כפולים.",
+      "evidence": "Error ETL Process record · ScriptMain.cs:38,47",
+      "limit_he": "התנהגות זמן ריצה; לא הוכחה"
+    },
+    {
+      "id": "F5",
+      "severity": "medium",
+      "type": "dependency",
+      "text_he": "כל הכתיבות ל-CRM עוברות דרך CRM2015.Proxy.dll, שלא סופק. בפרויקטים שונים מופיעים שלושה HintPath שונים לאותה Assembly.",
+      "evidence": "externalReferences"
+    },
+    {
+      "id": "F6",
+      "severity": "medium",
+      "type": "dependency",
+      "text_he": "Configuration מסוג XML (C:\\Generix\\SSISConfigFile.dtsConfig) עשוי לדרוס בזמן ריצה את מחרוזת החיבור של CRM. הערך בחבילה (Initial Catalog=ALTSHULER_MSCRM, Data Source=Psql) הוא ערך זמן תכנון בלבד.",
+      "evidence": "DTS:Configuration line 17; CRM connection string line 6"
+    },
+    {
+      "id": "F7",
+      "severity": "low",
+      "type": "logic",
+      "text_he": "ב-Set Organization Variables נעשה Dictionary.Add ללא בדיקה. אם אותו gen_key קיים גם ב-global וגם ב-scope של החבילה, הריצה תיכשל.",
+      "evidence": "Set Organization Variables · main.cs:126"
+    }
+  ],
+  "reviewDecision": "pending_user_approval",
+  "independentVerification": {
+    "date": "2026-11-05",
+    "method": "Independent agent re-checked every claim against the raw DTSX",
+    "result": "3 missing items (logging, mid-batch errors, null balance), 1 possible item, 2 wrong citations, 3 overclaims; all corrected in this file",
+    "extractorFixed": "LogProviders/LoggingOptions added; safety net for unhandled DTS element types"
+  }
+}

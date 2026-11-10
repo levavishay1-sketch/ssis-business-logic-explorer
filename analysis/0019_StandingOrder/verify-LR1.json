@@ -1,0 +1,55 @@
+{
+  "verifier": "ssis-verifier",
+  "package": "0019_StandingOrder",
+  "scope": "logic-claims re-check after fixes",
+  "checkedAt": "2026-11-07T12:00:00Z",
+  "checked": 4,
+  "results": [
+    {
+      "id": "L|summary",
+      "hash": "4eda529e8a80",
+      "verdict": "WRONG",
+      "detail": "Unit 1 is correct: the filters, the NULL behaviour, the bank, amount and date match, the depositType branches, the ROW_NUMBER partition (at most one order per amount, bank, account and branch per run) and the write all match the SQL (DTSX:3975-4012) and main.cs:126-130. In unit 2 the connection facts are correct: no package configuration exists, [Prod] is used only by readers (DTSX:2247 Lookup, 2314 source, 4020 source) and [SSIS_Logs] only by the log provider (DTSX:16). The SQL-comment labels for depositType and the constant 100000009 are correctly attributed. Unit 2 states the wrong number of script writers. 'Of the 3 script writers' leaves out the Script Task 'Create ETL Process record', which also writes to CRM (crmServiceProxy.Create of gen_etlprocess, DTSX:272, 277). Four scripts write to CRM: update Standing Order (business), and ETL Warning, ETL Record Finish and Create ETL Process record (framework). The business conclusion (the only business write is the gen_standingorder SDK Update) is still correct.",
+      "evidence": "0019_StandingOrder.dtsx:272,277 (Create ETL Process record ScriptMain.cs:32,37 crmServiceProxy.Create gen_etlprocess); 810 (ETL Record Finish gen_etlprocess Update); 3298,3310 (ETL Warning gen_etlprocesswarning Create); 4340-4344 (update Standing Order main.cs:126-130); SQL 3975-4012",
+      "wrongUnits": [
+        {
+          "unit": 2,
+          "problem": "Script-writer count is 3; the Script Task 'Create ETL Process record' also writes to CRM (Create gen_etlprocess).",
+          "correct": "Four scripts write to CRM: 1 business (update Standing Order) and 3 framework (ETL Warning, ETL Record Finish, Create ETL Process record).",
+          "evidence": "0019_StandingOrder.dtsx:272, 277"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Update Standing Order First Transaction Received|detailed",
+      "hash": "380b8acefcad",
+      "verdict": "CONFIRMED",
+      "detail": "Every unit matches the SqlCommand (DTSX:3975-4012): joins Gen_ftCurrentYear-Gen_fundmain-Gen_standingorder-gen_banks; filters = 0, '53', '02'; right('0000000000000'+x,12) account comparison, branch and bank number; depositType = 2 / <> 2 branches with the SQL comments '--One time' / '--Not one time'; NULL depositType satisfies neither branch; ROW_NUMBER partition by ft.gen_transtotalamount, so.gen_bankname, so.gen_bankaccountnumber, so.gen_branch order by gen_ActualExecutionDate asc, RowNum = 1. Write: main.cs:126-130 Entity gen_standingorder, statuscode = OptionSetValue(FIRST_TRANSACTION_RECEIVED = 100000009, main.cs:84), gen_isfirsttransactionreceivied = true, service.Update per row. catch writes ErrorBuffer (main.cs:131-136) → Set Warning columns → ETL Warning (paths DTSX:5070-5071), and processing continues. Tie-breaking on equal dates is non-deterministic; this is not stated here but finding#1 covers it.",
+      "evidence": "0019_StandingOrder.dtsx:3975-4012; 4298-4350 (main.cs 84,120-137); paths 5070-5072; precedence 5080-5081",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Update Standing Order First Transaction Received|detail",
+      "hash": "1299c8756ed4",
+      "verdict": "INCOMPLETE",
+      "detail": "Units 1, 3, 4 and 5 are correct. Unit 2 describes the bank-account comparison only as 'zero-padded to 12 digits'. The SQL is right('0000000000000' + x, 12) on both sides (DTSX:3992). Values longer than 12 characters are also cut to their last 12 characters, so two different account numbers with the same last 12 characters would match, and a NULL account number never matches. The 'detailed' claim shows the exact expression, but this plain-language unit leaves the truncation out. Minor wording point in unit 4: 'statecode אינו משתנה' is proven only in the sense that the code does not set statecode (main.cs:126-129). The runtime result depends on CRM platform behaviour and on the external CRM.Proxy, which are not in the files. The open-question claim words this correctly as 'not set in the code'.",
+      "evidence": "0019_StandingOrder.dtsx:3992 (right(...,12)); main.cs:126-129 (DTSX:4340-4343)",
+      "wrongUnits": [
+        {
+          "unit": 2,
+          "problem": "The account match is described as zero-padding to 12 digits only; the right(...,12) truncation of longer values is omitted.",
+          "correct": "Both account numbers are prefixed with 13 zeros and the last 12 characters are compared: shorter values are zero-padded, longer values are cut to their last 12 characters; NULL never matches.",
+          "evidence": "0019_StandingOrder.dtsx:3992"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Update Standing Order First Transaction Received|decisions",
+      "hash": "7e119bfe34c9",
+      "verdict": "CONFIRMED",
+      "detail": "All four decision rows reproduce the SQL conditions exactly (operators, literals '53' and '02', = 0 filters, right(...,12), OR of the two depositType branches with <=, ROW_NUMBER partition/order and RowNum = 1). The NULL depositType note is correct (NULL = 2 and NULL <> 2 are both unknown).",
+      "evidence": "0019_StandingOrder.dtsx:3978, 3986-4012",
+      "wrongUnits": []
+    }
+  ]
+}

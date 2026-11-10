@@ -1,0 +1,186 @@
+{
+  "verifier": "ssis-verifier",
+  "package": "0005_Customer Account",
+  "scope": "logic-claims re-check",
+  "checkedAt": "2026-11-10",
+  "checked": 13,
+  "results": [
+    {
+      "id": "L|finding#4",
+      "hash": "d1d955a180d2",
+      "verdict": "CONFIRMED",
+      "detail": "Set gen_name (DTSX:34382) is (DT_WSTR,4)(DT_I4)gen_producttypeid + \"-\" + (DT_WSTR,12)(DT_I8)gen_bankaccountnumber, with errorRowDisposition and truncationRowDisposition FailComponent and length 17. Every row of the source reaches it before any filter: source -> Multicast -> Component Task Name -> Set gen_name. A non-numeric value or a cast overflow therefore fails the component and the data flow. All precedence constraints are Success with one incoming each (DTSX:82412-82427). No executable is disabled, no MaximumErrorCount/ForceExecutionResult override exists, and the package has no configuration. The population is gen_existinfile = 1 inner-joined to product and gen_customeraccounttype, row_number = 1 (DTSX:33252-33313). The ownership argument holds: the ambiguity rule plus the single-table 'from gen_fundmain with (nolock) where Gen_existinfile = 1' inside the Update Aggrigations SQL (DTSX:68399). The finding is framed conditionally.",
+      "evidence": "0005_Customer Account.dtsx:33252-33313, 34382-34412, 68399, 82412-82427",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|finding#10",
+      "hash": "77b8340d21af",
+      "verdict": "CONFIRMED",
+      "detail": "The SQL (DTSX:33252-33314) is not filtered on existing links. The inner joins are product on productid = gen_fundtypename and gen_customeraccounttype on cat.gen_id = p.Gen_producttypeid and cat.gen_bankname = f.gen_bankname (the fund's bank). The WHERE is gen_existinfile = 1, and row_number partitions by f.gen_bankname, f.gen_bankaccountnumber, p.gen_producttypeid with num = 1. The create/update decision is the Get Customer Account Guid Lookup: Match goes to Multicast 1 (update), No Match to Multicast 2 (create). The ownership evidence is exact. DTSX:33310/33313 are the unqualified columns. DTSX:68399 is a single-table gen_fundmain query with Gen_existinfile. DTSX:2607 has p.productid. 0008:5652 has 'join Product p on p.ProductId = fm.gen_fundtypename' with Gen_fundmain fm.",
+      "evidence": "0005_Customer Account.dtsx:2607, 32121-32176, 33252-33314, 68399; 0008_LeumiFile-PY.dtsx:5652",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package (control flow)|detailed",
+      "hash": "afcfd74a1879",
+      "verdict": "WRONG",
+      "detail": "These units check out. The chain order and Success-only constraints match DTSX:82412-82427. [1]: gen_etlvariable sets ServerName/OrganizationName/CrmMinimumDate; the system user is found by domainname like '%crmadmin%' and used as ModifiedBy (DTSX:29585). [4]: isnull(c.EMailAddress1, a.EMailAddress1) / isnull(c.DoNotEMail, a.DoNotEMail) where gen_joiningmailtoagent = 1 (DTSX:62354-62360); the update is 2 if !email_IsNull && !donotemail_IsNull && donotemail == false, else 4 (Set Joining main.cs:15-17, 41-48); AWAITING_EMAIL_SEND = 1 is the constant at Create main.cs:19; there is no mail-sending task or code. [9]: TransactionCurrency where CurrencyName = User::CurrencyName, a design value of 'שקל חדש' that nothing assigns, with ExchangeRate 1 where TransactionCurrencyId is null (DTSX:29-31, 79895-79896). [14]: the OnError script casts the String variable with (Guid) before Update/Create (DTSX:82604; variable DataType 8 at DTSX:41-42; .ToString() at DTSX:9869), so 'not proven' is correct. [15] is consistent with step 7.\nWRONG: unit [2] states universally that a customer account is created or updated 'for every combination of account type and bank account number in the funds'. Only funds with gen_existinfile = 1 that inner-join to product and gen_customeraccounttype are read (DTSX:33309-33313). An existing account is updated only when a compared field differs (Is Need To Update All / Is Need To Update All 1 == TRUE, DTSX:33634, 33667). Three other overview units drop a row condition in the same way (counted under this verdict). [3]: only gen_existinfile = 1 funds with a matching product/type/account are linked (DTSX:2606-2613). [5]: the account is written only when |balance diff| > 1 or DATEDIFF(HH) > 12 on a date, aggregated over gen_existinfile = 1 funds (DTSX:68399), not on any difference. [6]: the copy happens only from funds where both gen_paragraph14 and gen_employerconfirmation are not null; when several such funds are linked to an account, the source fund is not determined (DTSX:79889).",
+      "evidence": "0005_Customer Account.dtsx:2606-2613, 9869, 29585, 33309-33313, 33634, 33667, 41-42, 59032-59040, 59917-59960, 62354-62360, 68399, 79889, 79895-79896, 82412-82427, 82590-82620",
+      "wrongUnits": [
+        {
+          "unit": "[2] 'שלב 1: לכל צירוף של סוג חשבון ומספר חשבון בנק בקופות נוצר חשבון לקוח או מתעדכן החשבון הקיים'",
+          "problem": "This is universal ('every combination in the funds') and makes the update unconditional. Only funds with gen_existinfile = 1 and a matching product and customer-account type are read. An existing account is updated only if a compared field differs.",
+          "correct": "שלב 1: לכל צירוף של סוג חשבון ומספר חשבון בנק בקופות המסומנות gen_existinfile = 1 שיש להן מוצר וסוג חשבון לקוח תואמים נוצר חשבון לקוח, או שהחשבון הקיים מתעדכן כשיש הבדל באחד השדות המושווים.",
+          "evidence": "DTSX:33309-33313, 33634, 33667"
+        },
+        {
+          "unit": "[3] 'קופות שאינן מקושרות לחשבון הנכון מקושרות אליו'",
+          "problem": "The row condition gen_existinfile = 1 is omitted. Funds without it are never linked.",
+          "correct": "קופות המסומנות gen_existinfile = 1 שנמצא להן חשבון תואם ואינן מקושרות אליו מקושרות אליו; פרטי ייעוץ שיש להם ערך בחשבון מועתקים לקופה.",
+          "evidence": "DTSX:2606-2613; Update Customer Account Guid in Fund main.cs:42-65"
+        },
+        {
+          "unit": "[5] '…ונכתבים לחשבון כשיש הבדל'",
+          "problem": "The write happens only above thresholds, not on any difference: balance |diff| > 1, dates DATEDIFF(HH) > 12 hour boundaries. The aggregation covers only funds with Gen_existinfile = 1.",
+          "correct": "…מחושבים מהקופות המסומנות Gen_existinfile = 1 ונכתבים לחשבון כשהיתרה שונה ביותר מ-1 או כש-DATEDIFF בשעות של אחד התאריכים גדול מ-12.",
+          "evidence": "DTSX:68399"
+        },
+        {
+          "unit": "[6] 'סעיף 14 ואישור המעסיק מועתקים מהקופה לחשבון הלקוח'",
+          "problem": "The condition that both values are not null on the fund is omitted. With several qualifying linked funds, which fund supplies the values is not determined.",
+          "correct": "סעיף 14 ואישור המעסיק מועתקים לחשבון הלקוח מקופה מקושרת שבה שני השדות אינם ריקים (כשיש כמה קופות כאלה, לא נקבע מאיזו).",
+          "evidence": "DTSX:79889"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Create or Update Customer Accounts|title",
+      "hash": "a38658a8f689",
+      "verdict": "WRONG",
+      "detail": "Correct units: the ownership argument (DTSX:68399); the inner joins; the partition on bank + account + product type, ordered by gen_modifiedbybank desc; name = producttypeid-account; the block flag from a fund with gen_IsDepositBlocked = '1' and the same account/type (DTSX:31964-31971); the lookup on gen_customeraccounttype + gen_bankaccountnumber; the automated joining as first created per (id, document type, account) and used only if status 7; the 5050 exception (Create main.cs:19-20, 41-44); the SQL path when the broker is equal and both are present (DTSX:18090), with the 41-column UPDATE and Param_26 <- p.gen_subproduct (DTSX:40982-41027, 41210, 33306); the SDK path for the rest, with the block flag always sent and mfratedtotal/letterofbenefit sent when not null. WRONG: flow_he[1] says that in 0004 and 0008 'the field gets the run time when the fund record is written'. In 0004 only the UPDATE Gen_fundmain sets gen_modifiedbybank = getdate() (0004:92873-92875). The fund INSERT 'Create gen_FundMain' (insert into Gen_fundmainbase, 0004:61789-61898, 108 columns, including Gen_existinfile = Param_74) does not write gen_modifiedbybank. Its output goes to a contact update, not to Update gen_fundmain, so a fund inserted by 0004 has no value from that run. The 'Update gen_agentappointmentdate' write on Gen_fundmain (0004:92815-92820) also leaves it unchanged. All five 0008 'Create gen_fundmain' copies do set DateTime.Now (0008:23801, 25673, 27545, …). Note: 0009 writes gen_fundmain with gen_existinfile = true and does not set gen_modifiedbybank (no occurrence in 0009). A NULL value sorts last under DESC. Note, not counted: short_he says 'לכל צירוף של סוג חשבון לקוח ומספר חשבון', but the partition key is bank + account + p.gen_producttypeid (flow_he[1] states it exactly). The two are equivalent only if gen_customeraccounttype is unique per (gen_id, gen_bankname), which the files do not show.",
+      "evidence": "0005_Customer Account.dtsx:18090, 31964-31971, 33252-33314, 40982-41027, 68399; 0004_LeumiFile-MY.dtsx:61789-61898, 92815-92820, 92873-92875; 0008_LeumiFile-PY.dtsx:23781-23801",
+      "wrongUnits": [
+        {
+          "unit": "flow_he[1] '(בחבילות 0004 ו-0008 שסופקו השדה מקבל את זמן הריצה כשרשומת הקופה נכתבת …)'",
+          "problem": "This is not exact for 0004. The INSERT of a new fund (0004:61789-61898) does not write gen_modifiedbybank. Only the UPDATE Gen_fundmain (0004:92873-92875) sets getdate(). In 0008 every fund create sets DateTime.Now.",
+          "correct": "(ב-0004 השדה מקבל getdate() כשקופה קיימת מתעדכנת (0004:92875), אבל הוספת קופה חדשה (0004:61789-61898) אינה כותבת אותו; ב-0008 יצירת קופה כותבת DateTime.Now (0008:23801); קופה בלי ערך ממוינת אחרונה; שזה מועד העדכון האחרון מהבנק הוא השערה לפי שם השדה)",
+          "evidence": "0004_LeumiFile-MY.dtsx:61789-61898, 92873-92875; 0008_LeumiFile-PY.dtsx:23801"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Create or Update Customer Accounts|short",
+      "hash": "480ec5e1c776",
+      "verdict": "WRONG",
+      "detail": "Units [2]-[12] are correct. [2] block lookup: gen_IsDepositBlocked = '1', keys gen_bankaccountnumber + gen_customeraccounttype, No Match -> FALSE / Match -> TRUE (DTSX:31964-31971, 33580, 33607). [3] Get Customer Account Guid on the same two keys (DTSX:32121-32176). [5] Create main.cs:39-228: fund consulting values are overwritten by non-null AJ values; the automated joining is num = 1 by createdon over all statuses, AND joiningstatus = 7 (DTSX:32038); joiningmailtoagent = 1 unless '5050'. [7]/[9] Conditional Split UnSupported = both broker numbers present and equal (DTSX:18090) -> SQL UPDATE of 41 columns incl. gen_issmallaccount/gen_productsubcustomeraccount (Param_26 <- p.gen_subproduct). The Compare (DTSX:12421) inputs have neither column. [11] Compare 1 (DTSX:14893) lacks gen_issmallaccount. Update CustomerAccounts sends changed fields, always the block flag, and mfratedtotal/letterofbenefit when not null (main.cs:44-56). [12] is conditional. WRONG: unit [1] repeats the cross-package statement about gen_modifiedbybank. 0004's fund INSERT (0004:61789-61898) does not write the field; only 0004's UPDATE (0004:92875) does.",
+      "evidence": "0005_Customer Account.dtsx:12421, 14893, 18090, 31964-31971, 32038, 32121-32176, 33252-33314, 33580, 33607, 40982-41027; 0004_LeumiFile-MY.dtsx:61789-61898, 92873-92875",
+      "wrongUnits": [
+        {
+          "unit": "[1] '(בחבילות 0004 ו-0008 שסופקו השדה מקבל את זמן הריצה כשרשומת הקופה נכתבת …)'",
+          "problem": "0004 inserts new funds without gen_modifiedbybank. Only 0004's UPDATE sets getdate().",
+          "correct": "(ב-0004 השדה מקבל getdate() רק כשקופה קיימת מתעדכנת (0004:92875); הוספת קופה (0004:61789-61898) אינה כותבת אותו; ב-0008 יצירת קופה כותבת DateTime.Now (0008:23801); שזה מועד העדכון האחרון מהבנק הוא השערה)",
+          "evidence": "0004_LeumiFile-MY.dtsx:61789-61898, 92873-92875"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Create or Update Customer Accounts|detailed",
+      "hash": "77be9b35a4ce",
+      "verdict": "WRONG",
+      "detail": "I re-derived every unit. These are correct: [2] CASE ProductTypeCode (DTSX:33299-33304); [3] Set gen_name casts with FailComponent; [4]-[8] block lookup (CacheType 1, NoMatchBehavior 1); [9] Full-cache lookup on two keys; [11] Get Automated Joining SQL, Convert Product Type 4->2, 5->3, 2->4, Merge Join JoinType 1 with 3 keys (Sort keys bankaccountnumberO / documenttype~ProductTypeFromDerivedColumn / id) and TreatNullsAsEqual = true (DTSX:33702-33704); [12] Dates To Local 1 inputs are birth date, consulting start/end and AJ start/end advising (DTSX:31041); [14]; [16]; [18] Compare input types are only wstr/guid/i4/bool/r8/dbTimeStamp, so the listed rules are complete, and gen_issmallaccount/gen_productsubcustomeraccount are absent; [22] the 41-column UPDATE, ModifiedBy = ?, ModifiedOn = GETUTCDATE(), Param_26 <- gen_subproduct; the five SQL texts and param maps are identical; [24] Dates To Local inputs are birth/consulting dates for fund and DB (DTSX:30078); [25] Compare 1 uses exact Equals and has gen_productsubcustomeraccount but not gen_issmallaccount; [29] Update CustomerAccounts main.cs:44-111 and Helpers.cs:8-108 (tolerances < 12h, < 0.01, < 0.001); copies 0-3 are identical and copy 4 differs only by a '//' line. WRONG: unit [1] repeats the gen_modifiedbybank statement, and 0004's fund INSERT (0004:61789-61898) does not write the field. Also counted under this verdict: the [13] list of created attributes is presented as the content of the new record but omits written attributes. Create main.cs also writes gen_name (130), gen_customeridnumber (73), gen_customerdateofbirth (76), gen_estatetype (79), gen_brokernumber (82), gen_coursenumber (61), gen_mftemplate (52), gen_mfratedtotal (49), gen_depositmfindicator/gen_accrualmfindicator (184, 189), gen_letterofbenefitindex (214), gen_lastdepositon (223), gen_employmentstartedon (227) and gen_address1_name (109). Some of these may fall under 'לקוח'/'דמי ניהול', but gen_name, gen_estatetype, gen_coursenumber, gen_letterofbenefitindex, gen_lastdepositon and gen_employmentstartedon fall under none of the named categories.",
+      "evidence": "0005_Customer Account.dtsx:12421, 14893, 18090, 18124, 18171 (Create main.cs:39-228), 30078, 31041, 31964-31971, 32033-32038, 32121-32176, 33252-33314, 33700-33704, 34382, 34413-34560, 40982-41027, 42616 (main.cs/Helpers.cs); 0004_LeumiFile-MY.dtsx:61789-61898, 92873-92875",
+      "wrongUnits": [
+        {
+          "unit": "[1] '(בחבילות 0004 ו-0008 שסופקו השדה מקבל את זמן הריצה כשרשומת הקופה נכתבת …)'",
+          "problem": "0004 inserts new funds without gen_modifiedbybank. Only 0004's UPDATE sets getdate().",
+          "correct": "(ב-0004 השדה מקבל getdate() רק כשקופה קיימת מתעדכנת (0004:92875); הוספת קופה (0004:61789-61898) אינה כותבת אותו; ב-0008 יצירת קופה כותבת DateTime.Now (0008:23801); שזה מועד העדכון האחרון מהבנק הוא השערה)",
+          "evidence": "0004_LeumiFile-MY.dtsx:61789-61898, 92873-92875"
+        },
+        {
+          "unit": "[13] 'נוצר חשבון לקוח חדש עם פרטי הקופה: מספר חשבון, בנק, סוג חשבון, מוצר, לקוח, סוכן, סוכנות, מעסיק, כתובת, דמי ניהול, עמלות, חשבון קטן וחסימת הפקדות'",
+          "problem": "Written attributes are missing from the enumeration: gen_name, gen_estatetype, gen_coursenumber, gen_letterofbenefitindex, gen_lastdepositon and gen_employmentstartedon (all written when not null).",
+          "correct": "Add them to the list (gen_name = שם החשבון משלב [3]; gen_estatetype; gen_coursenumber; gen_letterofbenefitindex; gen_lastdepositon ← gen_lastdepositdate; gen_employmentstartedon), or state that the list is partial and point to the field mapping.",
+          "evidence": "Create Customer Account main.cs:61, 79, 130, 214, 223, 227 (DTSX:18171)"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Create or Update Customer Accounts|detail",
+      "hash": "35c6081c52d9",
+      "verdict": "WRONG",
+      "detail": "Correct units: [1] the source tables, gen_existinfile ownership and partition; 0004 writes gen_fundmain by SQL including gen_existinfile = 1 (0004:92873-92874) and 0008/0009 by SDK with gen_existinfile = true (0008:23781-23784, 0009:27019-27026). No supplied package creates gen_automatedjoining: 0029:29686 is an Update and 0027 updates status 7 joinings (0027:980-984, 1370-1376). [2] matching keys, conversion and TreatNullsAsEqual. [3] the three branches, the uncompared columns and the p.gen_subproduct vs cat.gen_productsubcustomeraccount difference (DTSX:33305-33306, 41060, 41210, 20336, 45455). [4] Create/Update via ExecuteMultiple, plus a direct UPDATE on Gen_customeraccountBase through [qsql] (Unsupported). [6] the sourceFeed citations check out. WRONG: [5] repeats the gen_modifiedbybank statement. 0004's fund INSERT (0004:61789-61898) does not write the field; only 0004's UPDATE (0004:92875) sets getdate().",
+      "evidence": "0005_Customer Account.dtsx:20336, 33252-33314, 33700-33704, 41060, 41210, 45455; 0004_LeumiFile-MY.dtsx:61789-61898, 92873-92875; 0008_LeumiFile-PY.dtsx:23781-23801; 0009_LeumiFile-BY.dtsx:27019-27026; 0027_AutomatedJoining.dtsx:980-984, 1370-1376; 0029_POA.dtsx:29686-29694",
+      "wrongUnits": [
+        {
+          "unit": "[5] '(בחבילות 0004 ו-0008 שסופקו השדה מקבל את זמן הריצה כשרשומת הקופה נכתבת …)'",
+          "problem": "0004 inserts new funds without gen_modifiedbybank. Only 0004's UPDATE sets getdate().",
+          "correct": "(ב-0004 השדה מקבל getdate() רק כשקופה קיימת מתעדכנת (0004:92875); הוספת קופה (0004:61789-61898) אינה כותבת אותו; ב-0008 יצירת קופה כותבת DateTime.Now (0008:23801); שזה מועד העדכון האחרון מהבנק הוא השערה)",
+          "evidence": "0004_LeumiFile-MY.dtsx:61789-61898, 92873-92875"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Connect Funds to Customer Accounts|title",
+      "hash": "5c4905f1c6ac",
+      "verdict": "CONFIRMED",
+      "detail": "SQL DTSX:2588-2613: funds joined to product (p.productid = gen_fundtypename), gen_customeraccounttype (p.Gen_producttypeid = cat.gen_id and p.gen_bankname = cat.gen_bankname) and gen_customeraccount (type + exact account number). The WHERE is (f.Gen_customeraccountname is null or <> ca.Gen_customeraccountId) and Gen_existinfile = 1. The ownership argument rests on DTSX:68399. Dates To Local (DTSX:1697) converts the consulting dates of the account and the fund. The script (main.cs:36-65, five identical copies) always sets gen_customeraccountname, and sets each consulting field only when the account value is not null and the fund value is null or different.",
+      "evidence": "0005_Customer Account.dtsx:1697, 2588-2613, 3112 (main.cs:36-65), 68399",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Connect Funds to Customer Accounts|short",
+      "hash": "da4889327bc4",
+      "verdict": "CONFIRMED",
+      "detail": "[1] selection and ownership: DTSX:2609-2613, 68399. [2] the account type comes from the product and the product's bank (DTSX:2608), with exact account number (DTSX:2609). [3] gen_customeraccountname is always set (main.cs:40). [4]-[8] are the per-field rule !genX_IsNull && (fmX_IsNull || genX != fmX) (main.cs:42-65); a null value in the account leaves the fund value. [9] is conditional on a matching account and a successful update.",
+      "evidence": "0005_Customer Account.dtsx:2588-2613, 3112 (main.cs:36-65), 68399",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Connect Funds to Customer Accounts|detailed",
+      "hash": "d46ddc26742f",
+      "verdict": "WRONG",
+      "detail": "Units [1]-[13] are correct: the joins/WHERE (DTSX:2588-2613), the ownership argument, Dates To Local inputs (DTSX:1697: gen_consultingstartdate/enddate, fm_consultingstartdate/enddate), five identical script copies (DTSX:3110-8347), the field mapping (main.cs:42-65) and ExecuteMultiple Update in batches of 10. WRONG: the end state [14] 'הקופות מקושרות לחשבון הלקוח הנכון ונושאות את פרטי הייעוץ שלו' contradicts units [2]-[4] and [13] of the same claim. A fund already linked to the right account is not selected, so its consulting details are not synced in this step even if they differ from the account. A null value in the account does not overwrite the fund's value. Only gen_existinfile = 1 funds with a matching account are handled.",
+      "evidence": "0005_Customer Account.dtsx:1697, 2588-2613, 3112 (main.cs:36-71)",
+      "wrongUnits": [
+        {
+          "unit": "[14] (end) 'הקופות מקושרות לחשבון הלקוח הנכון ונושאות את פרטי הייעוץ שלו'",
+          "problem": "This overstates the end state. Funds already linked to the account are not selected, so their consulting details are not synced. Empty account values are not copied.",
+          "correct": "קופות שנבחרו (gen_existinfile = 1, לא מקושרות או מקושרות לחשבון אחר, ונמצא להן חשבון תואם) מקושרות לחשבון ומקבלות ממנו את פרטי הייעוץ שיש להם ערך בחשבון (אם העדכון הצליח). קופות שכבר מקושרות לחשבון הנכון אינן מתעדכנות בשלב זה.",
+          "evidence": "DTSX:2610-2613; main.cs:42-65"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Connect Funds to Customer Accounts|detail",
+      "hash": "d7c2b0d5a885",
+      "verdict": "CONFIRMED",
+      "detail": "[1] the four CRM tables through [qsql] (psql/ALTSHULER_MSCRM; the package has no configuration), Gen_existinfile = 1 with the ownership argument, and the 0004/0008/0009 upstream citations (0004:61789-61900, 92874-92953; 0008:23781-23784; 0009:27019-27026). Among the supplied packages only 0005 creates gen_customeraccount. [2] the match conditions (DTSX:2608-2609). [3] the selection and the per-field rule. [4] SDK ExecuteMultiple Update in batches of 10 (main.cs:68-71, 93). [5] linking includes funds for accounts created earlier in the same run (step 1 precedes, DTSX:82413, 82415).",
+      "evidence": "0005_Customer Account.dtsx:4-6, 2588-2613, 3112 (main.cs), 82413, 82415; 0004_LeumiFile-MY.dtsx:61789-61898, 92873-92875; 0008_LeumiFile-PY.dtsx:23781-23784; 0009_LeumiFile-BY.dtsx:27019-27026",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Connect Funds to Customer Accounts|decisions",
+      "hash": "9c768cc92fa0",
+      "verdict": "CONFIRMED",
+      "detail": "[1] matches the WHERE at DTSX:2610-2613 and states the ownership argument. [2] matches main.cs:42-65; a NULL fund value counts as 'different'.",
+      "evidence": "0005_Customer Account.dtsx:2610-2613, 3112 (main.cs:42-65), 68399",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Update Consulting Field  In Fund Main From Transfer Request|detail",
+      "hash": "d9e2bc6ce852",
+      "verdict": "WRONG",
+      "detail": "Correct units: [1] the SQL (DTSX:77180-77213) is tr LEFT JOIN Gen_fundmain on tr.gen_customeraccount = fm.gen_customeraccountname, with type 5, status 8 (comments 'בין מסלולים'/'הסתיים') and gen_dateofcopyingconsultingdetailstofund is null. The ownership argument rests on the single-table 'update gen_transferrequest set gen_dateofcopyingconsultingdetailstofund = GETUTCDATE()' (DTSX:79598-79599). No supplied package creates gen_transferrequest (only updates in 0005, 0028:11114, 0029:40559, 0036:3886-3888), and 0036 updates only gen_tanferinstatus of status-7 requests. [2] There is no join to a specific fund; note that 0028:3382 reads a tr.gen_sourcefundnumber column, but its target is not shown and it is not used to join gen_fundmain. [3] the Derived Column ISNULL(tr_X) ? fm_X : tr_X; Update Fund Main 1-5 (identical SQL); success rows -> Aggregate on gen_transferrequestid -> Update TransferRequest (identical SQL), so a request is marked if at least one fund row succeeded. [4] direct UPDATEs through [qsql] (Unsupported). WRONG: [5] states unconditionally 'כשאין לחשבון קופות, הבקשה מסומנת בלי שעודכנה קופה'. With no fund, all fm.* are NULL, and the row is selected only if at least one tr consulting field is not null (DTSX:77207-77212). In that case Update Fund Main runs with Gen_fundmainId = NULL (0 rows, success) and the request is marked. A request with no funds and all six consulting fields empty is never selected and never marked.",
+      "evidence": "0005_Customer Account.dtsx:75665-75736, 77180-77213, 77740-77802, 79190-79599, 79641-79782; 0028_Fund Enrolment.dtsx:3382, 11114; 0029_POA.dtsx:40559; 0036_TransferRequest.dtsx:3584-3586, 3886-3888",
+      "wrongUnits": [
+        {
+          "unit": "[5] 'כשאין לחשבון קופות, הבקשה מסומנת בלי שעודכנה קופה.'",
+          "problem": "This is stated unconditionally. Without funds, the request is selected, and so marked, only if at least one of its six consulting fields is not null.",
+          "correct": "כשאין לחשבון קופות (או ש-gen_customeraccount של הבקשה ריק), הבקשה מסומנת בלי שעודכנה קופה – בתנאי שלפחות אחד מששת פרטי הייעוץ בבקשה אינו ריק; אחרת היא אינה נבחרת ואינה מסומנת.",
+          "evidence": "DTSX:77200, 77207-77212, 79190-79199"
+        }
+      ]
+    }
+  ]
+}

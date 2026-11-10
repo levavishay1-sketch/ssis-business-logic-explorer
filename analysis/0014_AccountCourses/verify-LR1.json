@@ -1,0 +1,44 @@
+{
+  "verifier": "ssis-verifier",
+  "package": "0014_AccountCourses",
+  "scope": "logic-claims re-check after fixes",
+  "checkedAt": "2026-11-07T12:20:09Z",
+  "checked": 5,
+  "results": [
+    {
+      "id": "L|summary",
+      "hash": "7bdae4efb879",
+      "verdict": "CONFIRMED",
+      "detail": "Re-derived from the source SQL (inner join Gen_fundmain on gen_fundnumber, three LEFT JOINs with state = 1, OR of the three non-null ids; the only comment is '--  In Progress' on the transferin join), main.cs (changed-fields-only entity, ExecuteMultiple Update in batches of 10) and Helpers.cs (Boolean flags fall to 'default: return true', so they count as different only when the course value is NULL). Scope note: the configuration file DTSX:17 is not supplied and may override [CRM]; [CRM] is used only by OLE DB sources/lookups; there is no SQL DML (no OLE DB Command, Destination or Execute SQL task writing); the SDK write is gen_accountcourses Update. All statements match. The 'state 1 = open' meaning is labelled as a hypothesis.",
+      "evidence": "DTSX:4-6 CM [CRM]; DTSX:17 Configuration; DTSX:3884-3902 SqlCommand; DTSX:4141-4185 Helpers.IsEqual (default: return true); BufferWrapper 'public Boolean genisconfiscateDB' etc.; DTSX:4363-4400 main.cs Input0_ProcessInputRow; DTSX:4420-4441 ExcecuteBulk"
+    },
+    {
+      "id": "L|Package\\Update Account courses|title",
+      "hash": "48216b87b335",
+      "verdict": "CONFIRMED",
+      "detail": "Population, five compared fields, changed-only update, batch of 10 (Count == 10) and failures routed to the ETL warning are all as in the DTSX. 'In Progress' is attributed to the transferin join only, which is where the comment is.",
+      "evidence": "DTSX:3898-3902 joins and WHERE; DTSX:4393-4394 Count == 10; DTSX:5494-5498 paths CastingError/Error -> Union All -> Set Warning columns -> ETL Warning"
+    },
+    {
+      "id": "L|Package\\Update Account courses|short",
+      "hash": "b63d51fe9ca0",
+      "verdict": "CONFIRMED",
+      "detail": "Step 7 is correct: PropertyType.Name of the *DB flag properties is 'Boolean', the switch has only case \"bool\", so IsEqual returns true (equal) unless exactly one side is null. The fund flags are never null (ISNULL(...,0)), so a flag is sent only when the course flag is NULL. A Yes/No change is not detected.",
+      "evidence": "DTSX:3888-3891 ISNULL(f.Gen_is*,0); Helpers.cs:10-12,50-61 (DTSX:4143-4145, 4183-4194); main.cs CheckIfToUpdate2 calls DTSX:4370-4373"
+    },
+    {
+      "id": "L|Package\\Update Account courses|detailed",
+      "hash": "64b36c1b7aec",
+      "verdict": "CONFIRMED",
+      "detail": "Every step re-derived. Decimal compare |a-b| < 0.01, null-vs-value = different, fund-balance NULL writes null; entity.Id = genaccountcoursesId with no lookup; DontNeedToUpdate output exists and is not connected; Fault -> ErrorBuffer.ErrorText only -> Union All -> ETL Warning with gen_recordkey \"\" (DTSX:3984-3985). Step 26 is correct: when the server gives no response, the exception thrown inside ExcecuteBulk is caught in Input0_ProcessInputRow, the current row goes to CastingError, myEntities.Clear() is skipped, so Count == 10 never holds again and everything that remains is sent in one request at end of rowset.",
+      "evidence": "DTSX:4365 entity.Id; DTSX:4378 MONEY line; DTSX:4389-4400 needToUpdate/Count==10/DirectRowToDontNeedToUpdate; DTSX:4401-4410 catch -> DirectRowToCastingError; DTSX:4416-4440 ExcecuteBulk throw + Clear; DTSX:4443-4452 EndOfRowset flush; DTSX:5481 DontNeedToUpdate output (no path)"
+    },
+    {
+      "id": "L|Package\\Update Account courses|detail",
+      "hash": "86f84401b967",
+      "verdict": "CONFIRMED",
+      "detail": "The source/population, matching (gen_accountcoursesId; fund via ac.gen_fundnumber = f.Gen_fundmainId), decisions, the write (five attributes, Money or null, SDK ExecuteMultipleExtension Update, batch of 10 plus remainder) and the result statement on flags all match the code. The state-1 meaning is labelled as a hypothesis, and the external Proxy is flagged as not inspected.",
+      "evidence": "DTSX:3884-3902; main.cs DTSX:4363-4452; Helpers.cs DTSX:4134-4232"
+    }
+  ]
+}

@@ -1,0 +1,70 @@
+# 0016_TransferOut.dtsx · FE7489856D80B9311DD7BC289CA21C6A1FF23FCBD2365BC9F421A40A74A91A37
+
+## Connection managers
+- [psql] OLEDB Data Source=psql;Initial Catalog=ALTSHULER_MSCRM;Integrated Security=SSPI;  
+- [SSIS_Logs] OLEDB Data Source=psrs;Initial Catalog=SSIS_Logs;Integrated Security=SSPI;  
+
+## Executables (disabled marked !)
+-   Close Transfer Out | Microsoft.Pipeline  
+-   Create ETL Process record | Microsoft.ScriptTask  
+-   End ETL Process record | Microsoft.Pipeline  
+-   Get Variables From SystemConfigurarion | Microsoft.Pipeline  
+
+## Precedence
+- Get Variables From SystemConfigurarion -> Create ETL Process record | Success Constraint   
+- Close Transfer Out -> End ETL Process record | Success Constraint   
+- Create ETL Process record -> Close Transfer Out | Success Constraint   
+
+## DataFlow Close Transfer Out
+  - Aggregate | Aggregate  | conn   | in 4 out 4
+  - Check number of transactions | ConditionalSplit  | conn   | in 1 out 0
+  - Close Transfer Out | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 4 out 2
+  - Compare sums | ConditionalSplit  | conn   | in 2 out 0
+  - ETL Warning | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 4 out 0
+  - Is full transfer out | ConditionalSplit  | conn   | in 1 out 0
+  - OLE DB Source | OLEDBSource  | conn [psql]  | in 0 out 9
+  - Set Warning columns | DerivedColumn  | conn   | in 1 out 4
+  - Union All | UnionAll  | conn   | in 18 out 9
+  - Union All 1 | UnionAll  | conn   | in 3 out 2
+     path Aggregate.Outputs[Aggregate Output 1] => Close Transfer Out.Inputs[Input 0]
+     path Close Transfer Out.Outputs[CastingError] => Union All 1.Inputs[Union All Input 1]
+     path Set Warning columns.Outputs[Derived Column Output] => ETL Warning.Inputs[Input 0]
+     path Close Transfer Out.Outputs[Error] => Union All 1.Inputs[Union All Input 2]
+     path Check number of transactions.Outputs[Has Transactions] => Union All.Inputs[Union All Input 1]
+     path Is full transfer out.Outputs[IsFull] => Check number of transactions.Inputs[Conditional Split Input]
+     path Is full transfer out.Outputs[Not full] => Compare sums.Inputs[Conditional Split Input]
+     path OLE DB Source.Outputs[OLE DB Source Output] => Is full transfer out.Inputs[Conditional Split Input]
+     path Compare sums.Outputs[Sums Are Equal] => Union All.Inputs[Union All Input 2]
+     path Union All 1.Outputs[Union All Output 1] => Set Warning columns.Inputs[Derived Column Input]
+     path Union All.Outputs[Union All Output 1] => Aggregate.Inputs[Aggregate Input 1]
+
+## DataFlow End ETL Process record
+  - ETL Record Finish | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 2 out 0
+  - Get gen_etlprocessid | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 0 out 1
+  - Lookup | Lookup  | conn [psql]  | in 1 out 1
+     path Lookup.Outputs[Lookup Match Output] => ETL Record Finish.Inputs[Input 0]
+     path Get gen_etlprocessid.Outputs[Output 0] => Lookup.Inputs[Lookup Input]
+
+## DataFlow Get Variables From SystemConfigurarion
+  - Get SystemConfigurations | OLEDBSource  | conn [psql]  | in 0 out 2
+  - Set Variables | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 2 out 0
+     path Get SystemConfigurations.Outputs[OLE DB Source Output] => Set Variables.Inputs[Input 0]
+
+## SQL statements
+- Close Transfer Out\OLE DB Source | Microsoft.OLEDBSource.SqlCommand | [psql] 
+    select Tout.Gen_customercareId, Tout.Gen_isfulltransfer, Tout.Gen_deliverydate, ac.gen_accountcoursesId, ft.gen_valuedate, sum(ISNULL(ft.gen_transtotalamount, 0)) as actualTransactionAmount, sum(ISNULL(ac.gen_transactionamount,0)) as expectedTransactionAmount, count(ft.Gen_ftCurrentYearId) as transferCount, ft.gen_appendixghissuingdate from Gen_customercare as Tout join gen_accountcourses as ac on
+- End ETL Process record\Lookup | Microsoft.Lookup.SqlCommand | [psql] 
+    select p.gen_etlprocessid , case when pw.gen_etlprocessid is null then 0 else 1 end as isWarningExist from gen_etlprocess p left join (select distinct gen_etlprocessId from gen_etlprocesswarning ) as pw on p.gen_etlprocessId = pw.gen_etlprocessId
+- End ETL Process record\Lookup | Microsoft.Lookup.SqlCommandParam | [psql] 
+    select * from (select p.gen_etlprocessid , case when pw.gen_etlprocessid is null then 0 else 1 end as isWarningExist from gen_etlprocess p left join (select distinct gen_etlprocessId from gen_etlprocesswarning ) as pw on p.gen_etlprocessId = pw.gen_etlprocessId) [refTable] where [refTable].[gen_etlprocessid] = ?
+- Get Variables From SystemConfigurarion\Get SystemConfigurations | Microsoft.OLEDBSource.SqlCommand | [psql] 
+    SELECT gen_key ,gen_Value FROM gen_etlvariable where gen_scope ='global' or gen_scope = ?
+
+## Code write candidates (per owner)
+- Close Transfer Out\Close Transfer Out {"crm-service":1,"crm-entity":3,"output-buffer":3,"crm-sdk-execute":3}
+- Close Transfer Out\ETL Warning {"crm-entity":3,"crm-sdk-create":1}
+- Create ETL Process record {"crm-entity":1,"crm-sdk-create":1,"variables-write":1}
+- End ETL Process record\ETL Record Finish {"sql-command":2,"crm-entity":3,"output-buffer":1,"crm-sdk-update":1}
+- End ETL Process record\Get gen_etlprocessid {"sql-command":2,"output-buffer":2}
+
+## External refs (non-framework) CRM2015.Proxy

@@ -1,0 +1,326 @@
+{
+ "package": "0036_TransferRequest",
+ "analyst": "ssis-business-logic",
+ "source": {
+  "file": "source/DailyProcess/0036_TransferRequest.dtsx",
+  "sha256": "3834C0CD6435E3D2E320BE8EF4990B333CCFB6948AAB942E82B5869E134E0E3B",
+  "lines": 4912
+ },
+ "scopeNote_he": "הכתיבה העסקית היחידה היא עדכון gen_transferrequest דרך SDK (CrmProxy.GetCrmService().Update) ברכיב הסקריפט 'Update Transfer Requests'. [Psql] = Psql/ALTSHULER_MSCRM (DTSX:4) משמש לקריאה בלבד. בחבילה אין Package Configuration, אין log provider ואין Event Handlers. CRM.Proxy הוא אסמבלי חיצוני שלא נבדק. נותח קוד המקור (C#) בלבד.",
+ "summary_he": "החבילה מסמנת בקשות העברה (gen_transferrequest) בסטטוס 7 שהתאריך gen_SendToBankDate (לפי שם השדה: תאריך שליחה לבנק; המשמעות לא מוכחת) שלהן אינו ריק והוא ביום הסף או לפניו: הסטטוס שלהן (gen_tanferinstatus) הופך ל-11. יום הסף הוא היום השלישי אחורה, החל מאתמול, שאינו ברשימת ימי שישי, שבת וחג מלוח השנה של ה-CRM (CalendarRule). שישי, שבת וחג מדולגים רק אם ב-CalendarRule יש starttime ששווה בדיוק לחצות המקומית של אותו יום; אם אין התאמה כזאת, הסף הוא 3 ימים קלנדריים לפני היום (תלוי בנתונים, לא מוצג בקבצים). לפי שמות הרכיבים זה סימון 'SuspicionAsEmitted', אבל המשמעות העסקית של הקוד לא מוכחת.",
+ "executionOrder": [
+  {
+   "step": 1,
+   "refId": "Package\\Get Variables From Etl Variables",
+   "title_he": "טעינת משתני ארגון (מסגרת)",
+   "trigger": "start (no incoming constraint)"
+  },
+  {
+   "step": 2,
+   "refId": "Package\\Create ETL Process record",
+   "title_he": "רשומת תהליך ETL (מסגרת)",
+   "trigger": "after Get Variables From Etl Variables · Success (DTSX:4549)"
+  },
+  {
+   "step": 3,
+   "refId": "Package\\Get NonWorkingDays",
+   "title_he": "שליפת כללי לוח השנה בשם Friday, Saturday ו-Holiday",
+   "trigger": "after Create ETL Process record · Success (DTSX:4550)"
+  },
+  {
+   "step": 4,
+   "refId": "Package\\Update LastThreeWorkingDays Variable",
+   "title_he": "חישוב תאריך הסף (לפי שם המשתנה LastThreeWorkingDays: שלושה ימי עבודה אחורה)",
+   "trigger": "after Get NonWorkingDays · Success (DTSX:4551)"
+  },
+  {
+   "step": 5,
+   "refId": "Package\\Update SuspicionAsEmitted Transfer Request",
+   "title_he": "העברת בקשות העברה שעדיין בסטטוס 7, שתאריך gen_SendToBankDate שלהן ביום הסף או לפניו, לסטטוס 11",
+   "trigger": "after Update LastThreeWorkingDays Variable · Success (DTSX:4552)"
+  },
+  {
+   "step": 6,
+   "refId": "Package\\End ETL Process record",
+   "title_he": "סיום רשומת תהליך ETL (מסגרת)",
+   "trigger": "after Update SuspicionAsEmitted Transfer Request · Success (DTSX:4553)"
+  }
+ ],
+ "ignoredAsFramework": [
+  "Package\\Get Variables From Etl Variables",
+  "Package\\Create ETL Process record",
+  "Package\\End ETL Process record"
+ ],
+ "components": [
+  {
+   "refId": "Package\\Update LastThreeWorkingDays Variable",
+   "title_he": "חישוב תאריך הסף (לפי שם המשתנה LastThreeWorkingDays: שלושה ימי עבודה אחורה)",
+   "techName": "Get NonWorkingDays + Update LastThreeWorkingDays Variable",
+   "short_he": "החבילה מחשבת תאריך סף: היום השלישי אחורה, החל מאתמול, שאינו ברשימת ימי שישי, שבת וחג מלוח השנה של ה-CRM. שישי, שבת וחג מדולגים רק אם ב-CalendarRule יש starttime ששווה בדיוק לחצות המקומית של אותו יום; אם אין התאמה כזאת, הסף הוא 3 ימים קלנדריים לפני היום (תלוי בנתונים, לא מוצג בקבצים). התאריך הזה הוא הסף לסימון בקשות ההעברה.",
+   "flow_he": [
+    "שליפת ימי שישי, שבת וחג מ-21 הימים האחרונים",
+    "ספירה אחורה מאתמול של שלושה ימים שלא נמצאו ברשימה (התאמה רק לחצות מקומית מדויקת)",
+    "שמירת התאריך במשתנה"
+   ],
+   "short": {
+    "nodes": [
+     {
+      "type": "step",
+      "text": "מלוח השנה של ה-CRM נשלפים כללי לוח השנה בשם Friday, Saturday ו-Holiday (שישי, שבת וחג) מ-21 הימים האחרונים."
+     },
+     {
+      "type": "step",
+      "text": "מתחילים מאתמול וסופרים אחורה שלושה ימים שלא נמצאו ברשימה; יום שנמצא ברשימה מדולג. יום נמצא ברשימה רק אם starttime שלו שווה בדיוק לחצות המקומית של אותו יום; אם אין אף התאמה, נספרים 3 ימים קלנדריים."
+     },
+     {
+      "type": "end",
+      "text": "התאריך שמתקבל הוא הסף לבדיקת בקשות ההעברה: יום העבודה השלישי לפני היום אם הדילוג על שישי, שבת וחג פועל, ואחרת 3 ימים קלנדריים לפני היום."
+     }
+    ]
+   },
+   "detailed": {
+    "nodes": [
+     {
+      "type": "step",
+      "text": "נשלפים מה-CRM כללי לוח השנה בשם שישי, שבת או חג, עם תאריך התחלה ב-21 הימים האחרונים.",
+      "tech": "Get NonWorkingDays DTSX:2257 · Connection {B1F06256...} = [Psql] (DTSX:4) · select starttime FROM CalendarRule where starttime between GetutcDate()-21 and GetutcDate() AND LTRIM(RTRIM(ISNULL(Name,''))) in ('Friday','Saturday','Holiday') · Full result set → User::NonWorkingDays"
+     },
+     {
+      "type": "step",
+      "text": "נקודת ההתחלה היא אתמול (תאריך השרת המקומי, בלי שעה).",
+      "tech": "ScriptMain.cs:116 DateTime.Now.AddDays(-1).Date (DTSX:3180)"
+     },
+     {
+      "type": "decision",
+      "text": "האם התאריך הנבדק נמצא ברשימת שישי, שבת וחג? הוא נמצא רק אם starttime באחת השורות שווה בדיוק לחצות המקומית של אותו יום.",
+      "tech": "dt.Select(\"starttime = '\" + currDate.ToString() + \"'\") (ScriptMain.cs:121)",
+      "branches": [
+       {
+        "label": "כן, שישי, שבת או חג",
+        "nodes": [
+         {
+          "type": "step",
+          "text": "היום לא נספר, ועוברים ליום הקודם."
+         }
+        ]
+       },
+       {
+        "label": "לא נמצא ברשימה",
+        "nodes": [
+         {
+          "type": "step",
+          "text": "אם זה היום השלישי שלא נמצא ברשימה, הספירה נעצרת. אחרת הוא נספר ועוברים ליום הקודם.",
+          "tech": "threeWorkingDays starts at 2; if ==0 break else -- (ScriptMain.cs:111, 123-129)"
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "type": "step",
+      "text": "הבדיקה נמשכת לכל היותר 21 ימים אחורה.",
+      "tech": "for (int i = 0; i < 21; i++) (ScriptMain.cs:119)"
+     },
+     {
+      "type": "step",
+      "text": "התאריך שמתקבל הוא היום השלישי לפני היום שלא נמצא ברשימה, כשאתמול נספר כראשון אם הוא לא ברשימה. אם אף יום לא נמצא ברשימה (למשל כי starttime אינו בדיוק חצות מקומית), זה 3 ימים קלנדריים לפני היום. התאריך נשמר במשתנה.",
+      "tech": "Dts.Variables[\"LastThreeWorkingDays\"] (ScriptMain.cs:96)"
+     },
+     {
+      "type": "step",
+      "text": "אם החישוב נכשל, הכישלון לא נחשב: המשימה מדווחת הצלחה, והמשתנה שומר את הערך שנקבע בזמן התכנון.",
+      "tech": "catch sets Failure (line 100) but line 104 sets Success unconditionally · design value 10/3/2017 1:52:22 PM (DTSX:20-21)"
+     },
+     {
+      "type": "end",
+      "text": "תאריך הסף מוכן לשלב הסימון."
+     }
+    ]
+   },
+   "detail_he": [
+    {
+     "h": "מקור ואוכלוסייה",
+     "t": "CalendarRule במסד הנתונים של ה-CRM, בשמות Friday, Saturday ו-Holiday, ב-21 הימים האחרונים (UTC)."
+    },
+    {
+     "h": "התאמה לרשומות קיימות",
+     "t": "לא רלוונטי."
+    },
+    {
+     "h": "החלטות",
+     "t": "יום שנמצא ברשימה לא נספר. יום נמצא ברשימה רק אם starttime שלו שווה בדיוק לחצות המקומית של אותו יום (dt.Select עם currDate.ToString()). הספירה נעצרת ביום השלישי שלא נמצא ברשימה."
+    },
+    {
+     "h": "כתיבה ל-CRM",
+     "t": "אין. התוצאה נשמרת רק במשתנה User::LastThreeWorkingDays."
+    },
+    {
+     "h": "תוצאה עסקית",
+     "t": "תאריך סף: שלושה ימי עבודה אחורה אם הדילוג על שישי, שבת וחג פועל; אם אין התאמה ל-CalendarRule, 3 ימים קלנדריים אחורה (תלוי בנתונים, לא מוצג בקבצים)."
+    }
+   ],
+   "decisions": [
+    {
+     "where": "Update LastThreeWorkingDays Variable ScriptMain.cs:121-129",
+     "condition": "result == null || result.Length <= 0 → if (threeWorkingDays == 0) break; else threeWorkingDays--",
+     "meaning_he": "ספירה אחורה של ימים שלא נמצאו ברשימת שישי, שבת וחג (התאמה רק כש-starttime שווה בדיוק לחצות המקומית).",
+     "outcome_he": "מתקבל התאריך של היום השלישי שלא נמצא ברשימה (3 ימים קלנדריים לפני היום אם אין אף התאמה)."
+    }
+   ],
+   "crmEffects": [],
+   "evidence": [
+    "DTSX:2257-2262 Get NonWorkingDays",
+    "DTSX:3025 Update LastThreeWorkingDays Variable · ScriptMain.cs:92-135 (DTSX:3180, sha c1ced330dc4a)",
+    "DTSX:20-21 User::LastThreeWorkingDays"
+   ],
+   "openQuestions_he": [
+    "starttime ב-CalendarRule נשמר כנראה ב-UTC (השערה). אם הוא לא בדיוק חצות מקומית, ההשוואה בשורה 121 לא תמצא אותו, וכל הימים ייחשבו ימי עבודה. צריך לבדוק על נתונים אמיתיים."
+   ]
+  },
+  {
+   "refId": "Package\\Update SuspicionAsEmitted Transfer Request",
+   "title_he": "העברת בקשות העברה שעדיין בסטטוס 7, שתאריך gen_SendToBankDate שלהן ביום הסף או לפניו, לסטטוס 11",
+   "techName": "Update SuspicionAsEmitted Transfer Request",
+   "short_he": "בקשות העברה בסטטוס 7 שהתאריך gen_SendToBankDate (לפי שם השדה: תאריך שליחה לבנק; המשמעות לא מוכחת) שלהן אינו ריק והוא ביום הסף או לפניו עוברות לסטטוס 11.",
+   "flow_he": [
+    "שליפת בקשות העברה בסטטוס 7 שתאריך gen_SendToBankDate שלהן עד תאריך הסף",
+    "עדכון הסטטוס ל-11"
+   ],
+   "short": {
+    "nodes": [
+     {
+      "type": "step",
+      "text": "נשלפות בקשות ההעברה שבסטטוס 7 שהתאריך gen_SendToBankDate (לפי שם השדה: תאריך שליחה לבנק; המשמעות לא מוכחת) שלהן אינו ריק והוא ביום הסף או לפניו. יום הסף הוא היום השלישי אחורה, החל מאתמול, שאינו ברשימת שישי, שבת וחג מלוח השנה של ה-CRM; שישי, שבת וחג מדולגים רק אם ב-CalendarRule יש starttime ששווה בדיוק לחצות המקומית של אותו יום; אם אין התאמה כזאת, הסף הוא 3 ימים קלנדריים לפני היום (תלוי בנתונים, לא מוצג בקבצים)."
+     },
+     {
+      "type": "write",
+      "text": "הבקשות האלה מעודכנות ב-CRM לסטטוס 11. אם העדכון של בקשה נכשל, היא נשארת בסטטוס 7."
+     },
+     {
+      "type": "end",
+      "text": "בקשות העברה שנמצאות בזמן הריצה בסטטוס 7, ושהתאריך gen_SendToBankDate (לפי שם השדה: תאריך שליחה לבנק; המשמעות לא מוכחת) שלהן הוא ביום הסף או לפניו, מסומנות בסטטוס 11. לפי שם הרכיב זה סימון 'SuspicionAsEmitted' (המשמעות העסקית לא מוכחת)."
+     }
+    ]
+   },
+   "detailed": {
+    "nodes": [
+     {
+      "type": "step",
+      "text": "נשלפות בקשות העברה בסטטוס 7 שהתאריך gen_SendToBankDate (לפי שם השדה: תאריך שליחה לבנק; המשמעות לא מוכחת) שלהן אינו ריק, והתאריך הזה לא אחרי תאריך הסף (השוואה ברמת יום).",
+      "tech": "Get Transfer Requests From DB DTSX:3579-3592 · [Psql] · select gen_transferrequestId from gen_transferrequest where gen_tanferinstatus = 7 and gen_SendToBankDate is not null and datediff(day, ?, gen_SendToBankDate) <= 0 · ? = User::LastThreeWorkingDays ({BCF4D8B7...} DTSX:20)"
+     },
+     {
+      "type": "step",
+      "text": "לכל בקשה נקבע הסטטוס החדש, 11.",
+      "tech": "Set Status As SuspicionAsEmitted DTSX:3616 · gen_suspicionAsEmitted = 11"
+     },
+     {
+      "type": "write",
+      "text": "בקשת ההעברה מעודכנת ב-CRM לסטטוס 11. העדכון שהחבילה שולחת מכיל רק את השדה gen_tanferinstatus; שינויים נוספים שה-CRM או תוספים עשויים לבצע אינם מוצגים בקבצים.",
+      "tech": "Update Transfer Requests main.cs:118-122 (DTSX:3645) · gen_transferrequest · Update · SDK · gen_tanferinstatus=OptionSetValue(11)"
+     },
+     {
+      "type": "decision",
+      "text": "האם העדכון הצליח?",
+      "tech": "catch → DirectRowToError (main.cs:124-133); Error output has no path (DTSX:4541-4542)",
+      "branches": [
+       {
+        "label": "כן",
+        "nodes": [
+         {
+          "type": "step",
+          "text": "הבקשה מסומנת בסטטוס 11."
+         }
+        ]
+       },
+       {
+        "label": "לא",
+        "nodes": [
+         {
+          "type": "step",
+          "text": "השגיאה לא נרשמת בשום מקום, והבקשה נשארת בסטטוס 7."
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "type": "step",
+      "text": "בשלב הזה אין התאמה לרשומות אחרות ואין פיצול נוסף. הבחירה נעשית כולה בשאילתה."
+     },
+     {
+      "type": "end",
+      "text": "בקשות העברה שעדיין בסטטוס 7 ושהתאריך gen_SendToBankDate שלהן ביום הסף או לפניו מסומנות בסטטוס 11. יום הסף הוא שלושה ימי עבודה אחורה רק אם הדילוג על שישי, שבת וחג פועל; אחרת 3 ימים קלנדריים."
+     }
+    ]
+   },
+   "detail_he": [
+    {
+     "h": "מקור ואוכלוסייה",
+     "t": "gen_transferrequest עם gen_tanferinstatus=7, gen_SendToBankDate לא ריק, ו-datediff(day, LastThreeWorkingDays, gen_SendToBankDate) <= 0."
+    },
+    {
+     "h": "התאמה לרשומות קיימות",
+     "t": "העדכון נעשה ישירות לפי gen_transferrequestId."
+    },
+    {
+     "h": "החלטות",
+     "t": "תנאי הבחירה ב-SQL בלבד."
+    },
+    {
+     "h": "כתיבה ל-CRM",
+     "t": "gen_transferrequest · Update · SDK: gen_tanferinstatus=11."
+    },
+    {
+     "h": "תוצאה עסקית",
+     "t": "בקשות העברה שעדיין בסטטוס 7, והתאריך gen_SendToBankDate (לפי שם השדה: תאריך שליחה לבנק; המשמעות לא מוכחת) שלהן הוא ביום הסף או לפניו (יום העבודה השלישי לפני היום אם הדילוג על שישי, שבת וחג פועל; אחרת 3 ימים קלנדריים לפני היום), עוברות לסטטוס 11. המשמעות העסקית של סטטוס 7 ושל סטטוס 11 לא מוכחת; השם SuspicionAsEmitted לקוח משמות הרכיבים בלבד."
+    }
+   ],
+   "decisions": [
+    {
+     "where": "Get Transfer Requests From DB",
+     "condition": "gen_tanferinstatus = 7 and gen_SendToBankDate is not null and datediff(day, ? , gen_SendToBankDate) <= 0  (? = User::LastThreeWorkingDays)",
+     "meaning_he": "בקשה בסטטוס 7 שהתאריך gen_SendToBankDate (לפי שם השדה: תאריך שליחה לבנק; המשמעות לא מוכחת) שלה אינו ריק והוא ביום הסף או לפניו (שלושה ימי עבודה אחורה רק אם הדילוג על שישי, שבת וחג פועל; אחרת 3 ימים קלנדריים).",
+     "outcome_he": "הבקשה עוברת לסטטוס 11."
+    }
+   ],
+   "crmEffects": [
+    {
+     "entity": "gen_transferrequest",
+     "verb": "Update (gen_tanferinstatus=11)",
+     "mechanism": "SDK",
+     "when_he": "כשהבקשה בסטטוס 7 ו-gen_SendToBankDate שלה (לפי שם השדה: תאריך שליחה לבנק) עד תאריך הסף (LastThreeWorkingDays)."
+    }
+   ],
+   "evidence": [
+    "DTSX:3574 Update SuspicionAsEmitted Transfer Request",
+    "DTSX:3579-3592 Get Transfer Requests From DB",
+    "DTSX:3616 Set Status As SuspicionAsEmitted = 11",
+    "DTSX:3643 Update Transfer Requests · main.cs:114-135 (DTSX:3645, sha 4483cbe07634)",
+    "DTSX:4541-4542 paths",
+    "DTSX:4 [Psql] = Psql/ALTSHULER_MSCRM"
+   ],
+   "openQuestions_he": [
+    "המשמעות העסקית של gen_tanferinstatus 7 ו-11 לא מוכחת. השם 'SuspicionAsEmitted' לקוח משמות הרכיבים בלבד.",
+    "gen_SendToBankDate הוא כנראה תאריך UTC (השערה), ואילו תאריך הסף מחושב לפי השעון המקומי של השרת. ההשוואה ברמת יום עלולה לזוז ביום אחד."
+   ]
+  }
+ ],
+ "findings_he": [
+  {
+   "severity": "medium",
+   "text": "כשלי עדכון של ה-SDK נבלעים: פלט ה-Error של Update Transfer Requests לא מחובר ושום דבר לא נרשם.",
+   "evidence": "DTSX:4541-4542 (2 paths only); main.cs:124-133"
+  },
+  {
+   "severity": "medium",
+   "text": "בחישוב תאריך הסף כישלון מוסתר. ה-catch מגדיר Failure, אבל שורה 104 מגדירה Success בכל מקרה. אם החישוב נכשל, הסימון רץ עם ערך התכנון של המשתנה (10/3/2017).",
+   "evidence": "ScriptMain.cs:94-104 (DTSX:3180); DTSX:20-21"
+  },
+  {
+   "severity": "info",
+   "text": "חישוב תאריך הסף (LastThreeWorkingDays) כאן כתוב אחרת מ-0027_AutomatedJoining (מונה שמתחיל ב-2 ויורד ל-0, לעומת מונה שמתחיל ב-1 ועולה ל-3). לפי מעקב על הקוד בשני המקרים מתקבל אותו תאריך: היום השלישי לפני היום שלא נמצא ברשימת הימים שמדלגים עליהם.",
+   "evidence": "0036 ScriptMain.cs:111-129 (DTSX:3180) · 0027 ScriptMain.cs:111-130 (DTSX:5131)"
+  }
+ ]
+}

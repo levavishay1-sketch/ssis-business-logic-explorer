@@ -1,0 +1,132 @@
+# 0013_Heir_Daily.dtsx · BBC3E43C9A1185EE4069107E633CE816C1FE022883B67F8C2EBBCBC6CABF30E4
+
+## Connection managers
+- [Contact Details] FLATFILE  EXPR ConnectionString=@[User::ContactDetailsFilePath] FLAT RaggedRight cp1255 cols=6
+- [Contact Don't Exist] FLATFILE C:\General SSIS files and Logs\יורשים\לקוח פרטי לא קיים.csv  FLAT Delimited cp1255 cols=2
+- [Convertion Failed Error] FLATFILE C:\General SSIS files and Logs\יורשים\set Heir Columns.csv  FLAT Delimited cp1255 cols=7
+- [CRM] OLEDB Data Source=Psql;Initial Catalog=ALTSHULER_MSCRM;Integrated Security=SSPI;  
+- [Heir Details] FLATFILE  EXPR ConnectionString=@[User::HeirDetailsFilePath] FLAT RaggedRight cp1255 cols=6
+- [Heir Load Failed Error] FLATFILE C:\General SSIS files and Logs\יורשים\Heir Source Faults.csv  FLAT Delimited cp1255 cols=3
+- [Source - Contact Details] FLATFILE  EXPR ConnectionString=@[User::ContactDetailsFilePath] FLAT RaggedRight cp1255 cols=14
+- [Source - Heir Details] FLATFILE  EXPR ConnectionString=@[User::HeirDetailsFilePath] FLAT RaggedRight cp1255 cols=14
+- [Source - Rasham] FLATFILE  EXPR ConnectionString=@[User::SelectedFilePath] FLAT RaggedRight cp1255 cols=6
+
+## Executables (disabled marked !)
+-   Convert Zips Files To Folders | Microsoft.ScriptTask  
+-   Create ETL Process record | Microsoft.ScriptTask  
+-   End ETL Process record | Microsoft.Pipeline  
+-   Foreach Loop Container | STOCK:FOREACHLOOP | FOREACH Microsoft.ForEachFromVarEnumerator ["User::SelectedDirctoryPath#0"] 
+-   Foreach Loop Container\Create And Update Heir | Microsoft.Pipeline  
+-   Foreach Loop Container\Get File From Folder | Microsoft.ScriptTask  
+-   Foreach Loop Container\Move Folder To Archive | Microsoft.ScriptTask  
+-   Foreach Loop Container\Split File | Microsoft.Pipeline  
+-   Get Heirs Folders | Microsoft.ScriptTask  
+-   Get Variables From SystemConfigurarion | Microsoft.Pipeline  
+
+## Precedence
+- Get Variables From SystemConfigurarion -> Create ETL Process record | Success Constraint   
+- Create ETL Process record -> Convert Zips Files To Folders | Success Constraint   
+- Foreach Loop Container -> End ETL Process record | Success Constraint   
+- Get Heirs Folders -> End ETL Process record | Success ExpressionAndConstraint !@[User::isFileExist]  
+- Convert Zips Files To Folders -> Get Heirs Folders | Success Constraint   
+- Get Heirs Folders -> Foreach Loop Container | Success ExpressionAndConstraint @[User::isFileExist]  
+- Foreach Loop Container\Split File -> Foreach Loop Container\Create And Update Heir | Success Constraint   
+- Foreach Loop Container\Get File From Folder -> Foreach Loop Container\Split File | Success Expression @[User::SelectedFilePath] != ""  
+- Foreach Loop Container\Create And Update Heir -> Foreach Loop Container\Move Folder To Archive | Success Constraint   
+
+## DataFlow End ETL Process record
+  - ETL Record Finish | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 2 out 0
+  - Get gen_etlprocessid | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 0 out 1
+  - Lookup | Lookup  | conn [CRM]  | in 1 out 1
+     path Lookup.Outputs[Lookup Match Output] => ETL Record Finish.Inputs[Input 0]
+     path Get gen_etlprocessid.Outputs[Output 0] => Lookup.Inputs[Lookup Input]
+
+## DataFlow Foreach Loop Container\Create And Update Heir
+  - Append Zeros To Fields | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 2 out 0
+  - casting error | DerivedColumn  | conn   | in 0 out 0
+  - change empty strings to null | DerivedColumn  | conn   | in 11 out 0
+  - Check If  Heir Exist | Lookup  | conn [CRM]  | in 4 out 16
+  - Check If Contact Exist | Lookup  | conn [CRM]  | in 1 out 1
+  - Contact | FlatFileSource  | conn [Source - Contact Details]  | in 0 out 5
+  - Create Heir | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 16 out 3
+  - Derived Column | DerivedColumn  | conn   | in 0 out 0
+  - Derived Column 1 | DerivedColumn  | conn   | in 0 out 0
+  - Derived Column 2 | DerivedColumn  | conn   | in 0 out 0
+  - error | DerivedColumn  | conn   | in 0 out 0
+  - Format Dates | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 1 out 0
+  - Heir | FlatFileSource  | conn [Source - Heir Details]  | in 0 out 12
+  - Merge Join | MergeJoin  | conn   | in 17 out 14
+  - no need to | DerivedColumn  | conn   | in 0 out 0
+  - Set Heir Columns | DerivedColumn  | conn   | in 4 out 3
+  - Sort | Sort  | conn   | in 12 out 12
+  - Sort 1 | Sort  | conn   | in 5 out 5
+  - Trim All Input Columns | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 5 out 0
+  - Trim All Input Columns 1 | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 12 out 0
+  - Update Heir | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 25 out 3
+  - updated | DerivedColumn  | conn   | in 0 out 0
+     path Update Heir.Outputs[CastingError] => casting error.Inputs[Derived Column Input]
+     path Set Heir Columns.Outputs[Derived Column Error Output] => Derived Column 1.Inputs[Derived Column Input]
+     path change empty strings to null.Outputs[Derived Column Output] => Update Heir.Inputs[Input 0]
+     path Set Heir Columns.Outputs[Derived Column Output] => Append Zeros To Fields.Inputs[Input 0]
+     path Update Heir.Outputs[DontNeedToUpdate] => no need to.Inputs[Derived Column Input]
+     path Update Heir.Outputs[Error] => error.Inputs[Derived Column Input]
+     path Heir.Outputs[Flat File Source Error Output] => Derived Column.Inputs[Derived Column Input]
+     path Contact.Outputs[Flat File Source Output] => Trim All Input Columns.Inputs[Input 0]
+     path Heir.Outputs[Flat File Source Output] => Trim All Input Columns 1.Inputs[Input 0]
+     path Check If  Heir Exist.Outputs[Lookup Match Output] => change empty strings to null.Inputs[Derived Column Input]
+     path Check If Contact Exist.Outputs[Lookup Match Output] => Check If  Heir Exist.Inputs[Lookup Input]
+     path Check If Contact Exist.Outputs[Lookup No Match Output] => Derived Column 2.Inputs[Derived Column Input]
+     path Check If  Heir Exist.Outputs[Lookup No Match Output] => Create Heir.Inputs[Input 0]
+     path Merge Join.Outputs[Merge Join Output] => Set Heir Columns.Inputs[Derived Column Input]
+     path Append Zeros To Fields.Outputs[Output 0] => Format Dates.Inputs[Input 0]
+     path Trim All Input Columns.Outputs[Output 0] => Sort 1.Inputs[Sort Input]
+     path Format Dates.Outputs[Output 0] => Check If Contact Exist.Inputs[Lookup Input]
+     path Trim All Input Columns 1.Outputs[Output 0] => Sort.Inputs[Sort Input]
+     path Update Heir.Outputs[Result] => updated.Inputs[Derived Column Input]
+     path Sort 1.Outputs[Sort Output] => Merge Join.Inputs[Merge Join Right Input]
+     path Sort.Outputs[Sort Output] => Merge Join.Inputs[Merge Join Left Input]
+
+## DataFlow Foreach Loop Container\Split File
+  - Check If Contact Or Heir | ConditionalSplit  | conn   | in 1 out 0
+  - Contact File Destination | FlatFileDestination  | conn [Contact Details]  | in 6 out 0
+  - Heir File Destination | FlatFileDestination  | conn [Heir Details]  | in 6 out 0
+  - Read data | FlatFileSource  | conn [Source - Rasham]  | in 0 out 6
+  - Trim All Input Columns | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 4 out 0
+     path Check If Contact Or Heir.Outputs[Contact Details] => Contact File Destination.Inputs[Flat File Destination Input]
+     path Read data.Outputs[Flat File Source Output] => Trim All Input Columns.Inputs[Input 0]
+     path Check If Contact Or Heir.Outputs[Heir Details] => Heir File Destination.Inputs[Flat File Destination Input]
+     path Trim All Input Columns.Outputs[Output 0] => Check If Contact Or Heir.Inputs[Conditional Split Input]
+
+## DataFlow Get Variables From SystemConfigurarion
+  - Get SystemConfigurations | OLEDBSource  | conn [CRM]  | in 0 out 2
+  - Set Variables | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 2 out 0
+     path Get SystemConfigurations.Outputs[OLE DB Source Output] => Set Variables.Inputs[Input 0]
+
+## SQL statements
+- End ETL Process record\Lookup | Microsoft.Lookup.SqlCommand | [CRM] 
+    select p.gen_etlprocessid , case when pw.gen_etlprocessid is null then 0 else 1 end as isWarningExist from gen_etlprocess p left join (select distinct gen_etlprocessId from gen_etlprocesswarning ) as pw on p.gen_etlprocessId = pw.gen_etlprocessId
+- End ETL Process record\Lookup | Microsoft.Lookup.SqlCommandParam | [CRM] 
+    select * from (select p.gen_etlprocessid , case when pw.gen_etlprocessid is null then 0 else 1 end as isWarningExist from gen_etlprocess p left join (select distinct gen_etlprocessId from gen_etlprocesswarning ) as pw on p.gen_etlprocessId = pw.gen_etlprocessId) [refTable] where [refTable].[gen_etlprocessid] = ?
+- Foreach Loop Container\Create And Update Heir\Check If  Heir Exist | Microsoft.Lookup.SqlCommand | [CRM] 
+    select gen_heirid as gen_heiriddb , gen_identitynumber as gen_identitynumberdb, gen_requestnumber as gen_requestnumberdb, gen_portfolionumber as gen_portfolionumberdb, gen_region as gen_regiondb, Gen_customeridentitynumber as Gen_customeridentitynumberdb, Gen_firstname as Gen_firstnamedb, Gen_lastname as Gen_lastnamedb, Gen_address as Gen_addressdb, Gen_city as Gen_citydb, Gen_postalcode as Gen_po
+- Foreach Loop Container\Create And Update Heir\Check If  Heir Exist | Microsoft.Lookup.SqlCommandParam | [CRM] 
+    select * from (select gen_heirid as gen_heiriddb , gen_identitynumber as gen_identitynumberdb, gen_requestnumber as gen_requestnumberdb, gen_portfolionumber as gen_portfolionumberdb, gen_region as gen_regiondb, Gen_customeridentitynumber as Gen_customeridentitynumberdb, Gen_firstname as Gen_firstnamedb, Gen_lastname as Gen_lastnamedb, Gen_address as Gen_addressdb, Gen_city as Gen_citydb, Gen_posta
+- Foreach Loop Container\Create And Update Heir\Check If Contact Exist | Microsoft.Lookup.SqlCommand | [CRM] 
+    select gen_identitynumber , contactid from contact
+- Foreach Loop Container\Create And Update Heir\Check If Contact Exist | Microsoft.Lookup.SqlCommandParam | [CRM] 
+    select * from (select gen_identitynumber , contactid from contact) [refTable] where [refTable].[gen_identitynumber] = ?
+- Get Variables From SystemConfigurarion\Get SystemConfigurations | Microsoft.OLEDBSource.SqlCommand | [CRM] 
+    SELECT gen_key ,gen_Value FROM gen_etlvariable where gen_scope ='global' or gen_scope = ?
+
+## Code write candidates (per owner)
+- Convert Zips Files To Folders {"variables-write":1,"sql-command":1,"file-io":5}
+- Create ETL Process record {"crm-entity":1,"crm-sdk-create":1,"variables-write":1}
+- End ETL Process record\ETL Record Finish {"sql-command":2,"crm-entity":3,"output-buffer":1,"crm-sdk-update":1}
+- End ETL Process record\Get gen_etlprocessid {"sql-command":2,"output-buffer":2}
+- Foreach Loop Container\Create And Update Heir\Create Heir {"crm-service":1,"sql-command":2,"crm-entity":4,"output-buffer":4,"crm-sdk-execute":3}
+- Foreach Loop Container\Create And Update Heir\Update Heir {"crm-service":1,"sql-command":2,"crm-entity":3,"output-buffer":16,"crm-sdk-execute":3}
+- Foreach Loop Container\Get File From Folder {"file-io":1,"variables-write":2}
+- Foreach Loop Container\Move Folder To Archive {"variables-write":1,"sql-command":1,"file-io":4}
+- Get Heirs Folders {"file-io":1,"variables-write":2}
+
+## External refs (non-framework) CRM2015.Proxy

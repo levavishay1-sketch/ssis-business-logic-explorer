@@ -1,0 +1,280 @@
+{
+  "verifier": "ssis-verifier",
+  "package": "0017_CloseWithdrawalForecast",
+  "scope": "logic-claims re-check after fixes",
+  "checkedAt": "2026-11-07T12:07:01.054Z",
+  "checked": 15,
+  "results": [
+    {
+      "id": "L|summary",
+      "hash": "fc7778fc7166",
+      "verdict": "INCOMPLETE",
+      "detail": "[2] scopeNote verified (single OLEDB [CRM] used only by sources, EnableConfig=True, config at DTSX:11, SDK Update via ExecuteMultipleExtension, labels 3/14/15 only from code comments). [1] verified for states 8/10, 54/5 labelled hypothesis, status logic and written fields, but it presents Gen_withdrawalvalue as 'the requested amount' without a hypothesis label.",
+      "evidence": "source/DailyProcess/0017_CloseWithdrawalForecast.dtsx:1-11, 1094-1145, 2176-2216",
+      "wrongUnits": [
+        {
+          "unit": 1,
+          "problem": "Calls Gen_withdrawalvalue 'the amount requested in the request' as fact. The column is unqualified (DTSX:1106/2186); no supplied file shows which joined table owns it (the only other occurrence, 0020_Preservation, is on gen_preservation), and its meaning comes from the column name.",
+          "correct": "Gen_withdrawalvalue (owning table not proven; hypothesis by name: the requested amount of the withdrawal).",
+          "evidence": "source/DailyProcess/0017_CloseWithdrawalForecast.dtsx:1106, 2186; source/DailyProcess/0020_Preservation.dtsx:3181, 3949"
+        }
+      ]
+    },
+    {
+      "id": "L|finding#2",
+      "hash": "b3cb9fa68682",
+      "verdict": "INCOMPLETE",
+      "detail": "Verified: auto flow writes Fault rows to ErrorBuffer whose Error output has no path (only path DTSX:1193); manual flow has no Fault branch; a null response is silently ignored and the list cleared; a failed request stays in state 8/10 and is re-selected only if it still meets the query. Missing: the exception path. The first sentence ('a failed update is not recorded anywhere') is general, but an exception fails the data flow and is raised to the OnError handler.",
+      "evidence": "source/DailyProcess/0017_CloseWithdrawalForecast.dtsx:190-215, 1193, 1484-1501, 2264, 5314, 5318",
+      "wrongUnits": [
+        {
+          "unit": 1,
+          "problem": "Exception path omitted; categorical claim.",
+          "correct": "No try/catch around ExcecuteBulk (main.cs:70-94, DTSX:190-215): an exception from ExecuteMultipleRequest or from the cast of response.Results[1].Value (external CRM.Proxy types) fails the script component and the data flow; requests not yet sent are not updated, the OnError handler runs, and because 'Close automaty sended withdrawals' -> 'Close manualy sended withdrawals' is a Success constraint (DTSX:5314) the manual flow does not run. The manual flow behaves the same way.",
+          "evidence": "source/DailyProcess/0017_CloseWithdrawalForecast.dtsx:192-195, 1486-1489, 5314, 5318"
+        }
+      ]
+    },
+    {
+      "id": "L|finding#6",
+      "hash": "f196ec6c8ccc",
+      "verdict": "CONFIRMED",
+      "detail": "Both scripts write genvaluedate.ToLocalTime() to gen_dateofactualwithdrawal and gen_withdrawalfinishdate. A scan of all supplied DTSX for writes to gen_ftcurrentyear finds only 0008 'insert ftCurrentYearBase 1-5' (DTSX 63118, 63653, 64188, 64723, 65258) and the 0022 owner-only UPDATE (0022:5050-5054). In 0008 every insert's gen_ValueDate comes through 'FT\\Dates ToUniveral', which applies ToUniversalTime() when the string is non-empty, not equal to CrmMinimumDate and parsable (lines 40-51 of that script). Other writers are correctly left external_unknown.",
+      "evidence": "source/DailyProcess/0017_CloseWithdrawalForecast.dtsx:170-172, 1462-1464; source/DailyProcess/0008_LeumiFile-PY.dtsx:63118-65258; source/DailyProcess/0022_Company Workers.dtsx:5050-5054",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Close automaty sended withdrawals|title",
+      "hash": "eeb75c6df494",
+      "verdict": "WRONG",
+      "detail": "Status logic, write list and flow_he[3-4] verified. short_he states as fact that a request with an empty send-to-bank date is not selected (owner of gen_datesenttothebank unproven, contradicting the package's open[4]); it describes the partition requirement as 'at least one partition not in status 5/6', which omits that NULL-status partitions are also excluded; and 'all partitions not in 5/6 are in status 4' is inexact because NULL-status partitions are ignored by min/max and do not block status 3.",
+      "evidence": "source/DailyProcess/0017_CloseWithdrawalForecast.dtsx:1094-1145, 1120, 1136; main.cs:32",
+      "wrongUnits": [
+        {
+          "unit": 2,
+          "problem": "Attributes gen_datesenttothebank to the withdrawal request ('a request whose send-to-bank date is empty is not selected') as fact. The column is unqualified (DTSX:1120) in a query over Gen_withdrawal, Gen_customeraccount, Gen_fundmain, gen_ftcurrentyear and Gen_fundtransactiontype, it appears nowhere else in the supplied files, and the package's own open question [4] says its owning table is not proven (hypothesis: Gen_withdrawal). The text contradicts that open question.",
+          "correct": "Label it as hypothesis: the transaction value date must be >= gen_datesenttothebank (owning table not proven; if it is Gen_withdrawal, a request with NULL date is never selected).",
+          "evidence": "source/DailyProcess/0017_CloseWithdrawalForecast.dtsx:1120"
+        },
+        {
+          "unit": 2,
+          "problem": "Partition filter 'not in status 5/6' omits NULL exclusion; status 3 rule phrased over partitions 'not in 5/6'.",
+          "correct": "Partitions with feedback status NULL, 5 or 6 are ignored; at least one partition with a non-NULL status other than 5/6 is required; status 3 when min = max = 4 over those partitions.",
+          "evidence": "source/DailyProcess/0017_CloseWithdrawalForecast.dtsx:1130-1140"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Close automaty sended withdrawals|short",
+      "hash": "dcaee98be8dd",
+      "verdict": "WRONG",
+      "detail": "Decision structure 14/3/15 verified. Unit [1] states as fact the request's send-to-bank date (owner unproven, contradicts open[4]) and omits NULL-status partition exclusion; unit [2] defines relevant partitions as those not in 5/6 (NULL-status ones are also excluded); unit [7] calls Gen_withdrawalvalue the requested amount without a hypothesis label.",
+      "evidence": "source/DailyProcess/0017_CloseWithdrawalForecast.dtsx:1106, 1120, 1130-1140",
+      "wrongUnits": [
+        {
+          "unit": 1,
+          "problem": "Attributes gen_datesenttothebank to the withdrawal request ('a request whose send-to-bank date is empty is not selected') as fact. The column is unqualified (DTSX:1120) in a query over Gen_withdrawal, Gen_customeraccount, Gen_fundmain, gen_ftcurrentyear and Gen_fundtransactiontype, it appears nowhere else in the supplied files, and the package's own open question [4] says its owning table is not proven (hypothesis: Gen_withdrawal). The text contradicts that open question.",
+          "correct": "Label it as hypothesis: the transaction value date must be >= gen_datesenttothebank (owning table not proven; if it is Gen_withdrawal, a request with NULL date is never selected).",
+          "evidence": "source/DailyProcess/0017_CloseWithdrawalForecast.dtsx:1120"
+        },
+        {
+          "unit": 1,
+          "problem": "Partition requirement omits NULL status.",
+          "correct": "At least one partition whose feedback status is not NULL and not 5/6 (NOT IN with NULL is not true).",
+          "evidence": "source/DailyProcess/0017_CloseWithdrawalForecast.dtsx:1136"
+        },
+        {
+          "unit": 2,
+          "problem": "Relevant partitions described as all except 5/6.",
+          "correct": "Partitions with NULL, 5 or 6 status are ignored.",
+          "evidence": "source/DailyProcess/0017_CloseWithdrawalForecast.dtsx:1136"
+        },
+        {
+          "unit": 7,
+          "problem": "Calls Gen_withdrawalvalue 'the amount requested in the request' as fact. The column is unqualified (DTSX:1106/2186); no supplied file shows which joined table owns it (the only other occurrence, 0020_Preservation, is on gen_preservation), and its meaning comes from the column name.",
+          "correct": "Gen_withdrawalvalue (owning table not proven; hypothesis by name: the requested amount of the withdrawal).",
+          "evidence": "source/DailyProcess/0017_CloseWithdrawalForecast.dtsx:1106, 2186; source/DailyProcess/0020_Preservation.dtsx:3181, 3949"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Close automaty sended withdrawals|detailed",
+      "hash": "9f037c28ccf2",
+      "verdict": "WRONG",
+      "detail": "Units [1], [3]-[16], [18]-[24] match the SQL and main.cs (14 default, 3 if min=max=4, 15 override for partial with integer mismatch; ToLocalTime; batches of 1000). Unit [2] states the NULL send-to-bank exclusion as a fact about the request although the package's open[4] says the owner of gen_datesenttothebank is unproven. Unit [17] presents Gen_withdrawalvalue as the requested amount without label. The exception path of ExcecuteBulk is missing from [25]/[26]. Secondary: the owners of the unqualified gen_transtotalamount / gen_netoamountofaction ('transaction sums') and join keys Gen_customeraccountId / Gen_fundmainId are not argued.",
+      "evidence": "source/DailyProcess/0017_CloseWithdrawalForecast.dtsx:1094-1145, 1106, 1120, 190-215, 5314",
+      "wrongUnits": [
+        {
+          "unit": 2,
+          "problem": "Attributes gen_datesenttothebank to the withdrawal request ('a request whose send-to-bank date is empty is not selected') as fact. The column is unqualified (DTSX:1120) in a query over Gen_withdrawal, Gen_customeraccount, Gen_fundmain, gen_ftcurrentyear and Gen_fundtransactiontype, it appears nowhere else in the supplied files, and the package's own open question [4] says its owning table is not proven (hypothesis: Gen_withdrawal). The text contradicts that open question.",
+          "correct": "Label it as hypothesis: the transaction value date must be >= gen_datesenttothebank (owning table not proven; if it is Gen_withdrawal, a request with NULL date is never selected).",
+          "evidence": "source/DailyProcess/0017_CloseWithdrawalForecast.dtsx:1120"
+        },
+        {
+          "unit": 17,
+          "problem": "Calls Gen_withdrawalvalue 'the amount requested in the request' as fact. The column is unqualified (DTSX:1106/2186); no supplied file shows which joined table owns it (the only other occurrence, 0020_Preservation, is on gen_preservation), and its meaning comes from the column name.",
+          "correct": "Gen_withdrawalvalue (owning table not proven; hypothesis by name: the requested amount of the withdrawal).",
+          "evidence": "source/DailyProcess/0017_CloseWithdrawalForecast.dtsx:1106, 2186; source/DailyProcess/0020_Preservation.dtsx:3181, 3949"
+        },
+        {
+          "unit": 25,
+          "problem": "Only Fault responses and null response are covered.",
+          "correct": "No try/catch around ExcecuteBulk (main.cs:70-94, DTSX:190-215): an exception from ExecuteMultipleRequest or from the cast of response.Results[1].Value (external CRM.Proxy types) fails the script component and the data flow; requests not yet sent are not updated, the OnError handler runs, and because 'Close automaty sended withdrawals' -> 'Close manualy sended withdrawals' is a Success constraint (DTSX:5314) the manual flow does not run.",
+          "evidence": "source/DailyProcess/0017_CloseWithdrawalForecast.dtsx:192-195, 5314, 5318"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Close automaty sended withdrawals|detail",
+      "hash": "800a5b949c18",
+      "verdict": "WRONG",
+      "detail": "Units [2]-[4] verified (status names from code comments are flagged as such; decision 'Gen_withdrawalvalue' named neutrally). Unit [1] states as fact that a request with NULL gen_datesenttothebank is not selected, contradicting open[4], and presents '[CRM], ALTSHULER_MSCRM' without the design-time caveat that the package's own scopeNote makes (EnableConfig=True, unsupplied config). Unit [5] says failed updates are not recorded anywhere, omitting the exception path.",
+      "evidence": "source/DailyProcess/0017_CloseWithdrawalForecast.dtsx:1, 4-11, 1094-1145, 1120, 190-215, 5314",
+      "wrongUnits": [
+        {
+          "unit": 1,
+          "problem": "Attributes gen_datesenttothebank to the withdrawal request ('a request whose send-to-bank date is empty is not selected') as fact. The column is unqualified (DTSX:1120) in a query over Gen_withdrawal, Gen_customeraccount, Gen_fundmain, gen_ftcurrentyear and Gen_fundtransactiontype, it appears nowhere else in the supplied files, and the package's own open question [4] says its owning table is not proven (hypothesis: Gen_withdrawal). The text contradicts that open question.",
+          "correct": "Label it as hypothesis: the transaction value date must be >= gen_datesenttothebank (owning table not proven; if it is Gen_withdrawal, a request with NULL date is never selected).",
+          "evidence": "source/DailyProcess/0017_CloseWithdrawalForecast.dtsx:1120"
+        },
+        {
+          "unit": 1,
+          "problem": "Connection target given as ALTSHULER_MSCRM without caveat.",
+          "correct": "Design-time Psql/ALTSHULER_MSCRM; may be overridden by C:\\Generix\\SSISConfigFile.dtsConfig (not supplied).",
+          "evidence": "source/DailyProcess/0017_CloseWithdrawalForecast.dtsx:1, 4-11"
+        },
+        {
+          "unit": 5,
+          "problem": "Categorical claim; exception path omitted.",
+          "correct": "No try/catch around ExcecuteBulk (main.cs:70-94, DTSX:190-215): an exception from ExecuteMultipleRequest or from the cast of response.Results[1].Value (external CRM.Proxy types) fails the script component and the data flow; requests not yet sent are not updated, the OnError handler runs, and because 'Close automaty sended withdrawals' -> 'Close manualy sended withdrawals' is a Success constraint (DTSX:5314) the manual flow does not run.",
+          "evidence": "source/DailyProcess/0017_CloseWithdrawalForecast.dtsx:192-195, 5314"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Close automaty sended withdrawals|decisions",
+      "hash": "1429b613aa3e",
+      "verdict": "WRONG",
+      "detail": "Conditions [1]-[4] quoted exactly; main.cs line refs correct; [2] NULL-status exclusion and [3] stated correctly. meaning_he of [1] states as fact that a request whose send date is empty is not included (owner of gen_datesenttothebank unproven per open[4]). meaning_he of [4] calls Gen_withdrawalvalue the requested amount without label.",
+      "evidence": "source/DailyProcess/0017_CloseWithdrawalForecast.dtsx:1106, 1114-1121, 1136",
+      "wrongUnits": [
+        {
+          "unit": 1,
+          "problem": "Attributes gen_datesenttothebank to the withdrawal request ('a request whose send-to-bank date is empty is not selected') as fact. The column is unqualified (DTSX:1120) in a query over Gen_withdrawal, Gen_customeraccount, Gen_fundmain, gen_ftcurrentyear and Gen_fundtransactiontype, it appears nowhere else in the supplied files, and the package's own open question [4] says its owning table is not proven (hypothesis: Gen_withdrawal). The text contradicts that open question.",
+          "correct": "Label it as hypothesis: the transaction value date must be >= gen_datesenttothebank (owning table not proven; if it is Gen_withdrawal, a request with NULL date is never selected).",
+          "evidence": "source/DailyProcess/0017_CloseWithdrawalForecast.dtsx:1120"
+        },
+        {
+          "unit": 4,
+          "problem": "Calls Gen_withdrawalvalue 'the amount requested in the request' as fact. The column is unqualified (DTSX:1106/2186); no supplied file shows which joined table owns it (the only other occurrence, 0020_Preservation, is on gen_preservation), and its meaning comes from the column name.",
+          "correct": "Gen_withdrawalvalue (owning table not proven; hypothesis by name: the requested amount of the withdrawal).",
+          "evidence": "source/DailyProcess/0017_CloseWithdrawalForecast.dtsx:1106, 2186; source/DailyProcess/0020_Preservation.dtsx:3181, 3949"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Close automaty sended withdrawals|open",
+      "hash": "007c91c28598",
+      "verdict": "INCOMPLETE",
+      "detail": "Items [1]-[5] are correct: [4] settles gen_currentstate by the SDK write of gen_currentstate on gen_withdrawal (main.cs:45) plus the ambiguity rule, conditional on the query running, and leaves gen_datesenttothebank unproven. Missing open item: the owning table and meaning of the unqualified Gen_withdrawalvalue, which drives status 15, cannot be settled from the supplied files.",
+      "evidence": "source/DailyProcess/0017_CloseWithdrawalForecast.dtsx:1106, 1117, 1120, 166",
+      "wrongUnits": [
+        {
+          "unit": 4,
+          "problem": "Calls Gen_withdrawalvalue 'the amount requested in the request' as fact. The column is unqualified (DTSX:1106/2186); no supplied file shows which joined table owns it (the only other occurrence, 0020_Preservation, is on gen_preservation), and its meaning comes from the column name.",
+          "correct": "Gen_withdrawalvalue (owning table not proven; hypothesis by name: the requested amount of the withdrawal).",
+          "evidence": "source/DailyProcess/0017_CloseWithdrawalForecast.dtsx:1106, 2186; source/DailyProcess/0020_Preservation.dtsx:3181, 3949"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Close manualy sended withdrawals|title",
+      "hash": "75c229897f8c",
+      "verdict": "CONFIRMED",
+      "detail": "short_he and flow_he match: state 10, 54/5 (hypothesis label), value date >= w.CreatedOn (qualified), partition with status not 5 and not NULL, default 3, 15 for partial withdrawal with mismatching amount, written fields. The amount wording ('סכומה אינו תואם') does not claim an owner.",
+      "evidence": "source/DailyProcess/0017_CloseWithdrawalForecast.dtsx:2176-2216, 1445-1470",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Close manualy sended withdrawals|short",
+      "hash": "10d36f5ae1b6",
+      "verdict": "INCOMPLETE",
+      "detail": "Units [1], [2], [4]-[9] verified. Unit [3] calls Gen_withdrawalvalue the requested amount without a hypothesis label.",
+      "evidence": "source/DailyProcess/0017_CloseWithdrawalForecast.dtsx:2186, 1449-1455",
+      "wrongUnits": [
+        {
+          "unit": 3,
+          "problem": "Calls Gen_withdrawalvalue 'the amount requested in the request' as fact. The column is unqualified (DTSX:1106/2186); no supplied file shows which joined table owns it (the only other occurrence, 0020_Preservation, is on gen_preservation), and its meaning comes from the column name.",
+          "correct": "Gen_withdrawalvalue (owning table not proven; hypothesis by name: the requested amount of the withdrawal).",
+          "evidence": "source/DailyProcess/0017_CloseWithdrawalForecast.dtsx:1106, 2186; source/DailyProcess/0020_Preservation.dtsx:3181, 3949"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Close manualy sended withdrawals|detailed",
+      "hash": "9a0a0314a705",
+      "verdict": "INCOMPLETE",
+      "detail": "Units [1]-[11], [13]-[19] verified, including the '! =' caveat and NULL-status exclusion. Unit [12] presents Gen_withdrawalvalue as the requested amount without label. Unit [20] covers missing Fault handling but not the exception path. Secondary: owners of the unqualified amount columns and join keys are not argued.",
+      "evidence": "source/DailyProcess/0017_CloseWithdrawalForecast.dtsx:2176-2216, 1484-1501",
+      "wrongUnits": [
+        {
+          "unit": 12,
+          "problem": "Calls Gen_withdrawalvalue 'the amount requested in the request' as fact. The column is unqualified (DTSX:1106/2186); no supplied file shows which joined table owns it (the only other occurrence, 0020_Preservation, is on gen_preservation), and its meaning comes from the column name.",
+          "correct": "Gen_withdrawalvalue (owning table not proven; hypothesis by name: the requested amount of the withdrawal).",
+          "evidence": "source/DailyProcess/0017_CloseWithdrawalForecast.dtsx:1106, 2186; source/DailyProcess/0020_Preservation.dtsx:3181, 3949"
+        },
+        {
+          "unit": 20,
+          "problem": "Exception path omitted.",
+          "correct": "No try/catch around ExcecuteBulk (DTSX:1484-1501): an exception from ExecuteMultipleRequest or from the cast of response.Results[1].Value fails the script component and the data flow; requests not yet sent are not updated and the OnError handler runs.",
+          "evidence": "source/DailyProcess/0017_CloseWithdrawalForecast.dtsx:1486-1489, 5318"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Close manualy sended withdrawals|detail",
+      "hash": "82ce2d3c3e77",
+      "verdict": "INCOMPLETE",
+      "detail": "Units [1]-[4] verified (population with w.CreatedOn and '! =' caveat, update by Gen_withdrawalid main.cs:45, default 3 / 15, write list). Unit [5] says update failures are not documented, which omits the exception path.",
+      "evidence": "source/DailyProcess/0017_CloseWithdrawalForecast.dtsx:2176-2216, 1445-1501",
+      "wrongUnits": [
+        {
+          "unit": 5,
+          "problem": "Categorical claim; exception path omitted.",
+          "correct": "No try/catch around ExcecuteBulk (DTSX:1484-1501): an exception from ExecuteMultipleRequest or from the cast of response.Results[1].Value fails the script component and the data flow; requests not yet sent are not updated and the OnError handler runs.",
+          "evidence": "source/DailyProcess/0017_CloseWithdrawalForecast.dtsx:1486-1489"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Close manualy sended withdrawals|decisions",
+      "hash": "b68ddf8926da",
+      "verdict": "INCOMPLETE",
+      "detail": "Conditions [1]-[3] quoted exactly; [2] includes NULL-status exclusion and the '! =' caveat. meaning_he of [3] calls Gen_withdrawalvalue 'the requested amount' without a hypothesis label.",
+      "evidence": "source/DailyProcess/0017_CloseWithdrawalForecast.dtsx:2186, 2196-2213, 1448-1454",
+      "wrongUnits": [
+        {
+          "unit": 3,
+          "problem": "Calls Gen_withdrawalvalue 'the amount requested in the request' as fact. The column is unqualified (DTSX:1106/2186); no supplied file shows which joined table owns it (the only other occurrence, 0020_Preservation, is on gen_preservation), and its meaning comes from the column name.",
+          "correct": "Gen_withdrawalvalue (owning table not proven; hypothesis by name: the requested amount of the withdrawal).",
+          "evidence": "source/DailyProcess/0017_CloseWithdrawalForecast.dtsx:1106, 2186; source/DailyProcess/0020_Preservation.dtsx:3181, 3949"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Close manualy sended withdrawals|open",
+      "hash": "636406ac65d9",
+      "verdict": "INCOMPLETE",
+      "detail": "[1] and [3] cannot be settled; [2] correctly settles gen_valuedate as ft's (ft.gen_valuedate referenced in the same statement, ambiguity rule, conditional on the query running). Missing open item: the owner and meaning of the unqualified Gen_withdrawalvalue used in the status-15 test.",
+      "evidence": "source/DailyProcess/0017_CloseWithdrawalForecast.dtsx:2186, 2190, 2200",
+      "wrongUnits": [
+        {
+          "unit": 2,
+          "problem": "Calls Gen_withdrawalvalue 'the amount requested in the request' as fact. The column is unqualified (DTSX:1106/2186); no supplied file shows which joined table owns it (the only other occurrence, 0020_Preservation, is on gen_preservation), and its meaning comes from the column name.",
+          "correct": "Gen_withdrawalvalue (owning table not proven; hypothesis by name: the requested amount of the withdrawal).",
+          "evidence": "source/DailyProcess/0017_CloseWithdrawalForecast.dtsx:1106, 2186; source/DailyProcess/0020_Preservation.dtsx:3181, 3949"
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,54 @@
+{
+  "verifier": "ssis-verifier",
+  "package": "0032_POAOperator",
+  "scope": "logic-claims re-check round 2",
+  "checkedAt": "2026-11-07T00:00:00Z",
+  "checked": 3,
+  "results": [
+    {
+      "id": "L|finding#2",
+      "hash": "9caf24011d06",
+      "verdict": "WRONG",
+      "detail": "Re-derived from the source. The account and policy queries (DTSX:3081-3110, 6125-6154) filter CreatedOn > DATEADD(dd,-2,GETDATE()) and gen_poaoperator.gen_poastatus = 2, joined through Account to gen_poaoperator.gen_employername. They do not compare against the POA's creation or start date. A grep of all 35 supplied DTSX finds gen_poaaccountoperator only in 0032, so the 'no other package creates it / unknown' statement is correct. The two create flows run only after the five update flows succeed (Constraints 7 and 8, DTSX:18801-18802); the 'run inside the window' wording covers this implicitly. The problem is the phrase 'לפני שייפוי הכוח נמצא תקף'. It treats gen_poaoperator.gen_poastatus = 2 as 'valid' and states this as fact. The files label status 2 as valid only for gen_poaaccountoperator.gen_poastatus: the constant VALID = 2 used for the new link (DTSX:742/843, 3803/3905) and the comment '-- valid' at DTSX:10055. No constant, comment or name in the files labels value 2 of gen_poaoperator.gen_poastatus. The only labels on that attribute are the derived columns for 4/5/6 (Expired/Invalid/Cancelled Status, DTSX:15722, 17728, 11121/13041). The label is a reasonable inference, but it is unproven and is not marked as one.",
+      "evidence": "DTSX:3081-3110; 6125-6154; 742; 843; 3803; 3905; 10055; 11964-11969; 18801-18802; grep -i gen_poaaccountoperator source/DailyProcess/*.dtsx (0032 only)",
+      "wrongUnits": [
+        {
+          "unit": 1,
+          "problem": "'נמצא תקף' presents the meaning 'valid' for gen_poaoperator.gen_poastatus = 2 as a fact. The files prove that label only for gen_poaaccountoperator.gen_poastatus (constant VALID = 2, comment '-- valid').",
+          "correct": "Keep the rest, but write the condition literally: '... before a run found an operator POA in status 2 for the employer ...'. If the word 'valid' is used, label it as a hypothesis by analogy to gen_poaaccountoperator (VALID = 2 at DTSX:742; '-- valid' at DTSX:10055).",
+          "evidence": "DTSX:742; 10055; 3109-3110; 6153-6154"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Create POA Account Operator|open",
+      "hash": "d87ffd8e2488",
+      "verdict": "WRONG",
+      "detail": "Unit 2 is correct. Check If POA Account Operator Exist runs 'select gen_customeraccount from gen_poaaccountoperator' with ParameterMap gen_customeraccountid (DTSX:543-553), with no operator or status filter. Only its No Match output is connected (to IS All Employees). Unit 1 is correct on the window (Gen_customeraccount.CreatedOn > DATEADD(dd,-2,GETDATE()), DTSX:3109), on the missing comparison with the POA's dates, on the coverage gate (IS All Employees: !ISNULL(gen_applypoa) && gen_applypoa == 1, DTSX:3216-3217, otherwise Check If Employee Exist), on the existing-link gate, and on 'no other package creates gen_poaaccountoperator'. Two problems in unit 1. (a) 'בסטטוס 2 (תקף)' states the meaning 'valid' for gen_poaoperator.gen_poastatus = 2 as fact. The files give that label only to gen_poaaccountoperator.gen_poastatus (VALID = 2 at DTSX:742; '-- valid' at DTSX:10055). (b) 'העובד ברשימה' omits that the list is restricted to active rows (gen_active = 1). The match is on Gen_customeridnumber plus the operator id against gen_poaemployeeemployeroperator.gen_identitynumber / gen_powerofattorenyoperator (DTSX:485-490, ParameterMap DTSX:499).",
+      "evidence": "DTSX:485-499; 543-553; 3081-3110; 3216-3217; 742; 10055; paths DTSX (No Match -> IS All Employees; Default -> Check If Employee Exist; Match -> Union All -> Create)",
+      "wrongUnits": [
+        {
+          "unit": 1,
+          "problem": "The label 'תקף' for gen_poaoperator status 2 is unproven and stated as fact. The employee-list condition omits gen_active = 1.",
+          "correct": "... only if a run inside the window finds an operator POA in status 2 for its employer (the meaning 'valid' is a hypothesis by analogy to gen_poaaccountoperator: VALID = 2, '-- valid'). The coverage conditions must also hold: gen_applypoa = 1, or the employee's ID number appears with this operator in an active (gen_active = 1) gen_poaemployeeemployeroperator row. The account must also have no existing link ...",
+          "evidence": "DTSX:485-499; 742; 10055; 3109-3110"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Create POA Account Operator - Pension|open",
+      "hash": "d67fcced4933",
+      "verdict": "WRONG",
+      "detail": "Unit 2 is correct. The Lookup is 'select gen_policy from gen_poaaccountoperator' with ParameterMap gen_policiesid (DTSX:3631-3641), with no operator filter. Only No Match is connected. Unit 1 is correct on the window (gen_policies.CreatedOn > DATEADD(dd,-2,GETDATE()), DTSX:6153), on the join through gen_policies.Gen_accountname -> Account -> gen_poaoperator.gen_employername, on the missing comparison with the POA's dates, and on the coverage and existing-link gates (DTSX:6256-6257, 3573-3587). It is also correct that no other supplied package creates gen_poaaccountoperator. The same two problems as the account flow apply to unit 1. (a) 'בסטטוס 2 (תקף)' states 'valid' as fact for gen_poaoperator.gen_poastatus = 2, but the files give that label only to gen_poaaccountoperator.gen_poastatus (VALID = 2 at DTSX:3803; '-- valid' at DTSX:10055). (b) 'העובד ברשימה' omits gen_active = 1. The match is gen_policies.Gen_identitynumber plus the operator id (DTSX:3573-3587).",
+      "evidence": "DTSX:3573-3587; 3631-3641; 6125-6154; 6256-6257; 3803; 10055",
+      "wrongUnits": [
+        {
+          "unit": 1,
+          "problem": "The label 'תקף' for gen_poaoperator status 2 is unproven and stated as fact. The employee-list condition omits gen_active = 1.",
+          "correct": "... only if a run inside the window finds an operator POA in status 2 for the policy's employer (the meaning 'valid' is a hypothesis by analogy to gen_poaaccountoperator). The coverage conditions must also hold: gen_applypoa = 1, or the policy's ID number appears with this operator in an active (gen_active = 1) gen_poaemployeeemployeroperator row. The policy must also have no existing link ...",
+          "evidence": "DTSX:3573-3587; 3803; 10055; 6153-6154"
+        }
+      ]
+    }
+  ]
+}

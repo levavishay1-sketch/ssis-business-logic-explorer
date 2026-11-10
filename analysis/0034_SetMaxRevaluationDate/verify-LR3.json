@@ -1,0 +1,66 @@
+{
+  "verifier": "ssis-verifier",
+  "package": "0034_SetMaxRevaluationDate",
+  "scope": "logic-claims re-check",
+  "checkedAt": "2026-11-10",
+  "checked": 7,
+  "results": [
+    {
+      "id": "L|summary",
+      "hash": "56c977eb1e5e",
+      "verdict": "CONFIRMED",
+      "detail": "summary_he re-derived from the single SqlStatementSource: SELECT @PrmMaxRevaluationDate = CONVERT(varchar(10), Max(dateadd(hh,3,gen_revaluationdate)),103) FROM Gen_fundmain WHERE gen_existinfile = 1 AND gen_revaluationdate < cast(YEAR(GETDATE()) as nvarchar)+'/'+CAST(MONTH(GETDATE()) as nvarchar)+'/'+'1', then UPDATE [gen_SystemConfigurationBase] SET [gen_Value] = @Prm WHERE gen_name = 'MaxRevaluationDate'. The DATEFORMAT dependence is stated correctly: the string is converted to datetime (higher precedence); gen_revaluationdate is datetime per the DB-derived parameter metadata of the INSERT into Gen_fundmainbase in 0004 (Param_69 dbTimeStamp, 0004_LeumiFile-MY.dtsx:62360). Under dmy a year-first string is read as y-d-m (11 Jan 2026 for '2026/11/1'); the connection sets no language (DTSX:6). Filter without +3h, +3h moves the stored date by a day when the max time is >= 21:00, dd/mm/yyyy (style 103), direct UPDATE on a Base table = Unsupported, and no other supplied DTSX contains 'MaxRevaluationDate' (grep) - all correct. scopeNote_he: one Execute SQL Task, no data flow, DTS:Variables empty, no DTS:Configurations element / EnableConfig, no event handlers, no log provider; [PCRM] = Data Source=PSQL; Initial Catalog=ALTSHULER_MSCRM (DTSX:4-6); Gen_fundmain as unsupplied object labelled השערה; Job override unknown - all correct.",
+      "evidence": "source/DailyProcess/0034_SetMaxRevaluationDate.dtsx:4-6, 12, 15; 0004_LeumiFile-MY.dtsx:62360; grep MaxRevaluationDate over source/DailyProcess (only 0034)",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|finding#2",
+      "hash": "ca627f1aa5ce",
+      "verdict": "CONFIRMED",
+      "detail": "Conditional and correct: a SELECT @var = MAX(...) over an empty set assigns NULL, and the UPDATE has no guard (no IF/ISNULL/WHERE on the value), so gen_Value is set to NULL when no row matches. Not framed as a bug.",
+      "evidence": "0034_SetMaxRevaluationDate.dtsx:15",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Execute SQL Task|title",
+      "hash": "347221c0c241",
+      "verdict": "CONFIRMED",
+      "detail": "title/short/flow units match the SQL: gen_existinfile = 1, revaluation date before the 'YYYY/M/1' string (1st of current month only under mdy/ymd - correctly hedged), MAX of date+3h, style 103 dd/mm/yyyy, UPDATE gen_SystemConfigurationBase.gen_Value WHERE gen_name='MaxRevaluationDate'.",
+      "evidence": "0034_SetMaxRevaluationDate.dtsx:15",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Execute SQL Task|short",
+      "hash": "2d070f472af4",
+      "verdict": "CONFIRMED",
+      "detail": "[1] flag meaning labelled unproven; boundary string and DATEFORMAT dependence correct (dmy -> y-d-m). [2] +3h then MAX then text dd/mm/yyyy. [3] direct DB write. [4] consumer unknown (no other supplied package mentions MaxRevaluationDate).",
+      "evidence": "0034_SetMaxRevaluationDate.dtsx:15",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Execute SQL Task|detailed",
+      "hash": "5227d91f50dd",
+      "verdict": "CONFIRMED",
+      "detail": "All units re-derived. [2] writers of gen_existinfile=1 on gen_fundmain verified: 0004 'UPDATE Gen_fundmain ... Set gen_existinfile = 1' (0004:92873-92874); 0004 INSERT into Gen_fundmainbase (61789) with Row.IsExistsFile = \"1\" (58963); 0008 SDK new Entity(\"gen_fundmain\") with gen_existinfile = true (23784 and 4 copies); 0009 SDK gen_fundmain (27026 and 4 copies). The only resets to 0 in supplied packages are gen_ftrequestbase (0009:189416), gen_warningnotebase (0012:92729) and gen_contactlinkBase.gen_existsinfile (0012:92720) - none on gen_fundmain. [3] dmy reading (day = current month number, January) correct. [7] NULL dates excluded. [8] 3h purpose labelled השערה. [9]-[13] MAX over empty set -> NULL -> gen_Value NULL. [14] UPDATE with no matching row updates nothing, no error, no INSERT. [15] bypasses CRM services.",
+      "evidence": "0034:15; 0004_LeumiFile-MY.dtsx:58963, 61789, 92873-92874; 0008_LeumiFile-PY.dtsx:23784; 0009_LeumiFile-BY.dtsx:27026, 189416; 0012_LeumiFile_CHN_Daily.dtsx:92720, 92729",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Execute SQL Task|detail",
+      "hash": "0338adeb6b97",
+      "verdict": "CONFIRMED",
+      "detail": "[1] population, implicit conversion and DATEFORMAT hedge, no language in connection string (DTSX:6), NULL excluded, existinfile writers and 'no reset' correct. [2] match by gen_name, no create. [3] SQL quoted exactly. [4] direct UPDATE of [gen_SystemConfigurationBase].[gen_Value] via [PCRM] -> PSQL/ALTSHULER_MSCRM; the package has no configuration, so design-time = runtime unless the Job overrides (stated in scopeNote). Unsupported. [5] consumer unknown - correct.",
+      "evidence": "0034:4-6, 15",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Execute SQL Task|decisions",
+      "hash": "079e539c2efc",
+      "verdict": "CONFIRMED",
+      "detail": "Both decisions quote the SQL exactly; meanings hedged for DATEFORMAT; outcomes (MAX participation; gen_Value = computed value or NULL) correct.",
+      "evidence": "0034:15",
+      "wrongUnits": []
+    }
+  ],
+  "missingWrites": []
+}

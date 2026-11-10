@@ -1,0 +1,359 @@
+{
+  "verifier": "ssis-verifier",
+  "package": "0023_Employers",
+  "scope": "logic-claims all",
+  "checkedAt": "2026-11-07T00:00:00Z",
+  "checked": 32,
+  "results": [
+    {
+      "id": "L|summary",
+      "hash": "d053bb466e17",
+      "verdict": "WRONG",
+      "detail": "Mechanics verified: gen_employers Update via ExecuteMultiple, weighted fee/funds value written to AccountBase by OLE DB Command on [CRM]. The business meaning of the gen_mf* fields and file columns is stated as fact without proof.",
+      "evidence": "Create main.cs:121-147 @DTSX:3887; DTSX:7988-7991; MF Source columns DTSX:9-24",
+      "wrongUnits": [
+        {
+          "unit": 1,
+          "problem": "Says the file updates 'הטבות דמי הניהול' (management-fee benefits) as fact.",
+          "correct": "Nothing in the supplied files expands 'MF' or labels gen_mfaccumulation/gen_mfdeposit as management fees. The file is 'הטבות מעסיקים.csv' with columns גמל / השתלמות / הפקדה / תאריך התחלת הסכם מהפקדה, and the task is 'Set MF on employers'. The analyst's own open question (Set MF open [1]) labels MF = Management Fee as a hypothesis, so this must be marked השערה here too. (Gen_employeesweightedmanagementfee in part 2 is a different, explicitly named attribute.)",
+          "evidence": "DTSX:9-24 (MF Source columns); grep of DTSX: no 'דמי ניהול' label; Set MF open [1]"
+        }
+      ]
+    },
+    {
+      "id": "L|exec",
+      "hash": "166c8cb6ab63",
+      "verdict": "WRONG",
+      "detail": "All triggers are correct. 8057, 8058 and 8059 lack LogicalAnd, so the two inputs of Update employer amount are OR. The only error is the step-4 label.",
+      "evidence": "DTSX:8053-8059",
+      "wrongUnits": [
+        {
+          "unit": 4,
+          "problem": "The label 'קליטת הטבות דמי ניהול למעסיקים' states the MF = management-fee meaning as fact.",
+          "correct": "The meaning of MF is unproven in the supplied files and must be labelled השערה (e.g. 'קליטת הטבות מעסיקים (MF, השערה: דמי ניהול)').",
+          "evidence": "DTSX:9-24; no label for gen_mf*"
+        }
+      ]
+    },
+    {
+      "id": "L|ignored",
+      "hash": "d72f7092179c",
+      "verdict": "CONFIRMED",
+      "detail": "Get Variables (gen_etlvariable read), Create/End ETL (gen_etlprocess), the OnError handler (gen_etlprocess status + annotation), Move FileTo Archive (MoveFile only), the three Set Warning columns, Union All 2 and ETL Warning 1 (gen_etlprocesswarning create) do no business CRM writes and feed nothing into gen_employers/account.",
+      "evidence": "Error ETL Process record ScriptMain.cs:32-51 @DTSX:8198; ETL Warning 1 main.cs:65-78 @DTSX:4912; DTSX:3693; DTSX:6033-6173"
+    },
+    {
+      "id": "L|finding#1",
+      "hash": "b570bf12889f",
+      "verdict": "CONFIRMED",
+      "detail": "UPDATE dbo.AccountBase SET Gen_EmployeesFundsValue=?, Gen_employeesweightedmanagementfee=? where accountid=? (Param_0 = FundsValue, Param_1 = fee, Param_2 = accountid) on connection [CRM] = Psql/ALTSHULER_MSCRM. It runs for rows where a stored value is NULL or differs. The impact is labelled as a hypothesis.",
+      "evidence": "DTSX:7988-7991; Update Account inputs -> Param_0/1/2; DTSX:4; DTSX:7747-7772"
+    },
+    {
+      "id": "L|finding#2",
+      "hash": "22ca34d33227",
+      "verdict": "CONFIRMED",
+      "detail": "The MF Source CM has the fixed ConnectionString 'C:\\Banks Source Files\\Leumi Source Files\\הטבות מעסיקים.csv' and no PropertyExpression. Check File Existence uses MFBenefitFilePath + MFBenefitFile, and Move FileTo Archive moves User::MFBenefitFile. The finding is worded conditionally.",
+      "evidence": "DTSX:9-11; Check File Existence ScriptMain.cs:36-53; DTSX:3693"
+    },
+    {
+      "id": "L|finding#3",
+      "hash": "43dc2adc6597",
+      "verdict": "CONFIRMED",
+      "detail": "Check If Date Valid sends both valid outputs (order 0 deposit, order 1 accumulation) into Union All 1 -> Create, and Create writes every non-null field (main.cs:127-136). The OR consequence is described correctly.",
+      "evidence": "DTSX:3759-3768; paths Deposit Date Valid / MF Accumulation Date Valid -> Union All 1; Create main.cs:127-136"
+    },
+    {
+      "id": "L|finding#4",
+      "hash": "ebffee96f354",
+      "verdict": "INCOMPLETE",
+      "detail": "Non-null codes other than 200001/1/200000/2 do go to the unconnected DE Output and are skipped silently.",
+      "evidence": "DTSX:3715-3724; Check Fund type outputs Pension Fund/Study Fund errorRowDisposition=FailComponent",
+      "wrongUnits": [
+        {
+          "unit": 0,
+          "problem": "Missing the NULL product-type case.",
+          "correct": "If product.ProductTypeCode is NULL for a matched employer (an inner join on product does not prevent a NULL code), 'ProductTypeCode == 200001 || ProductTypeCode == 1' evaluates to NULL. The Pension Fund/Study Fund outputs have errorRowDisposition=FailComponent, so the row fails the whole Set MF on employers data flow, and the archive move and the account calculation do not run. Such a row is not skipped silently.",
+          "evidence": "DTSX:5689-5695 (SQL), DTSX:3715, Check Fund type output dispositions"
+        }
+      ]
+    },
+    {
+      "id": "L|finding#5",
+      "hash": "92e9a32c70d7",
+      "verdict": "CONFIRMED",
+      "detail": "Create sets each gen_mf* field only `if (!Row.X_IsNull)` and sends RequestType.Update with no comparison against current values. Empty fields are not sent, so existing values remain. The 'cancelled benefit' consequence is conditional on cancellation being expressed as an empty field.",
+      "evidence": "Create main.cs:121-147"
+    },
+    {
+      "id": "L|finding#6",
+      "hash": "6ef6c5038290",
+      "verdict": "CONFIRMED",
+      "detail": "All six convert outputs have FailComponent, and MF Source columns have FailComponent on error and truncation. Because Sort is blocking, no row reaches Create before the failure. Constraint 8055 (Success) then blocks the archive move, 8059 is not satisfied, and 8058 is false because isFileExist=true, so Update employer amount does not run.",
+      "evidence": "DTSX:3820-3875; DTSX:8055, 8058, 8059"
+    },
+    {
+      "id": "L|finding#7",
+      "hash": "e54acd3a5f78",
+      "verdict": "CONFIRMED",
+      "detail": "SUM(ISNULL(balance,0) * pct) skips NULL products while the denominator includes the balance. Accounts without employers get SUM = 0, so both values are 0, written when the stored values are NULL. (When every fund of an account has a NULL pct and the balance is not 0, the fee becomes NULL; see the UEA detailed verdict.)",
+      "evidence": "get employers SQL DTSX:7796-7808"
+    },
+    {
+      "id": "L|finding#8",
+      "hash": "a4bb96ab1dd8",
+      "verdict": "WRONG",
+      "detail": "The DTSX facts are right: 8057, 8058 and 8059 lack LogicalAnd, 8053-8056 have \"True\", and no \"False\" appears anywhere. The statement about the extractor/evidence is wrong.",
+      "evidence": "tools/dtsx-extract.mjs:181; evidence/0023_Employers.json precedenceConstraints",
+      "wrongUnits": [
+        {
+          "unit": 1,
+          "problem": "Says the evidence file shows logicalAnd=true because dtsx-extract.mjs:181 defaults to True, and that the extractor must be fixed.",
+          "correct": "dtsx-extract.mjs:181 sets logicalAnd = (attribute === 'True'), so a missing attribute means OR. evidence/0023_Employers.json shows logicalAnd=false for the constraints at 8057, 8058 and 8059. The extractor already behaves as the finding requests.",
+          "evidence": "tools/dtsx-extract.mjs:181; evidence precedenceConstraints lines 8057-8059"
+        }
+      ]
+    },
+    {
+      "id": "L|finding#9",
+      "hash": "dac4e7e4a300",
+      "verdict": "CONFIRMED",
+      "detail": "The Create component sets Entity.Id = Row.Genemployersid and executes ExecuteMultipleExtension with RequestType.Update. It never creates records.",
+      "evidence": "Create main.cs:124-126, 147"
+    },
+    {
+      "id": "L|Package (control flow)|title",
+      "hash": "6354e388fd18",
+      "verdict": "CONFIRMED",
+      "detail": "Title, short_he and flow_he[1-5] match the constraints and Check File Existence (path + Archive\\yyyy.MM.dd created only when the file exists). The weighted management fee wording refers to the explicitly named Gen_employeesweightedmanagementfee.",
+      "evidence": "DTSX:8053-8059; Check File Existence ScriptMain.cs:36-55"
+    },
+    {
+      "id": "L|Package (control flow)|short",
+      "hash": "f22cdedd0d79",
+      "verdict": "WRONG",
+      "detail": "The flow is correct. Unit [4] states the MF meaning as fact.",
+      "evidence": "DTSX:9-24",
+      "wrongUnits": [
+        {
+          "unit": 4,
+          "problem": "Says 'הטבות דמי הניהול מהקובץ' as fact.",
+          "correct": "The meaning of the file's benefit fields as management fees is not proven in the supplied files. Label it השערה, or say 'הטבות המעסיקים מהקובץ'.",
+          "evidence": "DTSX:9-24; Set MF open [1]"
+        }
+      ]
+    },
+    {
+      "id": "L|Package (control flow)|detailed",
+      "hash": "0e1d97fccdde",
+      "verdict": "WRONG",
+      "detail": "Units [2]-[4], [6]-[12], [14] and [15] are verified. Unit [13] misstates the evidence file, unit [5] states the MF meaning as fact, and a failure branch of the archive step is missing.",
+      "evidence": "evidence/0023_Employers.json; DTSX:3693; DTSX:8059",
+      "wrongUnits": [
+        {
+          "unit": 13,
+          "problem": "Says the evidence file shows logicalAnd=true (the extractor's default).",
+          "correct": "The evidence shows logicalAnd=false for 8058 and 8059, and the extractor treats a missing attribute as OR (dtsx-extract.mjs:181).",
+          "evidence": "evidence precedenceConstraints; tools/dtsx-extract.mjs:181"
+        },
+        {
+          "unit": 5,
+          "problem": "'נקלטות הטבות דמי הניהול' is stated as fact.",
+          "correct": "The MF = management fee meaning is a hypothesis (unlabelled in the files).",
+          "evidence": "DTSX:9-24"
+        },
+        {
+          "unit": 0,
+          "problem": "Missing: the archive step can fail even after a successful load.",
+          "correct": "Move FileTo Archive is a MoveFile with no overwrite option set (FileSystemData has no overwrite attribute, so the default is no overwrite). If a file of the same name is already in today's Archive\\yyyy.MM.dd folder (e.g. a second file the same day), the move fails. Constraint 8059 (Success) is then not met, so the account calculation does not run, even though gen_employers was already updated.",
+          "evidence": "DTSX:3693; DTSX:8059"
+        }
+      ]
+    },
+    {
+      "id": "L|Package (control flow)|detail",
+      "hash": "9636fd91f71a",
+      "verdict": "WRONG",
+      "detail": "Units [1]-[3] are verified (fixed MF Source path, isFileExist decision, OR into the calculation, no CRM write in the control flow). Unit [4] states the MF meaning as fact.",
+      "evidence": "DTSX:9-24",
+      "wrongUnits": [
+        {
+          "unit": 4,
+          "problem": "'הטבות דמי הניהול של המעסיקים נטענות' is stated as fact.",
+          "correct": "The management-fee meaning of the gen_mf* benefits is not proven by the supplied files. Label it השערה.",
+          "evidence": "DTSX:9-24"
+        }
+      ]
+    },
+    {
+      "id": "L|Package (control flow)|decisions",
+      "hash": "0cd4c87110ce",
+      "verdict": "CONFIRMED",
+      "detail": "All 4 decisions match: ScriptMain.cs:45, 8057 (EvalOp 3 @[User::isFileExist]), 8058 (EvalOp 3 !@[User::isFileExist], no LogicalAnd), 8059 (Success, no LogicalAnd).",
+      "evidence": "Check File Existence ScriptMain.cs:45-53; DTSX:8057-8059"
+    },
+    {
+      "id": "L|Package (control flow)|open",
+      "hash": "254e204f2896",
+      "verdict": "CONFIRMED",
+      "detail": "MFBenefitFilePath/MFBenefitFile have the placeholder defaults 'FromDB', and the real values come from gen_etlvariable data that is not supplied. The config file is not supplied.",
+      "evidence": "DTSX variables MFBenefitFile/MFBenefitFilePath (value FromDB); DTSX:33"
+    },
+    {
+      "id": "L|Package\\Set MF on employers|title",
+      "hash": "40000c851cd8",
+      "verdict": "WRONG",
+      "detail": "flow_he[1]-[6] are verified, and short_he correctly labels MF as a hypothesis. title_he states it as fact.",
+      "evidence": "DTSX:9-24",
+      "wrongUnits": [
+        {
+          "unit": 1,
+          "problem": "title_he 'קליטת הטבות דמי ניהול' states the MF meaning as fact, contradicting short_he's own השערה label.",
+          "correct": "Label it as a hypothesis, e.g. 'קליטת הטבות מעסיקים (MF, השערה: דמי ניהול) לרשומות gen_employers'.",
+          "evidence": "DTSX:9-24"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Set MF on employers|short",
+      "hash": "eb0ae32d45b3",
+      "verdict": "WRONG",
+      "detail": "The branch structure matches. The meaning is stated as fact, and the validity test is simplified.",
+      "evidence": "DTSX:3759-3768; DTSX:9-24",
+      "wrongUnits": [
+        {
+          "unit": 6,
+          "problem": "'שיעור דמי הניהול מצבירה' is stated as fact (also unit [11]).",
+          "correct": "The MF = management fee meaning is a hypothesis.",
+          "evidence": "DTSX:9-24"
+        },
+        {
+          "unit": 7,
+          "problem": "The accumulation-validity test omits that an accumulation rate must exist.",
+          "correct": "Order 1 also requires !ISNULL(gen_mfaccumulation), plus both accumulation dates non-null, start < GETDATE() < end.",
+          "evidence": "DTSX:3767"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Set MF on employers|detailed",
+      "hash": "46ccc977b267",
+      "verdict": "WRONG",
+      "detail": "All tech facts are verified: MF Source mapping, TRIM (trim only; empty becomes NULL in convert), convert FailComponent, Left outer Merge Join on gen_corporatenumber with TreatNullsAsEqual, the split expressions and orders, Pension/Study derived columns, warning texts, and Update via ExecuteMultiple in batches of 1000. Errors: the MF meaning is stated as fact, and the NULL product-type behaviour is missing.",
+      "evidence": "DTSX:5836-5880, 3820-3875, 5732-5734, 3715-3801, 5936-6018, 6045-6159; Create main.cs:121-182",
+      "wrongUnits": [
+        {
+          "unit": 1,
+          "problem": "Names the file columns 'דמי ניהול לקופה / לקרן השתלמות / מהפקדה' as fact (also [12], [14], [25]).",
+          "correct": "The file headers are only 'גמל', 'השתלמות', 'הפקדה'. The management-fee meaning is a hypothesis.",
+          "evidence": "DTSX:9-24"
+        },
+        {
+          "unit": 15,
+          "problem": "Says any other product type is skipped without documentation.",
+          "correct": "This holds only for non-null other codes. A NULL ProductTypeCode makes the split condition NULL, and the Pension Fund/Study Fund outputs are FailComponent, so the whole data flow fails.",
+          "evidence": "DTSX:3715-3724 + output errorRowDisposition=FailComponent"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Set MF on employers|detail",
+      "hash": "f99974917a62",
+      "verdict": "WRONG",
+      "detail": "Units [1]-[4] are verified (population, Left outer join, decisions, the 5 attributes written only when non-null). Unit [5] states the meaning as fact.",
+      "evidence": "DTSX:9-24; Create main.cs:127-136",
+      "wrongUnits": [
+        {
+          "unit": 5,
+          "problem": "'הטבות דמי הניהול' is stated as fact.",
+          "correct": "The management-fee meaning of gen_mf* is a hypothesis (not labelled in the supplied files).",
+          "evidence": "DTSX:9-24"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Set MF on employers|decisions",
+      "hash": "e05673c276f7",
+      "verdict": "CONFIRMED",
+      "detail": "Decisions 1-9 match the DTSX exactly (JoinType=1 Left, key gen_corporatenumber, ISNULL(Gen_employersid), the fund-type expressions and orders, the date-valid expressions, Default -> warning, and Create's IsNull guards). The decision labels Pension/Study Fund are the output names in the DTSX.",
+      "evidence": "DTSX:5732, 3800, 3715-3724, 3759-3768; Create main.cs:127-136"
+    },
+    {
+      "id": "L|Package\\Set MF on employers|crm",
+      "hash": "d3fa16611764",
+      "verdict": "CONFIRMED",
+      "detail": "gen_employers Update via SDK ExecuteMultiple (RequestType.Update) of the 5 gen_mf* attributes, NULLs not sent. gen_employers join product is read via OLE DB Source on [CRM].",
+      "evidence": "Create main.cs:124-147; DTSX:5689-5699"
+    },
+    {
+      "id": "L|Package\\Set MF on employers|open",
+      "hash": "ecd0b34c9c32",
+      "verdict": "CONFIRMED",
+      "detail": "The MF meaning is correctly labelled a hypothesis and cannot be settled from the files. The date/number format depends on the data and locale. The product code semantics come from the product table, which is not supplied.",
+      "evidence": "DTSX:9-24, 3840-3870, 3715-3724"
+    },
+    {
+      "id": "L|Package\\Update employer amount|title",
+      "hash": "424a74ba3708",
+      "verdict": "CONFIRMED",
+      "detail": "The SQL, the 4-way change check and the direct UPDATE dbo.AccountBase on [CRM] all match.",
+      "evidence": "DTSX:7796-7812, 7747-7772, 7988-7991"
+    },
+    {
+      "id": "L|Package\\Update employer amount|short",
+      "hash": "534f317eb0b3",
+      "verdict": "CONFIRMED",
+      "detail": "The summary flow matches: compute, compare (NULL or different), then direct SQL update, otherwise no path.",
+      "evidence": "DTSX:7747-7772; Update employer amount paths"
+    },
+    {
+      "id": "L|Package\\Update employer amount|detailed",
+      "hash": "8be5cb535adf",
+      "verdict": "WRONG",
+      "detail": "Units [1]-[13] and [15] are verified against the SQL and the split. Unit [14] is wrong, and the all-NULL-percentage case is missing.",
+      "evidence": "DTSX:7796-7808; DTSX:7747-7772 (Update3 errorRowDisposition=FailComponent)",
+      "wrongUnits": [
+        {
+          "unit": 14,
+          "problem": "Says an account without employers/funds gets 0 'as long as its stored value is empty'.",
+          "correct": "Such an account computes 0/0. It is updated to 0 whenever a stored value is NULL OR differs from 0 (orders 2/3, !=). An account that previously had non-zero values and lost its employers/funds is also reset to 0.",
+          "evidence": "DTSX:7763, 7771"
+        },
+        {
+          "unit": 0,
+          "problem": "Missing: the weighted fee can be NULL.",
+          "correct": "If the balance sum is not 0 and every fund of the account has a NULL Gen_managementFeePercentage, the numerator SUM is NULL, so the fee is NULL (not a down-biased number). If the stored fee is NULL, order 0 sends the row to the update and writes NULL. If the stored fee is non-NULL (and FundsValueDB non-NULL), order 2 'fee != feeDB' evaluates to NULL; output Update3 has errorRowDisposition=FailComponent, so the data flow fails and End ETL does not run (8056).",
+          "evidence": "DTSX:7796-7801; DTSX:7763; DTSX:8056"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Update employer amount|detail",
+      "hash": "5448d1dc0aec",
+      "verdict": "CONFIRMED",
+      "detail": "Population (all accounts, LEFT JOINs), keyed by accountid, the 4 ordered conditions into Union All with first-match routing (no duplicates), and the direct SQL update of 2 attributes are all verified.",
+      "evidence": "DTSX:7796-7812, 7747-7772, 7988-7991; Union All paths"
+    },
+    {
+      "id": "L|Package\\Update employer amount|decisions",
+      "hash": "cc19ba1a3295",
+      "verdict": "CONFIRMED",
+      "detail": "The SQL CASE text and the 4 split conditions (orders 0-3) match exactly.",
+      "evidence": "DTSX:7796-7801, 7747-7772"
+    },
+    {
+      "id": "L|Package\\Update employer amount|crm",
+      "hash": "453843b51c23",
+      "verdict": "CONFIRMED",
+      "detail": "OLE DB Command on [CRM] (Psql/ALTSHULER_MSCRM): UPDATE dbo.AccountBase SET Gen_EmployeesFundsValue=?(Param_0), Gen_employeesweightedmanagementfee=?(Param_1) WHERE accountid=?(Param_2), which is Unsupported. Reads come from account/gen_employers/gen_fundmain.",
+      "evidence": "DTSX:7988-8001; Update Account input -> Param mapping; DTSX:4"
+    },
+    {
+      "id": "L|Package\\Update employer amount|open",
+      "hash": "0c0ff716cbc3",
+      "verdict": "CONFIRMED",
+      "detail": "Whether Gen_managementFeePercentage is NULL in practice, and what gen_corporatename targets, cannot be determined from the files. (The all-NULL consequence is covered in the detailed verdict.)",
+      "evidence": "DTSX:7796-7808"
+    }
+  ]
+}

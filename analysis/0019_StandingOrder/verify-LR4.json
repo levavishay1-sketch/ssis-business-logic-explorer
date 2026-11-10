@@ -1,0 +1,24 @@
+{
+  "verifier": "ssis-verifier",
+  "package": "0019_StandingOrder",
+  "scope": "logic-claims re-check",
+  "checkedAt": "2026-11-10",
+  "checked": 1,
+  "results": [
+    {
+      "id": "L|Package\\Update Standing Order First Transaction Received|short",
+      "hash": "eab695e410f8",
+      "verdict": "INCOMPLETE",
+      "detail": "I re-derived the units from the SqlCommand at DTSX:3975-4012 and from update Standing Order main.cs (DTSX:4092, sha 0d253194…). These units are correct. [1]: the filters are gen_isfirsttransactionreceivied = 0 and gen_ispastrecord = 0 (DTSX:3987-3988), with no statecode/statuscode filter. [2]: the conditions are '53'/'02' (DTSX:3989-3990); bank via gen_banks.Gen_BankNumber = ft.Gen_CurrentAccountBank (DTSX:3994); branch equality (DTSX:3993); account number right(13 zeros + x, 12) on both sides (DTSX:3992), which I accept as 'same account' because leading zeros are ignored; amount and date per depositType = 2 / <> 2 with '<=' (DTSX:3996-4009); a NULL depositType matches neither branch. The table meaning is labelled השערה. [6]: an order that is not updated keeps flag 0 and is read again next run. [7]: ROW_NUMBER partitions by ft.gen_transtotalamount, so.gen_bankname, so.gen_bankaccountnumber, so.gen_branch, with RowNum = 1 (DTSX:3978, 4012). Each order falls in one partition, because its amount is fixed by depositType, so only one order per combination is marked. The hedge in [8] about '53'/'02' and 'first transaction' is correct. What is missing is a written attribute. The write in unit [4], and the outcome in unit [8], name only statuscode = 100000009. The script also sets gen_isfirsttransactionreceivied = true in the same service.Update (main.cs:127, DTSX:4341). This second write is business logic: it is why a marked order is not selected again (filter = 0 at DTSX:3987). Contrast unit [6], where an order that is not marked is re-checked.",
+      "evidence": "0019_StandingOrder.dtsx:3975-4012 (3978, 3987-3994, 3996-4009, 4012); main.cs:84,125-129 (DTSX:4338-4343); paths DTSX:5070-5072; precedence DTSX:5079-5081",
+      "wrongUnits": [
+        {
+          "unit": "[4] write / [8] end",
+          "problem": "Only statuscode = 100000009 is listed. The script also writes gen_isfirsttransactionreceivied = true in the same Update.",
+          "correct": "הוראת הקבע מעודכנת דרך ה-SDK (Update): statuscode = 100000009 (FIRST_TRANSACTION_RECEIVED) ו-gen_isfirsttransactionreceivied = true, ולכן לא תיבחר שוב בריצות הבאות.",
+          "evidence": "main.cs:126-127 (DTSX:4340-4341)"
+        }
+      ]
+    }
+  ]
+}

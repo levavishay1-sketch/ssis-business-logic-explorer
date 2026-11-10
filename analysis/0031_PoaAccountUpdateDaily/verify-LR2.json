@@ -1,0 +1,145 @@
+{
+  "verifier": "ssis-verifier",
+  "package": "0031_PoaAccountUpdateDaily",
+  "scope": "logic-claims re-check round 2",
+  "checkedAt": "2026-11-07T16:56:57Z",
+  "checked": 13,
+  "results": [
+    {
+      "id": "L|summary",
+      "hash": "f5ad14a9cd5e",
+      "verdict": "WRONG",
+      "detail": "Unit 2 (scopeNote) is correct: no DTS:Configuration; [CRM] DTSX:4 and [SQL.GENERIX_STAGING] DTSX:53; the only OLE DB Commands on [CRM] are Update NeedToSendMailBit and Update sentToPrintOn; Kingsway (DTSX:23) is unused; the four agent-email scripts are commented out (DTSX:13989, 15683, 23130, 24705). Unit 1 is mostly correct: the CASE without ELSE, emailDetailsJson never read, the enrichment drop-outs, and the CSV split by agent/agency email all match. Three statements in unit 1 do not meet the standard. (a) 'תחזוקה יומית': the daily frequency comes only from the package name (PoaAccountUpdateDaily) and the folder name. No schedule is in the files, and the file name stamp is per run (_yyyy-MM-dd_HH_mm, DTSX:36911). (b) 'נשלח מייל סיכום, גם כשאין שורות': the mail is sent in Send Email PostExecute (main.cs:25-29). That PostExecute runs once per data-flow execution even with zero rows is SSIS lifecycle behaviour, not shown in the files, and the text does not mark it. It also only happens when Send Poa Emails runs, because all precedence constraints are Success. Also, the subject is the file name without its extension (main.cs:48-49), not 'שם קובץ הדיוור'. (c) 'לחשבונות ולתוכניות פנסיה ... נוצרים ייפויי כוח': in the pension flow, Remove Duplicates sorts on Gen_powerofattorneymainId only with EliminateDuplicates=true (DTSX:9066-9068). So per run only one new program per POA Main gets a POA. Not a defect, a note: the summary does not mention the annotation move (annotation.objectid Update via SDK, DTSX:3431 and 7722).",
+      "evidence": "DTSX:4, 23, 53, 3431, 7722, 9066-9068, 36911; Send Email main.cs:25-29, 48-49 (DTSX:33987); precedence constraints (all Success)",
+      "wrongUnits": [
+        { "unit": 1, "problem": "'תחזוקה יומית' states a run frequency taken only from the package and folder names.", "correct": "Drop 'יומית', or label it: 'לפי שם החבילה (Daily) — השערה; תזמון ההרצה לא מופיע בקבצים'.", "evidence": "package name 0031_PoaAccountUpdateDaily; Set Destinations Paths ScriptMain.cs (DTSX:36911): file name stamped per run" },
+        { "unit": 1, "problem": "'גם כשאין שורות' depends on SSIS PostExecute lifecycle behaviour, and the text does not mark it. The subject is not the file name but the file name without its extension.", "correct": "'בסוף זרימת Send Poa Emails (ב-PostExecute) נשלח מייל סיכום שהנושא שלו הוא שם קובץ הדיוור בלי הסיומת; לפי התנהגות SSIS המתועדת, לא מוצג בקבצים: PostExecute נקרא בכל הרצה של הזרימה, גם כשאין שורות.'", "evidence": "Send Email main.cs:25-29, 48-49 (DTSX:33987)" },
+        { "unit": 1, "problem": "'לחשבונות ולתוכניות פנסיה ... נוצרים ייפויי כוח' does not hold for pension programs. Only one program per POA Main continues in each run.", "correct": "'... לתוכניות פנסיה: תוכנית אחת לכל ייפוי כוח ראשי בכל ריצה (הסרת כפילויות לפי POA Main)'.", "evidence": "Create Power Of Attorney - Pension\\Remove Duplicates DTSX:9066-9068 (sort key Gen_powerofattorneymainId, EliminateDuplicates=true)" }
+      ]
+    },
+    {
+      "id": "L|finding#4",
+      "hash": "cb8e27be8bf7",
+      "verdict": "WRONG",
+      "detail": "The code is as described. Send Email PostExecute calls CreateAndSendEmail (main.cs:25-29). The email goes from the queue Guid.Parse(LibaSystemQueueId) to the queue Guid.Parse(MailingReportsCustomerTeamQueueId) (main.cs:55, 59), and the team name is labelled a hypothesis. But 'בכל ריצה, גם כשלא נוצרה אף שורת דיוור' rests on SSIS runtime behaviour that the files do not show: PostExecute is called once per data-flow execution even when the input gets zero rows. The finding does not mark this, as the standard requires. It also happens only in runs where Send Poa Emails executes, because every precedence constraint is Success. When rows exist but all go to the error file, the mail is sent too (that part follows from the paths).",
+      "evidence": "Send Email main.cs:25-29, 55, 59 (DTSX:33987); paths Update sentToPrintOn → Send Email; package precedence constraints",
+      "wrongUnits": [
+        { "unit": 1, "problem": "The zero-rows behaviour is SSIS runtime behaviour stated as fact without the required marker. 'בכל ריצה' ignores that the flow runs only after the earlier tasks succeed.", "correct": "'מייל הסיכום נשלח ב-PostExecute של Send Email בכל הרצה של זרימת Send Poa Emails; לפי התנהגות SSIS המתועדת, לא מוצג בקבצים: PostExecute נקרא גם כשלא הגיעה אף שורה, ולכן המייל נשלח גם כשלא נוצרה אף שורת דיוור.'", "evidence": "Send Email main.cs:25-29 (DTSX:33987)" }
+      ]
+    },
+    {
+      "id": "L|Package\\Handle Wait Status|title",
+      "hash": "7a7229de9a19",
+      "verdict": "CONFIRMED",
+      "detail": "Source: Gen_startdate <= GETDATE() and Gen_currentstate = 3 (DTSX:27226). 'ממתין' for 3 is attributed in this package's open claim to the 0029:3889 SQL comment '-- waiting'. Lookup on an active POA (state 1) with the same isnull(account, program) key (DTSX:27081). Is Renewal compares agentcyIdNumberPa == agentcyIdNumber; Not Renewal (default) goes to Update NeedToSendMailBit. That component runs on [CRM] (DTSX:31302): CASE WHEN old Gen_appendixtype in 2/3/5 THEN Param_0 END, with Param_0 = Gen_receivingdatePoa = dateadd(HH,3,poa.gen_receivingdate) of the waiting POA and Param_1 = PowerOfAttorneyIdPa. AppendixType: 2/3/5 goes to the letter branch, and it is reached only via Not Renewal. Update Json updates WHERE PowerOfAttorneyId = ? and isProcessed = 0 and emailDetailsJson is null (DTSX:31256-31260). Activation sets gen_currentstate = 1 through the SDK (main.cs:32-50). Flow steps 1-5 match. Not a defect: when several active POAs exist, the summary does not mention which match is used. The detailed claim covers this.",
+      "evidence": "DTSX:27226, 27081, 27045, 31302, 22849, 31256-31260, 30214 main.cs:32-50",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Handle Wait Status|short",
+      "hash": "f3d2d631b3f2",
+      "verdict": "CONFIRMED",
+      "detail": "The three branches match the paths. Lookup No Match goes to Union All Data To Update Status. Is Renewal Renewal goes to the Union. Not Renewal goes to Update NeedToSendMailBit, then AppendixType (NoMail to the Union; NeedToSendMail to Check Format, the email scripts (sync pass-through), Set Data, and the Union). All rows then go through Sort, Is emailDetailsJson Contains Data 1 (No Data), Multicast, and ACTIVE. Unit 8 places the SQL write and the JSON in the other-agent branch with the right conditions. Unit 10 is hedged correctly: activation holds 'unless the CRM update fails', and the text says the package does not read the JSON. No supplied DTSX reads emailDetailsJson in SQL (only 0030/0031 mention it, as a column).",
+      "evidence": "Handle Wait Status path list (component.mjs --list); DTSX:27045, 31299, 22849, 27372, 28819, 27012, 30214",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Handle Wait Status|detailed",
+      "hash": "7550d30b2224",
+      "verdict": "WRONG",
+      "detail": "The structure and data facts match the DTSX: source WHERE and columns (DTSX:27226-27264); Lookup CacheType=0 (full), NoMatchBehavior=1 (DTSX:27099-27100); Is Renewal and AppendixType with FailComponent (DTSX:27056, 22859); the parameter mapping of Update NeedToSendMailBit (DTSX:31302); Check Format 1/2, matching the literals 'מייל נוסח 1/2' (EmailFormat1/2 - Error); the email scripts commented out; Set Data main.cs:44-121 with IsFirst only on the first row per POA Main and the JSON only on that row; Update Json WHERE; Sort EliminateDuplicates=false (DTSX:28821); the No Data / Contains Data paths; ACTIVE main.cs:32-50; and the unconnected Error output. The failure statements about the SQL commands are correct (FailComponent, DTSX:31267, 31315). Three statements describe SSIS runtime behaviour that the files do not show, and they lack the required marker.",
+      "evidence": "DTSX:27079-27105 (Lookup), 27045/27056 (Is Renewal), 22849/22859 (AppendixType); reports/logic-verify-standard.md 'Accepted forms'",
+      "wrongUnits": [
+        { "unit": 2, "problem": "'אם יש כמה, נלקחת ההתאמה הראשונה' is SSIS Lookup behaviour (with duplicate keys in a full cache, the first row loaded is used). The file shows only CacheType=0; the behaviour is not shown in the files and the text does not mark it.", "correct": "'אם יש כמה ייפויי כוח פעילים באותו מפתח, לפי התנהגות SSIS המתועדת (לא מוצג בקבצים) ה-Lookup מחזיר את ההתאמה הראשונה שנטענה ל-cache; הסדר אינו מוגדר (אין ORDER BY).'", "evidence": "DTSX:27081 (no ORDER BY), 27099 (CacheType 0)" },
+        { "unit": 6, "problem": "'ערך NULL באחד הצדדים יכשיל את הזרימה' depends on SSIS expression evaluation: a NULL condition result is an error, and FailComponent then fails the flow. Only the NULL occurrence is marked as a hypothesis; the consequence is stated as fact.", "correct": "'... לפי התנהגות SSIS המתועדת, לא מוצג בקבצים: תנאי שמחזיר NULL נחשב שגיאה, ועם FailComponent (DTSX:27056) הזרימה נכשלת; השערה לגבי הופעת NULL.'", "evidence": "DTSX:27056" },
+        { "unit": 11, "problem": "The same unmarked runtime consequence for AppendixType with gen_appendixtype NULL.", "correct": "Add 'לפי התנהגות SSIS המתועדת, לא מוצג בקבצים' to the NULL → failure consequence (FailComponent DTSX:22859).", "evidence": "DTSX:22859" }
+      ]
+    },
+    {
+      "id": "L|Package\\Handle Wait Status|detail",
+      "hash": "fe377951d009",
+      "verdict": "WRONG",
+      "detail": "Units 3-6 are correct. Unit 4: SDK update gen_currentstate=1, SQL update of Gen_powerofattorneyBase.gen_receivingdateofcancelpoa (Unsupported), staging emailDetailsJson. Unit 5: in 0031 the field is read only by Handle Active Status (DTSX:18172), decides NoMail through ISNULL (DTSX:18083), and is the RecievingDate value in the JSON (Set Data For Cancel Poa Emails main.cs:99). It is written only by DTSX:31303. Unit 6: the 0029 gen_powerofattorney creators (0029:1779, 4269, 6761, 13901, 16621, 19488, 44891) all sit inside disabled executables (Active POA, Cancel*, Create POA for future funds*, Out of Date). 0030 has no gen_powerofattorney create. The 0030 staging loaders are at 0030:5219 / 6701 and are labelled a hypothesis. Units 1 and 2 are wrong.",
+      "evidence": "DTSX:27226 (poa.Gen_startdate <= GETDATE()), 27099 (CacheType 0), 18083, 18172, 31303; 0029_POA.dtsx executable Disabled flags (79, 2555, 4992, 7356, 10195, 13047, 15775, 18634, 43174)",
+      "wrongUnits": [
+        { "unit": 1, "problem": "'Gen_startdate <= היום' misstates the operand. The SQL compares with GETDATE(), the current date and time, not today's date. A POA whose start date-time is later today is not selected.", "correct": "'Gen_currentstate = 3 ו-Gen_startdate <= GETDATE() (התאריך והשעה הנוכחיים של שרת ה-SQL)'.", "evidence": "DTSX:27226 SqlCommand WHERE" },
+        { "unit": 2, "problem": "'Full cache, התאמה ראשונה' states SSIS Lookup duplicate-key behaviour as fact, without the required marker.", "correct": "'Full cache; אם יש כמה התאמות — לפי התנהגות SSIS המתועדת, לא מוצג בקבצים — נלקחת הראשונה שנטענה (סדר לא מוגדר)'.", "evidence": "DTSX:27081, 27099" }
+      ]
+    },
+    {
+      "id": "L|Package\\Handle Active Status|detailed",
+      "hash": "25475053760d",
+      "verdict": "WRONG",
+      "detail": "Units 1-7 and 9-15 match the DTSX. Source WHERE Gen_enddate <= GETDATE() and Gen_currentstate = 1 (DTSX:18171). NoMail = ISNULL(gen_receivingdateofcancelpoa). Check Format EmailFormatTrue goes to With Commission Appointment, whose error literal is 'מייל נוסח 3'; the default goes to To Perform Actions, 'נוסח 8'. Both scripts are commented out (DTSX:13989, 15683). RecievingDate = genreceivingdateofcancelpoa (main.cs:99). Update Json has no isProcessed filter (DTSX:22769-22771). Union All Data, Sort (EliminateDuplicates=false, DTSX:20669), and Contains Data 1 No Data go to Multicast and CANCELED. CANCELED main.cs:67-90 uses the constants CANCELED = 2 and WAITING_SENDING_TO_BANK = 2. The Error output has no path, and Union Error receives only Email Format3/8 - Error. Units 8 and 16 are wrong. Set Data For Cancel Poa Emails (main.cs:54-66, 88-96, 124) emits one CustomOutput row per POA but fills emailDetailsJson only for the IsFirst POA of each POA Main. The 'Is emailDetailsJson Contains Data' split sends only Contains Data to Update Json; its No Data output has no path. So the JSON is written only into the staging row of the first POA of each POA Main in the run. The staging rows of the other cancelled POAs under the same POA Main are not updated. This is the same mechanism that was corrected in Handle Wait Status unit 17.",
+      "evidence": "Set Data For Cancel Poa Emails main.cs:54-66, 88-96, 124 (DTSX:18330); Handle Active Status path list: only 'Is emailDetailsJson Contains Data.Outputs[Contains Data] => Update Json To PowerOfAttorneySendEmails'; DTSX:22769-22771",
+      "wrongUnits": [
+        { "unit": 8, "problem": "'ה-JSON נשמר בשורת ייפוי הכוח' reads as if every cancelled POA's staging row gets the JSON. In fact only the first POA (IsFirst) of each POA Main gets it.", "correct": "'ה-JSON (אחד לכל ייפוי כוח ראשי, כולל את כל ייפויי הכוח שלו) נשמר רק בשורת המכתב של ייפוי הכוח הראשון של כל ייפוי כוח ראשי בריצה, אם השורה קיימת, בלי תנאי על מצב העיבוד ועל JSON קיים (דורס). שורות המכתב של שאר ייפויי הכוח תחת אותו ייפוי כוח ראשי לא מתעדכנות.'", "evidence": "main.cs:56-65 (DTSX:18330); DTSX:22769-22771; no path from 'Is emailDetailsJson Contains Data.Outputs[No Data]'" },
+        { "unit": 16, "problem": "'נבנים נתוני מכתב ביטול ונשמרים בשורת המכתב ב-staging' has the same over-generalisation.", "correct": "'... נשמרים רק בשורת המכתב של ייפוי הכוח הראשון של כל ייפוי כוח ראשי (אם קיימת)'.", "evidence": "same as unit 8" }
+      ]
+    },
+    {
+      "id": "L|Package\\Send Poa Emails|title",
+      "hash": "aa2c93ea5974",
+      "verdict": "WRONG",
+      "detail": "Unit 1 is correct. In unit 2, the agent/agency enrichment and the drop of unmatched rows (Get Agent / Get Agencie / Get Power Of Attorney / Get Contact / Pension / Provident Fund: No Match without a path) are correct. The data file versus the error file (Check If Exists: ISNULL(EmailSohen) || EmailSohen == '') is correct. So are isProcessed = 1, gen_SentToPrintOn = GETUTCDATE() on [CRM], and the summary mail with the team-name hypothesis. flow_he[1], [2], [4] and [5] are correct. flow_he[3] is wrong. Get Reciving Date (DTSX:31966-31986) looks up any Gen_powerofattorney with Gen_currentstate = 1 that has the same 9-digit customer id and the same isnull(CustomerAccountName, programName). Calling it 'the new' active POA is an interpretation the files do not prove: activation in Handle Wait Status does not cancel the old POA, so an account can hold several active POAs. Also, 'שבוטל' is a meaning given to the staging value StatusAfterUpdate = 2. In 0031 it rests only on the split output name 'Canceled' (DTSX:31450), and no claim of this package attributes it. Supporting evidence exists: 0030 writes NewStatus = 2 to StatusAfterUpdate in 'Handle Active Status - For Cancel' (0030:4064/4115 with the email-name literals 'ביטול ייפוי כוח…', and 0030:5219), but 0030's role as loader is itself a hypothesis.",
+      "evidence": "DTSX:31450, 31964-31986, 32186 main.cs:56-69; 0030_PoaAccountUpdateDailyTest.dtsx:4064-4070, 4115-4121, 5219-5240",
+      "wrongUnits": [
+        { "unit": 5, "problem": "flow_he[3] 'תאריך הקבלה של ייפוי הכוח הפעיל החדש' says 'new', which is not proven. 'בייפוי כוח שבוטל' gives StatusAfterUpdate = 2 a meaning without attribution.", "correct": "'StatusAfterUpdate = 2 (שם הפלט 'Canceled'; ב-0030, הטוען המשוער, הערך 2 נכתב בזרימת הביטול) → תאריך הקבלה של ייפוי כוח פעיל (gen_currentstate = 1) של אותו לקוח ואותו חשבון/תוכנית; אם אין — תאריך הקבלה של ייפוי הכוח עצמו.'", "evidence": "DTSX:31450, 31966-31986; Proccess Data main.cs:56-69" }
+      ]
+    },
+    {
+      "id": "L|Package\\Send Poa Emails|short",
+      "hash": "ad6dd275917c",
+      "verdict": "WRONG",
+      "detail": "Units 1-8 match the DTSX: source isProcessed = 0 (DTSX:31820); the enrichment drop-outs; the email split; the error file with ErrorReason 'לא עודכנה כתובת מייל' (DTSX:31390); Update IsProcessed True and Update sentToPrintOn on both branches (Multicast 1 Output 3 and Multicast 2 Output 3 go to Union All, then DTSX:36554 and 36592); queue-to-queue SDK mail with the names labelled a hypothesis. Unit 9 says 'קובץ דיוור יומי'. The daily cadence comes only from the package name. The files show a per-run file name (_yyyy-MM-dd_HH_mm, Set Destinations Paths DTSX:36911) and no schedule.",
+      "evidence": "DTSX:31813-31820, 31390, 31417, 36554, 36592, 36911; Send Email main.cs:55, 59",
+      "wrongUnits": [
+        { "unit": 9, "problem": "'קובץ דיוור יומי' states a run frequency taken from the package name.", "correct": "'בכל הרצה נוצר קובץ דיוור (שם הקובץ כולל תאריך ושעה) למכתבי ייפוי כוח לסוכנים, יחד עם קובץ חריגים.' If 'יומי' stays, add 'לפי שם החבילה, השערה'.", "evidence": "Set Destinations Paths ScriptMain.cs (DTSX:36911)" }
+      ]
+    },
+    {
+      "id": "L|Package\\Send Poa Emails|detailed",
+      "hash": "420c0f1507d6",
+      "verdict": "WRONG",
+      "detail": "These units are correct. Units 1-10: source SQL (DTSX:31813-31820) and no-cache Get Agent / Get Agencie (CacheType 2) with No Match chained or without a path. Units 12-20: Pension / Provident Fund. Unit 23: Get Reciving Date with NoMatchBehavior=0 and Match output errorRowDisposition=IgnoreFailure (DTSX:32013), plus the getRecivingDate fallback (main.cs:56-69). Units 26-33 and 35: Proccess Data main.cs:30-52, the 15 Create POA File columns including 'סטטוס' = StringMap gen_currentstate LangId 1037 (DTSX:31863-31880), the error file, isProcessed and gen_SentToPrintOn on both branches. In unit 34, the sender and recipient queues are now correctly labelled a hypothesis, and the Set Destinations Paths description matches ScriptMain.cs (base name + '_' + yyyy-MM-dd_HH_mm + '.csv', {Year}/{Month} replacement, CreateDirectory; DTSX:36911-36925). Three statements are wrong.",
+      "evidence": "Get Power Of Attorney SqlCommand DTSX:31863-31880; Conditional Split DTSX:31450; Send Email main.cs:25-29 (DTSX:33987); 0030:4064, 4115, 5219",
+      "wrongUnits": [
+        { "unit": 11, "problem": "'מינוי הסוכן (טקסט) של ייפוי הכוח': the appointment label comes from the POA Main (poamain.gen_agentappointment, StringMap objecttypecode 10101), not from the gen_powerofattorney record.", "correct": "'... הסטטוס (טקסט) של ייפוי הכוח, ומינוי הסוכן (טקסט) של ייפוי הכוח הראשי'.", "evidence": "DTSX:31863-31872 (left join Gen_powerofattorneymain poamain; StringMap_appointmentofagent_Poam … AttributeValue = poamain.gen_agentappointment)" },
+        { "unit": 21, "problem": "'הסטטוס אחרי העדכון הוא 2 (״בוטל״)' gives a meaning to a staging value. In 0031 its only basis is the split output name 'Canceled'; no attribution is given.", "correct": "Attribute it: 'StatusAfterUpdate == 2 (פלט בשם Canceled; ב-0030, הטוען המשוער של הטבלה, הערך 2 נכתב בזרימת הביטול — השערה)'.", "evidence": "DTSX:31450; 0030_PoaAccountUpdateDailyTest.dtsx:4064-4070, 5219-5240" },
+        { "unit": 34, "problem": "'המייל נשלח בכל ריצה, גם בלי שורות' rests on SSIS PostExecute lifecycle behaviour that the files do not show, and the text does not mark it. It also holds only when Send Poa Emails executes.", "correct": "'המייל נשלח ב-PostExecute בכל הרצה של הזרימה; לפי התנהגות SSIS המתועדת, לא מוצג בקבצים: גם כשלא הגיעה אף שורה.'", "evidence": "Send Email main.cs:25-29 (DTSX:33987)" }
+      ]
+    },
+    {
+      "id": "L|Package\\Send Poa Emails|detail",
+      "hash": "6415f2f88f8b",
+      "verdict": "WRONG",
+      "detail": "Units 1, 2, 4 and 6 are correct. Unit 1: source isProcessed = 0; the loader is labelled a hypothesis. Unit 2: the id-based no-cache lookups; Get Reciving Date matches on the 9-digit id plus account/program name against an active POA. Unit 4: SQL update of Gen_powerofattorney.gen_SentToPrintOn (Unsupported), SDK email Create + SendEmail, staging isProcessed = 1, and two CSV files. Unit 6: sourceTables, with 0030:5219 / 6701 as a hypothesis. Units 3 and 5 are wrong.",
+      "evidence": "DTSX:31964-31986, 36911; 0030_PoaAccountUpdateDailyTest.dtsx:5219, 6701",
+      "wrongUnits": [
+        { "unit": 3, "problem": "'סטטוס 2 → תאריך הפעיל החדש': the lookup returns any POA with gen_currentstate = 1 for the same customer and account/program; 'new' is not proven. 'סטטוס 2' is also used as cancelled elsewhere without attribution.", "correct": "'StatusAfterUpdate = 2 → תאריך הקבלה של ייפוי כוח פעיל של אותו לקוח וחשבון/תוכנית (אחרת של ייפוי הכוח עצמו)'.", "evidence": "DTSX:31966-31986; Proccess Data main.cs:56-69" },
+        { "unit": 5, "problem": "'קובץ דיוור יומי' states a frequency taken from the package name.", "correct": "'קובץ דיוור (לכל הרצה, שם עם תאריך ושעה)'. If 'יומי' stays, add 'לפי שם החבילה, השערה'.", "evidence": "Set Destinations Paths DTSX:36911" }
+      ]
+    },
+    {
+      "id": "L|Package\\Create Power Of Attorney|detail",
+      "hash": "0b07eadb6e17",
+      "verdict": "WRONG",
+      "detail": "Units 2-6 are correct. Unit 2: the join on Gen_powerofattorneymain.gen_contactname = Gen_customeraccount.Gen_contactname; ROW_NUMBER per account by Gen_signaturedate desc, applied after the WHERE; the partial-cache lookup on Gen_powerofattorney.Gen_customeraccount whose Match output has no path. Unit 3: product 2 skips the consultation block (main.cs:197-220); OptionSet values are checked against the valid list. Unit 4: annotation.objectid Update and gen_powerofattorney Create, both via SDK. Unit 5: the outcome; Remove Duplicates on account + POA Main loses nothing, because rowNumber = 1 leaves one row per account. Unit 6: 0005:18169/18341/18556 and 0029:22327/22758 are exact; 0005 has no disabled executable, and 0029 'Create POA Main For Automated Joining' (0029:21361) is enabled. The value meanings are supported by supplied files: SQL comments '--training', '--gemel , gemel to invest , Compensation', '--appendix b1', '--active'; 0029:22780/34045 '//no', 'כן = 1, לא = 2' for the exclusion option sets. Unit 1 is wrong. The query joins Gen_customeraccount, Gen_powerofattorneymain and Annotation, and filters 'and gen_currentstate = 1 --active' with no table name (DTSX:3327). The text assigns 'פעיל' to the POA Main without saying that ownership is unproven and without the ambiguity argument the standard requires.",
+      "evidence": "DTSX:3295-3336 (Get Customer Accounts), 858-870, 1781 main.cs:131-222, 3431, 4799-4801; DTSX:40447-40449 (gen_powerofattorneymain has gen_currentstate); 0029_POA.dtsx:22780, 34045",
+      "wrongUnits": [
+        { "unit": 1, "problem": "'POA Main ב'1 פעיל' attributes the unqualified column gen_currentstate (WHERE gen_currentstate = 1, in a 3-table query) to Gen_powerofattorneymain. The text neither states the ownership as unknown nor argues it.", "correct": "Add the argument: 'gen_currentstate מופיע בלי שם טבלה; ל-gen_powerofattorneymain יש שדה כזה (DTSX:40449). אילו העמודה הייתה קיימת בשתי הטבלאות השאילתה הייתה נכשלת; לפי המשתמש החבילה רצה בפרודקשן — ולכן זה השדה של ייפוי הכוח הראשי.' Alternatively, state that the ownership is not proven.", "evidence": "DTSX:3327 ('and gen_currentstate = 1 --active'), DTSX:40447-40449" }
+      ]
+    },
+    {
+      "id": "L|Package\\Create Power Of Attorney - Pension|detail",
+      "hash": "2555755664fe",
+      "verdict": "WRONG",
+      "detail": "Units 2, 3, 4 and 6 are correct. Unit 2: the join on Gen_powerofattorneymain.gen_contactname = Gen_programmain.Gen_customername; ROW_NUMBER per program by signature date desc; the partial-cache lookup on Gen_powerofattorney.gen_customerprogram (DTSX:5184-5194), Match without a path. Unit 3: inclusion flags with SQL comments '--mekifa' / '--clalit'; dedupe by POA Main; valid OptionSets. Unit 4: annotation objectid Update and gen_powerofattorney Create via SDK. Unit 6: no Gen_programmain creator in the supplied files (grep: only 0029/0031/0037 mention programmain, none creates it), labelled a hypothesis. Unit 1 has the same unargued ownership of the unqualified gen_currentstate as the account flow (DTSX:7622; tables Gen_programmain, Gen_powerofattorneymain, Product, Annotation). Unit 5 overstates the outcome. Remove Duplicates sorts on Gen_powerofattorneymainId only with EliminateDuplicates=true (DTSX:9066-9068). When several new programs belong to the same POA Main, only one of them, in undefined order, gets a POA in a given run. This claim's own unit 3 ('כפילות לפי POA Main') and finding#7 say so.",
+      "evidence": "DTSX:7589-7630 (Get Policies), 5182-5194, 9066-9068, 6102 main.cs:131-220; DTSX:40447-40449",
+      "wrongUnits": [
+        { "unit": 1, "problem": "'POA Main ב'1 פעיל' attributes the unqualified gen_currentstate to the POA Main without the required ownership argument or an 'unknown' label.", "correct": "Same argument as the account flow: gen_powerofattorneymain has gen_currentstate (DTSX:40449); an ambiguous column would make the query fail, and the package runs in production. Otherwise state that ownership is not proven.", "evidence": "DTSX:7622 ('and gen_currentstate = 1 --active')" },
+        { "unit": 5, "problem": "'תוכניות פנסיה ... מקבלות ייפוי כוח פעיל אוטומטית' does not hold when several new programs share a POA Main. Only one program per POA Main gets a POA in each run.", "correct": "'... מקבלות ייפוי כוח פעיל אוטומטית — תוכנית אחת לכל ייפוי כוח ראשי בכל ריצה (הסרת כפילויות לפי POA Main בלבד); תוכניות נוספות של אותו ייפוי כוח ראשי מטופלות רק בריצות הבאות, אם עדיין בטווח היומיים ועדיין אין להן ייפוי כוח.'", "evidence": "Remove Duplicates DTSX:9066-9068 (sort key Gen_powerofattorneymainId, EliminateDuplicates=true)" }
+      ]
+    }
+  ]
+}

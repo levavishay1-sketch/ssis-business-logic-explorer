@@ -1,0 +1,269 @@
+{
+  "verifier": "ssis-verifier",
+  "package": "0027_AutomatedJoining",
+  "scope": "logic-claims all",
+  "checkedAt": "2026-11-07T10:30:00Z",
+  "checked": 29,
+  "results": [
+    {
+      "id": "L|summary",
+      "hash": "ae0124d7dacb",
+      "verdict": "CONFIRMED",
+      "detail": "Close flow: source status 7 (DTSX:975ff), Lookup on 12-char right-padded bank number (DTSX:912-932), Set columns 8 (DTSX:1016), SDK Update gen_joiningstatus + gen_customeraccountid (DTSX:1370-1376). 'Closes' is supported by the package's own labels (Close Joining processes / Get Joining To Close / Update to close joining). Marking flow: status 7, sendtobankdate not null, datediff(day, LastThreeWorkingDays, sendtobankdate) <= 0, set 12, SDK Update (DTSX:5536-5573, 5935-5939). Scope: all business writes via CrmProxy.GetCrmService().Update; [CRM] used only by OLE DB sources, Lookups and the select Execute SQL task; config DTSX:17, EnableConfig=True DTSX:1; ServerName/OrganizationName are ReadWrite variables filled from gen_etlvariable (DTSX:4101ff, 4241-4257).",
+      "evidence": "DTSX:1,4,17,912-1016,1370-1376,4101-4141,5536-5573,5935-5939",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|exec",
+      "hash": "7897f8abe670",
+      "verdict": "CONFIRMED",
+      "detail": "Constraints DTSX:6506-6511, none has DTS:Value or expression (Success), all LogicalAnd. Order: Get Variables (6508) -> Create ETL (6506) -> Close Joining processes (6510) -> Get NonWorkingDays (6509) -> Update LastThreeWorkingDays Variable (6511) -> Update SuspicionAsEmitted Joinings (6507) -> End ETL. Line numbers cited match.",
+      "evidence": "DTSX:6506-6511",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|ignored",
+      "hash": "fb821a5bf118",
+      "verdict": "CONFIRMED",
+      "detail": "Get Variables From Etl Variables reads gen_etlvariable and sets ConnStringSrsSsis_Logs, Description_Cant_Set_New_Standing_Order, OrganizationName, ServerName, TransactionCurrencyId (not LastThreeWorkingDays) (DTSX:4217-4326); Create/End ETL write gen_etlprocess (DTSX:2081-2087, 2619-2628); Set Warning columns 1 2 1 / ETL Warning 1 2 1 create gen_etlprocesswarning (DTSX:428-441); OnError Error ETL Process record updates gen_etlprocess + annotation (DTSX:6719-6734); OnPostExecute Cancel ETL Process record body is fully commented out (DTSX:7222-7245); log provider to SRS.SSIS_Logs (DTSX:20). No business writes or filters.",
+      "evidence": "DTSX:20,428-441,2081-2087,2619-2628,4217-4326,6719-6734,7222-7245",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|finding#1",
+      "hash": "100c61d74545",
+      "verdict": "WRONG",
+      "detail": "No Match output unconnected (NoMatchBehavior=1, paths DTSX:1876-1880 have no No Match path) is correct, but the stated consequence 'stays in status 7 until it is marked 12' is not generally true.",
+      "evidence": "DTSX:927,1876-1880,5546-5549",
+      "wrongUnits": [
+        {
+          "unit": 1,
+          "problem": "Implies every unmatched status-7 request will eventually be marked 12. The marking query also requires gen_sendtobankdate IS NOT NULL and datediff(day, LastThreeWorkingDays, gen_sendtobankdate) <= 0.",
+          "correct": "An unmatched status-7 request is not touched by the close step; it is moved to 12 only if gen_sendtobankdate is not null and is on/before the three-working-day threshold. A request with empty gen_sendtobankdate stays in status 7 with no record from this package.",
+          "evidence": "DTSX:5546-5549"
+        }
+      ]
+    },
+    {
+      "id": "L|finding#2",
+      "hash": "30107487c724",
+      "verdict": "CONFIRMED",
+      "detail": "Update Joinings catches SoapException/Exception and calls DirectRowToError (DTSX:5940-5948 / main.cs:124-133); the data flow has only two paths (DTSX:6498-6499), Error output unconnected. Close flow: Error -> Set Warning columns 1 2 1 -> ETL Warning 1 2 1 (DTSX:1877-1878).",
+      "evidence": "DTSX:1877-1878, 6498-6499; Update Joinings main.cs:124-133",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|finding#3",
+      "hash": "e06af9491a4e",
+      "verdict": "CONFIRMED",
+      "detail": "ScriptMain.cs (file starts DTSX:5131): catch sets Failure (line 100, DTSX:5230) and Dts.Log; line 104 (DTSX:5234) sets Success unconditionally, so Constraint 5 (Success) still runs the marking. Variable design value 10/2/2017 5:29:05 PM (DTSX:43). LastThreeWorkingDays is not in the gen_etlvariable ReadWrite list, so only design value or the unsupplied config can apply. Consequence worded conditionally.",
+      "evidence": "DTSX:1,17,42-43,5226-5234,6511",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|finding#4",
+      "hash": "c081aaa08278",
+      "verdict": "CONFIRMED",
+      "detail": "Lookup CacheType=0 (Full), TreatDuplicateKeysAsError=false, reference query has no ORDER BY (DTSX:914-918); duplicates silently resolve to one row. Worded conditionally.",
+      "evidence": "DTSX:914-926",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|finding#5",
+      "hash": "4e244bfab5ee",
+      "verdict": "CONFIRMED",
+      "detail": "Close Joining processes -> Get NonWorkingDays -> Update LastThreeWorkingDays Variable -> Update SuspicionAsEmitted Joinings, all Success (DTSX:6510, 6509, 6511); marking query re-reads gen_joiningstatus = 7.",
+      "evidence": "DTSX:6509-6511, 5546",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|finding#6",
+      "hash": "40069d5ddbb7",
+      "verdict": "CONFIRMED",
+      "detail": "Configuration type 1 (XML file) C:\\Generix\\SSISConfigFile.dtsConfig at DTSX:17, EnableConfig=True DTSX:1; file not supplied.",
+      "evidence": "DTSX:1, 17",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Close Joining processes|title",
+      "hash": "1c1eec68ddf9",
+      "verdict": "CONFIRMED",
+      "detail": "Source status 7 (DTSX:975ff), Lookup on bank account number (DTSX:912-932), Set columns 8 (DTSX:1016), Update sets status + EntityReference(gen_customeraccount) (DTSX:1370-1376), No Match unconnected.",
+      "evidence": "DTSX:912-1016, 1370-1376, 1876-1880",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Close Joining processes|short",
+      "hash": "09f9ad2c5af8",
+      "verdict": "WRONG",
+      "detail": "Units 1-6 correct. Unit 7 states an unproven causal meaning.",
+      "evidence": "DTSX:914-918, 978-982",
+      "wrongUnits": [
+        {
+          "unit": 7,
+          "problem": "'בקשות שנפתח להן חשבון לקוח' (requests for which a customer account was opened) is not what the code tests. The Lookup matches ANY Gen_customeraccount with the same right-padded 12-char bank account number; there is no date, creation or request link, so a pre-existing account also closes the request.",
+          "correct": "Requests in status 7 for which a customer account with the same (right('0000000000000'+x,12)) bank account number exists in CRM are moved to 8 and linked to that account.",
+          "evidence": "DTSX:914-918, 978-982"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Close Joining processes|detailed",
+      "hash": "837f159fcbc0",
+      "verdict": "CONFIRMED",
+      "detail": "All units verified: SQL status 7 no other filter; right('0000000000000'+...,12) on both sides (note: RIGHT also truncates values longer than 12 to their last 12 chars; the tech text shows the exact expression); reference filtered Gen_bankaccountnumber is not null; CacheType 0; NoMatchBehavior 1; Set columns 8; main.cs:69-75 Update; catch -> DirectRowToError -> Set Warning columns 1 2 1 -> ETL Warning 1 2 1; No Match no path.",
+      "evidence": "DTSX:914-1016, 1370-1385, 1876-1880",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Close Joining processes|detail",
+      "hash": "b4cf24ff76ee",
+      "verdict": "WRONG",
+      "detail": "Units 1-4 correct (unit 1 cites the design-time connection string; runtime override possible via config, stated in summary). Unit 5 states an unproven causal meaning.",
+      "evidence": "DTSX:914-918, 978-982",
+      "wrongUnits": [
+        {
+          "unit": 5,
+          "problem": "'בקשות הצטרפות שנפתח להן חשבון נסגרות' asserts the account was opened for the request; the code only checks that some customer account has the same normalized bank account number.",
+          "correct": "Requests whose normalized bank account number matches any existing Gen_customeraccount are set to status 8 and linked to the matched account (which may pre-date the request).",
+          "evidence": "DTSX:914-918, 978-982"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Close Joining processes|decisions",
+      "hash": "eb7d30920236",
+      "verdict": "CONFIRMED",
+      "detail": "Unit 1 SQL 'where gen_joiningstatus = 7' (DTSX:982); unit 2 matches both padded expressions, NoMatchBehavior=1, No Match unconnected.",
+      "evidence": "DTSX:914-927, 978-982",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Close Joining processes|crm",
+      "hash": "dd2e2796512f",
+      "verdict": "CONFIRMED",
+      "detail": "gen_automatedjoining Update via GetCrmService().Update, gen_joiningstatus=OptionSetValue(8 from Set columns), gen_customeraccountid=EntityReference(gen_customeraccount, looked-up id).",
+      "evidence": "DTSX:1016, 1370-1376",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Close Joining processes|open",
+      "hash": "83ea1fc57a91",
+      "verdict": "CONFIRMED",
+      "detail": "No OptionSet labels for gen_joiningstatus exist in the supplied files; gen_bankaccountnumbername origin not shown in any supplied package. Both labelled as hypothesis/unknown.",
+      "evidence": "DTSX:978-982",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Update LastThreeWorkingDays Variable|title",
+      "hash": "d1a6d79445fa",
+      "verdict": "CONFIRMED",
+      "detail": "Get NonWorkingDays SQL on CalendarRule names Friday/Saturday/Holiday, starttime between GetutcDate()-21 and GetutcDate() (DTSX:4090); script counts back from yesterday, result = 3rd working day (traced: all-working week returns D-3), stored in User::LastThreeWorkingDays.",
+      "evidence": "DTSX:4090, 5226-5263",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Update LastThreeWorkingDays Variable|short",
+      "hash": "7271450d4ad3",
+      "verdict": "CONFIRMED",
+      "detail": "Matches SQL DTSX:4090 and ScriptMain.cs:111-133 (DTSX:5241-5263).",
+      "evidence": "DTSX:4090, 5241-5263",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Update LastThreeWorkingDays Variable|detailed",
+      "hash": "3a79d3ea2d63",
+      "verdict": "CONFIRMED",
+      "detail": "Verified each unit: SQL + Rowset result binding to User::NonWorkingDays (DTSX:4090-4091); DateTime.Now.AddDays(-1).Date (line 116); dt.Select (line 121); counter starts 1, break at 3 (lines 111, 123-129); 21 iterations (line 119); variable assignment (line 96); catch Failure overwritten by Success (lines 100, 104); design value DTSX:43; config DTSX:1,17. If the loop never breaks the result is yesterday-21 (not mentioned; practically irrelevant).",
+      "evidence": "DTSX:43, 4090-4091, 5226-5263",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Update LastThreeWorkingDays Variable|detail",
+      "hash": "d057fd800e4b",
+      "verdict": "CONFIRMED",
+      "detail": "CalendarRule names + GetutcDate window; no CRM write in the script task (only Dts.Variables assignment).",
+      "evidence": "DTSX:4090, 5222-5263",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Update LastThreeWorkingDays Variable|decisions",
+      "hash": "9ad2a2490d7d",
+      "verdict": "CONFIRMED",
+      "detail": "Condition copied from ScriptMain.cs:123-128 (DTSX:5253-5258).",
+      "evidence": "DTSX:5251-5261",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Update LastThreeWorkingDays Variable|open",
+      "hash": "296311479bcb",
+      "verdict": "CONFIRMED",
+      "detail": "Both questions depend on runtime data / the unsupplied config file; labelled hypothesis/unknown. Comparison is a string-to-DateTime equality on currDate.ToString() (local midnight), so a non-midnight starttime would not match, as stated conditionally.",
+      "evidence": "DTSX:5251, 17",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Update SuspicionAsEmitted Joinings|title",
+      "hash": "a17d33772890",
+      "verdict": "CONFIRMED",
+      "detail": "SQL DTSX:5546-5549 with ParameterMapping Parameter0 -> {81CBF82A...} = User::LastThreeWorkingDays (DTSX:42); Set Status 12 (DTSX:5573ff); Update gen_joiningstatus (DTSX:5935-5939).",
+      "evidence": "DTSX:42, 5546-5551, 5935-5939",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Update SuspicionAsEmitted Joinings|short",
+      "hash": "4d99ae63638f",
+      "verdict": "WRONG",
+      "detail": "Units 1-2 correct. Unit 3 asserts a purpose not proven by the files.",
+      "evidence": "DTSX:5573ff",
+      "wrongUnits": [
+        {
+          "unit": 3,
+          "problem": "'מסומנות לטיפול' (flagged for handling) states a business purpose of status 12 as fact, while the same unit admits the meaning is unproven; nothing in the package defines what follows status 12.",
+          "correct": "Requests still in status 7 whose send-to-bank date is on/before the threshold are set to status 12; per component names this is 'SuspicionAsEmitted' (meaning and follow-up not proven).",
+          "evidence": "DTSX:5546-5549, 5573ff, 5935-5939"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Update SuspicionAsEmitted Joinings|detailed",
+      "hash": "dcdf20c1ce77",
+      "verdict": "CONFIRMED",
+      "detail": "Precedence correct; SQL verbatim; derived column gen_suspicionAsEmitted = 12; script sets only gen_joiningstatus (main.cs:118-122); catch -> DirectRowToError with Error output unconnected (DTSX:6498-6499). 'Not recorded anywhere' holds within the package (all exceptions caught, so no OnError event).",
+      "evidence": "DTSX:5546-5549, 5573ff, 5935-5948, 6498-6499",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Update SuspicionAsEmitted Joinings|detail",
+      "hash": "9f441ac62ee6",
+      "verdict": "CONFIRMED",
+      "detail": "Population, key, no split, write and the hedged meaning ('stuck' in quotes, exact meaning unproven) all match.",
+      "evidence": "DTSX:5546-5549, 5935-5939",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Update SuspicionAsEmitted Joinings|decisions",
+      "hash": "b357078f7808",
+      "verdict": "CONFIRMED",
+      "detail": "Condition verbatim from DTSX:5546-5549, ? bound to User::LastThreeWorkingDays.",
+      "evidence": "DTSX:5546-5551",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Update SuspicionAsEmitted Joinings|crm",
+      "hash": "4d2aba117fd8",
+      "verdict": "CONFIRMED",
+      "detail": "gen_automatedjoining Update via SDK, gen_joiningstatus=OptionSetValue(12).",
+      "evidence": "DTSX:5935-5939",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Update SuspicionAsEmitted Joinings|open",
+      "hash": "e30657e69601",
+      "verdict": "CONFIRMED",
+      "detail": "Status 12 meaning not defined in any supplied file; UTC storage of gen_sendtobankdate is a runtime/schema fact not in the files; correctly labelled.",
+      "evidence": "DTSX:5546-5549, 5246",
+      "wrongUnits": []
+    }
+  ]
+}

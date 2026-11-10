@@ -1,0 +1,93 @@
+{
+  "package": "0030_PoaAccountUpdateDailyTest",
+  "dataFlows": [
+    "Package\\Handle Wait Status - For Active",
+    "Package\\Handle Active Status - For Cancel"
+  ],
+  "analyst": "ssis-field-lineage",
+  "source": {
+    "file": "source/DailyProcess/0030_PoaAccountUpdateDailyTest.dtsx",
+    "sha256": "95908C42C72F0D604243BF30C049A07C0C21CE9F97F1AECCF350C2F83DB2EA1C"
+  },
+  "scriptOutputs": [],
+  "crmWrites": [
+    {
+      "component": "Package\\Handle Wait Status - For Active\\Update NeedToSendMailBit",
+      "identicalCopies": [],
+      "entity": "gen_powerofattorney",
+      "verb": "UPDATE",
+      "mechanism": "SQL (UPDATE Gen_powerofattorneyBase on [CRM] = psql/ALTSHULER_MSCRM)",
+      "status": "Unsupported",
+      "recordKey": "WHERE Gen_powerofattorneyId = ? (the only '?' in the SQL, DTSX:6668 -> Param_0 = input column PowerOfAttorneyIdPa, DTSX:6677/6680). PowerOfAttorneyIdPa is returned by Lookup 'Match PowerOfAttorney By CustomerAccount Or CustomerProgram' = pa.Gen_powerofattorneyId of an ACTIVE POA (pa.Gen_currentstate = 1) whose isnull(Gen_CustomerAccount, gen_customerprogram) equals CustomerAccountProgram = isnull(poa.Gen_CustomerAccount, gen_customerprogram) of the WAITING POA - i.e. the existing active POA is updated, not the waiting one.",
+      "recordKeyColumns": [
+        "PowerOfAttorneyIdPa"
+      ],
+      "declaredRowFilters": [],
+      "condition": "Rows come from 'Get Waiting Poa' (Gen_powerofattorney WHERE Gen_startdate <= GETDATE() AND Gen_currentstate = 3, and agentcyIdNumber = isnull(Contact.Gen_Identitynumber, Account.AccountNumber) NOT IN ('515092484','513334151','513173393','513173493','514979715','515462380') - this NOT IN also removes rows with NULL agentcyIdNumber; DTSX:5378-5418). Only rows for which the Lookup finds an active POA on the same customer account/program (Match; No Match goes to Union All, DTSX path 'Lookup No Match Output') and for which 'Is Renewal' (agentcyIdNumberPa == agentcyIdNumber, DTSX:5518-5521) is not true -> 'Not Renewal' output -> this command. 'Is Renewal' Renewal output has errorRowDisposition=FailComponent (DTSX:5518): a NULL agentcyIdNumberPa (active POA without agent/agency id) makes the condition NULL -> component and data flow fail (hypothesis per SSIS semantics). Full-cache lookup (CacheType=0, DTSX:5561): if several active POAs share the customer account/program only one (the first cached) is matched. Command input errorRowDisposition=FailComponent (DTSX:6675): an SQL error fails the data flow.",
+      "attributes": [
+        {
+          "attribute": "gen_iscancellationemailrequired",
+          "from": [],
+          "expression": "SET gen_iscancellationemailrequired = CASE WHEN Gen_appendixtype = 2 THEN 1 WHEN Gen_appendixtype = 3 THEN 1 WHEN Gen_appendixtype = 5 THEN 1 ELSE 0 END. No input column carries the value: it is computed inside the UPDATE from the TARGET row's own Gen_powerofattorneyBase.Gen_appendixtype (the old active POA), not from the waiting POA's gen_appendixtype. Result is 1 for appendix type 2/3/5, otherwise 0 (also 0 when Gen_appendixtype is NULL, via ELSE).",
+          "fixedValue": null,
+          "condition": "Value 1 or 0 decided by the target row's Gen_appendixtype; the row is updated only when reached via Lookup Match + 'Not Renewal' (see write condition)",
+          "evidence": "SqlCommand DTSX:6661-6668 (single '?' at line 6668 -> Param_0 = PowerOfAttorneyIdPa, DTSX:6677, 6680); connection [CRM] DTSX:4 (Initial Catalog=ALTSHULER_MSCRM)",
+          "declaredSources": [
+            {
+              "db": "Gen_powerofattorneyBase.Gen_appendixtype",
+              "role": "value",
+              "why": "The written value is CASE over the target row's own Gen_appendixtype (2/3/5 -> 1, else 0), evaluated inside the UPDATE statement",
+              "evidence": "DTSX:6661-6667"
+            },
+            {
+              "db": "Gen_powerofattorney.Gen_powerofattorneyId (Lookup 'Match PowerOfAttorney By CustomerAccount Or CustomerProgram', reference side, Gen_currentstate = 1)",
+              "role": "key",
+              "why": "PowerOfAttorneyIdPa returned by the lookup is the WHERE key (Param_0) - the active POA on the same customer account/program as the waiting POA",
+              "evidence": "Lookup SqlCommand DTSX:5543-5550, ParameterMap DTSX:5567; SqlCommand '?' DTSX:6668"
+            },
+            {
+              "db": "Gen_powerofattorney.Gen_CustomerAccount / gen_customerprogram",
+              "role": "key",
+              "why": "Lookup join: waiting POA isnull(Gen_CustomerAccount, gen_customerprogram) = active POA isnull(Gen_CustomerAccount, gen_customerprogram)",
+              "evidence": "Get Waiting Poa DTSX:5378-5418 (CustomerAccountProgram); Lookup DTSX:5543-5567"
+            },
+            {
+              "db": "Gen_powerofattorney.Gen_startdate / Gen_currentstate (waiting POA)",
+              "role": "condition",
+              "why": "Source WHERE poa.Gen_startdate <= GETDATE() and poa.Gen_currentstate = 3",
+              "evidence": "DTSX:5378-5418"
+            },
+            {
+              "db": "Get Waiting Poa: agentcyIdNumber (isnull(Contact.Gen_Identitynumber, Account.AccountNumber) of the waiting POA's agent/agency)",
+              "role": "condition",
+              "why": "Source WHERE agentcyIdNumber NOT IN (6 hard-coded agency numbers) and Is Renewal: only rows where agentcyIdNumberPa == agentcyIdNumber is not true reach the UPDATE",
+              "evidence": "DTSX:5378-5418, 5518-5521"
+            },
+            {
+              "db": "Lookup 'Match PowerOfAttorney By CustomerAccount Or CustomerProgram': agentcyIdNumberPa (isnull(Contact.Gen_Identitynumber, Account.AccountNumber) of the active POA)",
+              "role": "condition",
+              "why": "Is Renewal condition agentcyIdNumberPa == agentcyIdNumber (same agent/agency = renewal -> no update); NULL -> FailComponent (hypothesis per SSIS semantics)",
+              "evidence": "DTSX:5543-5550, 5518-5521"
+            }
+          ]
+        }
+      ],
+      "evidence": "Update NeedToSendMailBit DTSX:6658-6700; Lookup DTSX:5541-5610; Is Renewal DTSX:5507-5540; Get Waiting Poa DTSX:5373-5419; paths 'Lookup Match Output' -> Is Renewal, 'Not Renewal' -> Update NeedToSendMailBit (Handle Wait Status - For Active paths)"
+    }
+  ],
+  "readWriteModifications": [],
+  "lookupBridges": [],
+  "unresolved": [
+    {
+      "where": "Handle Wait Status - For Active\\Is Renewal (row filter for Update NeedToSendMailBit)",
+      "reason": "Runtime outcome when the looked-up active POA has NULL agentcyIdNumberPa (condition evaluates to NULL with FailComponent disposition) is stated per SSIS semantics, not observed; CRM data not supplied."
+    }
+  ],
+  "notes": [
+    "Writers in lineage (2): 1 business CRM write mapped here (Update NeedToSendMailBit, 1 attribute). Excluded as ETL plumbing: End ETL Process Record\\ETL Record Finish (updates gen_etlprocess, main.cs:44-52). Also plumbing (control flow): Create ETL Process Record (gen_etlprocess create, ScriptMain.cs:99-104), Write To ETLProcessCounter End (gen_etlprocesscounter create, ScriptMain.cs:53-64), Get Organization Variables, Get Valid Optionsets Values / Set Queue Id Variable (read-only scripts: no Create/Update/Execute calls in their code).",
+    "Unlike 0031_PoaAccountUpdateDaily, this Test package does NOT change the waiting POA's state in CRM: Handle Wait Status - For Active only writes the old active POA's gen_iscancellationemailrequired (direct SQL) and rows to GENERIX_STAGING.dbo.PowerOfAttorneySendEmails (staging, not CRM). Handle Active Status - For Cancel only reads CRM (Get Active Poa, Get Agency lookup) and writes to the same staging table - no CRM write in that flow. The 0031 component of the same name instead sets gen_receivingdateofcancelpoa with two parameters; here the SQL is different (one '?', sets gen_iscancellationemailrequired).",
+    "The flag written here (gen_iscancellationemailrequired) is read back in this package by 'Handle Active Status - For Cancel\\Get Active Poa' (poa.gen_iscancellationemailrequired, DTSX:4194) and used by 'Is Need To Send Cancellation Mail' (!ISNULL(gen_iscancellationemailrequired) && gen_iscancellationemailrequired == TRUE, DTSX:4408-4421) to route rows to the staging e-mail table - i.e. it only influences staging output in this package.",
+    "Direct UPDATE on Gen_powerofattorneyBase bypasses CRM SDK (no plugins/workflows/auditing, modifiedon not set) - Unsupported per CLAUDE.md rule 9; [CRM] connection = psql / Initial Catalog=ALTSHULER_MSCRM (DTSX:4).",
+    "Several waiting POAs on the same customer account/program map to the same active POA and each executes the same UPDATE; since the value depends only on the target row's Gen_appendixtype, the result is identical regardless of order."
+  ]
+}

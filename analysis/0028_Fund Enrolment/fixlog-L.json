@@ -1,0 +1,832 @@
+{
+ "changes": [
+  {
+   "claimId": "L|finding#8",
+   "field": "findings_he[7].text",
+   "before": "הזרימה לבקשות העברה מושבתת. אם תופעל, היא תרשום מזהים ב-##TblFundEnrolments בבסיס ה-CRM ולא בטבלת ה-staging, ולכן רשומותיה לא יסומנו ב-gen_ismailsend.",
+   "after": "הזרימה לבקשות העברה מושבתת. אם תופעל, היא תכתוב את המזהים דרך חיבור [CRM] לטבלה זמנית גלובלית ##TblFundEnrolments (טבלת ## נמצאת ב-tempdb של השרת), ולא לטבלת ה-staging TblFundEnrolments. לכן הרשומות שלה לא יסומנו ב-gen_ismailsend = 0. אף שלב בקבצים שסופקו אינו יוצר את ##TblFundEnrolments. אם הטבלה לא קיימת בזמן הריצה, ההוספה נכשלת (FailComponent), זרימת הנתונים נכשלת, והשלבים שאחריה בשרשרת Success לא רצים.",
+   "why": "המיקום 'בבסיס ה-CRM' לא מדויק (טבלת ## היא ב-tempdb), והצלחת ההוספה הונחה בלי הוכחה. אין שלב שיוצר את הטבלה.",
+   "evidence": "DTSX:10188-10199; DTSX:15645-15646",
+   "verifierAccepted": true
+  },
+  {
+   "claimId": "L|Package\\Create Fundenrolment|short",
+   "field": "short.nodes[4].text",
+   "before": "לכל הצטרפות ממוכנת בסטטוס 2 נפתחת רשומת טיפול אחת, המשויכת לצוות הרג'קטים, ומזהה הרשומה נשמר לסימון בסוף התהליך.",
+   "after": "לכל שורת מקור של הצטרפות ממוכנת בסטטוס 2 בלי Fund Enrolment נפתחת רשומת טיפול, המשויכת לצוות הרג'קטים, ומזהה הרשומה נשמר לסימון בסוף התהליך. אם להצטרפות יש כמה בקשות העברה, היא מופיעה בכמה שורות, ואז נפתחות לה כמה רשומות באותה ריצה.",
+   "why": "'רשומה אחת' לא מובטח: left join ל-gen_transferrequest (1:N) ו-Lookup במטמון מלא שנטען לפני הריצה יוצרים רשומה לכל שורה.",
+   "evidence": "Get All joining reject From bank DTSX:3357 (left join gen_transferrequest tr on tr.gen_automatedjoining = aj.gen_automatedjoiningId); Is Fundenrolment Exits DTSX:3632 CacheType=0",
+   "verifierAccepted": true
+  },
+  {
+   "claimId": "L|Package\\Create FundEnrolment For Pension|detailed",
+   "field": "detailed.nodes[3].branches[0].nodes[0].text",
+   "before": "הבעלים יהיה הרפרנט שעדכן את ההצטרפות (משתמש), וסטטוס ההצטרפות ב-Fund Enrolment ייקבע ל-17 (\"עבר בקרה ורג'קט\").",
+   "after": "הבעלים יהיה הרפרנט שעדכן את ההצטרפות (משתמש), וסטטוס ההצטרפות ב-Fund Enrolment ייקבע ל-17 (\"עבר בקרה ורג'קט\"). אם שדה הרפרנט המעדכן ריק, היצירה נכשלת (ראו בהמשך).",
+   "why": "חסר מקרה: קריאת gen_updatedbyreferent ריק בלי בדיקת IsNull זורקת חריגה בתוך ה-try.",
+   "evidence": "Create Fund Enrolment main.cs:136-139, 330-333 (DTSX:4758)",
+   "verifierAccepted": true
+  },
+  {
+   "claimId": "L|Package\\Create FundEnrolment For Pension|detailed",
+   "field": "detailed.nodes[9].branches[0].nodes[0].text (+tech)",
+   "before": "השגיאה אובדת בלי רישום. ההצטרפות תישלף שוב בריצה הבאה, כי היא עדיין לא מקושרת.",
+   "after": "השגיאה אובדת בלי רישום. ההצטרפות תישלף שוב בריצה הבאה, כי היא עדיין לא מקושרת. כך קורה גם בשני מקרים אלה: ההצטרפות מסומנת \"עבר בקרה ורג'קט\" ושדה הרפרנט המעדכן ריק; או שנבחר מוצר 1 או 2 ולא נמצא מוצר פנסיה מתאים. קריאת ערך ריק זורקת חריגה, ולא נוצרת רשומה. אם הנתונים לא משתנים, זה חוזר בכל ריצה.",
+   "why": "הוספת המקרה החסר שאומת בקוד: ערך NULL בשדה שנקרא בלי בדיקה מסתיים ב-CustingError הלא מחובר.",
+   "evidence": "Create Fund Enrolment main.cs:136-139, 166-173, 330-333 (DTSX:4758)",
+   "verifierAccepted": true
+  },
+  {
+   "claimId": "L|Package\\Create FundEnrolment For Pension|detailed",
+   "field": "detailed.nodes[13].text",
+   "before": "הצטרפויות פנסיה עם רג'קט מקבלות רשומת טיפול משויכת, וההצטרפות מצביעה עליה, ולכן לא תיפתח לה רשומה שנייה.",
+   "after": "כשהיצירה מצליחה, הצטרפויות פנסיה עם רג'קט מקבלות רשומת טיפול משויכת, וההצטרפות מצביעה עליה, ולכן לא תיפתח לה רשומה שנייה.",
+   "why": "התוצאה תלויה בהצלחת היצירה (ראו מקרי הכשל שנוספו).",
+   "evidence": "Create Fund Enrolment main.cs:330-333 (DTSX:4758)",
+   "verifierAccepted": true
+  },
+  {
+   "claimId": "L|Package\\Create FundEnrolment For Pension|short",
+   "field": "short.nodes[4].text",
+   "before": "לכל הצטרפות פנסיה עם רג'קט נפתחת רשומת טיפול אחת, וההצטרפות מסומנת כמקושרת אליה.",
+   "after": "כשהיצירה מצליחה, לכל הצטרפות פנסיה עם רג'קט נפתחת רשומת טיפול אחת, וההצטרפות מסומנת כמקושרת אליה.",
+   "why": "יישור עם detailed: מקרי כשל (רפרנט מעדכן ריק, מוצר פנסיה חסר) לא יוצרים רשומה.",
+   "evidence": "Create Fund Enrolment main.cs:136-139, 166-173, 330-333 (DTSX:4758)",
+   "verifierAccepted": true
+  },
+  {
+   "claimId": "L|Package\\Create FundEnrolment For Pension|detail",
+   "field": "detail_he[4].t",
+   "before": "כל הצטרפות פנסיה שיש בה רג'קט מקבלת רשומת טיפול, משויכת לגורם המטפל המתאים.",
+   "after": "כשהיצירה מצליחה, הצטרפות פנסיה שיש בה רג'קט מקבלת רשומת טיפול, משויכת לגורם המטפל המתאים. אם היצירה נכשלת (למשל: \"עבר בקרה ורג'קט\" עם רפרנט מעדכן ריק), לא נוצרת רשומה ואין רישום של הכשל.",
+   "why": "יישור עם detailed: מקרי כשל שקטים שאומתו בקוד.",
+   "evidence": "Create Fund Enrolment main.cs:136-139, 330-333 (DTSX:4758)",
+   "verifierAccepted": true
+  },
+  {
+   "claimId": "L|Package\\Create FundEnrolment For Pension|decisions",
+   "field": "decisions[5].outcome_he",
+   "before": "CustingError — לא מחובר (אובד)",
+   "after": "CustingError — לא מחובר (אובד). כולל קריאת ערך ריק: gen_updatedbyreferent (main.cs:138) או ComprehensivePension/GeneralPension (main.cs:169/171)",
+   "why": "יישור עם detailed: מקורות חריגה שאומתו בקוד.",
+   "evidence": "Create Fund Enrolment main.cs:136-139, 166-173, 330-333 (DTSX:4758)",
+   "verifierAccepted": true
+  },
+  {
+   "claimId": "L|Package\\Close FundEnrolments For Pension|detail",
+   "field": "detail_he[4].t",
+   "before": "רשומות טיפול של הצטרפויות שהסתיימו אינן נשארות פתוחות אצל צוות הרג'קטים.",
+   "after": "רשומות טיפול בסטטוס \"בתהליך\" של הצטרפויות פנסיה שעומדות בתנאי הסגירה נסגרות, בלי קשר לבעלים (צוות הרג'קטים, הרפרנט או אחר).",
+   "why": "בשאילתה אין תנאי בעלים; 'אצל צוות הרג'קטים' לא מוכח.",
+   "evidence": "Get Pension Joinings DTSX:904-923 (where Gen_fundenrolment.gen_enrolmentstatus = 1 and … ללא OwnerId)",
+   "verifierAccepted": true
+  },
+  {
+   "claimId": "L|Package\\Create FundEnrolment For Transfer Request|detailed",
+   "field": "detailed.nodes[6].text (+tech)",
+   "before": "המזהה היה נרשם בטבלה זמנית גלובלית ##TblFundEnrolments בבסיס ה-CRM, ולא בטבלת ה-staging שבה משתמשים שאר השלבים.",
+   "after": "המזהה היה נכתב, דרך חיבור [CRM], לטבלה זמנית גלובלית ##TblFundEnrolments (ב-tempdb), ולא לטבלת ה-staging TblFundEnrolments שבה משתמשים שאר השלבים. לכן רשומות אלה לא היו מסומנות ב-gen_ismailsend = 0. אף שלב בקבצים שסופקו אינו יוצר את הטבלה. אם היא לא קיימת בזמן הריצה, ההוספה נכשלת (FailComponent) וזרימת הנתונים נכשלת.",
+   "why": "טבלת ## נמצאת ב-tempdb ולא במסד ה-CRM, ואין הוכחה שהיא קיימת בזמן ריצה.",
+   "evidence": "DTSX:10191, 10199",
+   "verifierAccepted": true
+  },
+  {
+   "claimId": "L|Package\\Create FundEnrolment For Transfer Request|crm",
+   "field": "crmEffects",
+   "before": [
+    {
+     "entity": "gen_fundenrolment; gen_transferrequest",
+     "verb": "create; update (לו הופעלה)",
+     "mechanism": "SDK; SQL (Unsupported)",
+     "when_he": "מושבת — אין השפעה"
+    }
+   ],
+   "after": [
+    {
+     "entity": "gen_fundenrolment",
+     "verb": "create (לו הופעלה)",
+     "mechanism": "SDK",
+     "when_he": "מושבת — אין השפעה. לו הופעלה: לכל בקשת העברה שנשלפה"
+    },
+    {
+     "entity": "gen_fundenrolment (Gen_fundenrolmentBase)",
+     "verb": "update OwnerId = RejectTeamId, OwnerIdType = 9 (לו הופעלה)",
+     "mechanism": "SQL (Unsupported, OLE DB Command על [CRM])",
+     "when_he": "מושבת — אין השפעה. לו הופעלה: אחרי כל יצירה מוצלחת"
+    },
+    {
+     "entity": "gen_transferrequest (gen_transferrequestBase)",
+     "verb": "update gen_fundenrolmentid (לו הופעלה)",
+     "mechanism": "SQL (Unsupported, OLE DB Command על [CRM])",
+     "when_he": "מושבת — אין השפעה. לו הופעלה: אחרי כל יצירה מוצלחת"
+    }
+   ],
+   "why": "עדכון הבעלים ב-SQL (Update Fund Enrolment Owner) חסר ברשימה.",
+   "evidence": "DTSX:8160 (Disabled); Update Fund Enrolment Owner DTSX:11066-11072; Update Transfer Request DTSX:11111-11116",
+   "verifierAccepted": true
+  },
+  {
+   "claimId": "L|Package\\Update Reject Management With Fund Enrolment|detailed",
+   "field": "detailed.nodes[6].text",
+   "before": "כל רשומות ניהול הרג'קט הפעילות מוצמדות לרשומת הטיפול של מקורן.",
+   "after": "רשומות ניהול רג'קט פעילות שעדיין לא מקושרות מוצמדות לרשומת הטיפול של מקורן, כשהמקור כבר מקושר ל-Fund Enrolment ואינו בשיטת הרג'קט הישנה. רשומות של מקור בשיטה הישנה, או של מקור בלי Fund Enrolment, נשארות לא מקושרות.",
+   "why": "הכללת-יתר: רק רשומות שמקורן מקושר ל-FE ואינו gen_isoldrejectmethod = 1 נשלפות.",
+   "evidence": "Get Reject Management And Fund Enrolment DTSX:14666 (join gen_fundenrolmentbase … and (x.gen_isoldrejectmethod != 1 or … is null))",
+   "verifierAccepted": true
+  },
+  {
+   "claimId": "L|Package\\Create Fundenrolment|short",
+   "field": "short.nodes[4].text",
+   "before": "לכל שורת מקור של הצטרפות ממוכנת בסטטוס 2 בלי Fund Enrolment נפתחת רשומת טיפול, המשויכת לצוות הרג'קטים, ומזהה הרשומה נשמר לסימון בסוף התהליך. אם להצטרפות יש כמה בקשות העברה, היא מופיעה בכמה שורות, ואז נפתחות לה כמה רשומות באותה ריצה.",
+   "after": "כשהיצירה מצליחה, כל שורת מקור (הצטרפות ממוכנת בסטטוס 2 בלי Fund Enrolment) מקבלת רשומת טיפול חדשה. הרשומה משויכת לצוות הרג'קטים בעדכון SQL, ומזהה הרשומה נשמר לסימון בסוף התהליך. אם היצירה נכשלת, השורה נזרקת בלי רשומה ובלי רישום. אם להצטרפות יש כמה בקשות העברה, היא מופיעה בכמה שורות, ואז, כשהיצירות מצליחות, נפתחות לה כמה רשומות באותה ריצה.",
+   "why": "התוצאה הוצגה ללא תנאי. כל חריגה ביצירה (SoapException או Exception) מנותבת ל-CastingError, שאינו מחובר, ולכן שורה שנכשלה אובדת בלי רשומה ובלי רישום.",
+   "evidence": "Create gen_fundEnrolment main.cs:132, 279-291 (DTSX:1505); paths DTSX:4741-4747 (רק Result מחובר)",
+   "round": 2
+  },
+  {
+   "claimId": "L|Package\\Create Fundenrolment|title",
+   "field": "short_he",
+   "before": "לכל הצטרפות ממוכנת בסטטוס 2 שעדיין אין לה רשומת Fund Enrolment נפתחת רשומה חדשה ב-CRM עם פרטי העמית, הסוכן, המוצר, סיבות הרג'קט וההערות. הרשומה משויכת לצוות הרג'קטים ונרשמת ברשימת הרשומות שנוצרו בריצה.",
+   "after": "כשהיצירה מצליחה, לכל הצטרפות ממוכנת בסטטוס 2 שעדיין אין לה רשומת Fund Enrolment נפתחת רשומה חדשה ב-CRM עם פרטי העמית, הסוכן, המוצר, סיבות הרג'קט וההערות. הרשומה משויכת לצוות הרג'קטים ונרשמת ברשימת הרשומות שנוצרו בריצה. יצירה שנכשלת נזרקת בלי רישום.",
+   "why": "יישור עם short: התוצאה מותנית בהצלחת היצירה (CastingError לא מחובר).",
+   "evidence": "Create gen_fundEnrolment main.cs:279-291 (DTSX:1505); DTSX:4741-4747",
+   "round": 2
+  },
+  {
+   "claimId": "L|Package\\Create Fundenrolment|detailed",
+   "field": "detailed.nodes[13].text",
+   "before": "לכל הצטרפות ממוכנת בסטטוס 2 שאין לה Fund Enrolment נפתחת רשומת טיפול חדשה, המשויכת לצוות הרג'קטים.",
+   "after": "כשהיצירה מצליחה, לכל שורת מקור של הצטרפות ממוכנת בסטטוס 2 שאין לה Fund Enrolment נפתחת רשומת טיפול חדשה, המשויכת לצוות הרג'קטים. יצירה שנכשלת נזרקת בלי רשומה ובלי רישום (הפלט CastingError לא מחובר).",
+   "why": "אותה עובדה כמו ב-short [9]: התוצאה מותנית בהצלחת היצירה.",
+   "evidence": "Create gen_fundEnrolment main.cs:279-291 (DTSX:1505); DTSX:4741-4747",
+   "round": 2
+  },
+  {
+   "claimId": "L|Package\\Create Fundenrolment|detail",
+   "field": "detail_he[4].t",
+   "before": "נפתחת רשומת טיפול בהצטרפות (Fund Enrolment) לכל הצטרפות ממוכנת בסטטוס 2, והיא משויכת לצוות הרג'קטים לטיפול.",
+   "after": "כשהיצירה מצליחה, נפתחת רשומת טיפול בהצטרפות (Fund Enrolment) לכל שורת מקור של הצטרפות ממוכנת בסטטוס 2 (הצטרפות עם כמה בקשות העברה עשויה לקבל כמה רשומות), והיא משויכת לצוות הרג'קטים לטיפול. כל חריגה ביצירה (דוגמאות אפשריות: תקלת CRM, תאריך סגירה או קבלה שאינו בפורמט dd/MM/yyyy, RejectTeamId שאינו GUID תקין) מנתבת את השורה לפלט CastingError שאינו מחובר, ולכן לא נוצרת רשומה ואין רישום של הכשל.",
+   "why": "אותה עובדה כמו ב-short [9]: התוצאה מותנית בהצלחת היצירה.",
+   "evidence": "Create gen_fundEnrolment main.cs:132-136, 251-255, 279-291 (DTSX:1505); DTSX:4741-4747",
+   "round": 2
+  },
+  {
+   "claimId": "L|Package\\Create FundEnrolment For Pension|detailed",
+   "field": "detailed.nodes[2].text",
+   "before": "נבנית הערה: \"1: <סיבה 1>; …\" ואחריה הערת הרג'קט.",
+   "after": "נבנית הערה: \"1: <סיבה 1>; …\" ואחריה הערת הרג'קט. ארבעת שמות הסיבות והערת הרג'קט נקראים בלי בדיקת ערך ריק (IsNull), מחוץ ל-try/catch, ולרכיב אין פלט שגיאה. לפי התנהגות SSIS המתועדת, לא מוצג בקבצים: אם קריאת עמודה ריקה זורקת חריגה, אז ערך ריק באחד מהם מכשיל את זרימת הנתונים כולה, ושלבי ההמשך בשרשרת Success (סגירת רשומות הפנסיה, קישור ניהול הרג'קטים וסימון gen_ismailsend) לא רצים באותה ריצה.",
+   "why": "בניית ההערה הוצגה כבטוחה. אותו כלל קריאת NULL שעליו נשענת יחידה 30 חל גם כאן, ושם אין try ואין פלט שגיאה. הכלל עצמו הוא התנהגות זמן ריצה שלא מוצגת בקבצים, ולכן מנוסח בתנאי.",
+   "evidence": "Set gen_note DTSX:7153, קוד DTSX:7396-7406 (String.IsNullOrWhiteSpace(Row.genrejectionreason1Name..4Name / Row.genrejectreasonsnotes) בלי _IsNull); getter Buffer.GetString DTSX:7621-7627; Constraints 4-7, 9 DTSX:15643-15648",
+   "round": 2
+  },
+  {
+   "claimId": "L|Package\\Create FundEnrolment For Pension|detailed",
+   "field": "detailed.nodes[2].tech",
+   "before": "Set gen_note main.cs:115-131 @DTSX:7153",
+   "after": "Set gen_note main.cs:115-131 @DTSX:7153 (קוד DTSX:7396-7406): Row.genrejectionreason1Name..4Name ו-Row.genrejectreasonsnotes נקראים בתוך String.IsNullOrWhiteSpace(...) בלי _IsNull; getter = Buffer.GetString (DTSX:7621ff); אין try/catch; פלט יחיד Output 0",
+   "why": "פירוט טכני ליחידה 3.",
+   "evidence": "DTSX:7396-7406; DTSX:7621-7627",
+   "round": 2
+  },
+  {
+   "claimId": "L|Package\\Create FundEnrolment For Pension|detailed",
+   "field": "detailed.nodes[3].branches[0].nodes[0].text",
+   "before": "הבעלים יהיה הרפרנט שעדכן את ההצטרפות (משתמש), וסטטוס ההצטרפות ב-Fund Enrolment ייקבע ל-17 (\"עבר בקרה ורג'קט\"). אם שדה הרפרנט המעדכן ריק, היצירה נכשלת (ראו בהמשך).",
+   "after": "הבעלים יהיה הרפרנט שעדכן את ההצטרפות (משתמש), וסטטוס ההצטרפות ב-Fund Enrolment ייקבע ל-17 (\"עבר בקרה ורג'קט\"). שדה הרפרנט המעדכן נקרא בלי בדיקת ערך ריק. לפי התנהגות SSIS המתועדת, לא מוצג בקבצים: אם הוא ריק וקריאת ערך ריק זורקת חריגה, היצירה נכשלת (ראו בהמשך).",
+   "why": "עקביות: ההנחה שקריאת NULL זורקת חריגה הוצגה כעובדה. היא התנהגות זמן ריצה שלא מוצגת בקבצים.",
+   "evidence": "Create Fund Enrolment main.cs:136-139 (DTSX:5015-5025)",
+   "round": 2
+  },
+  {
+   "claimId": "L|Package\\Create FundEnrolment For Pension|detailed",
+   "field": "detailed.nodes[9].branches[0].nodes[0].text",
+   "before": "השגיאה אובדת בלי רישום. ההצטרפות תישלף שוב בריצה הבאה, כי היא עדיין לא מקושרת. כך קורה גם בשני מקרים אלה: ההצטרפות מסומנת \"עבר בקרה ורג'קט\" ושדה הרפרנט המעדכן ריק; או שנבחר מוצר 1 או 2 ולא נמצא מוצר פנסיה מתאים. קריאת ערך ריק זורקת חריגה, ולא נוצרת רשומה. אם הנתונים לא משתנים, זה חוזר בכל ריצה.",
+   "after": "השגיאה אובדת בלי רישום. ההצטרפות תישלף שוב בריצה הבאה, כי היא עדיין לא מקושרת. שני ערכים נקראים בתוך ה-try בלי בדיקת ערך ריק: הרפרנט המעדכן, כשההצטרפות מסומנת \"עבר בקרה ורג'קט\", ומזהה מוצר הפנסיה, כשנבחר מוצר 1 או 2. לפי התנהגות SSIS המתועדת, לא מוצג בקבצים: אם קריאת ערך ריק זורקת חריגה, החריגה נתפסת כאן ולא נוצרת רשומה. אם הנתונים לא משתנים, זה חוזר בכל ריצה.",
+   "why": "עקביות: כלל קריאת NULL מנוסח בתנאי בכל מקום ברכיב, כמו ביחידה 3.",
+   "evidence": "Create Fund Enrolment main.cs:132-138, 166-173, 330-334 (DTSX:4758)",
+   "round": 2
+  },
+  {
+   "claimId": "L|Package\\Create FundEnrolment For Pension|detailed",
+   "field": "detailed.nodes[13].text",
+   "before": "כשהיצירה מצליחה, הצטרפויות פנסיה עם רג'קט מקבלות רשומת טיפול משויכת, וההצטרפות מצביעה עליה, ולכן לא תיפתח לה רשומה שנייה.",
+   "after": "כשהיצירה מצליחה, הצטרפויות פנסיה עם רג'קט מקבלות רשומת טיפול משויכת, וההצטרפות מצביעה עליה, ולכן לא תיפתח לה רשומה שנייה. יצירה שנכשלת אובדת בלי רישום. בנוסף, לפי התנהגות SSIS המתועדת, לא מוצג בקבצים: אם קריאת עמודה ריקה זורקת חריגה, ערך ריק באחד משמות הסיבות או בהערת הרג'קט מכשיל את זרימת הנתונים כולה בשלב בניית ההערה. אז הצטרפויות שטרם עובדו לא מטופלות, והשלבים הבאים בחבילה לא רצים באותה ריצה.",
+   "why": "התוצאה השמיטה את מסלול הכשל ברמת זרימת הנתונים (Set gen_note בלי _IsNull, בלי try ובלי פלט שגיאה).",
+   "evidence": "DTSX:7396-7406; DTSX:7621-7627; Constraints DTSX:15643-15648",
+   "round": 2
+  },
+  {
+   "claimId": "L|Package\\Create FundEnrolment For Pension|detail",
+   "field": "detail_he[4].t",
+   "before": "כשהיצירה מצליחה, הצטרפות פנסיה שיש בה רג'קט מקבלת רשומת טיפול, משויכת לגורם המטפל המתאים. אם היצירה נכשלת (למשל: \"עבר בקרה ורג'קט\" עם רפרנט מעדכן ריק), לא נוצרת רשומה ואין רישום של הכשל.",
+   "after": "כשהיצירה מצליחה, הצטרפות פנסיה שיש בה רג'קט מקבלת רשומת טיפול, משויכת לגורם המטפל המתאים. חריגה ביצירה נתפסת ומנותבת לפלט CustingError שאינו מחובר, ולכן לא נוצרת רשומה ואין רישום של הכשל. לפי התנהגות SSIS המתועדת, לא מוצג בקבצים: אם קריאת ערך ריק זורקת חריגה, זה קורה גם כש\"עבר בקרה ורג'קט\" והרפרנט המעדכן ריק, או כשנבחר מוצר 1/2 ומזהה מוצר הפנסיה ריק. באותו תנאי, ערך ריק באחד משמות הסיבות או בהערת הרג'קט (נקראים בלי בדיקת IsNull ומחוץ ל-try בבניית ההערה) מכשיל את זרימת הנתונים כולה, והשלבים הבאים בחבילה לא רצים באותה ריצה.",
+   "why": "התוצאה העסקית השמיטה את מסלול הכשל ב-Set gen_note. כלל קריאת NULL מנוסח בתנאי.",
+   "evidence": "DTSX:7396-7406; Create Fund Enrolment main.cs:132-334 (DTSX:4758); DTSX:15643-15648",
+   "round": 2
+  },
+  {
+   "claimId": "L|Package\\Create FundEnrolment For Pension|decisions",
+   "field": "decisions[5].outcome_he",
+   "before": "CustingError — לא מחובר (אובד). כולל קריאת ערך ריק: gen_updatedbyreferent (main.cs:138) או ComprehensivePension/GeneralPension (main.cs:169/171)",
+   "after": "CustingError — לא מחובר (אובד). לפי התנהגות SSIS המתועדת, לא מוצג בקבצים: אם קריאת ערך ריק זורקת חריגה, גם gen_updatedbyreferent ריק (main.cs:138) או ComprehensivePension/GeneralPension ריקים (main.cs:169/171) מגיעים לכאן.",
+   "why": "עקביות: כלל קריאת NULL מנוסח בתנאי.",
+   "evidence": "Create Fund Enrolment main.cs:138, 169, 171, 330-334 (DTSX:4758)",
+   "round": 2
+  },
+  {
+   "claimId": "L|Package\\Create FundEnrolment For Pension|title",
+   "field": "short_he",
+   "before": "לכל הצטרפות פנסיה בלי Fund Enrolment, בסטטוס 2/4 או שעברה בקרה עם רג'קט, ושיש לה סיבת רג'קט, הערה או רשומת ניהול רג'קטים, נפתחת רשומת Fund Enrolment. הרשומה משויכת לצוות הרג'קטים או לרפרנט המעדכן, ונקשרת חזרה להצטרפות.",
+   "after": "כשהיצירה מצליחה, לכל הצטרפות פנסיה בלי Fund Enrolment, בסטטוס 2/4 או שעברה בקרה עם רג'קט, ושיש לה סיבת רג'קט, הערה או רשומת ניהול רג'קטים, נפתחת רשומת Fund Enrolment. הרשומה משויכת לצוות הרג'קטים או לרפרנט המעדכן, ונקשרת חזרה להצטרפות.",
+   "why": "יישור עם short ו-detailed: התוצאה מותנית בהצלחת היצירה.",
+   "evidence": "Create Fund Enrolment main.cs:330-334 (DTSX:4758)",
+   "round": 2
+  },
+  {
+   "claimId": "L|Package\\Create FundEnrolment For Pension|short",
+   "field": "short.nodes[4].text",
+   "before": "כשהיצירה מצליחה, לכל הצטרפות פנסיה עם רג'קט נפתחת רשומת טיפול אחת, וההצטרפות מסומנת כמקושרת אליה.",
+   "after": "כשהיצירה מצליחה, לכל הצטרפות פנסיה עם רג'קט נפתחת רשומת טיפול אחת, וההצטרפות מסומנת כמקושרת אליה. לפי התנהגות SSIS המתועדת, לא מוצג בקבצים: אם קריאת ערך ריק זורקת חריגה, שם סיבה או הערה ריקים בשלב בניית ההערה עוצרים את כל השלב, והשלבים הבאים בחבילה לא רצים באותה ריצה.",
+   "why": "יישור עם detailed (יחידה 36): short לא יכול להשמיט מסלול כשל שמופיע ב-detailed.",
+   "evidence": "DTSX:7396-7406; DTSX:15643-15648",
+   "round": 2
+  },
+  {
+   "claimId": "L|Package\\Create FundEnrolment For Transfer Request|detailed",
+   "field": "detailed.nodes[1].text",
+   "before": "אוכלוסייה (לו הופעלה): בקשות העברה פעילות מסוג 5, בסטטוס העברה 2, בלי Fund Enrolment. לא נכללות בקשות שסטטוס המשוב שלהן 3 או 4 ויש להן מסלול פעיל עם שגיאה המכילה 11879018.",
+   "after": "אוכלוסייה (לו הופעלה): בקשות העברה פעילות (statecode 0) מסוג 5, בסטטוס העברה 2, בלי Fund Enrolment. לא נכללות בקשות שיש להן מסלול פעיל עם שגיאה המכילה 11879018 וסטטוס המשוב שלהן 3, 4 או ריק (NULL). כשהסטטוס ריק, הביטוי NOT(...) מחזיר UNKNOWN, והשורה לא נשלפת.",
+   "why": "סמנטיקת NULL הושמטה: gen_feedbackstatus NULL עם מסלול שגיאה פעיל נותן NOT(UNKNOWN AND TRUE) = UNKNOWN, והשורה מסוננת.",
+   "evidence": "Get Failed Transfer Request DTSX:10038-10043",
+   "round": 2
+  },
+  {
+   "claimId": "L|Package\\Create FundEnrolment For Transfer Request|detailed",
+   "field": "detailed.nodes[7].text",
+   "before": "מושבת — אין כתיבה בפועל.",
+   "after": "מושבת — אין כתיבה בפועל. (לו הופעלה: בניית ההערה קוראת את תיאור הרג'קט בלי בדיקת ערך ריק ומחוץ ל-try. לפי התנהגות SSIS המתועדת, לא מוצג בקבצים: אם קריאת ערך ריק זורקת חריגה, תיאור רג'קט ריק היה מכשיל את זרימת הנתונים.)",
+   "why": "עקביות עם כלל קריאת NULL שבשאר רכיבי החבילה (הערת המאמת). אין השפעה כרגע, כי הזרימה מושבתת.",
+   "evidence": "Set gen_note 1 DTSX:10501-10502; getter Buffer.GetString DTSX:8875-8880; DTSX:8160 Disabled",
+   "round": 2
+  },
+  {
+   "claimId": "L|Package\\Create FundEnrolment For Transfer Request|detail",
+   "field": "detail_he[0].t",
+   "before": "gen_transferrequest מסוג 5, gen_tanferinstatus = 2, בלי Fund Enrolment, פעילה. לא נכללות בקשות עם משוב 3/4 ומסלול פעיל עם שגיאה '%11879018%'.",
+   "after": "gen_transferrequest מסוג 5, gen_tanferinstatus = 2, בלי Fund Enrolment, פעילה. לא נכללות בקשות שיש להן מסלול פעיל עם שגיאה '%11879018%' וסטטוס משוב 3, 4 או NULL (עם NULL הביטוי NOT(...) הוא UNKNOWN והשורה מסוננת).",
+   "why": "אותה עובדה כמו ביחידה 2 של detailed: סמנטיקת NULL.",
+   "evidence": "DTSX:10038-10043",
+   "round": 2
+  },
+  {
+   "claimId": "L|Package\\Create FundEnrolment For Transfer Request|decisions",
+   "field": "decisions[1].outcome_he",
+   "before": "יצירה (לו הופעלה)",
+   "after": "יצירה (לו הופעלה). בקשה עם מסלול שגיאה פעיל ו-gen_feedbackstatus NULL לא נשלפת (NOT(UNKNOWN) = UNKNOWN).",
+   "why": "אותה עובדה כמו ביחידה 2 של detailed: סמנטיקת NULL.",
+   "evidence": "DTSX:10038-10043",
+   "round": 2
+  },
+  {
+   "claimId": "L|Package\\Update Reject Management With Fund Enrolment|detailed",
+   "field": "detailed.nodes[5].text",
+   "before": "כשל בעדכון מנותב לעמודה שאינה נשמרת בשום מקום (Derived Column ריק, בלי המשך).",
+   "after": "כשל בעדכון מנותב לפלט Failure, שמוביל ל-Derived Column ריק בלי המשך, ולכן לא נשמר בשום מקום. זה נכון כשהודעת השגיאה נכנסת בעמודה ErrorMessage (200 תווים). לפי התנהגות SSIS המתועדת, לא מוצג בקבצים: אם השמת מחרוזת ארוכה יותר זורקת חריגה, החריגה נזרקת בתוך ה-catch, זרימת הנתונים נכשלת, וסימון gen_ismailsend (Update FundEnrolment) לא רץ באותה ריצה.",
+   "why": "הניתוב ל-Failure מובטח רק אם ex.Message נכנס ב-wstr(200). אחרת ההשמה בתוך ה-catch עלולה לזרוק.",
+   "evidence": "ErrorMessage wstr(200) DTSX:15623; catch DTSX:15055-15059; path Failure DTSX:15631; Constraints 7, 9 DTSX:15647-15648",
+   "round": 2
+  },
+  {
+   "claimId": "L|Package\\Update Reject Management With Fund Enrolment|detailed",
+   "field": "detailed.nodes[5].tech",
+   "before": "Outputs[Failure] → Derived Column (DTSX:14623) — dead end",
+   "after": "Outputs[Failure] → Derived Column (DTSX:14623) — dead end; Row.ErrorMessage = ex.Message (DTSX:15057), ErrorMessage wstr(200) (DTSX:15623)",
+   "why": "פירוט טכני ליחידה 10.",
+   "evidence": "DTSX:15057; DTSX:15623",
+   "round": 2
+  },
+  {
+   "claimId": "L|Package\\Update Reject Management With Fund Enrolment|detailed",
+   "field": "detailed.nodes[6].text",
+   "before": "רשומות ניהול רג'קט פעילות שעדיין לא מקושרות מוצמדות לרשומת הטיפול של מקורן, כשהמקור כבר מקושר ל-Fund Enrolment ואינו בשיטת הרג'קט הישנה. רשומות של מקור בשיטה הישנה, או של מקור בלי Fund Enrolment, נשארות לא מקושרות.",
+   "after": "רשומות ניהול רג'קט פעילות שעדיין לא מקושרות מוצמדות לרשומת הטיפול של מקורן, כשהמקור כבר מקושר ל-Fund Enrolment ואינו בשיטת הרג'קט הישנה. רשומות של מקור בשיטה הישנה, או של מקור בלי Fund Enrolment, נשארות לא מקושרות. אם להצטרפות ממוכנת יש יותר מ-Fund Enrolment אחד (למשל כשיש לה כמה בקשות העברה), השאילתה מחזירה שורה לכל Fund Enrolment, ורשומת ניהול הרג'קט מתעדכנת פעם לכל שורה. העדכון האחרון קובע, וסדר השורות לא מוגדר (אין ORDER BY).",
+   "why": "הושמט המקרה של כמה Fund Enrolment להצטרפות ממוכנת אחת: חלק 1 מצטרף על fe.Gen_automatedjoining (1:N).",
+   "evidence": "Get Reject Management And Fund Enrolment DTSX:14666-14682 (UNION בלי ORDER BY; חלק 1 DTSX:14666-14669); Get All joining reject From bank DTSX:3357 (left join gen_transferrequest)",
+   "round": 2
+  },
+  {
+   "claimId": "L|Package\\Update Reject Management With Fund Enrolment|decisions",
+   "field": "decisions[1].outcome_he",
+   "before": "Update; catch → Failure (dead end)",
+   "after": "Update; catch → Failure (dead end), כשהודעת השגיאה נכנסת ב-wstr(200). לפי התנהגות SSIS המתועדת, לא מוצג בקבצים: אם השמה ארוכה יותר זורקת חריגה, זרימת הנתונים נכשלת.",
+   "why": "אותה עובדה כמו ביחידה 10 של detailed.",
+   "evidence": "DTSX:15057; DTSX:15623",
+   "round": 2
+  },
+  {
+   "claimId": "L|finding#3",
+   "field": "findings_he[2].text",
+   "before": "כשלי יצירה של Fund Enrolment אובדים בלי רישום: הפלטים CastingError ו-CustingError לא מחוברים. גם כשל בקישור ניהול רג'קטים מנותב ל-Derived Column ריק. ההצטרפויות יישלפו שוב בריצה הבאה, אבל אין עדות לכשל.",
+   "after": "כשלי יצירה של Fund Enrolment אובדים בלי רישום: הפלטים CastingError ו-CustingError לא מחוברים. גם כשל בקישור ניהול רג'קטים מנותב ל-Derived Column ריק, כשהודעת השגיאה נכנסת ב-200 תווים (לפי התנהגות SSIS המתועדת, לא מוצג בקבצים: הודעה ארוכה יותר עלולה להכשיל את זרימת הנתונים). ההצטרפויות יישלפו שוב בריצה הבאה, אבל אין עדות לכשל.",
+   "why": "עקביות עם יחידה 10 של Update Reject Management: הניתוב ל-Failure מותנה באורך ההודעה.",
+   "evidence": "DTSX:15057; DTSX:15623",
+   "round": 2
+  },
+  {
+   "round": 3,
+   "date": "2026-11-07T16:43:39.272Z",
+   "claimId": "L|Package\\Create Fundenrolment|title",
+   "field": "components[Create Fundenrolment].short_he",
+   "before": "כשהיצירה מצליחה, לכל הצטרפות ממוכנת בסטטוס 2 שעדיין אין לה רשומת Fund Enrolment נפתחת רשומה חדשה ב-CRM עם פרטי העמית, הסוכן, המוצר, סיבות הרג'קט וההערות. הרשומה משויכת לצוות הרג'קטים ונרשמת ברשימת הרשומות שנוצרו בריצה. יצירה שנכשלת נזרקת בלי רישום.",
+   "after": "כשהיצירה מצליחה, כל שורת מקור מקבלת רשומת Fund Enrolment חדשה ב-CRM, עם פרטי העמית, הסוכן, המוצר, סיבות הרג'קט וההערות. שורות המקור הן הצטרפויות ממוכנות בסטטוס 2, שתאריך הסנכרון האחרון שלהן ריק או מוקדם מתאריך השינוי האחרון שלהן (בחבילות שסופקו לא נמצא מי מעדכן את תאריך הסנכרון), ושעדיין אין להן רשומת Fund Enrolment. הצטרפות עם כמה בקשות העברה מופיעה בכמה שורות, ולכן עשויה לקבל כמה רשומות. הרשומה משויכת לצוות הרג'קטים ונרשמת ברשימת הרשומות שנוצרו בריצה. יצירה שנכשלת נזרקת בלי רישום.",
+   "why": "הכללת-יתר: חסרו תנאי תאריך הסנכרון (כולל ריק) והמקרה של כמה רשומות להצטרפות אחת.",
+   "evidence": "Get All joining reject From bank DTSX:3407 (left join gen_transferrequest), DTSX:3415-3417 (where (gen_lastsyncdate is null or gen_lastsyncdate < aj.ModifiedOn) and aj.gen_joiningstatus = 2); grep gen_lastsyncdate בכל source/: רק 0028 (DTSX:3361, 3415-3416, קריאה בלבד)"
+  },
+  {
+   "round": 3,
+   "date": "2026-11-07T16:43:39.272Z",
+   "claimId": "L|Package\\Create Fundenrolment|title",
+   "field": "components[Create Fundenrolment].flow_he[0]",
+   "before": "שליפת הצטרפויות ממוכנות בסטטוס 2 (שלא סונכרנו מאז השינוי האחרון).",
+   "after": "שליפת הצטרפויות ממוכנות בסטטוס 2 שתאריך הסנכרון האחרון שלהן ריק או מוקדם מתאריך השינוי (שורה לכל בקשת העברה של ההצטרפות).",
+   "why": "\"שלא סונכרנו מאז השינוי האחרון\" לא כיסה את המקרה של תאריך סנכרון ריק; נוסף ריבוי השורות.",
+   "evidence": "Get All joining reject From bank DTSX:3407 (left join gen_transferrequest), DTSX:3415-3417 (where (gen_lastsyncdate is null or gen_lastsyncdate < aj.ModifiedOn) and aj.gen_joiningstatus = 2); grep gen_lastsyncdate בכל source/: רק 0028 (DTSX:3361, 3415-3416, קריאה בלבד)"
+  },
+  {
+   "round": 3,
+   "date": "2026-11-07T16:43:39.272Z",
+   "claimId": "L|Package\\Create Fundenrolment|short",
+   "field": "components[Create Fundenrolment].short.nodes[0].text",
+   "before": "נשלפות הצטרפויות ממוכנות בסטטוס 2 שהשתנו מאז הסנכרון האחרון, עם פרטי העמית, הסוכן, המוצר וסיבות הרג'קט.",
+   "after": "נשלפות הצטרפויות ממוכנות בסטטוס 2 שתאריך הסנכרון האחרון שלהן ריק או מוקדם מתאריך השינוי האחרון שלהן (בחבילות שסופקו לא נמצא מי מעדכן את תאריך הסנכרון). לכל אחת מצורפים פרטי העמית, הסוכן, המוצר וסיבות הרג'קט, ושורה נפרדת לכל בקשת העברה שלה.",
+   "why": "יחידה 1 השמיטה את ענף ה-NULL של תנאי הסנכרון.",
+   "evidence": "Get All joining reject From bank DTSX:3407 (left join gen_transferrequest), DTSX:3415-3417 (where (gen_lastsyncdate is null or gen_lastsyncdate < aj.ModifiedOn) and aj.gen_joiningstatus = 2); grep gen_lastsyncdate בכל source/: רק 0028 (DTSX:3361, 3415-3416, קריאה בלבד)"
+  },
+  {
+   "round": 3,
+   "date": "2026-11-07T16:43:39.272Z",
+   "claimId": "L|Package\\Create Fundenrolment|short",
+   "field": "components[Create Fundenrolment].short.nodes[4].text",
+   "before": "כשהיצירה מצליחה, כל שורת מקור (הצטרפות ממוכנת בסטטוס 2 בלי Fund Enrolment) מקבלת רשומת טיפול חדשה. הרשומה משויכת לצוות הרג'קטים בעדכון SQL, ומזהה הרשומה נשמר לסימון בסוף התהליך. אם היצירה נכשלת, השורה נזרקת בלי רשומה ובלי רישום. אם להצטרפות יש כמה בקשות העברה, היא מופיעה בכמה שורות, ואז, כשהיצירות מצליחות, נפתחות לה כמה רשומות באותה ריצה.",
+   "after": "כשהיצירה מצליחה, כל שורת מקור (הצטרפות ממוכנת בסטטוס 2, שתאריך הסנכרון שלה ריק או מוקדם מתאריך השינוי, ובלי Fund Enrolment) מקבלת רשומת טיפול חדשה. הרשומה משויכת לצוות הרג'קטים בעדכון SQL, ומזהה הרשומה נשמר לסימון בסוף התהליך. אם היצירה נכשלת, השורה נזרקת בלי רשומה ובלי רישום. אם להצטרפות יש כמה בקשות העברה, היא מופיעה בכמה שורות, ואז, כשהיצירות מצליחות, נפתחות לה כמה רשומות באותה ריצה.",
+   "why": "עקביות עם יחידה 1: תנאי הסנכרון.",
+   "evidence": "Get All joining reject From bank DTSX:3407 (left join gen_transferrequest), DTSX:3415-3417 (where (gen_lastsyncdate is null or gen_lastsyncdate < aj.ModifiedOn) and aj.gen_joiningstatus = 2); grep gen_lastsyncdate בכל source/: רק 0028 (DTSX:3361, 3415-3416, קריאה בלבד)"
+  },
+  {
+   "round": 3,
+   "date": "2026-11-07T16:43:39.272Z",
+   "claimId": "L|Package\\Create Fundenrolment|detailed",
+   "field": "components[Create Fundenrolment].detailed.nodes[8].text",
+   "before": "תאריך הסגירה ותאריך קבלת הבקשה מומרים מטקסט בפורמט dd/MM/yyyy, וסכום ההעברה הצפוי נרשם כסכום כספי.",
+   "after": "תאריך הסגירה ותאריך קבלת הבקשה מגיעים מהמקור כטקסט dd/MM/yyyy אחרי הוספת 3 שעות (כך שנשמר רק התאריך הקלנדרי שאחרי ההזזה), והם מומרים חזרה לתאריך. סכום ההעברה הצפוי נרשם כסכום כספי.",
+   "why": "השלמה (הערת המאמת, לא חוסמת): המקור מזיז את התאריכים ב-3 שעות וממיר לטקסט.",
+   "evidence": "DTSX:3380-3381 CONVERT(nVARCHAR(10),DATEADD(hh,3,aj.gen_closingdate),103); main.cs:251-260"
+  },
+  {
+   "round": 3,
+   "date": "2026-11-07T16:43:39.272Z",
+   "claimId": "L|Package\\Create Fundenrolment|detailed",
+   "field": "components[Create Fundenrolment].detailed.nodes[10].branches[0].nodes[0].text",
+   "before": "השגיאה נרשמת בעמודה בלבד ואינה נשמרת בשום מקום. ההצטרפות תישלף שוב בריצה הבאה, כי אין לה Fund Enrolment.",
+   "after": "השגיאה נרשמת רק בעמודה של פלט CastingError, שאינו מחובר, ולכן אינה נשמרת בשום מקום. בשאילתת המקור אין תנאי על Fund Enrolment: ההצטרפות תישלף שוב בריצות הבאות כל עוד היא בסטטוס 2 ותאריך הסנכרון שלה ריק או מוקדם מתאריך השינוי. היצירה תנוסה שוב רק אם באותה ריצה ה-Lookup לא ימצא לה Fund Enrolment. אם שורה אחרת של אותה הצטרפות (בקשת העברה אחרת) נוצרה בהצלחה, השורה שנכשלה תדולג בכל הריצות הבאות ולא תנוסה שוב.",
+   "why": "הסיבה \"כי אין לה Fund Enrolment\" שגויה: המקור אינו מסנן לפי Fund Enrolment; השליפה החוזרת מותנית בסטטוס ובתאריך הסנכרון, והניסיון החוזר מותנה ב-Lookup.",
+   "evidence": "Get All joining reject From bank DTSX:3407 (left join gen_transferrequest), DTSX:3415-3417 (where (gen_lastsyncdate is null or gen_lastsyncdate < aj.ModifiedOn) and aj.gen_joiningstatus = 2); grep gen_lastsyncdate בכל source/: רק 0028 (DTSX:3361, 3415-3416, קריאה בלבד); Is Fundenrolment Exits DTSX:3612-3638 (Full cache, gen_automatedjoining = ?)"
+  },
+  {
+   "round": 3,
+   "date": "2026-11-07T16:43:39.272Z",
+   "claimId": "L|Package\\Create Fundenrolment|detailed",
+   "field": "components[Create Fundenrolment].detailed.nodes[13].text",
+   "before": "כשהיצירה מצליחה, לכל שורת מקור של הצטרפות ממוכנת בסטטוס 2 שאין לה Fund Enrolment נפתחת רשומת טיפול חדשה, המשויכת לצוות הרג'קטים. יצירה שנכשלת נזרקת בלי רשומה ובלי רישום (הפלט CastingError לא מחובר).",
+   "after": "כשהיצירה מצליחה, לכל שורת מקור של הצטרפות ממוכנת בסטטוס 2, שתאריך הסנכרון שלה ריק או מוקדם מתאריך השינוי ושאין לה Fund Enrolment, נפתחת רשומת טיפול חדשה, המשויכת לצוות הרג'קטים. יצירה שנכשלת נזרקת בלי רשומה ובלי רישום (הפלט CastingError לא מחובר).",
+   "why": "עקביות: תנאי הסנכרון.",
+   "evidence": "Get All joining reject From bank DTSX:3407 (left join gen_transferrequest), DTSX:3415-3417 (where (gen_lastsyncdate is null or gen_lastsyncdate < aj.ModifiedOn) and aj.gen_joiningstatus = 2); grep gen_lastsyncdate בכל source/: רק 0028 (DTSX:3361, 3415-3416, קריאה בלבד)"
+  },
+  {
+   "round": 3,
+   "date": "2026-11-07T16:43:39.272Z",
+   "claimId": "L|Package\\Create Fundenrolment|detail",
+   "field": "components[Create Fundenrolment].detail_he[מקור ואוכלוסייה].t",
+   "before": "gen_automatedjoining ב-CRM, בסטטוס הצטרפות 2, כש-gen_lastsyncdate ריק או מוקדם מ-ModifiedOn. החבילה אינה מעדכנת את gen_lastsyncdate. בצירוף: בקשות העברה (left join), חוזה סוכן, ומוצר מחלוקת המסלולים הראשונה. זו טבלת CRM, לא staging.",
+   "after": "gen_automatedjoining ב-CRM, בסטטוס הצטרפות 2, כש-gen_lastsyncdate ריק או מוקדם מ-ModifiedOn. החבילה אינה מעדכנת את gen_lastsyncdate, ובחבילות שסופקו לא נמצא מי מעדכן אותו. בצירוף: בקשות העברה (left join, שורה לכל בקשה), חוזה סוכן, ומוצר מחלוקת המסלולים הראשונה. זו טבלת CRM, לא staging.",
+   "why": "השלמה: אף חבילה שסופקה לא נמצאה כמעדכנת gen_lastsyncdate; ריבוי שורות לפי בקשות העברה.",
+   "evidence": "Get All joining reject From bank DTSX:3407 (left join gen_transferrequest), DTSX:3415-3417 (where (gen_lastsyncdate is null or gen_lastsyncdate < aj.ModifiedOn) and aj.gen_joiningstatus = 2); grep gen_lastsyncdate בכל source/: רק 0028 (DTSX:3361, 3415-3416, קריאה בלבד)"
+  },
+  {
+   "round": 3,
+   "date": "2026-11-07T16:43:39.272Z",
+   "claimId": "L|Package\\Create Fundenrolment|detail",
+   "field": "components[Create Fundenrolment].detail_he[תוצאה עסקית].t",
+   "before": "כשהיצירה מצליחה, נפתחת רשומת טיפול בהצטרפות (Fund Enrolment) לכל שורת מקור של הצטרפות ממוכנת בסטטוס 2 (הצטרפות עם כמה בקשות העברה עשויה לקבל כמה רשומות), והיא משויכת לצוות הרג'קטים לטיפול. כל חריגה ביצירה (דוגמאות אפשריות: תקלת CRM, תאריך סגירה או קבלה שאינו בפורמט dd/MM/yyyy, RejectTeamId שאינו GUID תקין) מנתבת את השורה לפלט CastingError שאינו מחובר, ולכן לא נוצרת רשומה ואין רישום של הכשל.",
+   "after": "כשהיצירה מצליחה, נפתחת רשומת טיפול בהצטרפות (Fund Enrolment) לכל שורת מקור של הצטרפות ממוכנת בסטטוס 2 שתאריך הסנכרון שלה ריק או מוקדם מתאריך השינוי (הצטרפות עם כמה בקשות העברה עשויה לקבל כמה רשומות), והיא משויכת לצוות הרג'קטים לטיפול. בחריגה שנתפסת ביצירה (דוגמאות אפשריות: תקלת CRM, תאריך סגירה או קבלה שאינו בפורמט dd/MM/yyyy, RejectTeamId שאינו GUID תקין) הקוד מנתב את השורה לפלט CastingError שאינו מחובר, ולכן לא נוצרת רשומה ואין רישום של הכשל.",
+   "why": "תנאי הסנכרון; \"כל חריגה\" הוחלף ב\"חריגה שנתפסת\" (תיאור הקוד בלבד, בלי פרטי plumbing).",
+   "evidence": "Get All joining reject From bank DTSX:3407 (left join gen_transferrequest), DTSX:3415-3417 (where (gen_lastsyncdate is null or gen_lastsyncdate < aj.ModifiedOn) and aj.gen_joiningstatus = 2); grep gen_lastsyncdate בכל source/: רק 0028 (DTSX:3361, 3415-3416, קריאה בלבד); main.cs:279-291"
+  },
+  {
+   "round": 3,
+   "date": "2026-11-07T16:43:39.272Z",
+   "claimId": "L|Package\\Create Fundenrolment|detail",
+   "field": "components[Create Fundenrolment].sourceTables[0].loadedBy_he",
+   "before": "טבלת CRM, לא staging. בחבילות שסופקו לא נמצא מי יוצר אותה; 0027_AutomatedJoining רק מעדכן אותה (השערה: נוצרת מחוץ לחבילות שסופקו).",
+   "after": "טבלת CRM, לא staging. בחבילות שסופקו לא נמצא מי יוצר אותה (השערה: נוצרת מחוץ לחבילות שסופקו). בין היתר מעדכנות אותה 0027_AutomatedJoining ו-0029_POA (בזרימה Create POA Main For Automated Joining, רכיב Update Automated Joining: gen_testedtocreatepoa = true ב-SDK).",
+   "why": "רשימת הכותבים לא הייתה מלאה: גם 0029_POA מעדכנת gen_automatedjoining בזרימה פעילה.",
+   "evidence": "0029_POA.dtsx:21361 (Executable ללא Disabled), 29486 Update Automated Joining, 29686-29690 (new Entity(\"gen_automatedjoining\"); gen_testedtocreatepoa = true; proxy.Update)"
+  },
+  {
+   "round": 3,
+   "date": "2026-11-07T16:43:39.272Z",
+   "claimId": "L|Package\\Create Fundenrolment|crm",
+   "field": "components[Create Fundenrolment].crmEffects[0].when_he",
+   "before": "הצטרפות ממוכנת בסטטוס 2 בלי Fund Enrolment קיים",
+   "after": "שורת מקור: הצטרפות ממוכנת בסטטוס 2, gen_lastsyncdate ריק או מוקדם מ-ModifiedOn, ובלי Fund Enrolment קיים (Lookup)",
+   "why": "עקביות: תנאי הסנכרון.",
+   "evidence": "Get All joining reject From bank DTSX:3407 (left join gen_transferrequest), DTSX:3415-3417 (where (gen_lastsyncdate is null or gen_lastsyncdate < aj.ModifiedOn) and aj.gen_joiningstatus = 2); grep gen_lastsyncdate בכל source/: רק 0028 (DTSX:3361, 3415-3416, קריאה בלבד)"
+  },
+  {
+   "round": 3,
+   "date": "2026-11-07T16:43:39.272Z",
+   "claimId": "L|Package\\Create Fundenrolment|open",
+   "field": "components[Create Fundenrolment].openQuestions_he[0]",
+   "before": "האם נדרש לפתוח Fund Enrolment גם להצטרפות בלי רג'קטים? הקוד יוצר לכל הצטרפות בסטטוס 2, כי בדיקת הרג'קטים לעולם אינה מתקיימת.",
+   "after": "האם נדרש לפתוח Fund Enrolment גם להצטרפות בלי רג'קטים? הקוד יוצר לכל הצטרפות בסטטוס 2 שנשלפת (תאריך סנכרון ריק או מוקדם מתאריך השינוי) ואין לה Fund Enrolment, כי בדיקת הרג'קטים לעולם אינה מתקיימת.",
+   "why": "עקביות: תנאי הסנכרון.",
+   "evidence": "Get All joining reject From bank DTSX:3407 (left join gen_transferrequest), DTSX:3415-3417 (where (gen_lastsyncdate is null or gen_lastsyncdate < aj.ModifiedOn) and aj.gen_joiningstatus = 2); grep gen_lastsyncdate בכל source/: רק 0028 (DTSX:3361, 3415-3416, קריאה בלבד)"
+  },
+  {
+   "round": 3,
+   "date": "2026-11-07T16:43:39.272Z",
+   "claimId": "L|finding#2",
+   "field": "findings_he[1].text",
+   "before": "סינון \"אין רג'קטים\" בזרימת ההצטרפות הממוכנת הוא קוד מת: התנאי דורש JoiningStatus != 2, אבל המקור שולף רק gen_joiningstatus = 2. לכן נפתח Fund Enrolment לכל הצטרפות ממוכנת בסטטוס 2 בלי Fund Enrolment, גם בלי שום רג'קט או הערה. האם זו הכוונה? לא ידוע.",
+   "after": "סינון \"אין רג'קטים\" בזרימת ההצטרפות הממוכנת הוא קוד מת: התנאי דורש JoiningStatus != 2, אבל המקור שולף רק gen_joiningstatus = 2. לכן נפתח Fund Enrolment לכל הצטרפות ממוכנת בסטטוס 2 שנשלפת (תאריך הסנכרון ריק או מוקדם מתאריך השינוי) ואין לה Fund Enrolment, גם בלי שום רג'קט או הערה. האם זו הכוונה? לא ידוע.",
+   "why": "עקביות: תנאי הסנכרון.",
+   "evidence": "Get All joining reject From bank DTSX:3407 (left join gen_transferrequest), DTSX:3415-3417 (where (gen_lastsyncdate is null or gen_lastsyncdate < aj.ModifiedOn) and aj.gen_joiningstatus = 2); grep gen_lastsyncdate בכל source/: רק 0028 (DTSX:3361, 3415-3416, קריאה בלבד)"
+  },
+  {
+   "round": 3,
+   "date": "2026-11-07T16:43:39.272Z",
+   "claimId": "L|finding#3",
+   "field": "findings_he[2].text",
+   "before": "כשלי יצירה של Fund Enrolment אובדים בלי רישום: הפלטים CastingError ו-CustingError לא מחוברים. גם כשל בקישור ניהול רג'קטים מנותב ל-Derived Column ריק, כשהודעת השגיאה נכנסת ב-200 תווים (לפי התנהגות SSIS המתועדת, לא מוצג בקבצים: הודעה ארוכה יותר עלולה להכשיל את זרימת הנתונים). ההצטרפויות יישלפו שוב בריצה הבאה, אבל אין עדות לכשל.",
+   "after": "בחריגה שנתפסת ביצירת Fund Enrolment, הקוד מנתב את השורה לפלט CastingError (הצטרפות ממוכנת) או CustingError (פנסיה), ושניהם לא מחוברים, ולכן אין רישום של הכשל. גם פלט ה-Failure של קישור ניהול הרג'קטים מחובר ל-Derived Column ריק בלי המשך. אם יצירה להצטרפות ממוכנת נכשלה, ההצטרפות תישלף שוב בריצות הבאות רק כל עוד היא בסטטוס 2 ותאריך הסנכרון שלה ריק או מוקדם מתאריך השינוי, והיצירה תנוסה שוב רק אם ה-Lookup לא ימצא לה Fund Enrolment. אם שורה אחרת של אותה הצטרפות (בקשת העברה אחרת) נוצרה בהצלחה, השורה שנכשלה לא תנוסה שוב. אם יצירה להצטרפות פנסיה נכשלה, ההצטרפות תישלף שוב כל עוד היא עומדת בתנאי השליפה (כולל gen_fundenrolmentid ריק).",
+   "why": "\"יישלפו שוב בריצה הבאה\" נאמר בלי תנאים; נוספו התנאים. הסתייגות 200 התווים (plumbing) הוסרה, והניתוב תואר כהתנהגות הקוד בלבד.",
+   "evidence": "Create gen_fundEnrolment main.cs:282-291 (DTSX:1505); Create Fund Enrolment main.cs:330-333 (DTSX:4758); DTSX:14623; DTSX:3407, 3415-3417; Is Fundenrolment Exits DTSX:3612-3638; Get Pension Joining DTSX:6934-6937"
+  },
+  {
+   "round": 3,
+   "date": "2026-11-07T16:43:39.272Z",
+   "claimId": "L|Package\\Create FundEnrolment For Pension|decisions",
+   "field": "components[Create FundEnrolment For Pension].decisions",
+   "before": "[{\"where\":\"Get Pension Joining WHERE (DTSX:6872)\",\"condition\":\"pj.gen_fundenrolmentid is null and (pj.gen_joiningstatus = 2 or pj.gen_joiningstatus = 4 or gen_passedandreject = 1) and (rejectionreason1..4 is not null or gen_rejectreasonsnotes is not null or rm.gen_rejectmanagementid is not null)\",\"meaning_he\":\"אוכלוסיית ההצטרפויות לטיפול\",\"outcome_he\":\"נשלפות ליצירה\"},{\"where\":\"Create Fund Enrolment main.cs:136\",\"condition\":\"!Row.genpassedandreject_IsNull && Row.genpassedandreject == true\",\"meaning_he\":\"עבר בקרה ורג'קט\",\"outcome_he\":\"Owner = gen_updatedbyreferent (type 8), gen_joiningstatus = 17; אחרת Owner = RejectTeamId (type 9), gen_joiningstatus = pj\"},{\"where\":\"Create Fund Enrolment main.cs:168-171\",\"condition\":\"genproduct == 1 / == 2\",\"meaning_he\":\"מקיפה / כללית\",\"outcome_he\":\"gen_fundtypename = ComprehensivePension / GeneralPension\"},{\"where\":\"Create Fund Enrolment main.cs:290\",\"condition\":\"genjoiningsource == 3 || == 4\",\"meaning_he\":\"הצטרפות מקובץ / ממשק מעסיק\",\"outcome_he\":\"gen_employersfile = true\"},{\"where\":\"Create Fund Enrolment main.cs:299-322\",\"condition\":\"genneedhealthdeclaration == 1 || (== 2 && genunderwritingstatus in (2,3)) / (== 2 && genunderwritingstatus == 1)\",\"meaning_he\":\"חיתום\",\"outcome_he\":\"gen_movedfromunderwritingaccount = true + gen_foldernumber=\\\"123456\\\" / = false\"},{\"where\":\"Create Fund Enrolment main.cs:330-333\",\"condition\":\"catch (Exception)\",\"meaning_he\":\"כשל יצירה\",\"outcome_he\":\"CustingError — לא מחובר (אובד). לפי התנהגות SSIS המתועדת, לא מוצג בקבצים: אם קריאת ערך ריק זורקת חריגה, גם gen_updatedbyreferent ריק (main.cs:138) או ComprehensivePension/GeneralPension ריקים (main.cs:169/171) מגיעים לכאן.\"}]",
+   "after": "[{\"where\":\"Get Pension Joining WHERE (DTSX:6872)\",\"condition\":\"pj.gen_fundenrolmentid is null and (pj.gen_joiningstatus = 2 or pj.gen_joiningstatus = 4 or gen_passedandreject = 1) and (rejectionreason1..4 is not null or gen_rejectreasonsnotes is not null or rm.gen_rejectmanagementid is not null)\",\"meaning_he\":\"אוכלוסיית ההצטרפויות לטיפול\",\"outcome_he\":\"נשלפות ליצירה\"},{\"where\":\"Create Fund Enrolment main.cs:136\",\"condition\":\"!Row.genpassedandreject_IsNull && Row.genpassedandreject == true\",\"meaning_he\":\"עבר בקרה ורג'קט\",\"outcome_he\":\"Owner = gen_updatedbyreferent (type 8), gen_joiningstatus = 17; אחרת Owner = RejectTeamId (type 9), gen_joiningstatus = pj\"},{\"where\":\"Create Fund Enrolment main.cs:168-171\",\"condition\":\"genproduct == 1 / == 2\",\"meaning_he\":\"מקיפה / כללית\",\"outcome_he\":\"gen_fundtypename = ComprehensivePension / GeneralPension\"},{\"where\":\"Create Fund Enrolment main.cs:271-274 (DTSX:5153-5156)\",\"condition\":\"Row.gencount_IsNull\",\"meaning_he\":\"אין מונה בהצטרפות\",\"outcome_he\":\"gen_counter = 1; אחרת gen_counter = gen_count\"},{\"where\":\"Create Fund Enrolment main.cs:284-285 (DTSX:5166-5167)\",\"condition\":\"!Row.gennewsletterapproval_IsNull\",\"meaning_he\":\"יש ערך באישור הדיוור (כן או לא)\",\"outcome_he\":\"gen_ispension = true (וגם gen_marketing_and_direct_mail_services_use = gen_newsletterapproval, DTSX:5163-5164). כשהשדה ריק, gen_ispension לא נקבע.\"},{\"where\":\"Create Fund Enrolment main.cs:290\",\"condition\":\"genjoiningsource == 3 || == 4\",\"meaning_he\":\"הצטרפות מקובץ / ממשק מעסיק\",\"outcome_he\":\"gen_employersfile = true\"},{\"where\":\"Create Fund Enrolment main.cs:299-322\",\"condition\":\"genneedhealthdeclaration == 1 || (== 2 && genunderwritingstatus in (2,3)) / (== 2 && genunderwritingstatus == 1)\",\"meaning_he\":\"חיתום\",\"outcome_he\":\"gen_movedfromunderwritingaccount = true + gen_foldernumber=\\\"123456\\\" / = false\"},{\"where\":\"Create Fund Enrolment main.cs:330-333\",\"condition\":\"catch (Exception)\",\"meaning_he\":\"כשל יצירה\",\"outcome_he\":\"CustingError — לא מחובר (אובד). לפי התנהגות SSIS המתועדת, לא מוצג בקבצים: אם קריאת ערך ריק זורקת חריגה, גם gen_updatedbyreferent ריק (main.cs:138) או ComprehensivePension/GeneralPension ריקים (main.cs:169/171) מגיעים לכאן.\"}]",
+   "why": "נוספו שורות ההחלטה של gen_ispension ושל ברירת המחדל gen_counter = 1.",
+   "evidence": "DTSX:5153-5156; 5163-5167"
+  },
+  {
+   "round": 3,
+   "date": "2026-11-07T16:43:39.272Z",
+   "claimId": "L|Package\\Create FundEnrolment For Pension|detailed",
+   "field": "components[Create FundEnrolment For Pension].detailed.nodes[9].branches[0].nodes[0].text",
+   "before": "השגיאה אובדת בלי רישום. ההצטרפות תישלף שוב בריצה הבאה, כי היא עדיין לא מקושרת. שני ערכים נקראים בתוך ה-try בלי בדיקת ערך ריק: הרפרנט המעדכן, כשההצטרפות מסומנת \"עבר בקרה ורג'קט\", ומזהה מוצר הפנסיה, כשנבחר מוצר 1 או 2. לפי התנהגות SSIS המתועדת, לא מוצג בקבצים: אם קריאת ערך ריק זורקת חריגה, החריגה נתפסת כאן ולא נוצרת רשומה. אם הנתונים לא משתנים, זה חוזר בכל ריצה.",
+   "after": "השגיאה אובדת בלי רישום. ההצטרפות עדיין לא מקושרת, ולכן תישלף שוב בריצות הבאות כל עוד היא עומדת בשאר תנאי השליפה (סטטוס 2/4 או \"עבר בקרה ורג'קט\", ויש לה רג'קט). שני ערכים נקראים בתוך ה-try בלי בדיקת ערך ריק: הרפרנט המעדכן, כשההצטרפות מסומנת \"עבר בקרה ורג'קט\", ומזהה מוצר הפנסיה, כשנבחר מוצר 1 או 2. לפי התנהגות SSIS המתועדת, לא מוצג בקבצים: אם קריאת ערך ריק זורקת חריגה, החריגה נתפסת כאן ולא נוצרת רשומה. אם הנתונים לא משתנים, זה חוזר בכל ריצה.",
+   "why": "עקביות עם finding#3: השליפה החוזרת מותנית בתנאי המקור.",
+   "evidence": "Get Pension Joining DTSX:6934-6937"
+  },
+  {
+   "round": 3,
+   "date": "2026-11-07T16:43:39.272Z",
+   "claimId": "L|Package\\Create FundEnrolment For Transfer Request|decisions",
+   "field": "components[Create FundEnrolment For Transfer Request].decisions",
+   "before": "[{\"where\":\"Executable DTSX:8160\",\"condition\":\"DTS:Disabled = True\",\"meaning_he\":\"מושבת\",\"outcome_he\":\"לא רצה\"},{\"where\":\"Get Failed Transfer Request WHERE (DTSX:9954)\",\"condition\":\"(tr.gen_tanferinstatus = 2 and not (tr.gen_feedbackstatus in(3,4) and tc.gen_transferrequestId is not null)) and tr.Gen_transferType = 5 and tr.gen_fundenrolmentid is null and tr.statecode = 0\",\"meaning_he\":\"בקשת העברה בין מסלולים שנכשלה\",\"outcome_he\":\"יצירה (לו הופעלה). בקשה עם מסלול שגיאה פעיל ו-gen_feedbackstatus NULL לא נשלפת (NOT(UNKNOWN) = UNKNOWN).\"},{\"where\":\"Create Fund Enrolment main.cs:145/183\",\"condition\":\"!gencontactcustomername_IsNull / else if !genaccountcustomername_IsNull\",\"meaning_he\":\"לקוח פרטי / עסקי\",\"outcome_he\":\"מקור נתוני הכתובת\"}]",
+   "after": "[{\"where\":\"Executable DTSX:8160\",\"condition\":\"DTS:Disabled = True\",\"meaning_he\":\"מושבת\",\"outcome_he\":\"לא רצה\"},{\"where\":\"Get Failed Transfer Request WHERE (DTSX:9954)\",\"condition\":\"(tr.gen_tanferinstatus = 2 and not (tr.gen_feedbackstatus in(3,4) and tc.gen_transferrequestId is not null)) and tr.Gen_transferType = 5 and tr.gen_fundenrolmentid is null and tr.statecode = 0\",\"meaning_he\":\"בקשת העברה בין מסלולים שנכשלה\",\"outcome_he\":\"יצירה (לו הופעלה). בקשה עם מסלול שגיאה פעיל ו-gen_feedbackstatus NULL לא נשלפת (NOT(UNKNOWN) = UNKNOWN).\"},{\"where\":\"Get Failed Transfer Request (DTSX:10019-10026)\",\"condition\":\"case when TR.gen_requestsource = 2 then (select top 1 gen_agentcontractid from gen_agentcontract where Gen_brokernumber = '00000004000') else tr.gen_agentcontractid end\",\"meaning_he\":\"בחירת חוזה הסוכן לפי מקור הבקשה (משמעות הערך 2 לא ידועה מהקבצים)\",\"outcome_he\":\"לו הופעלה: כשמקור הבקשה הוא 2, החוזה הוא חוזה כלשהו עם מספר ברוקר '00000004000' (top 1 בלי ORDER BY); אחרת, החוזה שבבקשה. מהחוזה שנבחר נלקחים מספר הברוקר, המפקח, הסוכן והסוכנות.\"},{\"where\":\"Create Fund Enrolment main.cs:145/183\",\"condition\":\"!gencontactcustomername_IsNull / else if !genaccountcustomername_IsNull\",\"meaning_he\":\"לקוח פרטי / עסקי\",\"outcome_he\":\"מקור נתוני הכתובת\"}]",
+   "why": "נוספה ההחלטה על חוזה הסוכן כשמקור הבקשה הוא 2.",
+   "evidence": "DTSX:10019-10026; select gen_agentcontract.gen_agentcontractid as gen_brokernumber, gen_agentcontract.gen_supervisor; joins Gen_agents/Gen_agencie on gen_agentcontract (DTSX:9954-10035)"
+  },
+  {
+   "round": 3,
+   "date": "2026-11-07T16:43:39.272Z",
+   "claimId": "L|Package\\Create FundEnrolment For Pension|short",
+   "item": "gen_note overflow (wstr(1000) בפנסיה / wstr(500) בבקשות העברה) מכשיל את זרימת הנתונים לפי התנהגות SSIS המתועדת",
+   "note": "לא נוסף. נבדק שאין בטקסט קביעה שסותרת זאת (למשל \"ההערה תמיד נשמרת\"): רשימות הכשלים אינן ממצות, והתוצאות מנוסחות בתנאי \"כשהיצירה מצליחה\".",
+   "outOfScope": "ETL plumbing — runtime failure (reports/logic-verify-standard.md; CLAUDE.md Focus)"
+  },
+  {
+   "round": 3,
+   "date": "2026-11-07T16:43:39.272Z",
+   "claimId": "L|Package\\Create FundEnrolment For Pension|detailed",
+   "item": "gen_note overflow (wstr(1000) בפנסיה / wstr(500) בבקשות העברה) מכשיל את זרימת הנתונים לפי התנהגות SSIS המתועדת",
+   "note": "לא נוסף. נבדק שאין בטקסט קביעה שסותרת זאת (למשל \"ההערה תמיד נשמרת\"): רשימות הכשלים אינן ממצות, והתוצאות מנוסחות בתנאי \"כשהיצירה מצליחה\".",
+   "outOfScope": "ETL plumbing — runtime failure (reports/logic-verify-standard.md; CLAUDE.md Focus)"
+  },
+  {
+   "round": 3,
+   "date": "2026-11-07T16:43:39.272Z",
+   "claimId": "L|Package\\Create FundEnrolment For Pension|detail",
+   "item": "gen_note overflow (wstr(1000) בפנסיה / wstr(500) בבקשות העברה) מכשיל את זרימת הנתונים לפי התנהגות SSIS המתועדת",
+   "note": "לא נוסף. נבדק שאין בטקסט קביעה שסותרת זאת (למשל \"ההערה תמיד נשמרת\"): רשימות הכשלים אינן ממצות, והתוצאות מנוסחות בתנאי \"כשהיצירה מצליחה\".",
+   "outOfScope": "ETL plumbing — runtime failure (reports/logic-verify-standard.md; CLAUDE.md Focus)"
+  },
+  {
+   "round": 3,
+   "date": "2026-11-07T16:43:39.272Z",
+   "claimId": "L|Package\\Create FundEnrolment For Transfer Request|detailed",
+   "item": "gen_note overflow (wstr(1000) בפנסיה / wstr(500) בבקשות העברה) מכשיל את זרימת הנתונים לפי התנהגות SSIS המתועדת",
+   "note": "לא נוסף. נבדק שאין בטקסט קביעה שסותרת זאת (למשל \"ההערה תמיד נשמרת\"): רשימות הכשלים אינן ממצות, והתוצאות מנוסחות בתנאי \"כשהיצירה מצליחה\".",
+   "outOfScope": "ETL plumbing — runtime failure (reports/logic-verify-standard.md; CLAUDE.md Focus)"
+  },
+  {
+   "round": 3,
+   "date": "2026-11-07T16:43:39.272Z",
+   "claimId": "L|finding#3",
+   "item": "Description wstr(2000) / ErrorMessage wstr(2000) overflow ו-se.Detail null בתוך ה-catch",
+   "note": "לא נוסף, לפי הנחיית המתאם; הסתייגות 200 התווים הוסרה במקום זאת.",
+   "outOfScope": "ETL plumbing — runtime failure"
+  },
+  {
+   "round": 4,
+   "date": "2026-11-07T17:11:40.861Z",
+   "claimId": "L|Package\\Create Fundenrolment|title",
+   "before": "ושעדיין אין להן רשומת Fund Enrolment.",
+   "after": "ושעדיין אין להן רשומת Fund Enrolment. gen_joiningstatus (בכינוי JoiningStatus, DTSX:3364) ו-gen_lastsyncdate שבתנאי השליפה (DTSX:3415-3416) אינם מסויגים בשאילתת המקור. הם עמודות של ההצטרפות הממוכנת (gen_automatedjoining), כי aj.gen_lastsyncdate ו-aj.gen_joiningstatus מופיעים באותה שאילתה (DTSX:3361, 3417), ואילו העמודה הייתה קיימת גם בטבלה מצורפת השאילתה הייתה נכשלת (שם עמודה עמום); לפי המשתמש החבילה רצה בפרודקשן.",
+   "note": "ownership argument for unqualified gen_lastsyncdate / gen_joiningstatus"
+  },
+  {
+   "round": 4,
+   "date": "2026-11-07T17:11:40.861Z",
+   "claimId": "L|Package\\Create Fundenrolment|title",
+   "before": "(התנאי דורש סטטוס שונה מ-2)",
+   "after": "(התנאי דורש סטטוס שונה מ-2, והמקור שולף רק סטטוס 2)",
+   "note": "clarify; ownership argued in short_he"
+  },
+  {
+   "round": 4,
+   "date": "2026-11-07T17:11:40.861Z",
+   "claimId": "L|Package\\Create Fundenrolment|short",
+   "before": "ושורה נפרדת לכל בקשת העברה שלה.",
+   "after": "ושורה נפרדת לכל בקשת העברה שלה. gen_joiningstatus (בכינוי JoiningStatus, DTSX:3364) ו-gen_lastsyncdate שבתנאי השליפה (DTSX:3415-3416) אינם מסויגים בשאילתת המקור. הם עמודות של ההצטרפות הממוכנת (gen_automatedjoining), כי aj.gen_lastsyncdate ו-aj.gen_joiningstatus מופיעים באותה שאילתה (DTSX:3361, 3417), ואילו העמודה הייתה קיימת גם בטבלה מצורפת השאילתה הייתה נכשלת (שם עמודה עמום); לפי המשתמש החבילה רצה בפרודקשן.",
+   "note": "ownership argument"
+  },
+  {
+   "round": 4,
+   "date": "2026-11-07T17:11:40.861Z",
+   "claimId": "L|Package\\Create Fundenrolment|detailed",
+   "before": "חוזה הסוכן, והמוצר מחלוקת המסלולים הראשונה שנוצרה.",
+   "after": "וחוזה הסוכן. המוצר נלקח מחלוקת המסלולים (gen_coursepartition) הראשונה לפי createdon, בחלוקה לפי gen_automatedjoining. בתת-השאילתה gen_automatedjoining אינו מסויג (DTSX:3409-3414); הוא של gen_coursepartition, כי לטבלה זו יש עמודה כזו (0015_TransferIn DTSX:42644: join gen_coursepartition cp … cp.gen_automatedjoining), ואילו העמודה הייתה קיימת גם ב-product תת-השאילתה הייתה נכשלת; לפי המשתמש החבילה רצה בפרודקשן. gen_joiningstatus (בכינוי JoiningStatus, DTSX:3364) ו-gen_lastsyncdate שבתנאי השליפה (DTSX:3415-3416) אינם מסויגים בשאילתת המקור. הם עמודות של ההצטרפות הממוכנת (gen_automatedjoining), כי aj.gen_lastsyncdate ו-aj.gen_joiningstatus מופיעים באותה שאילתה (DTSX:3361, 3417), ואילו העמודה הייתה קיימת גם בטבלה מצורפת השאילתה הייתה נכשלת (שם עמודה עמום); לפי המשתמש החבילה רצה בפרודקשן.",
+   "note": "ownership arguments (aj columns; subquery gen_automatedjoining)"
+  },
+  {
+   "round": 4,
+   "date": "2026-11-07T17:11:40.861Z",
+   "claimId": "L|Package\\Create Fundenrolment|detailed",
+   "before": "לגוף המעביר (competitor)",
+   "after": "לרשומת competitor לפי tr.gen_sourcefundtype (השערה: הגוף המעביר)",
+   "note": "meaning from column name labelled השערה (main.cs @DTSX:1784)"
+  },
+  {
+   "round": 4,
+   "date": "2026-11-07T17:11:40.861Z",
+   "claimId": "L|Package\\Create Fundenrolment|detailed",
+   "before": "שם העמית (גם כשם הרשומה)",
+   "after": "שם העמית (נכתב גם ל-gen_enrolmentid)",
+   "note": "record-name meaning unproven; removed (DTSX:1851)"
+  },
+  {
+   "round": 4,
+   "date": "2026-11-07T17:11:40.861Z",
+   "claimId": "L|Package\\Create Fundenrolment|detail",
+   "before": "ומוצר מחלוקת המסלולים הראשונה.",
+   "after": "ומוצר מחלוקת המסלולים הראשונה (gen_automatedjoining שבתת-השאילתה אינו מסויג; הוא של gen_coursepartition, שיש לה עמודה כזו לפי 0015_TransferIn DTSX:42644, ואילו הייתה גם ב-product תת-השאילתה הייתה נכשלת). gen_joiningstatus (בכינוי JoiningStatus, DTSX:3364) ו-gen_lastsyncdate שבתנאי השליפה (DTSX:3415-3416) אינם מסויגים בשאילתת המקור. הם עמודות של ההצטרפות הממוכנת (gen_automatedjoining), כי aj.gen_lastsyncdate ו-aj.gen_joiningstatus מופיעים באותה שאילתה (DTSX:3361, 3417), ואילו העמודה הייתה קיימת גם בטבלה מצורפת השאילתה הייתה נכשלת (שם עמודה עמום); לפי המשתמש החבילה רצה בפרודקשן.",
+   "note": "ownership arguments"
+  },
+  {
+   "round": 4,
+   "date": "2026-11-07T17:11:40.861Z",
+   "claimId": "L|Package\\Create Fundenrolment|open",
+   "before": "כי בדיקת הרג'קטים לעולם אינה מתקיימת.",
+   "after": "כי בדיקת הרג'קטים לעולם אינה מתקיימת (gen_lastsyncdate ו-gen_joiningstatus אינם מסויגים בשאילתה; הם של ההצטרפות, כי aj.gen_lastsyncdate ו-aj.gen_joiningstatus מופיעים בה, DTSX:3361, 3417, ואילו העמודה הייתה קיימת גם בטבלה מצורפת השאילתה הייתה נכשלת; לפי המשתמש החבילה רצה בפרודקשן).",
+   "note": "ownership argument"
+  },
+  {
+   "round": 4,
+   "date": "2026-11-07T17:11:40.861Z",
+   "claimId": "L|finding#2",
+   "before": "אבל המקור שולף רק gen_joiningstatus = 2.",
+   "after": "אבל המקור שולף רק aj.gen_joiningstatus = 2. gen_joiningstatus (בכינוי JoiningStatus, DTSX:3364) ו-gen_lastsyncdate שבתנאי השליפה (DTSX:3415-3416) אינם מסויגים בשאילתת המקור. הם עמודות של ההצטרפות הממוכנת (gen_automatedjoining), כי aj.gen_lastsyncdate ו-aj.gen_joiningstatus מופיעים באותה שאילתה (DTSX:3361, 3417), ואילו העמודה הייתה קיימת גם בטבלה מצורפת השאילתה הייתה נכשלת (שם עמודה עמום); לפי המשתמש החבילה רצה בפרודקשן.",
+   "note": "ownership argument"
+  },
+  {
+   "round": 4,
+   "date": "2026-11-07T17:11:40.861Z",
+   "claimId": "L|finding#3",
+   "before": "ותאריך הסנכרון שלה ריק או מוקדם מתאריך השינוי,",
+   "after": "ותאריך הסנכרון שלה ריק או מוקדם מתאריך השינוי (gen_lastsyncdate ו-gen_joiningstatus אינם מסויגים בשאילתה; הם של ההצטרפות, כי aj.gen_lastsyncdate ו-aj.gen_joiningstatus מופיעים בה, DTSX:3361, 3417, ואילו העמודה הייתה קיימת גם בטבלה מצורפת השאילתה הייתה נכשלת; לפי המשתמש החבילה רצה בפרודקשן),",
+   "note": "ownership argument"
+  },
+  {
+   "round": 4,
+   "date": "2026-11-07T17:11:40.861Z",
+   "claimId": "L|finding#9",
+   "before": "gen_lastsyncdate של ההצטרפות הממוכנת משמש כמסנן",
+   "after": "gen_lastsyncdate של ההצטרפות הממוכנת משמש כמסנן (gen_lastsyncdate ו-gen_joiningstatus אינם מסויגים בשאילתה; הם של ההצטרפות, כי aj.gen_lastsyncdate ו-aj.gen_joiningstatus מופיעים בה, DTSX:3361, 3417, ואילו העמודה הייתה קיימת גם בטבלה מצורפת השאילתה הייתה נכשלת; לפי המשתמש החבילה רצה בפרודקשן)",
+   "note": "same ownership argument, applied everywhere the fact appears"
+  },
+  {
+   "round": 4,
+   "date": "2026-11-07T17:11:40.861Z",
+   "claimId": "L|Package\\Create FundEnrolment For Pension|title",
+   "before": "בסטטוס 2/4 או שעברה בקרה עם רג'קט, ושיש לה סיבת רג'קט, הערה או רשומת ניהול רג'קטים,",
+   "after": "בסטטוס 2/4 או מסומנת \"עבר בקרה ורג'קט\" (gen_passedandreject = 1), ושיש לה סיבת רג'קט 1-4 או רשומת ניהול רג'קטים, או שהערת הרג'קט (gen_rejectreasonsnotes) אינה ריקה,",
+   "note": "note ownership not asserted"
+  },
+  {
+   "round": 4,
+   "date": "2026-11-07T17:11:40.861Z",
+   "claimId": "L|Package\\Create FundEnrolment For Pension|title",
+   "before": "ונקשרת חזרה להצטרפות.",
+   "after": "ונקשרת חזרה להצטרפות. gen_passedandreject בתנאי השליפה אינו מסויג (DTSX:6934). הוא של הצטרפות הפנסיה, כי pj.gen_passedandreject נשלף באותה שאילתה (DTSX:6909), ואילו העמודה הייתה קיימת גם בטבלה מצורפת השאילתה הייתה נכשלת (שם עמודה עמום); לפי המשתמש החבילה רצה בפרודקשן. לעומת זאת gen_rejectreasonsnotes (הערת הרג'קט, DTSX:6912, 6937) מופיע רק בלי סיוג, וגם בשאר הקבצים שסופקו אין לו הפניה מסויגת, ולכן לא ידוע לאיזו טבלה בשאילתה הוא שייך.",
+   "note": "ownership argument / unknown owner"
+  },
+  {
+   "round": 4,
+   "date": "2026-11-07T17:11:40.861Z",
+   "claimId": "L|Package\\Create FundEnrolment For Pension|short",
+   "before": "נשלפות הצטרפויות פנסיה שעדיין אין להן Fund Enrolment, בסטטוס 2 או 4 או שעברו בקרה עם רג'קט, ושיש להן סיבת רג'קט, הערה או רשומת ניהול רג'קטים.",
+   "after": "נשלפות הצטרפויות פנסיה שעדיין אין להן Fund Enrolment, בסטטוס 2 או 4 או מסומנות \"עבר בקרה ורג'קט\", ושיש להן סיבת רג'קט 1-4 או רשומת ניהול רג'קטים, או שהערת הרג'קט (gen_rejectreasonsnotes) אינה ריקה. gen_passedandreject בתנאי השליפה אינו מסויג (DTSX:6934). הוא של הצטרפות הפנסיה, כי pj.gen_passedandreject נשלף באותה שאילתה (DTSX:6909), ואילו העמודה הייתה קיימת גם בטבלה מצורפת השאילתה הייתה נכשלת (שם עמודה עמום); לפי המשתמש החבילה רצה בפרודקשן. לעומת זאת gen_rejectreasonsnotes (הערת הרג'קט, DTSX:6912, 6937) מופיע רק בלי סיוג, וגם בשאר הקבצים שסופקו אין לו הפניה מסויגת, ולכן לא ידוע לאיזו טבלה בשאילתה הוא שייך.",
+   "note": "ownership: passedandreject argued, rejectreasonsnotes unknown"
+  },
+  {
+   "round": 4,
+   "date": "2026-11-07T17:11:40.861Z",
+   "claimId": "L|Package\\Create FundEnrolment For Pension|short",
+   "before": "לכל הצטרפות פנסיה עם רג'קט נפתחת",
+   "after": "לכל הצטרפות פנסיה שנשלפה נפתחת",
+   "note": "avoid asserting note ownership"
+  },
+  {
+   "round": 4,
+   "date": "2026-11-07T17:11:40.861Z",
+   "claimId": "L|Package\\Create FundEnrolment For Pension|detailed",
+   "before": "נשלפות הצטרפויות פנסיה שלא מקושרות ל-Fund Enrolment, בסטטוס הצטרפות 2 או 4 או מסומנות \"עבר בקרה ורג'קט\", ושיש להן לפחות אחת מסיבות הרג'קט 1-4, הערת רג'קט, או רשומת ניהול רג'קטים.",
+   "after": "נשלפות הצטרפויות פנסיה שלא מקושרות ל-Fund Enrolment, בסטטוס הצטרפות 2 או 4 או מסומנות \"עבר בקרה ורג'קט\", ושיש להן לפחות אחת מסיבות הרג'קט 1-4 או רשומת ניהול רג'קטים, או שהערת הרג'קט (gen_rejectreasonsnotes) אינה ריקה. gen_passedandreject בתנאי השליפה אינו מסויג (DTSX:6934). הוא של הצטרפות הפנסיה, כי pj.gen_passedandreject נשלף באותה שאילתה (DTSX:6909), ואילו העמודה הייתה קיימת גם בטבלה מצורפת השאילתה הייתה נכשלת (שם עמודה עמום); לפי המשתמש החבילה רצה בפרודקשן. לעומת זאת gen_rejectreasonsnotes (הערת הרג'קט, DTSX:6912, 6937) מופיע רק בלי סיוג, וגם בשאר הקבצים שסופקו אין לו הפניה מסויגת, ולכן לא ידוע לאיזו טבלה בשאילתה הוא שייך.",
+   "note": "ownership: passedandreject argued, rejectreasonsnotes unknown"
+  },
+  {
+   "round": 4,
+   "date": "2026-11-07T17:11:40.861Z",
+   "claimId": "L|Package\\Create FundEnrolment For Pension|detailed",
+   "before": "לחוזה הסוכן, לגוף המעביר ולסיבות הרג'קט.",
+   "after": "לחוזה הסוכן, לרשומת competitor לפי gen_fundtype של ההצטרפות (השערה: הגוף המעביר) ולסיבות הרג'קט.",
+   "note": "meaning labelled השערה (main.cs:175-176 @DTSX:5058)"
+  },
+  {
+   "round": 4,
+   "date": "2026-11-07T17:11:40.861Z",
+   "claimId": "L|Package\\Create FundEnrolment For Pension|detailed",
+   "before": "(סטטוס 2/4 או \"עבר בקרה ורג'קט\", ויש לה רג'קט)",
+   "after": "(סטטוס 2/4 או \"עבר בקרה ורג'קט\", ותנאי הרג'קט שבשליפה)",
+   "note": "avoid asserting note ownership"
+  },
+  {
+   "round": 4,
+   "date": "2026-11-07T17:11:40.861Z",
+   "claimId": "L|Package\\Create FundEnrolment For Pension|detailed",
+   "before": "הצטרפויות פנסיה עם רג'קט מקבלות",
+   "after": "הצטרפויות פנסיה שנשלפו מקבלות",
+   "note": "avoid asserting note ownership"
+  },
+  {
+   "round": 4,
+   "date": "2026-11-07T17:11:40.861Z",
+   "claimId": "L|Package\\Create FundEnrolment For Pension|detail",
+   "before": "gen_pensionjoining ב-CRM (with nolock): gen_fundenrolmentid ריק; סטטוס 2 או 4 או gen_passedandreject = 1; ויש סיבת רג'קט 1-4, הערת רג'קט, או רשומת gen_rejectmanagement (הראשונה לפי createdon).",
+   "after": "gen_pensionjoining ב-CRM (with nolock): gen_fundenrolmentid ריק; סטטוס 2 או 4 או gen_passedandreject = 1; ויש סיבת רג'קט 1-4 או רשומת gen_rejectmanagement (הראשונה לפי createdon), או ש-gen_rejectreasonsnotes אינו ריק. gen_passedandreject בתנאי השליפה אינו מסויג (DTSX:6934). הוא של הצטרפות הפנסיה, כי pj.gen_passedandreject נשלף באותה שאילתה (DTSX:6909), ואילו העמודה הייתה קיימת גם בטבלה מצורפת השאילתה הייתה נכשלת (שם עמודה עמום); לפי המשתמש החבילה רצה בפרודקשן. לעומת זאת gen_rejectreasonsnotes (הערת הרג'קט, DTSX:6912, 6937) מופיע רק בלי סיוג, וגם בשאר הקבצים שסופקו אין לו הפניה מסויגת, ולכן לא ידוע לאיזו טבלה בשאילתה הוא שייך.",
+   "note": "ownership: passedandreject argued, rejectreasonsnotes unknown"
+  },
+  {
+   "round": 4,
+   "date": "2026-11-07T17:11:40.861Z",
+   "claimId": "L|Package\\Create FundEnrolment For Pension|detail",
+   "before": "הצטרפות פנסיה שיש בה רג'קט מקבלת",
+   "after": "הצטרפות פנסיה שעומדת בתנאי השליפה מקבלת",
+   "note": "avoid asserting note ownership"
+  },
+  {
+   "round": 4,
+   "date": "2026-11-07T17:11:40.861Z",
+   "claimId": "L|Package\\Create FundEnrolment For Transfer Request|decisions",
+   "before": "מהחוזה שנבחר נלקחים מספר הברוקר, המפקח, הסוכן והסוכנות.",
+   "after": "מהחוזה שנבחר נלקחים מספר הברוקר, המפקח, הסוכן והסוכנות, וגם הרפרנט: isnull(agencie.gen_operationpersonname, agents.gen_operationpersonname) של הסוכנות והסוכן של החוזה (DTSX:9998, 10029-10030), שנכתב ל-gen_referentname כמשתמש (systemuser) כשאינו ריק (DTSX:8558-8560).",
+   "note": "chosen contract also determines gen_referentname"
+  },
+  {
+   "round": 9,
+   "date": "2026-11-10T06:02:52.088Z",
+   "claimId": "L|Package\\Create Fundenrolment|detailed",
+   "field": "components.0.detailed.nodes.7.text",
+   "before": "סוג הפעולה נלקח מסוג ההצטרפות, ומקור הרשומה נקבע כ\"מערכת\". סטטוס \"בתהליך\" נקבע רק כשיש תאריך סגירה.",
+   "after": "סוג הפעולה נלקח מסוג ההצטרפות של ההצטרפות הממוכנת, ומקור הרשומה נקבע כ\"מערכת\". סטטוס \"בתהליך\" נקבע רק כשיש תאריך סגירה. gen_joiningtype (בכינוי JoiningType) אינו מסויג בשאילתת המקור (DTSX:3365). הוא של ההצטרפות הממוכנת (gen_automatedjoining), כי לטבלה זו יש עמודה כזו (0015_TransferIn DTSX:68567: aj.gen_joiningtype, כש-aj הוא gen_automatedjoining), ואילו העמודה הייתה קיימת גם בבקשת ההעברה או בחוזה הסוכן השאילתה הייתה נכשלת (שם עמודה עמום); לפי המשתמש החבילה רצה בפרודקשן. תת-השאילתה productByCourse מחזירה רק num, gen_automatedjoining ו-ProductId (DTSX:3409-3411).",
+   "why": "ייחוס gen_joiningtype הלא-מסויג להצטרפות הממוכנת ניתן בלי טיעון בעלות; נוסף טיעון לפי כלל העמימות.",
+   "evidence": "0028 DTSX:3365, 3409-3417; 0015_TransferIn DTSX:68562 (from gen_automatedjoining aj), 68567 (aj.gen_joiningtype=1)"
+  },
+  {
+   "round": 9,
+   "date": "2026-11-10T06:02:52.088Z",
+   "claimId": "L|Package\\Create Fundenrolment|detailed",
+   "field": "components.0.detailed.nodes.7.tech",
+   "before": "gen_actiontype=JoiningType; gen_source=100000000; if (!genclosedate_IsNull) gen_enrolmentstatus=1 (main.cs:241-247)",
+   "after": "gen_actiontype=JoiningType; gen_source=100000000; if (!genclosedate_IsNull) gen_enrolmentstatus=1 (main.cs:241-247); JoiningType = gen_joiningtype לא מסויג (DTSX:3365) → aj, לפי 0015_TransferIn DTSX:68567 וכלל העמימות",
+   "why": "תיעוד טיעון הבעלות ב-tech.",
+   "evidence": "0028 DTSX:3365; 0015_TransferIn DTSX:68567"
+  },
+  {
+   "round": 9,
+   "date": "2026-11-10T06:02:52.088Z",
+   "claimId": "L|Package\\Create FundEnrolment For Pension|detailed",
+   "field": "components.1.detailed.nodes.6.text",
+   "before": "קבועים: סטטוס \"בתהליך\" ומקור \"מערכת\". מונה ההצטרפויות נלקח מההצטרפות, ואם הוא ריק נקבע 1. נרשמים גם תאריך קבלת הבקשה וסכום ההעברה הצפוי.",
+   "after": "קבועים: סטטוס \"בתהליך\" ומקור \"מערכת\". gen_counter נלקח מ-gen_count של הצטרפות הפנסיה (pj.gen_count), ואם הוא ריק נקבע 1; משמעות השדה לא ידועה מהקבצים שסופקו. נרשמים גם תאריך קבלת הבקשה וסכום ההעברה הצפוי.",
+   "why": "המשמעות 'מונה ההצטרפויות' אינה מוכחת בשום קובץ שסופק (אין הערה בקוד או ב-SQL).",
+   "evidence": "0028 DTSX:5152-5156 (//Whole Number; gen_counter = Row.gencount / 1), DTSX:6908 pj.gen_count"
+  },
+  {
+   "round": 9,
+   "date": "2026-11-10T06:02:52.088Z",
+   "claimId": "L|Package\\Create FundEnrolment For Pension|decisions",
+   "field": "components.1.decisions.3.meaning_he",
+   "before": "אין מונה בהצטרפות",
+   "after": "gen_count של הצטרפות הפנסיה ריק (NULL); משמעות השדה לא ידועה מהקבצים שסופקו",
+   "why": "אותה משמעות לא מוכחת ('מונה') הופיעה גם בהחלטות; תוקן בכל מקום בחבילה.",
+   "evidence": "0028 DTSX:5152-5156"
+  },
+  {
+   "round": 9,
+   "date": "2026-11-10T06:02:52.088Z",
+   "claimId": "L|Package\\Create FundEnrolment For Transfer Request|title",
+   "field": "components.3.title_he",
+   "before": "פתיחת רשומת טיפול לבקשת העברה שנכשלה (מושבת)",
+   "after": "פתיחת רשומת טיפול לבקשת העברה בסטטוס 2 (מושבת)",
+   "why": "'שנכשלה' לסטטוס 2 נלקח משם הרכיב בלבד; תוקן בכל מקום בחבילה.",
+   "evidence": "0028 DTSX:9949 (Get Failed Transfer Request), 10039"
+  },
+  {
+   "round": 9,
+   "date": "2026-11-10T06:02:52.088Z",
+   "claimId": "L|Package\\Create FundEnrolment For Transfer Request|title",
+   "field": "components.3.short_he",
+   "before": "זרימת הנתונים מושבתת (DTSX:8160), ולכן אינה כותבת דבר. לו הופעלה, הייתה פותחת Fund Enrolment לבקשות העברה בין מסלולים שנכשלו, משייכת אותו לצוות הרג'קטים ומקשרת אותו לבקשה.",
+   "after": "זרימת הנתונים מושבתת (DTSX:8160), ולכן אינה כותבת דבר. לו הופעלה, הייתה פותחת Fund Enrolment לבקשות העברה מסוג 5 (\"בין מסלולים\" – לפי הערת SQL בחבילה 0005_Customer Account, DTSX:70706) בסטטוס העברה 2 (\"נכשלה\" – השערה, משם הרכיב Get Failed Transfer Request בלבד), משייכת אותו לצוות הרג'קטים ומקשרת אותו לבקשה.",
+   "why": "'שנכשלו' משם הרכיב בלבד; 'בין מסלולים' לא יוחס.",
+   "evidence": "0028 DTSX:9949, 10039-10040; 0005_Customer Account DTSX:70706"
+  },
+  {
+   "round": 9,
+   "date": "2026-11-10T06:02:52.088Z",
+   "claimId": "L|Package\\Create FundEnrolment For Transfer Request|short",
+   "field": "components.3.short.nodes.1.text",
+   "before": "לו הופעלה, היו נשלפות בקשות העברה בין מסלולים (סוג 5) בסטטוס 2, בלי Fund Enrolment.",
+   "after": "לו הופעלה, היו נשלפות בקשות העברה מסוג 5 (\"בין מסלולים\" – לפי הערת SQL בחבילה אחרת שסופקה) בסטטוס העברה 2 (השערה: בקשה שנכשלה – משם הרכיב בלבד), בלי Fund Enrolment.",
+   "why": "ייחוס 'בין מסלולים' וסימון 'נכשלה' כהשערה.",
+   "evidence": "0028 DTSX:10039-10040; 0005_Customer Account DTSX:70706"
+  },
+  {
+   "round": 9,
+   "date": "2026-11-10T06:02:52.088Z",
+   "claimId": "L|Package\\Create FundEnrolment For Transfer Request|decisions",
+   "field": "components.3.decisions.1.meaning_he",
+   "before": "בקשת העברה בין מסלולים שנכשלה",
+   "after": "בקשת העברה פעילה מסוג 5 בסטטוס העברה 2 שעדיין לא קושרה ל-Fund Enrolment. \"בין מסלולים\" לסוג 5 – לפי הערת ה-SQL 'tr.Gen_transferType = 5--בין מסלולים' בחבילה 0005_Customer Account (DTSX:70706). \"נכשלה\" לסטטוס 2 – השערה בלבד, משם הרכיב Get Failed Transfer Request; בקבצים שסופקו אין הערה לערך 2 של gen_tanferinstatus.",
+   "why": "'שנכשלה' נלקח משם הרכיב בלבד; 'בין מסלולים' יוחס להערת SQL בחבילה 0005.",
+   "evidence": "0028 DTSX:9949, 10039-10042; 0005_Customer Account DTSX:70706"
+  },
+  {
+   "round": 9,
+   "date": "2026-11-10T06:02:52.088Z",
+   "claimId": "L|Package\\Create FundEnrolment For Transfer Request|decisions",
+   "field": "components.3.decisions.3.meaning_he",
+   "before": "לקוח פרטי / עסקי",
+   "after": "לקוח פרטי (איש קשר) / לקוח עסקי (חשבון) – לפי הערות ה-SQL בשאילתת המקור: '--מיקוד לקוח פרטי' על Contact.address1_postalcode ו-'--ת.ד. לקוח עסקי' על Account.gen_postalcode (DTSX:9959, 9966)",
+   "why": "ייחוס המשמעות 'לקוח פרטי / עסקי' להערות ה-SQL (הערת המאמת).",
+   "evidence": "0028 DTSX:9959, 9966"
+  },
+  {
+   "round": "c1",
+   "date": "2026-11-10T06:32:54.972Z",
+   "claimId": "L|Package\\Create FundEnrolment For Transfer Request|decisions",
+   "field": "components[3].decisions[1].outcome_he",
+   "before": "יצירה (לו הופעלה). בקשה עם מסלול שגיאה פעיל ו-gen_feedbackstatus NULL לא נשלפת (NOT(UNKNOWN) = UNKNOWN).",
+   "after": "יצירה (לו הופעלה). tc = רשומות gen_transfercourses עם gen_errordetails LIKE '%11879018%' ו-statecode = 0 (DTSX:10031–10037). בקשה שיש לה רשומה כזו לא נשלפת כש-gen_feedbackstatus הוא 3, 4 או NULL (NOT(UNKNOWN) = UNKNOWN); בקשה בלי רשומה כזו עוברת סעיף זה בכל gen_feedbackstatus.",
+   "why": "tc covers only gen_transfercourses with statecode 0 whose gen_errordetails contain 11879018, not any active error course.",
+   "evidence": "DTSX:10031-10037, 10039"
+  },
+  {
+   "round": "c1",
+   "date": "2026-11-10T06:32:54.972Z",
+   "claimId": "L|Package\\Create FundEnrolment For Transfer Request|decisions",
+   "field": "components[3].decisions[3].outcome_he",
+   "before": "מקור נתוני הכתובת",
+   "after": "לו הופעלה: הענף (איש קשר קודם, אחרת חשבון) קובע מאיזה מקור נלקחים gen_street, gen_house_number, gen_index, gen_post_box, gen_email, gen_contactname ו-gen_mobilephone (כל שדה רק כשאינו NULL); gen_city נכתב רק בענף החשבון (בענף איש הקשר השורה מוערת, main.cs:148–149). כששני השמות NULL, אף אחד מהשדות האלה לא נכתב (main.cs:145–223).",
+   "why": "The branch also decides gen_contactname, gen_email, gen_mobilephone; gen_city only in the account branch.",
+   "evidence": "Create Fund Enrolment main.cs:145-223 (DTSX:8166)"
+  }
+ ]
+}

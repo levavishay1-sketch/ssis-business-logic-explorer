@@ -1,0 +1,32 @@
+{
+  "verifier": "ssis-verifier",
+  "package": "0019_StandingOrder",
+  "scope": "logic-claims re-check round 2",
+  "checkedAt": "2026-11-07",
+  "checked": 2,
+  "results": [
+    {
+      "id": "L|summary",
+      "hash": "aaf1fb549c95",
+      "verdict": "CONFIRMED",
+      "detail": "Unit 1 was re-derived from the SqlCommand (DTSX:3975-4012). It matches on: the joins (Gen_ftCurrentYear to Gen_fundmain to Gen_standingorder to gen_banks); the order filters (= 0 on both flags, so NULL is excluded); '53' and '02'; the bank, branch and account matching; the amount and date per depositType (= 2 or <> 2, so NULL depositType matches neither); and ROW_NUMBER partitioned by ft.gen_transtotalamount, so.gen_bankname, so.gen_bankaccountnumber, so.gen_branch with RowNum = 1, which gives at most one order per combination per run. The write matches main.cs:126-130 (main.cs line 1 = DTSX:4215): statuscode = OptionSetValue(100000009) and gen_isfirsttransactionreceivied = true via service.Update. Gen_ftCurrentYear's meaning is labelled השערה. 'התקבלה תנועה ראשונה' renders the code constant FIRST_TRANSACTION_RECEIVED, which unit 2 attributes (main.cs:84). Unit 2 is also correct. There is no DTS:Configuration, so the connection string is the effective target. [Prod] is used only by the read components (DTSX:2247 Lookup, 2314 and 4020 sources, all SELECT). [SSIS_Logs] is used only by the log provider (DTSX:16). The CRM write calls are exactly four: Create ETL Process record crmServiceProxy.Create (DTSX:277), ETL Record Finish Update (DTSX:818), ETL Warning Create (DTSX:3310) and update Standing Order service.Update (DTSX:4343). Only the last is business. No event handlers and no disabled executables. The '--One time' / '--Not one time' comments are at DTSX:3998 and 4005. Note: the phrase 'הסינון היחיד על ההוראה' sits in the statecode/statuscode context. The other order conditions are described in the same text as matching conditions, so I did not treat it as wrong.",
+      "evidence": "0019_StandingOrder.dtsx:3975-4012 (SqlCommand), 4215+ main.cs (84, 126-130), 277, 818, 3310, 4343, 5079-5081 precedence",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Update Standing Order First Transaction Received|detail",
+      "hash": "be94c18e5c21",
+      "verdict": "WRONG",
+      "detail": "Units 1-4 are correct. Unit 1 has the right filters, joins and literals (DTSX:3986-3990). Unit 2 has 13 zeros and right(...,12) on both sides (DTSX:3992), so truncation to the last 12 characters and the NULL non-match are stated. It also has branch, bank via gen_banks, and Id at main.cs:128. Unit 3 has the right depositType branches, operators and the RowNum = 1 partition. Unit 4 has statuscode = FIRST_TRANSACTION_RECEIVED (100000009, main.cs:84,126) and gen_isfirsttransactionreceivied = true (main.cs:127), with no statecode, Create or Delete. Unit 5 states a business meaning as fact without proof: 'הוראות קבע שהחיוב הראשון שלהן התקבל בפועל בקופה'. The matched row is an ft row with Gen_TransTypeID '53' and Gen_transgrouptypeid '02'. The same package's scopeNote says these codes have no definition in the supplied files, so calling it 'the charge, actually received' is not proven. 'First' is also not proven per order. The source is only Gen_ftCurrentYear, and ROW_NUMBER is partitioned by (transaction amount, order bank, account, branch), not by order. So the earliest transaction of a partition is assigned to one order, and that is not necessarily that order's first charge. The marking's meaning can only be attributed to the code constant name FIRST_TRANSACTION_RECEIVED.",
+      "evidence": "0019_StandingOrder.dtsx:3978 (ROW_NUMBER partition), 3980 (from Gen_ftCurrentYear), 3989-3990 ('53','02'); main.cs:84 const FIRST_TRANSACTION_RECEIVED",
+      "wrongUnits": [
+        {
+          "unit": "[5] תוצאה עסקית",
+          "problem": "The text states as fact that the order's first charge was actually received in the fund. The transaction codes 53/02 have no definition in the files, and 'first' is not per order: ROW_NUMBER is partitioned by amount and the order's bank details, and only Gen_ftCurrentYear is read.",
+          "correct": "הוראות קבע שנמצאה עבורן תנועה תואמת (סוג '53', קבוצה '02', פרטי בנק, סכום ותאריך) בקופת חשבון הלקוח מסומנות ב-statuscode 100000009 (שם הקבוע בקוד: FIRST_TRANSACTION_RECEIVED) וב-gen_isfirsttransactionreceivied = true, ולכן אינן נבחרות שוב בריצות הבאות.",
+          "evidence": "DTSX:3978-3992; main.cs:84,126-127"
+        }
+      ]
+    }
+  ]
+}

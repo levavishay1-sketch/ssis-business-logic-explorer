@@ -1,0 +1,268 @@
+{
+  "verifier": "ssis-verifier",
+  "package": "0015_TransferIn",
+  "scope": "logic-claims re-check after fixes",
+  "checkedAt": "2026-11-07T12:00:00Z",
+  "checked": 21,
+  "results": [
+    {
+      "id": "L|finding#3",
+      "hash": "e9f1160c40e5",
+      "verdict": "CONFIRMED",
+      "detail": "Re-derived. Clone TransferIn 1 main.cs reads Row.gendescription (47), gencontactname (50, Guid), genidentitynumber (51), geninvesthousename (73), gensourcefundnumber (74), gensourcefundtype (75), genfundfinanceid (76), genmislakanumber (95) without _IsNull; BufferWrapper getters call Buffer.GetString/GetGuid directly (e.g. DTSX:1663-1667), which throw on NULL. The exception is caught by catch(Exception) (111-117) -> ErrorBuffer row, before myEntities.Add, so no Create. The other unchecked reads (gentransfertype 52, gensourceaccount 96, Gencustomeraccountid 41) cannot be NULL because of the SQL filters (ti.Gen_transferType in (1,7), ca.gen_sourceaccount is not null, PK), so the listed set is complete. Description NULL when gen_customeraccountdestName is NULL (N'...'+NULL), identity NULL when both isnull() arguments are NULL (SQL DTSX:11136). Re-selection depends on DATEDIFF(HOUR, ca.CreatedOn, GETUTCDATE()) <= 24; schedule not in files - correctly stated as unknown. Clone TransferIn 1-5 code is byte-identical after line-number strip.",
+      "evidence": "DTSX:11136 (SQL lines 5-6, 8, 39-43); Clone TransferIn 1 main.cs:41-96, 105-117; BufferWrapper DTSX:1663-1667; Clone TransferIn 2-5 diffed identical",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|finding#4",
+      "hash": "4f3d5e3a150a",
+      "verdict": "CONFIRMED",
+      "detail": "FT56: SDK Create gen_coursepartition x5 Result outputs are sync and feed Union All (90 in / 18 out) -> Derived Column -> Group by TransferIn (GroupBy transferinId, Sum interest, Min actualexecutiondate, Max arrearsdays_int; AggregationType 0/4/6/7) -> Update Transfer In (main.cs:54-57 gen_actualtransferdate = genactualexecutiondate). Rows reach Result regardless of Create success. FT56 Dates To Local inputs are only CreatedOn and gen_fundcreationdate (DTSX:45390). Close TI External runs later in the linear Success chain (Close TI internal -> Step 6 -> Close TI External). Its SQL (DTSX:14175) selects state 1, type 1/7 requests with CPs having non-null actual amount and date, min(cp.gen_actualtransferdate); Dates To Local (DTSX:13300) converts gen_actualtransferdate and gen_actualtransferdateDB; Update transferin main.cs:53-56 writes only if different from the DB value. Only writers of gen_transferin.gen_actualtransferdate in the package: Close TI External, Close TI internal (types 5/6 only), FT56 -> two sources for types 1/7 is correct.",
+      "evidence": "DTSX:45390, 46286-46340, 53938 (main.cs:46-75), 14175, 13300, 15866 (main.cs:53-56); writer grep DTSX:16201.., 27376.., 54118..; precedence constraints DTSX:110984-111007",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|finding#7",
+      "hash": "1b3e619295e6",
+      "verdict": "CONFIRMED",
+      "detail": "Internal SQL (DTSX:24801): state 1, type 5/6, CP actual amount and date not null, HAVING ABS(DATEDIFF(day, min(cp.gen_actualtransferdate), ti.CreatedOn)) < 30 (direction-neutral, as stated). Is Between Course or Funds (DTSX:25024): 6 -> Union All 2 -> close columns with no further check; 5 -> need to update? (DTSX:25083) with EvaluationOrder 0 ISNULL(signature) -> not close, 1 ISNULL(receivedstamp) -> not close, 2 ISNULL(Expected) || ABS(actual-expected) <= expected*0.15 -> close, default not close. External SQL (DTSX:14175) same state/CP filters, no 30-day HAVING; split (DTSX:14395) !ISNULL(Gen_receivedstamp) && gen_actualtransferdate > Gen_receivedstamp. Label 'נתקבל' for the received-stamp date is supported by a code comment (DTSX:68551 'תאריך חותמת נתקבל').",
+      "evidence": "DTSX:24801, 25024, 25083-25120 (EvaluationOrder 0/1/2, default Not To Close), 25990, 14175, 14395",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package (control flow)|open",
+      "hash": "6a63070cc753",
+      "verdict": "CONFIRMED",
+      "detail": "Selection is by account CreatedOn relative to GETUTCDATE() (DTSX:11136), not by last run; Clone TransferIn is the first business step after Create ETL Process record (Success constraint), so any run that reaches it clones accounts in the window; 'כ-24 שעות' correctly approximates DATEDIFF(HOUR) semantics; schedule not in files. No other step creates clones.",
+      "evidence": "DTSX:11136; precedence constraints DTSX:110984-111007",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Clone TransferIn|detailed",
+      "hash": "304bb26bc9f4",
+      "verdict": "WRONG",
+      "detail": "Most units match DTSX:11136, Dates To Local (DTSX:10066, 9 dates, <2005 +2h) and Clone TransferIn main.cs:39-96 (5 identical copies). But unit [14] lists non-literal values as fixed values, unit [15] uses an unsourced label that contradicts [13] and finding#3, and units [1]/[2] state strict bounds that DATEDIFF does not implement.",
+      "evidence": "DTSX:11136 SQL; Clone TransferIn 1 main.cs:40-48, 73-76; Create CP - Joining Only SQL DTSX:42637",
+      "wrongUnits": [
+        {
+          "unit": 14,
+          "problem": "Under the heading 'ערכים קבועים' it lists 'תאריך קבלת דחייה = עכשיו' (DateTime.Now) and the description built from ti.gen_customeraccountdestName. Per CLAUDE.md rule 7, run-time values and row values are not fixed values.",
+          "correct": "Fixed literals: gen_transferincreationsource=2, gen_currentstate=1, gen_actionstatus=6, gen_rejecttype=3, gen_requestrejectreason=39, gen_iscreditsheet=true. Non-fixed: gen_rejectreceivedate = DateTime.Now (time of the SSIS host when the row is processed); gen_description = N'חשבון מקור – ' + source request's gen_customeraccountdestName (row value).",
+          "evidence": "Clone TransferIn 1 main.cs:40-48; DTSX:11136 line 8 of SQL"
+        },
+        {
+          "unit": 15,
+          "problem": "Labels gen_fundfinanceid as 'מספר אישור מס הכנסה' without stating the source. The only such label in the files is a SQL comment on CP.gen_fundfinanceid (gen_coursepartition, another component). Unit [13] and finding#3 call the same field 'מספר אישור (gen_fundfinanceid)'.",
+          "correct": "Use 'מספר אישור (gen_fundfinanceid)', or cite the label as coming from the comment 'מסםר אישור מ\"ה' on gen_coursepartition.gen_fundfinanceid in Create CP - Joining Only (DTSX:42637).",
+          "evidence": "DTSX:42637; Clone TransferIn 1 main.cs:76"
+        },
+        {
+          "unit": 2,
+          "problem": "'נספח ד' שלה נשלח עד 6 חודשים לפני היום' is not what DATEDIFF(MONTH, ti.gen_appendixdsent, GETUTCDATE()) <= 6 does. DATEDIFF counts calendar-month boundaries, so an appendix sent up to almost 7 months earlier qualifies (e.g. sent on the 1st of January, run on 31 July -> 6). A future-dated value (negative difference) also qualifies.",
+          "correct": "Appendix D sent in a calendar month at most 6 month-boundaries before the current UTC month (up to almost 7 months), or in the future; NULL -> not selected.",
+          "evidence": "DTSX:11136 (SQL line 43)"
+        },
+        {
+          "unit": 1,
+          "problem": "'נוצרו לפני 24 שעות לכל היותר' - DATEDIFF(HOUR, ca.CreatedOn, GETUTCDATE()) <= 24 counts hour boundaries, so accounts created up to almost 25 hours earlier qualify (minor).",
+          "correct": "Accounts whose CreatedOn is at most 24 hour boundaries before GETUTCDATE() (about 24-25 hours).",
+          "evidence": "DTSX:11136 (SQL line 39)"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Clone TransferIn|detail",
+      "hash": "cc5f11cfea11",
+      "verdict": "WRONG",
+      "detail": "Cross-package statements verified: gen_customeraccount.gen_sourceaccount is written only by 0006 'Update Details from employer Fields CustomerAccount' (SDK service.Update, 0006 DTSX:9817-9821; value from Lookup 'Get Source Account', lineage DTSX:10754). Case-insensitive grep of all supplied DTSX finds no other writer. Hypotheses (0005, 0008/0009) are labelled. Batches of 10 are confirmed (main.cs:100). The decision summary misstates the appendix-D window.",
+      "evidence": "DTSX:11136; 0006 DTSX:7482, 9501, 9817-9821, 10754; Clone TransferIn 1 main.cs:100-103, 122",
+      "wrongUnits": [
+        {
+          "unit": 3,
+          "problem": "'נספח ד' נשלח לפני 6 חודשים לכל היותר' - the SQL is DATEDIFF(MONTH, ti.gen_appendixdsent, GETUTCDATE()) <= 6. It counts month boundaries, so it accepts up to almost 7 months, and it also accepts future dates.",
+          "correct": "DATEDIFF(MONTH, gen_appendixdsent, GETUTCDATE()) <= 6 (calendar months; up to almost 7 months; NULL excluded).",
+          "evidence": "DTSX:11136 (SQL line 43)"
+        },
+        {
+          "unit": 1,
+          "problem": "'חשבונות שנוצרו ב-24 השעות האחרונות' (also in [5]) - DATEDIFF(HOUR) <= 24 admits up to almost 25 hours (minor).",
+          "correct": "Accounts created within DATEDIFF(HOUR, CreatedOn, GETUTCDATE()) <= 24 (about 24-25 hours).",
+          "evidence": "DTSX:11136 (SQL line 39)"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Clone TransferIn|open",
+      "hash": "23db90bf4190",
+      "verdict": "CONFIRMED",
+      "detail": "No labels exist in the supplied DTSX for gen_transferincreationsource=2 (0009 defines only TRANSFERIN_CREATION_SOURCE_LEUMI_BY = 1), gen_rejecttype=3 (0009 defines only REJECT_TYPE_CHILD_SAVINGS = 4) or gen_requestrejectreason=39. The comment '//סטטוס פעולה=עדכון עצמי' is at create transferin (joining only) main.cs:83 and labels Fixed Fields gen_actionstatus = 6 (DTSX:68495). The text presents it as a comment. 0006 statement verified: component 'Update Details from employer Fields CustomerAccount'; gensourceaccount comes from Lookup 'Get Source Account'; it is written only when SourceAccount160 is not NULL and not empty/zeros after Trim('0') (IsNullOrWhiteSpace), the lookup value is not NULL, and it differs from gensourceaccountDB. The text leaves out the lookup-not-NULL condition, which the phrase 'הערך הוא gensourceaccount מה-Lookup' implies.",
+      "evidence": "0009 DTSX:82782, 97110; DTSX:68495; create transferin (joining only) main.cs:83; 0006 DTSX:7482, 9817-9821, 10754",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Create CP for Fund With FT 56|detailed",
+      "hash": "fd4ea31c071e",
+      "verdict": "WRONG",
+      "detail": "SQL (DTSX:46144), Dates To Local (DTSX:45390), SDK Create main.cs:34-87, Derived Column (DTSX:46109), Aggregate (DTSX:46286) and Update Transfer In main.cs:46-75 match units [1]-[4], [7]-[11]. Two units overstate.",
+      "evidence": "DTSX:46144, 45390, 46109, 46286, 46546 main.cs:37-83, 53938 main.cs:46-75",
+      "wrongUnits": [
+        {
+          "unit": 5,
+          "problem": "'הקופה לא נבחרת; לא נוצר פיצול והבקשה לא מתעדכנת' - the request is not updated from this fund only. Group by TransferIn aggregates all selected rows of the request, so if another fund of the same request qualifies, the request is still updated (with totals of the qualifying funds only).",
+          "correct": "The fund produces no row: no CP is created for it and its 56 transactions are not included in the request's totals. The request is updated only if at least one other fund of it qualifies.",
+          "evidence": "DTSX:46144 (LEFT JOIN cp ... WHERE cp.gen_coursepartitionId is null); DTSX:46286 GroupBy gen_transferinId"
+        },
+        {
+          "unit": 12,
+          "problem": "'לקופות שקיבלו כסף מהעברה חיצונית פתוחה' - the SQL does not tie the 56 transactions to the open request. There is no date or request link: any 56 transaction (01/02, modeldependage != 2) in the current-year or previous-year table of a fund of the destination account qualifies. That the money came from this open transfer is not proven.",
+          "correct": "Funds of the destination account of an open type 1/7 request that have any 56 transaction (and no CP) get a CP. The link to this request's money is השערה.",
+          "evidence": "DTSX:46144 (ft subquery has no date/request filter)"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Create CP for Fund With FT 56|detail",
+      "hash": "cf8a9bf8d323",
+      "verdict": "INCOMPLETE",
+      "detail": "Units [1], [2], [4], [6] are verified. Tables are as listed. 0008 has 'insert into Gen_ftCurrentYearBase' (0008 DTSX:63118...). No supplied package writes gen_ftpreviousyear (0009 only reads it, 0009 DTSX:94733). An existing CP is matched by gen_fundnumberdest only. The decisions list is incomplete.",
+      "evidence": "DTSX:46144; 0008 DTSX:63118-65258; 0009 DTSX:94733-94773",
+      "wrongUnits": [
+        {
+          "unit": 3,
+          "problem": "The decisions list names the agent-contract INNER JOIN but omits the equally filtering INNER JOIN to Product (Product.ProductId = fm.gen_fundtypename). A fund without a matching product is dropped.",
+          "correct": "Add: the fund must have a product (fm.gen_fundtypename joined to Product).",
+          "evidence": "DTSX:46144 ('inner Join Product with(nolock) on Product.ProductId = fm.gen_fundtypename')"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Update CoursePartition internal|title",
+      "hash": "6e6f561e4ddd",
+      "verdict": "CONFIRMED",
+      "detail": "SQL (DTSX:83719): @BetweenCource_CP = CPs of state-1, type 5/6 requests whose dest fund belongs to the dest account. Sums 57 transactions (01/02, modeldependage != 2) with DATEDIFF(DAY, created, entry) between 0 and 5 OR DATEDIFF(DAY, entry, created) between 0 and 1, from both year tables. HAVING sum > 0 AND min(valuedate) NOT NULL AND (amount differs, or amount NULL, or date differs). Update Course Partition writes via SDK. The 5 copies differ only in ExcecuteBulk/ExecuteBulk naming.",
+      "evidence": "DTSX:83719; Update Course Partition main.cs:41-53; copies diffed",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Update CoursePartition internal|detailed",
+      "hash": "0e61ec6a4ae8",
+      "verdict": "CONFIRMED",
+      "detail": "All units match: population (DTSX:83719 insert into @BetweenCource_CP with fm join on account and cp.gen_fundnumberdest), 57 filters and window, sum/min, HAVING as quoted, Dates To Local converts only gen_valuedate (DTSX:83035), Update Course Partition main.cs:41-45 writes gen_actualtransferamount (Money) and gen_actualtransferdate when amount > 0 and valuedate not null. The 5 copies are identical except the method name. CP actual amount and date feed Close TI internal (DTSX:24801).",
+      "evidence": "DTSX:83719, 83035, 84337 main.cs:39-57, 24801",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Update CoursePartition external|title",
+      "hash": "8aa68ddda8d6",
+      "verdict": "CONFIRMED",
+      "detail": "SQL (DTSX:75517): @PeriodOfTimeToCheck = 0. Population: type 1/7, state-1 CPs on dest funds of the dest account. Filter: 56 transactions (01/02, modeldependage != 2) with DATEDIFF(DAY, created, entry) >= 0, inner-joined to Gen_fundtransactiontype and gen_banks. HAVING is the same as internal. SDK Update of gen_coursepartition.",
+      "evidence": "DTSX:75517; Update Course Partition main.cs:34-46",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Update CoursePartition external|detailed",
+      "hash": "db6cd7a9beae",
+      "verdict": "CONFIRMED",
+      "detail": "All units match DTSX:75517 (as quoted, including JOIN Gen_fundtransactiontype/gen_banks), Dates To Local converts only gen_valuedate (DTSX:74833), Update Course Partition main.cs writes amount (Money) and date when amount > 0 and valuedate not null, keyed by gen_coursepartitionid. The 5 copies are byte-identical. Values feed Close TI External (DTSX:14175).",
+      "evidence": "DTSX:75517, 74833, 76136 main.cs:34-47, 14175",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Close TI internal|open",
+      "hash": "5428cd9debcc",
+      "verdict": "CONFIRMED",
+      "detail": "[1] No label for gen_transferin gen_currentstate=3 or gen_actionstatus 1/22 exists in the supplied DTSX. CURRENT_STATE_FINISHED=3 in 0016/0025 is on gen_customercare, and the other '3' comments are on other entities (0017, 0029/0030), so the restriction to gen_transferin is accurate. 'תקין' is the comment at create transferin (joining only) main.cs:80, next to Fixed Fields gen_rejectreason=1. [2] Create transferIn Column/Column 1 derive gen_modifiedByBank = gen_actualtransferdate before Union All -> Dates To Local. The internal Dates To Local inputs (DTSX:23966) include gen_modifiedbybankDB but not gen_modifiedByBank. The external Dates To Local (DTSX:13300) includes both. Update transferin compares them (main.cs:55-57).",
+      "evidence": "DTSX:23882, 23930, 23966, 13300; Close TI internal Update transferin main.cs:55-57; 0016 DTSX:341-386; DTSX:61351",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Create TI - Joining Only|detail",
+      "hash": "8132064de1d0",
+      "verdict": "WRONG",
+      "detail": "Verified: SQL DTSX:68551 joins, LEFT JOIN on ti.gen_automatedjoining, status 8, type 1, CreatedOn > '2020-01-01'. SDK Create gen_transferin. No supplied package creates gen_automatedjoining. 0027 Close Joining processes selects joinings with status 7 (0027 DTSX:984), uses Lookup 'Get customer accounts' on a 12-digit padded bank account number, sets status 8 (Set columns) and updates gen_joiningstatus and gen_customeraccountid via SDK (0027 DTSX:1368-1376). The only other 0027 joining-status writer sets 12. Two units are inexact.",
+      "evidence": "DTSX:68551, 68495; 0027 DTSX:912-932, 980-984, 1027, 1368-1376, 5582, 5936-5939",
+      "wrongUnits": [
+        {
+          "unit": 3,
+          "problem": "'חשבון נפתח 0-12 חודשים אחרי ההצטרפות' - the SQL is dateDiff(month, aj.CreatedOn, ca.CreatedOn) between 0 and 12, which counts calendar-month boundaries. It also accepts an account created earlier in the same calendar month as the joining (difference 0), and accounts up to almost 13 months later.",
+          "correct": "DATEDIFF(MONTH, aj.CreatedOn, ca.CreatedOn) between 0 and 12: the account was created from the start of the joining's calendar month up to 12 calendar months later.",
+          "evidence": "DTSX:68551 (SQL line 'dateDiff(month,aj.CreatedOn,ca.CreatedOn) between 0 and 12')"
+        },
+        {
+          "unit": 5,
+          "problem": "'לכל הצטרפות ממוכנת' overgeneralizes: a request is created only for joinings that meet the filters in [3] (status 8, type 1, created after 2020-01-01, linked account in the month window, no existing request). The 'הצטרפות בלבד' label for type 2 comes from a code comment (main.cs:74; SQL comment DTSX:42648) and is not cited as such.",
+          "correct": "פתיחת בקשת העברה פנימה מסוג 2 ('הצטרפות בלבד' לפי הערה בקוד) לכל הצטרפות ממוכנת שעומדת בתנאים.",
+          "evidence": "DTSX:68551; create transferin (joining only) main.cs:74"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Create TI - Joining Only|open",
+      "hash": "88d767135409",
+      "verdict": "WRONG",
+      "detail": "[1] verified: main.cs:46-56 sends gen_contactname, gen_accountname and gen_automatedjoining as EntityReference('gen_customeraccount', ...). [2] contains an error about another entity.",
+      "evidence": "create transferin (joining only) main.cs:46-56; 0005 DTSX:32056; 0028 DTSX:909-919",
+      "wrongUnits": [
+        {
+          "unit": 2,
+          "problem": "The 0028 comment 'בוטל או הסתיים' on (5,6,7,8,13) is on pj.gen_joiningstatus where pj = gen_pensionjoining, not gen_automatedjoining. It is presented as evidence for the meaning of automated-joining status 8 without saying it is a different entity, and its applicability is not proven. The 0005 comment ('status send to the bank' for 7) is correctly on gen_automatedjoining, and the 0027 statement is correct.",
+          "correct": "State that the 0028 comment refers to gen_pensionjoining.gen_joiningstatus (0028 DTSX:911, 915). Whether the same option values apply to gen_automatedjoining is השערה/unknown.",
+          "evidence": "0028 DTSX:911 ('from gen_pensionjoining pj'), 915"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Create CP - Joining Only|detail",
+      "hash": "c17db4dbf3f1",
+      "verdict": "CONFIRMED",
+      "detail": "SQL (DTSX:42623) matches the tables, matching keys and decisions: TI.Gen_transferType = 2; (CP2 on the same fund with a product different from CP and fund type) OR no CP2. CoursePartition is created via SDK Create (main.cs:41-107). Within the supplied files, gen_transferin.gen_automatedjoining is written only by Create TI - Joining Only. gen_coursepartition is created only in 0008, 0009 and 0015, none of which writes gen_automatedjoining on it. 0026 and 0028 only read gen_coursepartition, and 0027 never references it.",
+      "evidence": "DTSX:42623, 42591; Create CoursePartition main.cs:41-107; grep of all DTSX for gen_coursepartition / gen_automatedjoining writes",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Update TI - first transaction (53)|title",
+      "hash": "edb52d128572",
+      "verdict": "CONFIRMED",
+      "detail": "SQL (DTSX:92029): ActionStatus 11, type 1, appendixdsent IS NULL, 53 transactions on CP destination funds (both year tables), ROW_NUMBER by valuedate ASC (NULL first). The code writes gen_fixtransferdate = valuedate, gen_moneyassociatingdate = entrydate and gen_actionstatus = 12. The labels 'מועד קובע' and 'תאריך שיוך כספים' come from code comments (main.cs:43, 48).",
+      "evidence": "DTSX:92029; Update TransferIn By Transaction main.cs:41-53",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Update TI - first transaction (53)|detailed",
+      "hash": "a866dbed62a4",
+      "verdict": "WRONG",
+      "detail": "Units [1]-[8], [10] match DTSX:92029, Dates To Local DTSX:91305 (entrydate, valuedate) and main.cs:41-62 (5 identical copies). Unit [9] overstates the result when valuedate is NULL. Unit [7] omits tie behaviour.",
+      "evidence": "DTSX:92029, 91305; Update TransferIn By Transaction main.cs:43-53; 0009 DTSX:114906",
+      "wrongUnits": [
+        {
+          "unit": 9,
+          "problem": "'ואז הבקשה עוברת ל-12 בלי מועד קובע' - when valuedate is NULL the code just does not write gen_fixtransferdate. Any value already stored stays: 0009 writes gen_transferin.gen_fixtransferdate (0009 DTSX:114906 and copies). The request can therefore reach 12 with an existing fixed date.",
+          "correct": "With an empty value date, the status still becomes 12 but gen_fixtransferdate is not written (an existing value is kept, none is set).",
+          "evidence": "main.cs:43-53; 0009 DTSX:114906"
+        },
+        {
+          "unit": 7,
+          "problem": "Missing: when two (fund, entry date) groups of a request have the same earliest value date, ROW_NUMBER picks one of them arbitrarily, so the entry date written as gen_moneyassociatingdate is not deterministic.",
+          "correct": "Add: ties on gen_valuedate are broken arbitrarily (no secondary ORDER BY).",
+          "evidence": "DTSX:92029 ('ROW_NUMBER() OVER(PARTITION BY Gen_transferinId ORDER BY gen_valuedate ASC)')"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Update TI - first transaction (53)|detail",
+      "hash": "ebc807c94908",
+      "verdict": "CONFIRMED",
+      "detail": "Tables are as listed: gen_fundmain is joined only for the current year. The matching keys are cp.gen_fundnumberdest and cp.gen_transferin. The decisions are status 11, type 1, appendix NULL, a 53 transaction exists, and the earliest valuedate wins (NULL first). Writes: SDK Update of gen_fixtransferdate and gen_moneyassociatingdate, plus gen_actionstatus = OptionSetValue(12), which is a literal. No supplied package writes gen_ftpreviousyear, and 0008 inserts Gen_ftCurrentYearBase. Both are stated as unknown / השערה.",
+      "evidence": "DTSX:92029; main.cs:41-62; 0008 DTSX:63118; 0009 DTSX:94733",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Update TI - first transaction (53)|open",
+      "hash": "9824b28d734a",
+      "verdict": "CONFIRMED",
+      "detail": "The constants ACTION_STATUS_WATING_FOR_DEPOSIT = 11, ACTION_STATUS_DEPOSIT_RECIVED = 12 and TRANSFER_TYPE_JOINING_AND_TRANSFER = 1 are at 0009 DTSX:82780-82783, inside the component 'Create transferin from outside source\\Compare Fields Before Update' (starts at 0009 DTSX:82619). No file labels type 7, so the 'why only 1' question legitimately stays open.",
+      "evidence": "0009 DTSX:82619, 82779-82787",
+      "wrongUnits": []
+    }
+  ]
+}

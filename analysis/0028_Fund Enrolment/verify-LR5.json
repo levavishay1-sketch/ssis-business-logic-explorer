@@ -1,0 +1,71 @@
+{
+  "verifier": "ssis-verifier",
+  "package": "0028_Fund Enrolment",
+  "scope": "logic-claims re-check",
+  "checkedAt": "2026-11-10",
+  "source": "source/DailyProcess/0028_Fund Enrolment.dtsx sha256 87DD97D507243E63D6B13EE4A556CC69891B1B15F2237AE362456304BB9FDA42",
+  "checked": 6,
+  "results": [
+    {
+      "id": "L|Package\\Create Fundenrolment|detailed",
+      "hash": "d23b532fa73b",
+      "verdict": "CONFIRMED",
+      "detail": "Every unit was re-derived from the raw DTSX.\n- [1] The source SQL is on [CRM] (DTSX:3357-3417). The WHERE clause is (gen_lastsyncdate is null or gen_lastsyncdate < aj.ModifiedOn) and aj.gen_joiningstatus = 2. The ownership argument holds: aj.gen_lastsyncdate is at 3361 and aj.gen_joiningstatus is at 3417. A WHERE clause cannot see SELECT aliases, so gen_lastsyncdate refers to the table column. The subquery's gen_automatedjoining belongs to gen_coursepartition: 0015_TransferIn DTSX:42644 has cp.gen_automatedjoining. productByCourse exposes only num, gen_automatedjoining and ProductId (3409-3411). In row_number, the partition is by gen_automatedjoining and the order is by createdon, and num = 1 is used.\n- [2] tr is a LEFT JOIN on tr.gen_automatedjoining, so a joining with several transfer requests appears in several rows.\n- [3] Set gen_notes main.cs:117-129 builds '1: x; ' … and appends the source note (left(gen_rejectwidedescription,3000)).\n- [4]-[8] Is Fundenrolment Exits: CacheType=0 (full cache), NoMatchBehavior=1. The Match output has no path, and No Match goes to Check If Rejects Null. The reference query has no state filter.\n- [9]-[13] The No CreateRow expression has no path, and Create Row is the default output (IsDefaultOut, DTSX:1492). JoiningStatus is always 2, so the branch is dead.\n- [14]-[18] The attribute set matches Create gen_fundEnrolment main.cs:140-277 (DTSX:1769-1906) exactly. gen_enrolmentstatus = ENROLMENT_STATUS_IN_PROCESS is set only when genclosedate is not null. gen_source = ENROLMENT_SOURCE_SYSTEM. The dates are CONVERT(...,103) of DATEADD(hh,3,...) and are parsed with ParseExact 'dd/MM/yyyy'. Money is used for the amount. The document-type branches use the constants GEMEL=1, STUDY_FUND=2, GEMEL_INVEST=4 and CHILDSAVING=5. gen_actiontype ownership is argued via 0015_TransferIn DTSX:68567 (aj.gen_joiningtype).\n- [27]-[29] SoapException and Exception are both caught, then DirectRowToCastingError. CastingError has no path. No step in the package updates gen_lastsyncdate (grep).\n- [31] RejectTeamId = Guid.Parse(Variables.RejectTeamId). The variable is filled by Get Organization Variables from gen_etlvariable into the systemConfigurations dictionary, so 'משתני התצורה' is supported by the code naming.\n- [32] Update Owner (DTSX:4696) on [CRM] is a direct SQL update of Gen_fundenrolmentBase with OwnerIdType = 9. The params are Param_0 = RejectTeamId and Param_1 = FundEnrollmentId.\n- [33] The insert into staging TblFundEnrolments (DTSX:3578) is read by Update FundEnrolment, which sets gen_ismailsend = 0 at the end of the package (Constraint 7).\nNot counted: unit [15] does not mention Right(first+' '+last,100) or that the concatenation is NULL when either part is NULL. That is a mapping-level detail.",
+      "evidence": "DTSX:3352-3417 (SQL), 3612-3638 (Lookup), 1463/1485/1492 (split), 1630-1921 (Create main.cs), 3704 (Set gen_notes), 4693-4709, 3575-3578, 12917-12958 (org variables), 13750-13785 (Update FundEnrolment), 15641-15647 (constraints); 0015_TransferIn.dtsx:42644, 68567",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Create FundEnrolment For Pension|detailed",
+      "hash": "f1a14fca5e7c",
+      "verdict": "CONFIRMED",
+      "detail": "Every unit was re-derived.\n- [1] The WHERE clause is at DTSX:6934-6937 and is quoted correctly. gen_passedandreject is pj's: pj.gen_passedandreject is at 6909. For gen_rejectreasonsnotes, every occurrence in every supplied DTSX is unqualified: only 0028 has it, at lines 910, 917, 6912 and 6937. Its ownership is therefore stated correctly as unknown. Combining the Close query (pj + Gen_fundenrolment) with this query does not prove an owner either.\n- [2] The aliases are ComprehensivePension = top(1) productid where producttypecode='200003' and GeneralPension = '200004'. The labels follow the aliases and the code comments /*מקיפה*/ and /*כללית*/ at main.cs:168/170.\n- [3] Set gen_note main.cs:115-131 reads the 4 names and the note through IsNullOrWhiteSpace(Row.X) with no _IsNull check and no try, and has a single output. The NULL-read consequence is properly hedged. The Success chain is Constraint 4 (Pension→Close), then 5 (the disabled TR flow), then 6 (Reject Mgmt), then 7 (Update FundEnrolment / gen_ismailsend).\n- [4]-[8] main.cs:136-151: passedandreject true gives Owner = gen_updatedbyreferent with type 8 and status 17 (FUND_ENROLMENT_JOINING_STATUS_AVAR_BAKARA_AND_REJECT). Otherwise Owner = RejectTeamId with type 9, and the status is copied when not null.\n- [9]-[15] main.cs:166-173.\n- [16]-[18] The attribute set matches main.cs:153-294 exactly. That includes gen_counter = gen_count ?? 1, the constants 1 and 100000000, the newsletter → gen_ispension rule, and joiningsource 3/4 (JOINING_STATUS_INSERT_FROM_FILE/EMPLOER_INTERFACE).\n- [19]-[27] main.cs:296-325, with the comments No/Yes/אושר/אושר בהחרגה/בתהליך and FOLDER_NUMBER '123456'.\n- [28]-[30] The try is at 132 and the catch at 330-334, and CustingError has no path. The only unchecked row reads inside the try are at 138, 169 and 171.\n- [32]-[35] The Multicast has 3 connected outputs:\n  - Update Fund Enrolment Owner (DTSX:8100): Param_0 = OwnerId, Param_1 = OwnerIdType, Param_2 = FundEnrolmentId.\n  - Upate Pension Joining (8056): Param_0 = FundEnrolmentId, Param_1 = gen_pensionjoiningid.\n  - Insert TblFundEnrolments on staging (7098).\n- [36] Close FundEnrolments only sets gen_enrolmentstatus = 3, so the link persists.",
+      "evidence": "DTSX:6867-6937, 7153 (Set gen_note), 4758-5208 (Create main.cs; 5153-5167 checked), 7132, 8053-8056, 8097-8100, 7095-7098, 85-127 (Close), 15641-15647",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Create FundEnrolment For Pension|decisions",
+      "hash": "895eb7142127",
+      "verdict": "CONFIRMED",
+      "detail": "- [1] The WHERE clause matches DTSX:6934-6937.\n- [2] main.cs:136-150 (owner/type/status). In the else branch the status is set only if it is not null. The source filter guarantees 2 or 4 there, so the claim holds.\n- [3] main.cs:168-171 with the comments מקיפה/כללית.\n- [4] main.cs:271-274: DTSX:5153 is 'if(!Row.gencount_IsNull)' and 5156 is 'gen_counter = 1'. The meaning is correctly stated as unknown.\n- [5] main.cs:281-285: DTSX:5163-5164 and 5166-5167 match.\n- [6] main.cs:290, with constants 3 and 4.\n- [7] main.cs:299-322.\n- [8] The catch is at 330-333 and CustingError has no path. The NULL-read note is hedged as documented SSIS behaviour.",
+      "evidence": "DTSX:6934-6937; DTSX:4758 Create Fund Enrolment main.cs:136-333 (DTSX:5153-5167)",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Create FundEnrolment For Transfer Request|title",
+      "hash": "57c5018c4ce1",
+      "verdict": "CONFIRMED",
+      "detail": "- DTS:Disabled=\"True\" is at DTSX:8160.\n- 'בין מסלולים' is attributed to the SQL comment in 0005_Customer Account DTSX:70706 ('tr.Gen_transferType = 5--בין מסלולים'), which was verified.\n- 'נכשלה' is labelled השערה from the component name. No supplied file comments value 2 of gen_tanferinstatus; the only comment is for 8, 'הסתיים'.\n- The owner is RejectTeamId with type 9 via Update Fund Enrolment Owner (DTSX:11069).\n- The request link is made by Update Transfer Request (DTSX:11114: Param_0 = FundEnrolmentId, Param_1 = gen_transferrequestid) and by the gen_transferrequestid lookup in the Create (main.cs:132-133).\nNote, not counted: as a summary, flow_he[2] omits two source conditions, tr.statecode = 0 and the NOT(feedbackstatus in(3,4) AND tc) exclusion. The decisions claim lists them.",
+      "evidence": "DTSX:8160, 10039-10042, 11066-11114; 0005_Customer Account.dtsx:70706-70707",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Create FundEnrolment For Transfer Request|short",
+      "hash": "29fb366c9ea8",
+      "verdict": "CONFIRMED",
+      "detail": "- The flow is disabled (DTSX:8160).\n- Type 5 is attributed to an SQL comment in another supplied package (0005 DTSX:70706).\n- Status 2 'נכשלה' is labelled השערה.\n- The write consists of the Create (SDK), the owner set to RejectTeamId/9 by SQL, and the gen_transferrequestBase.gen_fundenrolmentid link by SQL.\n- 'אין לה השפעה על ה-CRM' is correct while the flow is disabled.\nNote, not counted: as a summary, [2] omits tr.statecode = 0 and the feedbackstatus/tc exclusion.",
+      "evidence": "DTSX:8160, 9954-10042, 8166 main.cs:124-325, 11066-11114",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Create FundEnrolment For Transfer Request|decisions",
+      "hash": "0f30eb627e05",
+      "verdict": "WRONG",
+      "detail": "Rows [1] and [3] match.\n- [1]: DTS:Disabled=True is at DTSX:8160.\n- [3]: the CASE and the top 1 without ORDER BY are at DTSX:10019-10027. The referent isnull(...) is at 9998, and the systemuser lookup is written at 8558-8560.\n- Row [2]'s condition column is quoted exactly (DTSX:10039-10042). Its meaning_he attributions are correct: 'בין מסלולים' from 0005 DTSX:70706, and 'נכשלה' as השערה.\nTwo outcomes are not exact.\n1. Row [2]'s outcome describes tc as 'מסלול שגיאה פעיל'. That is not the condition. tc is defined at DTSX:10031-10037 as gen_transfercourses with gen_errordetails LIKE '%11879018%' AND statecode = 0. It is not any active course that has an error. Two cases show the difference:\n   - A request whose active course has a different error, and whose gen_feedbackstatus is NULL, IS selected, because tc is NULL and NOT(FALSE) = TRUE.\n   - The NULL rule stated there applies only to requests that have an active course whose error details contain 11879018.\n   The specific value 11879018 is missing from the stated condition.\n2. Row [4]'s outcome is 'מקור נתוני הכתובת', but the branch decides more than the address. Per main.cs:145-223 it also selects the source of three more values:\n   - gen_contactname: TR.gen_contactnameName or TR.gen_accountnameName.\n   - gen_email: Contact.emailaddress1 or Account.emailaddress2.\n   - gen_mobilephone: Contact.mobilephone or Account.gen_primaryphone.\n   gen_city is written only in the account branch: the contact-branch city is commented out at main.cs:148-149, and the account branch writes it at 186-188. When both names are NULL, none of these attributes is written. The outcome under-states which CRM values this branch decides.",
+      "evidence": "DTSX:10031-10042 (tc subquery + WHERE); DTSX:8166 Create Fund Enrolment main.cs:145-223 (contact/account branches)",
+      "wrongUnits": [
+        {
+          "unit": "[2] outcome_he",
+          "problem": "'בקשה עם מסלול שגיאה פעיל ו-gen_feedbackstatus NULL לא נשלפת' generalises tc to any active error course. The exclusion applies only to an active course whose error details contain 11879018.",
+          "correct": "tc = gen_transfercourses with gen_errordetails LIKE '%11879018%' and statecode = 0. A request that has such a course is excluded when gen_feedbackstatus is 3 or 4, and also when it is NULL (NOT(UNKNOWN) = UNKNOWN). A request without such a course passes this clause whatever its gen_feedbackstatus.",
+          "evidence": "DTSX:10031-10037, 10039"
+        },
+        {
+          "unit": "[4] outcome_he",
+          "problem": "'מקור נתוני הכתובת' omits the other CRM attributes whose source this branch decides.",
+          "correct": "The branch is chosen by whether TR.gen_contactnameName or TR.gen_accountnameName is filled. It decides the source of the address fields (gen_street, gen_house_number, gen_index, gen_post_box, and gen_city in the account branch only), and also of gen_email, gen_contactname and gen_mobilephone (Contact vs Account). If both names are NULL, none of these is written.",
+          "evidence": "main.cs:145-223 (DTSX:8166 component)"
+        }
+      ]
+    }
+  ]
+}

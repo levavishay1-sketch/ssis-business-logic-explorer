@@ -1,0 +1,63 @@
+# 0014_AccountCourses.dtsx · BBB424F202337F9F76966509CACF3D52AA9306C800A09ECC3EA635E44F08DEF1
+
+## Connection managers
+- [CRM] OLEDB Data Source=Psql;Initial Catalog=ALTSHULER_MSCRM;Integrated Security=SSPI;  
+- [SRS.SSIS_Logs] OLEDB  EXPR ConnectionString=@[User::ConnStringSrsSsis_Logs] 
+
+## Executables (disabled marked !)
+-   Create ETL Process record | Microsoft.ScriptTask  
+-   End ETL Process record | Microsoft.Pipeline  
+-   Get Organization Variables | Microsoft.Pipeline  
+-   Update Account courses | Microsoft.Pipeline  
+-   Package.EventHandlers[OnError] | EventHandler  
+-   Package.EventHandlers[OnError]\Error ETL Process record | Microsoft.ScriptTask  
+
+## Precedence
+- Get Organization Variables -> Create ETL Process record | Success Constraint   
+- Create ETL Process record -> Update Account courses | Success Constraint   
+- Update Account courses -> End ETL Process record | Success Constraint   
+
+## DataFlow End ETL Process record
+  - ETL Record Finish | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 2 out 0
+  - Get gen_etlprocessid | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 0 out 1
+  - Lookup | Lookup  | conn [CRM]  | in 1 out 1
+     path Lookup.Outputs[Lookup Match Output] => ETL Record Finish.Inputs[Input 0]
+     path Get gen_etlprocessid.Outputs[Output 0] => Lookup.Inputs[Lookup Input]
+
+## DataFlow Get Organization Variables
+  - OLE DB Source | OLEDBSource  | conn [CRM]  | in 0 out 2
+  - Set Organization Variables | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 2 out 0
+     path OLE DB Source.Outputs[OLE DB Source Output] => Set Organization Variables.Inputs[Input 0]
+
+## DataFlow Update Account courses
+  - ETL Warning | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 4 out 0
+  - get restrictions and accounts balance | OLEDBSource  | conn [CRM]  | in 0 out 12
+  - Set Warning columns | DerivedColumn  | conn   | in 1 out 4
+  - Union All | UnionAll  | conn   | in 14 out 13
+  - Update AccountCourcess | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 12 out 2
+     path Update AccountCourcess.Outputs[CastingError] => Union All.Inputs[Union All Input 1]
+     path Set Warning columns.Outputs[Derived Column Output] => ETL Warning.Inputs[Input 0]
+     path Update AccountCourcess.Outputs[Error] => Union All.Inputs[Union All Input 2]
+     path get restrictions and accounts balance.Outputs[OLE DB Source Output] => Update AccountCourcess.Inputs[Input 0]
+     path Union All.Outputs[Union All Output 1] => Set Warning columns.Inputs[Derived Column Input]
+
+## SQL statements
+- End ETL Process record\Lookup | Microsoft.Lookup.SqlCommand | [CRM] 
+    select p.gen_etlprocessid , case when pw.gen_etlprocessid is null then 0 else 1 end as isWarningExist from gen_etlprocess p left join (select distinct gen_etlprocessId from gen_etlprocesswarning ) as pw on p.gen_etlprocessId = pw.gen_etlprocessId
+- End ETL Process record\Lookup | Microsoft.Lookup.SqlCommandParam | [CRM] 
+    select * from (select p.gen_etlprocessid , case when pw.gen_etlprocessid is null then 0 else 1 end as isWarningExist from gen_etlprocess p left join (select distinct gen_etlprocessId from gen_etlprocesswarning ) as pw on p.gen_etlprocessId = pw.gen_etlprocessId) [refTable] where [refTable].[gen_etlprocessid] = ?
+- Get Organization Variables\OLE DB Source | Microsoft.OLEDBSource.SqlCommand | [CRM] 
+    select gen_key, gen_value from gen_etlvariable WITH (NOLOCK) where (gen_scope = 'global' OR gen_scope = ?)
+- Update Account courses\get restrictions and accounts balance | Microsoft.OLEDBSource.SqlCommand | [CRM] 
+    select ac.gen_accountcoursesId, ac.gen_accountbalance as gen_accountbalanceDB , ac.gen_transactionpercent as gen_transactionpercent, ac.gen_isconfiscate as gen_isconfiscateDB, ac.gen_ismortgaged as gen_ismortgagedDB, ac.gen_isreceivership as gen_isreceivershipDB, ac.gen_iswarning as gen_iswarningDB , f.Gen_AccountBalance as gen_accountbalance, ISNULL(f.Gen_isConfiscate,0) as gen_isconfiscate, ISNU
+
+## Code write candidates (per owner)
+- Create ETL Process record {"crm-entity":1,"crm-sdk-create":1,"variables-write":1}
+- End ETL Process record\ETL Record Finish {"sql-command":2,"crm-entity":3,"output-buffer":1,"crm-sdk-update":1}
+- End ETL Process record\Get gen_etlprocessid {"sql-command":2,"output-buffer":2}
+- Get Organization Variables\Set Organization Variables {"sql-command":2}
+- Update Account courses\ETL Warning {"crm-entity":3,"crm-sdk-create":1}
+- Update Account courses\Update AccountCourcess {"crm-service":1,"sql-command":2,"crm-entity":2,"output-buffer":3,"crm-sdk-execute":3}
+- Package.EventHandlers[OnError]\Error ETL Process record {"crm-entity":4,"crm-sdk-update":1,"crm-sdk-create":1}
+
+## External refs (non-framework) CRM2015.Proxy

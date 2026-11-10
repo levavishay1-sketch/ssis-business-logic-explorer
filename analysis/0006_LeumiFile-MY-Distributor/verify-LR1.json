@@ -1,0 +1,45 @@
+{
+  "verifier": "ssis-verifier",
+  "package": "0006_LeumiFile-MY-Distributor",
+  "scope": "logic-claims re-check after fixes",
+  "checkedAt": "2026-11-07T12:00:00Z",
+  "checked": 2,
+  "results": [
+    {
+      "id": "L|Package\\Foreach Loop Container\\Update Details from employer CustomerAccount|title",
+      "hash": "5246f1c043fe",
+      "verdict": "INCOMPLETE",
+      "detail": "Units 1, 3-7 verified: flat file source has 10 output columns (no staging); Get fund type name(product) = product join gen_banks where Gen_BankNumber = '10', NoMatchBehavior=1 with no path from No Match (silent drop, DTSX:7403-7434); Check CustomerAccount Exist = gen_customeraccount join gen_fundmain by bank account number + fund type, No Match -> Set Warning columns 1 -> ETL Warning 1 (DTSX:2961-3006); Aggregate, trim, date and code conversions present; Get Source Account matches right('000000000000'+Gen_bankaccountnumber,12) on the CRM side (DTSX:7484-7493). Problems: unit 2 lists the written fields but omits gen_updateeligibilitydate (= DateTime.Now, written together with gen_compensationeligibility, main.cs:133-135), and presents 'תאריך קבלת ההודעה מהבנק' as a detail 'שמקורו במעסיק' although its value is the run time DateTime.Now (main.cs:181), triggered by the file flags. Unit 8 says update happens after comparison with existing values and names only the closing date as collected without comparison; gen_bankstoppaymentsreceivingdate is also collected without any comparison whenever isProvisionDateUpdate or isEndWorkDate is true (main.cs:179-183), which by itself sets isNeedToUpdate. The package summary already says both are written every run, so this unit is narrower than the package's own summary.",
+      "evidence": "Update Details from employer Fields CustomerAccount main.cs (sha ffda9300922d) 131-137, 179-189, 199-204; DTSX:2961-3006, 7403-7434, 7484-7493, 9501",
+      "wrongUnits": [
+        {
+          "unit": 2,
+          "problem": "Field list omits gen_updateeligibilitydate; the bank-notice date is described as an employer-sourced detail although its value is DateTime.Now.",
+          "correct": "Also list 'תאריך עדכון הזכאות (רגע הריצה)' written with the eligibility; state that the bank-notice receiving date is set to the run time when one of the two file flags is '1'.",
+          "evidence": "main.cs:133-135, 179-183"
+        },
+        {
+          "unit": 8,
+          "problem": "Only the closing date is named as collected without comparison.",
+          "correct": "Two fields are collected without comparison: a valid closing date (main.cs:185-189) and the bank-notice receiving date = now whenever isProvisionDateUpdate or isEndWorkDate is true (main.cs:179-183).",
+          "evidence": "main.cs:179-189, 199-204"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Foreach Loop Container\\Update Details from employer CustomerAccount|short",
+      "hash": "70901d1bbb78",
+      "verdict": "WRONG",
+      "detail": "Units 1-5 verified (bank-10 product lookup with silent drop; customer-account lookup by bank number + fund type; no match -> warning, no update). Unit 6 is now correct as far as it goes (closing date written whenever valid, no comparison, main.cs:185-189; bank-notice date written when a flag is set, main.cs:179-183), though it does not say the bank-notice value is the run time or that gen_updateeligibilitydate is written with the eligibility. Unit 7 overstates the outcome: the accounts do not generally 'reflect' the file data. Eligibility is only ever set to 1 (file 0 never clears it, main.cs:131); an empty end-employment date, closing date or source account never clears the CRM value (main.cs:170-178, 185-197); stop-reason codes outside the 15-code list become -1 and are ignored (Convert script main.cs:116-151, writer 139-152); several different rows for the same account give several updates in undefined order (package finding#5). The end node must be stated conditionally.",
+      "evidence": "Update Details from employer Fields CustomerAccount main.cs 131-204; Convert StopPaymentsReason And CompensationEligibility to Int main.cs 116-151; DTSX:2806 Aggregate",
+      "wrongUnits": [
+        {
+          "unit": 7,
+          "problem": "States that the customer accounts reflect the eligibility, stop-payment, end-of-employment, closing and source-account data reported in the file; the code proves several cases where they do not.",
+          "correct": "Accounts receive the file's values only per field rule: eligibility only set to 1; stop reason/report date updated or cleared; end-employment date, closing date and source account only overwritten, never cleared; unknown reason codes ignored; final value undefined when several rows hit one account.",
+          "evidence": "main.cs:131-197; package finding#3/#5"
+        }
+      ]
+    }
+  ]
+}

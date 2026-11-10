@@ -1,0 +1,870 @@
+{
+ "verifier": "ssis-verifier",
+ "package": "0029_POA",
+ "scope": "logic-claims all",
+ "checkedAt": "2026-11-07T11:34:33.981Z",
+ "checked": 88,
+ "results": [
+  {
+   "id": "L|summary",
+   "hash": "3251bfd27347",
+   "verdict": "WRONG",
+   "detail": "Sources, entities, disabled flows and scope note re-checked and correct (14 pipelines, 10 Disabled=True; [CRM]=Psql/ALTSHULER_MSCRM; SQL UPDATE gen_pensionjoiningbase; TR UPDATE gen_transferrequest in disabled flow). But the universal statement in [1] 'for each joining it links an existing matching POA Main (+-7 days) or creates a new one and marks the joining as handled' is false for several proven branches.",
+   "evidence": "0029_POA.dtsx:22176/22205 (Check If POA Of Customer Account Exists, Match output unconnected); 22253 (rowNumber==1, Other Signature Date -> Union All for update); 22286 (else output); 27154 If POA period merge main.cs:115-136 (Output 0 unconnected); 22327 Create POA Main main.cs:319-323; 33566 main.cs:327-328",
+   "wrongUnits": [
+    {
+     "unit": 1,
+     "problem": "'For each joining it links or creates, and marks the joining handled' is not what the code does.",
+     "correct": "Automated joining: rows whose customer account already has a gen_powerofattorney for the same agency/agent, and B'1 rows caught by the 'period merge' rule, get neither a link nor a mark (re-read every run). B'1 rows that are not the latest signature (rowNumber<>1), types other than 1/2, rows with no agent and no agency, and rows whose create failed are marked tested=true with no POA Main created or linked. Pension: rows with no agent/agency, rows whose create failed, and extra joinings of an identity that already has an active POA Main get no POA Main and no mark.",
+     "evidence": "DTSX:22176, 22253, 22286, 27154 main.cs:117-136, 22327 main.cs:317-330 + Success [sync], 33566 main.cs:324-328, 31387 main.cs:47-85"
+    }
+   ]
+  },
+  {
+   "id": "L|exec",
+   "hash": "e7b4a604f1af",
+   "verdict": "CONFIRMED",
+   "detail": "All 15 top-level executables and the 14 precedence constraints re-derived: no DTS:Value (=Success), all LogicalAnd=True, chain matches exactly incl. line numbers 45650-45663. Disabled flags at 79, 2555, 4992, 7356, 10195, 13047, 15775, 18634, 37781, 43174 confirmed; the 2 business flows and the 3 framework tasks are enabled.",
+   "evidence": "0029_POA.dtsx:45650-45663; Disabled=True at the 10 listed lines",
+   "wrongUnits": []
+  },
+  {
+   "id": "L|ignored",
+   "hash": "fc1ab7cdaba0",
+   "verdict": "WRONG",
+   "detail": "All Error ETL Process record handlers, ETL Warning / Set Warning columns / Union All (disabled flows, they only carry the Update/Create Error output to gen_etlprocesswarning), Failed* derived columns, Set Error Columns, Union All 1 (pension) and Create/End ETL Process record are plumbing: checked, no business writes. Exception: Get Organization Variables is not pure plumbing. It reads gen_etlvariable from CRM and loads User::POAMainMonthsToAdd. That value sets gen_powerofattorneymain.gen_enddate (Receivingdate.AddMonths(monthsToAdd)) for POAs whose agent/agency has validity3months, in the active automated-joining flow and in the disabled TR flow.",
+   "evidence": "0029_POA.dtsx:42346 (select gen_key, gen_value from gen_etlvariable where gen_scope='global' or =PackageName); 43144 ReadWriteVariables=...POAMainMonthsToAdd...; Set Organization Variables main.cs:103-109 (throws if key missing); 33 (variable default 'From Db'); 22728 / Create POA Main main.cs:137-140,256-260",
+   "wrongUnits": [
+    {
+     "unit": 1,
+     "problem": "Get Organization Variables is classed as pure ETL plumbing, but it supplies a business parameter that reaches CRM.",
+     "correct": "It loads POAMainMonthsToAdd from CRM table gen_etlvariable (key POAMainMonthsToAdd, scope global or package name). The Create POA Main script parses it (default 3 only when it is not an integer). If the key is missing, Set Organization Variables throws and the package stops. The value sets gen_enddate of new POA Mains with Validity3Months. Either document this dependency in the Automated Joining description or exclude this variable from the plumbing classification.",
+     "evidence": "DTSX:42346, 43144, 22327 main.cs:137-140,256-260"
+    }
+   ]
+  },
+  {
+   "id": "L|finding#1",
+   "hash": "6e754b92cd02",
+   "verdict": "CONFIRMED",
+   "detail": "Update Pension Joining is an OLE DB Command on [CRM] (Psql/ALTSHULER_MSCRM): 'update gen_pensionjoiningbase set gen_createpoamain = 3 where gen_pensionjoiningid = ?' (1 param = PensionJoiningId). In the same flow Check If Poa Attached main.cs:71-74 sets gen_createpoamain=3 through CrmProxy.Update (SDK).",
+   "evidence": "0029_POA.dtsx:36941/36944; 31387 main.cs:67-75; DTSX:4-6",
+   "wrongUnits": []
+  },
+  {
+   "id": "L|finding#2",
+   "hash": "773916c590e6",
+   "verdict": "CONFIRMED",
+   "detail": "Create POA Main (AJ) Success output is synchronous with no exclusion group, so every input row (created, failed, skipped by return) reaches Union All Automated Joining Id For Update and then Update Automated Joining (gen_testedtocreatepoa=true via SDK). Create errors go to Failed Create POA -> ETL Warning only. The next run filters on gen_testedtocreatepoa null/0, so there is no retry.",
+   "evidence": "0029_POA.dtsx:22327 (Success [sync], Error [async]); paths Create POA Main.Success -> Union All ... Input 1; 29486 main.cs:63-79; 26929 WHERE",
+   "wrongUnits": []
+  },
+  {
+   "id": "L|finding#3",
+   "hash": "d86f69d06f2a",
+   "verdict": "CONFIRMED",
+   "detail": "Check If POA Of Customer Account Exists: the Match Output has no path. If POA period merge: rows not DirectRowTo NotSignitureDateMerge only reach Output 0, which has no path. Neither reaches the update of gen_testedtocreatepoa, so the joining is re-selected each run.",
+   "evidence": "0029_POA.dtsx:22176 (Match unconnected), 27154 main.cs:115-136, 27960 Output 0 (no path)",
+   "wrongUnits": []
+  },
+  {
+   "id": "L|finding#4",
+   "hash": "23026827de23",
+   "verdict": "CONFIRMED",
+   "detail": "Verified: If POA period merge compares gen_agencylicensenumber/gen_agentlicensenumber (Gen_agencie/Gen_agents.Gen_LicenseNumber) to gen_agencyidentity (Account.AccountNumber) / gen_agentidentity (Contact.gen_identitynumber) from Check If Exists POA Main. The agent branch line 132 compares the agent licence to genagencyidentity. Pension Check If Exist POA joins AgentcyIdentityNumber = ISNULL(agent licence, agency licence) to agentcyIdentitynumber = isnull(contact.gen_identitynumber, account.AccountNumber). The consequence is correctly labelled as a hypothesis.",
+   "evidence": "0029_POA.dtsx:27949-27954; 27154 main.cs:117-136; 21938; 36352; 31223/31273",
+   "wrongUnits": []
+  },
+  {
+   "id": "L|finding#5",
+   "hash": "b4540403488e",
+   "verdict": "CONFIRMED",
+   "detail": "Update Pension Joining 'OLE DB Command Output' feeds Union All 1 Input 2, which has no mapped columns. Union All 1 feeds ETL Warning (main.cs:60-76 creates gen_etlprocesswarning and uses Row.RecordKey.ToString()). Failed To Update pension Joining and Failed Update POA Main outputs have no paths. The runtime effect is labelled a hypothesis.",
+   "evidence": "0029_POA.dtsx:36854 (Input 2 no columns), paths list; 35448 main.cs:60-76",
+   "wrongUnits": []
+  },
+  {
+   "id": "L|finding#6",
+   "hash": "5639dda7c278",
+   "verdict": "CONFIRMED",
+   "detail": "Update POA Main (pension) catches exceptions into ErrorBuffer but Output 0 is synchronous, so every row (also failed updates) goes to Union All 2 Input 2 and then Update Pension Joining (gen_createpoamain=3).",
+   "evidence": "0029_POA.dtsx:36979 main.cs:28-42; path Update POA Main.Output 0 -> Union All 2 Input 2; 36906; 36941",
+   "wrongUnits": []
+  },
+  {
+   "id": "L|finding#7",
+   "hash": "a64927203109",
+   "verdict": "CONFIRMED",
+   "detail": "Ten Disabled=True data flows match the list. 0031_PoaAccountUpdateDaily has no disabled executables; its Handle Wait Status selects Gen_currentstate=3 with startdate<=GETDATE and sets ACTIVE=1, and Handle Active Status sets CANCELED=2.",
+   "evidence": "0029_POA.dtsx:79,2555,4992,7356,10195,13047,15775,18634,37781,43174; 0031_PoaAccountUpdateDaily.dtsx:27265, 30447-30470, 8089-8136 (relative to 13734)",
+   "wrongUnits": []
+  },
+  {
+   "id": "L|finding#8",
+   "hash": "e7a7faa8313d",
+   "verdict": "CONFIRMED",
+   "detail": "The info flows have no Conditional Split: Get POA Main goes straight to Set columns. The action flows split on POAMainOrder==1. TR Create POA Main main.cs:123-124 uses EntityReference('gen_agencie') and EntityReference('gen_agents'); the active flows use account and contact. Note: the action-flow filter is row_number per gen_contactname over the (POA Main x customer account) join, so it keeps one row (one account) per customer, not only the latest POA Main. This is flagged on the action-flow claims, not here.",
+   "evidence": "0029_POA.dtsx:15548, 21135 (no split), 10719, 16299, 12827, 37859 main.cs:123-124",
+   "wrongUnits": []
+  },
+  {
+   "id": "L|Package\\Create POA Main For Automated Joining|title",
+   "hash": "1f49d94aa283",
+   "verdict": "CONFIRMED",
+   "detail": "Population (status 8, type not null and !=3 '-- !=No poa', signature, not tested, join to customer account by 12-padded bank account), stop on existing account-level POA for the same agent or agency, B1 = latest signature then +-7 lookup / period merge / create, B2 = already linked / +-7 / create, then annotation and gen_testedtocreatepoa=true. Type 1/2 = Bet 1/Bet 2 is proven by the split output names and the BET_1/BET_2 constants. 'Finished' for status 8 comes only from the component label 'Get Finished Automated Joining'.",
+   "evidence": "0029_POA.dtsx:26929, 22176, 22286, 22253, 21936, 21545, 27154, 27968, 21740, 22327 main.cs:119-121,159-305, 29486",
+   "wrongUnits": []
+  },
+  {
+   "id": "L|Package\\Create POA Main For Automated Joining|short",
+   "hash": "620e3cdfb8e8",
+   "verdict": "WRONG",
+   "detail": "Units [1]-[18] match the flow. The end-state [19] contradicts the code and the claim's own units [4] and [17].",
+   "evidence": "0029_POA.dtsx:22253/22286 (paths to Union All Automated Joining Id For Update), 27154 main.cs:117-136, 22327 main.cs:274-275,317-330",
+   "wrongUnits": [
+    {
+     "unit": 19,
+     "problem": "'Every finished joining with B'1/B'2 has a linked POA Main and will not be handled again' is false.",
+     "correct": "These cases end without a linked POA Main: B'1 rows that are not the latest signature (marked tested, no link); rows with no agent and no agency, and rows dropped by the in-run B'1 dedup (marked, no create); rows whose create failed (marked, only an ETL warning). Rows stopped by the account-level POA check or by period merge get no link and are re-read every run.",
+     "evidence": "DTSX:22253 Other Signature Date -> Union All Input 4; 22327 main.cs:319-330, 272-276 + Success [sync]; 22176 Match unconnected; 27960 Output 0 unconnected"
+    }
+   ]
+  },
+  {
+   "id": "L|Package\\Create POA Main For Automated Joining|detailed",
+   "hash": "41525e92fa05",
+   "verdict": "WRONG",
+   "detail": "Units [1]-[52] verified against SQL/code: WHERE clause, ROW_NUMBER, agent/agency ids, Validity3Months ISNULL, lookups (Customer Account partial 3 keys, Check If Exists POA Main full cache appendixtype=2/currentstate=1/rownumber=1 by createdon desc on identityINT+agent+agency identity), Bet 1 lookup (11 params counted, null->2 defaults), period merge (TotalDays>=0 and licence==identity, agent branch vs genagencyidentity), Is Exists by AJ (full cache), Bet 2 lookup (13 params, raw gen_excludeprovidentfunds), Create (dedup, appendix 2/3, names, defaults, dates, end date logic, annotation 'יפוי כח נסרק לחשבון '+gen_customeraccount.gen_name), Update POA Main, Update AJ. Note on [48]: POAMainMonthsToAdd comes from CRM table gen_etlvariable through Get Organization Variables (a missing key makes the package fail; 3 is used only when the value is not an integer). The end-state [53] is wrong.",
+   "evidence": "0029_POA.dtsx:26929, 22178/22205, 21938/22026, 21367, 21572/21620, 27154, 27970, 21460, 21816, 22327 main.cs:159-456, 30374, 29486, 42346, 43144",
+   "wrongUnits": [
+    {
+     "unit": 53,
+     "problem": "'Every finished B'1/B'2 joining has a linked POA Main, except cases stopped without a mark' is still false. It contradicts [12], [41] and [52].",
+     "correct": "Joinings can be marked tested=true with no POA Main linked or created: B'1 rows that are not the latest signature (rowNumber<>1), rows with neither agent nor agency, rows dropped by the in-run B'1 dedup, rows whose service.Create failed, and rows whose link update failed (Update POA Main Output 0 is sync).",
+     "evidence": "DTSX:22253, 22327 main.cs:272-276,319-330 (Success sync), 30374 main.cs:37-41 + path Output 0 -> Union All Input 3"
+    }
+   ]
+  },
+  {
+   "id": "L|Package\\Create POA Main For Automated Joining|detail",
+   "hash": "181fffa8c7e5",
+   "verdict": "CONFIRMED",
+   "detail": "Population, the three matching steps, decisions (type 1/2/other, rowNumber=1, period merge, 3-month validity) and the four SDK writes all verified. Source-table provenance verified across supplied packages: gen_automatedjoining is only updated (0027 lines 1371/5936 Update; no creator found), and gen_customeraccount is created in 0005 (new Entity('gen_customeraccount')). gen_powerofattorney / gen_powerofattorneymain are created only in 0029 and 0031 (0031 new Entity('gen_powerofattorney') lines 1921/6361).",
+   "evidence": "0029_POA.dtsx:26929, 22176, 21936, 21545, 27154, 27968, 21740, 22327, 30374, 29486; 0027_AutomatedJoining.dtsx:1371,5936; 0005_Customer Account.dtsx:18341; 0031_PoaAccountUpdateDaily.dtsx:1921,6361",
+   "wrongUnits": []
+  },
+  {
+   "id": "L|Package\\Create POA Main For Automated Joining|decisions",
+   "hash": "85907beb3368",
+   "verdict": "CONFIRMED",
+   "detail": "All 10 conditions match the SQL, expressions and code exactly: WHERE clause; account-level POA lookup params (agency acct no, agent id, customer account) with Match unconnected; split ==1/==2/default; rowNumber==1; full-cache keys; Bet 1 SQL incl. SignatureDate OR ReceivingDate +-7; period merge incl. agent-branch comparison to genagencyidentity; AJ link lookup; Bet 2 SQL with raw ExcludeProvidentFunds; IsValidity3Months end date.",
+   "evidence": "0029_POA.dtsx:26929, 22178/22205, 22286, 22253, 21938/22026, 21572/21620, 27154 main.cs:117-136, 27972, 21816, 22327 main.cs:256-264",
+   "wrongUnits": []
+  },
+  {
+   "id": "L|Package\\Create POA Main For Automated Joining|crm",
+   "hash": "0b455b21fcc7",
+   "verdict": "CONFIRMED",
+   "detail": "Four SDK writes verified: service.Create(gen_powerofattorneymain) main.cs:266; annotation Create main.cs:290-294 (objectid=gen_powerofattorneymain); Update POA Main proxy.Update gen_automatedjoining main.cs:32-35; Update Automated Joining gen_testedtocreatepoa=true main.cs:67-72. Every row reaches the last write, including failed creates (Success is sync).",
+   "evidence": "0029_POA.dtsx:22327, 30374, 29486",
+   "wrongUnits": []
+  },
+  {
+   "id": "L|Package\\Create POA Main For Automated Joining|open",
+   "hash": "95ab38a941e4",
+   "verdict": "CONFIRMED",
+   "detail": "[1] Status 8 is labelled only by the component name, and type 3 only by the SQL comment '!=No poa'. No OptionSet labels are in the supplied files, so the question stays open. [2] Code line 132 confirms the agent-licence vs agency-identity comparison. [3] B2 lookup passes raw gen_excludeprovidentfunds while Create sets 2. NULL can never match '=' in SQL, so this is correctly a hypothesis about data. [4] Runtime NULL matching of the full-cache lookup cannot be settled from the files.",
+   "evidence": "0029_POA.dtsx:26929 (comments), 27154 main.cs:132, 21816 param 3, 22327 main.cs:204, 22020 CacheType 0",
+   "wrongUnits": []
+  },
+  {
+   "id": "L|Package\\Create POA Main For Pension Joining|title",
+   "hash": "7bbbbdc3eb77",
+   "verdict": "WRONG",
+   "detail": "Population (status 13 '--הסתיים', createpoamain=1 '-- required', signature, active contact by identity), SDK mark when POA Main already points to the joining, +-7 link, create + note, SQL createpoamain=3 all verified. flow_he[3] states a general one-candidate-per-identity rule that only exists on one branch.",
+   "evidence": "0029_POA.dtsx:36352, 36497, 31387 main.cs:45-122, paths Get POA Main.NoMatch -> Union All Input 3, 33566 main.cs:322-406",
+   "wrongUnits": [
+    {
+     "unit": 5,
+     "problem": "'One creation candidate per identity' is presented as a general rule.",
+     "correct": "Dedup to one candidate per identity (first read) happens only in Check If Poa Attached To Pension Joining, which receives only joinings whose identity already has an active (statecode=0) POA Main. Joinings with no active POA Main for the identity go from Get POA Main No Match straight to Union All, then Check If Exist POA / Create POA Main. Create POA Main calls CreatePOA for every row (dictionary commented out, main.cs:404-405), so several joinings of the same identity can each create a POA Main.",
+     "evidence": "DTSX:36495 (Lookup) + path NoMatch -> Union All Input 3; 31387 main.cs:47,65; 33566 main.cs:404-405"
+    }
+   ]
+  },
+  {
+   "id": "L|Package\\Create POA Main For Pension Joining|short",
+   "hash": "bd7db3dbc24c",
+   "verdict": "WRONG",
+   "detail": "Steps [1]-[12] match the flow. The end-state [13] is not true.",
+   "evidence": "0029_POA.dtsx:33566 main.cs:324-328, 267-283; 31387 main.cs:47-85",
+   "wrongUnits": [
+    {
+     "unit": 13,
+     "problem": "'Every finished pension joining with a POA has a linked POA Main' is false.",
+     "correct": "Joinings with no agent and no agency (Create returns), joinings whose create failed (Error output only), and extra joinings of an identity whose active POA Main already points to another joining or which was already chosen as a candidate (dropped in Check If Poa Attached) get no POA Main and stay gen_createpoamain=1.",
+     "evidence": "DTSX:33566 main.cs:327-328, 278-283; 31387 main.cs:47-85"
+    }
+   ]
+  },
+  {
+   "id": "L|Package\\Create POA Main For Pension Joining|detailed",
+   "hash": "e9f8b1fbb833",
+   "verdict": "WRONG",
+   "detail": "Verified: source SQL, Get POA Main (partial, Gen_identitynumber=? and statecode=0), Check If Poa Attached logic incl. SDK update '// Created', Derived Column expressions, Check If Exist POA (12 params counted and in order), Update POA Main, Create POA Main fields (createdby from CrmAdminGuid when not empty, startdate=Now, enddate=expiration, source 3 '//הצטרפות'), annotation text and SuccessBuffer before annotation, Union All 2 -> SQL update, warnings. Unit [12] states the empty-exclusions default as a general rule, but it applies on one path only. Unit [24] omits one written attribute. The end-state [28] is wrong.",
+   "evidence": "0029_POA.dtsx:36352, 36497, 31387 main.cs:45-122, 35357, 31223/31273, 36979, 33566 main.cs:142-406, 36941, 36854, 36906",
+   "wrongUnits": [
+    {
+     "unit": 12,
+     "problem": "The NULL-exclusion default ('yes' for attachment 2, else 'no') is presented as general.",
+     "correct": "It is applied only in Check If Poa Attached (main.cs:49-50), i.e. only to joinings whose identity already has an active POA Main. For joinings with no POA Main (Get POA Main No Match -> Union All Input 3) the raw nullable booleans are used: the Derived Column gives NULL (NULL ? 1 : 2), so Check If Exist POA cannot match, and Create POA Main writes 2 ('לא') because the bool defaults to false (main.cs:357-361, 201-217).",
+     "evidence": "DTSX:31387 main.cs:49-50; 35357; 33566 main.cs:201-217,357-361; Union All Input 3 lineage = Get Finished Pension Joinings"
+    },
+    {
+     "unit": 24,
+     "problem": "The list of attributes on the new POA Main omits gen_isenddatelessthan10years.",
+     "correct": "gen_isenddatelessthan10years=true is also written when the joining's gen_isenddatelessthan10years is true (main.cs:262-265). gen_includepension is written only when gen_includingpensionproducts is not NULL (main.cs:195-198).",
+     "evidence": "DTSX:33566 main.cs:195-198, 262-265"
+    },
+    {
+     "unit": 28,
+     "problem": "'Finished pension joinings get a POA Main and are marked' is a universal end state that contradicts [21] and [27].",
+     "correct": "These joinings stay unmarked and get no POA Main: rows without agent/agency, failed creates, and dropped same-identity joinings on the POA-Main-exists path.",
+     "evidence": "DTSX:33566 main.cs:327-328, 278-283; 31387 main.cs:47-85"
+    }
+   ]
+  },
+  {
+   "id": "L|Package\\Create POA Main For Pension Joining|detail",
+   "hash": "133d71bd8075",
+   "verdict": "WRONG",
+   "detail": "Population, matching, SDK/SQL writes and outcome verified. 0028 updates gen_pensionjoiningBase but no creator of gen_pensionjoining exists in the supplied packages, so the 'creator not found (hypothesis)' label is correct. gen_createpoamain appears only in 0029. Unit [3] generalises two rules that hold on one branch only.",
+   "evidence": "0029_POA.dtsx:36352, 36497, 31387, 35357, 31223, 33566, 36941; 0028_Fund Enrolment.dtsx:8056",
+   "wrongUnits": [
+    {
+     "unit": 3,
+     "problem": "'Empty exclusions -> yes for attachment 2' and 'one creation per identity per run' are stated generally.",
+     "correct": "Both apply only to joinings whose identity already has an active POA Main (they pass through Check If Poa Attached). For identities without an active POA Main there is no per-identity dedup: each joining row can create its own POA Main (Create POA Main main.cs:404-405). NULL exclusions are written as 2 ('לא') regardless of attachment type.",
+     "evidence": "DTSX:31387 main.cs:47-65; 36495 NoMatch -> Union All Input 3; 33566 main.cs:201-217, 404-405"
+    }
+   ]
+  },
+  {
+   "id": "L|Package\\Create POA Main For Pension Joining|decisions",
+   "hash": "54ea5249b519",
+   "verdict": "CONFIRMED",
+   "detail": "All six conditions match exactly: WHERE clause; Get POA Main lookup (statecode=0) Match -> script, NoMatch -> Union All; script conditions main.cs:47/67 incl. SDK update and IsOther; Derived Column appendix/isFutureFundValid; Check If Exist POA +-7 with Match -> Update POA Main, NoMatch -> Create; Create main.cs:327 return.",
+   "evidence": "0029_POA.dtsx:36352, 36497, 31387 main.cs:47,67-84, 35357, 31223, 33566 main.cs:327",
+   "wrongUnits": []
+  },
+  {
+   "id": "L|Package\\Create POA Main For Pension Joining|crm",
+   "hash": "a8dd8e072c0c",
+   "verdict": "CONFIRMED",
+   "detail": "Five writes verified: SDK gen_pensionjoining.gen_createpoamain=3 (Check If Poa Attached main.cs:71-74), SDK Create gen_powerofattorneymain (main.cs:267), SDK annotation (main.cs:295-298), SDK Update gen_powerofattorneymain.gen_pensionjoining (main.cs:32-35), and direct SQL update gen_pensionjoiningbase on [CRM] (Unsupported) after Create Success (async) or the Update POA Main sync output.",
+   "evidence": "0029_POA.dtsx:31387, 33566, 36979, 36906, 36941",
+   "wrongUnits": []
+  },
+  {
+   "id": "L|Package\\Create POA Main For Pension Joining|open",
+   "hash": "29fa20b240a0",
+   "verdict": "CONFIRMED",
+   "detail": "[1] The licence vs identity/account-number comparison is real, and equality depends on data (not settleable). [2] Status 13 '--הסתיים', 1 '-- required' and 3 '// Created' come from code comments only, and no OptionSet metadata is supplied. [3] CrmAdminGuid has a package default (6403B02B-...) and EnableConfig=True with the unsupplied C:\\Generix\\SSISConfigFile.dtsConfig, so an override cannot be ruled out.",
+   "evidence": "0029_POA.dtsx:31223, 36352 comments, 31387 main.cs:73, 17-18, 11",
+   "wrongUnits": []
+  },
+  {
+   "id": "L|Package\\Create POA MAIN For Transfer Request|title",
+   "hash": "58aa68dde483",
+   "verdict": "CONFIRMED",
+   "detail": "Disabled at 37781. Source: transferType 5 '-- between courses', status 8 '-- finished', existence null or 2 '-- 2 -> No', attachment 2/3. The B1 lookup has its Match unconnected. Create + annotation, then SQL update gen_powerofattorneymainexistence=1 '-- 1 ---> Yes'.",
+   "evidence": "0029_POA.dtsx:37781, 40229, 40326, 37789/37805, 37859, 40559",
+   "wrongUnits": []
+  },
+  {
+   "id": "L|Package\\Create POA MAIN For Transfer Request|short",
+   "hash": "4d71f3e5a8bd",
+   "verdict": "CONFIRMED",
+   "detail": "Matches the disabled flow: population, B'1-only duplicate check, create + annotation + SQL mark. No current effect.",
+   "evidence": "0029_POA.dtsx:37781, 40229, 37787, 37859 main.cs:84-199, 40556",
+   "wrongUnits": []
+  },
+  {
+   "id": "L|Package\\Create POA MAIN For Transfer Request|detailed",
+   "hash": "879d22fd9e7f",
+   "verdict": "CONFIRMED",
+   "detail": "Every unit verified: Disabled flag and incoming Constraint 13 (45655); WHERE; split conditions; Check POA Main partial lookup on contact/agent/agency/signature date (date-converted), Match unconnected; Get Contact Details full-cache, NoMatch unconnected; create source 4 (SOURCE_BETWEEN_COURSES), appendix from request, isallowaction/isfuturefundvalid true, signature/receiving +3h, end +10y or +monthsToAdd when Validity3Months, annotation format; SQL UPDATE gen_transferrequest (view) with 1 param.",
+   "evidence": "0029_POA.dtsx:37781, 45655, 40229, 40326, 37789, 40171, 37859 main.cs:84-199, 40559",
+   "wrongUnits": []
+  },
+  {
+   "id": "L|Package\\Create POA MAIN For Transfer Request|detail",
+   "hash": "e4a4f854afdb",
+   "verdict": "CONFIRMED",
+   "detail": "Population, B'1 matching keys, decisions, writes and 'disabled, no effect' verified. Provenance: gen_transferrequest is only updated in 0036 (entity.LogicalName='gen_transferrequest' update) and 0028 (OLE DB update). No creator was found in the supplied packages, so the 'hypothesis' label is correct.",
+   "evidence": "0029_POA.dtsx:40229, 37789, 37859, 40559; 0036_TransferRequest.dtsx:3886; 0028_Fund Enrolment.dtsx:11114",
+   "wrongUnits": []
+  },
+  {
+   "id": "L|Package\\Create POA MAIN For Transfer Request|decisions",
+   "hash": "eb19c0774260",
+   "verdict": "CONFIRMED",
+   "detail": "Disabled flag and split expressions '!ISNULL(x) && x == 2' / '== 3' verified.",
+   "evidence": "0029_POA.dtsx:37781, 40326",
+   "wrongUnits": []
+  },
+  {
+   "id": "L|Package\\Create POA MAIN For Transfer Request|crm",
+   "hash": "945eec1d6436",
+   "verdict": "CONFIRMED",
+   "detail": "crmServiceProxy.Create(gen_powerofattorneymain), Create(annotation), and OLE DB Command UPDATE gen_transferrequest on [CRM] (direct SQL, Unsupported). All inside a disabled flow.",
+   "evidence": "0029_POA.dtsx:37859 main.cs:172,198; 40559",
+   "wrongUnits": []
+  },
+  {
+   "id": "L|Package\\Create POA MAIN For Transfer Request|open",
+   "hash": "02c32474934d",
+   "verdict": "CONFIRMED",
+   "detail": "Code passes EntityReference('gen_agencie', ...) / ('gen_agents', ...) holding Gen_agencie.gen_agencyname / gen_agents.gen_contactname GUIDs (account/contact ids). The active flows use 'account'/'contact'. Failure on create is a correctly labelled hypothesis (runtime).",
+   "evidence": "0029_POA.dtsx:37859 main.cs:123-124; 40229 select list",
+   "wrongUnits": []
+  },
+  {
+   "id": "L|Package\\Out of Date|title",
+   "hash": "57d5ebf9cf3e",
+   "verdict": "CONFIRMED",
+   "detail": "Disabled; Get POA's selects gen_powerofattorney where gen_currentstate in (1,3) and getdate()>gen_enddate; Set columns gen_currentstate=5; Update POA SDK.",
+   "evidence": "0029_POA.dtsx:43174, 44475, 44508, 44608",
+   "wrongUnits": []
+  },
+  {
+   "id": "L|Package\\Out of Date|short",
+   "hash": "669d641181d3",
+   "verdict": "CONFIRMED",
+   "detail": "Matches SQL and the constant 5.",
+   "evidence": "0029_POA.dtsx:43174, 44475, 44508",
+   "wrongUnits": []
+  },
+  {
+   "id": "L|Package\\Out of Date|detailed",
+   "hash": "803ffc5d796a",
+   "verdict": "CONFIRMED",
+   "detail": "Incoming Constraint 12 from TR (45654) verified. ExecuteMultiple batch of 1000 (entitiesList.Count==1000). Fault handling has ErrorBuffer commented out, so faults are not logged.",
+   "evidence": "0029_POA.dtsx:45654, 44475, 44508, 44608 main.cs:124-171",
+   "wrongUnits": []
+  },
+  {
+   "id": "L|Package\\Out of Date|detail",
+   "hash": "c2e6cf56ecaf",
+   "verdict": "CONFIRMED",
+   "detail": "Population, update by fetched id, condition and SDK write verified. gen_powerofattorney is created only in 0029 (disabled flows) and 0031.",
+   "evidence": "0029_POA.dtsx:44475, 44508, 44608; 0031_PoaAccountUpdateDaily.dtsx:1921,6361",
+   "wrongUnits": []
+  },
+  {
+   "id": "L|Package\\Out of Date|decisions",
+   "hash": "5d60b5b5a6fe",
+   "verdict": "CONFIRMED",
+   "detail": "Verified.",
+   "evidence": "0029_POA.dtsx:43174, 44475",
+   "wrongUnits": []
+  },
+  {
+   "id": "L|Package\\Out of Date|crm",
+   "hash": "bff5d7eca8d4",
+   "verdict": "CONFIRMED",
+   "detail": "Verified: Update gen_powerofattorney.gen_currentstate via ExecuteMultipleExtension (RequestType.Update), batch 1000.",
+   "evidence": "0029_POA.dtsx:44608",
+   "wrongUnits": []
+  },
+  {
+   "id": "L|Package\\Cancel Active POA|title",
+   "hash": "96942ec04d6f",
+   "verdict": "CONFIRMED",
+   "detail": "SQL verified: active (=1 '-- active') with isallowaction=1 and remainactiveinparallel 2 or NULL, inner join waiting (=3 '-- waiting') with startdate<getdate and isallowaction=1 on the same customer account. SendToDelete=1 when neither the non-null agent nor the non-null agency is equal. Set columns gen_currentstate=2 (0031 const CANCELED=2 confirms 2 = cancelled). Update sets gen_isneedtosendcancelmailtoagentcy=true when SendToDelete==1.",
+   "evidence": "0029_POA.dtsx:2555, 3856, 3940, 4040 main.cs:71-88; 0031:CANCELED=2",
+   "wrongUnits": []
+  },
+  {
+   "id": "L|Package\\Cancel Active POA|short",
+   "hash": "075b78aaf4e1",
+   "verdict": "CONFIRMED",
+   "detail": "Verified as in title.",
+   "evidence": "0029_POA.dtsx:3856, 3940, 4040",
+   "wrongUnits": []
+  },
+  {
+   "id": "L|Package\\Cancel Active POA|detailed",
+   "hash": "0ff310da21f8",
+   "verdict": "CONFIRMED",
+   "detail": "Incoming Constraint 2 (45656), batch 300, ErrorBuffer commented out in ExecuteBulk (faults not logged) verified.",
+   "evidence": "0029_POA.dtsx:45656, 3856, 3940, 4040 main.cs:71-119",
+   "wrongUnits": []
+  },
+  {
+   "id": "L|Package\\Cancel Active POA|detail",
+   "hash": "1152db0701df",
+   "verdict": "CONFIRMED",
+   "detail": "Verified.",
+   "evidence": "0029_POA.dtsx:3856, 4040",
+   "wrongUnits": []
+  },
+  {
+   "id": "L|Package\\Cancel Active POA|decisions",
+   "hash": "9b120ff6fd76",
+   "verdict": "CONFIRMED",
+   "detail": "Verified.",
+   "evidence": "0029_POA.dtsx:2555, 3856",
+   "wrongUnits": []
+  },
+  {
+   "id": "L|Package\\Cancel Active POA|crm",
+   "hash": "41895142b6c8",
+   "verdict": "CONFIRMED",
+   "detail": "Verified (main.cs:74-85, ExecuteMultiple Update, batch 300).",
+   "evidence": "0029_POA.dtsx:4040",
+   "wrongUnits": []
+  },
+  {
+   "id": "L|Package\\Cancel Active POA|open",
+   "hash": "04af08c093cf",
+   "verdict": "CONFIRMED",
+   "detail": "The inner join emits one row per (active, waiting) pair, so an active POA with several waiting ones appears several times in the update list. The effect is correctly labelled a hypothesis.",
+   "evidence": "0029_POA.dtsx:3856",
+   "wrongUnits": []
+  },
+  {
+   "id": "L|Package\\Cancel Duplicate waiting POA|title",
+   "hash": "235d28f20f90",
+   "verdict": "CONFIRMED",
+   "detail": "row_number per Gen_CustomerAccount by gen_startdate desc over state 3 with isallowaction=1, POA_order>1 -> gen_currentstate=2.",
+   "evidence": "0029_POA.dtsx:4992, 6293, 6330",
+   "wrongUnits": []
+  },
+  {
+   "id": "L|Package\\Cancel Duplicate waiting POA|short",
+   "hash": "a4c528dace57",
+   "verdict": "CONFIRMED",
+   "detail": "Verified.",
+   "evidence": "0029_POA.dtsx:6293, 6330",
+   "wrongUnits": []
+  },
+  {
+   "id": "L|Package\\Cancel Duplicate waiting POA|detailed",
+   "hash": "98c7f5fca2bd",
+   "verdict": "CONFIRMED",
+   "detail": "Constraint 3 (45657), batch 100, faults not logged (ErrorBuffer commented) verified.",
+   "evidence": "0029_POA.dtsx:45657, 6293, 6330, 6430 main.cs:71-118",
+   "wrongUnits": []
+  },
+  {
+   "id": "L|Package\\Cancel Duplicate waiting POA|detail",
+   "hash": "c3f90da506fb",
+   "verdict": "CONFIRMED",
+   "detail": "Verified.",
+   "evidence": "0029_POA.dtsx:6293, 6430",
+   "wrongUnits": []
+  },
+  {
+   "id": "L|Package\\Cancel Duplicate waiting POA|decisions",
+   "hash": "61ff1530dabd",
+   "verdict": "CONFIRMED",
+   "detail": "Verified.",
+   "evidence": "0029_POA.dtsx:4992, 6293",
+   "wrongUnits": []
+  },
+  {
+   "id": "L|Package\\Cancel Duplicate waiting POA|crm",
+   "hash": "7f7104d8b270",
+   "verdict": "CONFIRMED",
+   "detail": "Verified.",
+   "evidence": "0029_POA.dtsx:6330, 6430",
+   "wrongUnits": []
+  },
+  {
+   "id": "L|Package\\Active POA|title",
+   "hash": "9dde4b8f3bf5",
+   "verdict": "CONFIRMED",
+   "detail": "Gen_currentstate=3 and Gen_startdate<GETDATE() -> gen_currentstate=1.",
+   "evidence": "0029_POA.dtsx:79, 1380, 1413",
+   "wrongUnits": []
+  },
+  {
+   "id": "L|Package\\Active POA|short",
+   "hash": "e76ea35f7ba5",
+   "verdict": "CONFIRMED",
+   "detail": "Verified.",
+   "evidence": "0029_POA.dtsx:1380, 1413",
+   "wrongUnits": []
+  },
+  {
+   "id": "L|Package\\Active POA|detailed",
+   "hash": "9b9a687ad23a",
+   "verdict": "CONFIRMED",
+   "detail": "Constraint 4 (45658), batch 300, faults not logged verified.",
+   "evidence": "0029_POA.dtsx:45658, 1380, 1413, 1513 main.cs:125-172",
+   "wrongUnits": []
+  },
+  {
+   "id": "L|Package\\Active POA|detail",
+   "hash": "9d22a7e1a9a8",
+   "verdict": "CONFIRMED",
+   "detail": "Verified.",
+   "evidence": "0029_POA.dtsx:1380, 1513",
+   "wrongUnits": []
+  },
+  {
+   "id": "L|Package\\Active POA|decisions",
+   "hash": "a3c33d479c5b",
+   "verdict": "CONFIRMED",
+   "detail": "Verified.",
+   "evidence": "0029_POA.dtsx:79, 1380",
+   "wrongUnits": []
+  },
+  {
+   "id": "L|Package\\Active POA|crm",
+   "hash": "02ebc618de84",
+   "verdict": "CONFIRMED",
+   "detail": "Verified.",
+   "evidence": "0029_POA.dtsx:1413, 1513",
+   "wrongUnits": []
+  },
+  {
+   "id": "L|Package\\Active POA|open",
+   "hash": "1dc5be0a9ad1",
+   "verdict": "CONFIRMED",
+   "detail": "0031 Handle Wait Status (enabled, 0031 has no Disabled flags) selects Gen_currentstate=3 with startdate<=GETDATE() and sets ACTIVE=1.",
+   "evidence": "0031_PoaAccountUpdateDaily.dtsx:22844, 27265, 30447-30470",
+   "wrongUnits": []
+  },
+  {
+   "id": "L|Package\\Canncel POA main|title",
+   "hash": "b7484f9cfe63",
+   "verdict": "CONFIRMED",
+   "detail": "POA Main gen_currentstate=1, gen_includepension=2, appendixtype<>4, no POA in state 1 or 3 -> currentstate=3 and gen_iscancellationemailsenttoagent=TRUE.",
+   "evidence": "0029_POA.dtsx:7356, 8657, 8696",
+   "wrongUnits": []
+  },
+  {
+   "id": "L|Package\\Canncel POA main|short",
+   "hash": "a8d256f11a08",
+   "verdict": "CONFIRMED",
+   "detail": "Verified.",
+   "evidence": "0029_POA.dtsx:8657, 8696",
+   "wrongUnits": []
+  },
+  {
+   "id": "L|Package\\Canncel POA main|detailed",
+   "hash": "21b772d7a666",
+   "verdict": "WRONG",
+   "detail": "Units [1]-[8] and [10] verified (Constraint 5 at 45659, SQL, Set columns, batch 300). Unit [9] is wrong for this flow.",
+   "evidence": "0029_POA.dtsx:45659, 8657, 8696, 8802 main.cs:94-119; path Update POAM.Error -> Union All Input 2 -> Set Warning columns -> ETL Warning",
+   "wrongUnits": [
+    {
+     "unit": 9,
+     "problem": "Says ExecuteMultiple faults are not recorded (ErrorBuffer commented out).",
+     "correct": "In Update POAM the fault branch is active code: ErrorBuffer.AddRow(); ErrorBuffer.Description = resultItem.Fault.Message (main.cs:113-114). The Error output goes Union All -> Set Warning columns -> ETL Warning, so faults would be logged as ETL warnings. Only the other four status flows have these lines commented out.",
+     "evidence": "DTSX:8802 main.cs:110-115; paths of Canncel POA main"
+    }
+   ]
+  },
+  {
+   "id": "L|Package\\Canncel POA main|detail",
+   "hash": "1976dd371fd5",
+   "verdict": "CONFIRMED",
+   "detail": "Verified.",
+   "evidence": "0029_POA.dtsx:8657, 8696, 8802",
+   "wrongUnits": []
+  },
+  {
+   "id": "L|Package\\Canncel POA main|decisions",
+   "hash": "533bfd98eca6",
+   "verdict": "CONFIRMED",
+   "detail": "Verified.",
+   "evidence": "0029_POA.dtsx:7356, 8657",
+   "wrongUnits": []
+  },
+  {
+   "id": "L|Package\\Canncel POA main|crm",
+   "hash": "7a9a24bce90b",
+   "verdict": "CONFIRMED",
+   "detail": "Verified: Update gen_powerofattorneymain currentstate + gen_iscancellationemailsenttoagent through ExecuteMultiple, batch 300.",
+   "evidence": "0029_POA.dtsx:8802 main.cs:75-85",
+   "wrongUnits": []
+  },
+  {
+   "id": "L|Package\\Create POA for future funds providant - allow action|title",
+   "hash": "9867a856b63b",
+   "verdict": "WRONG",
+   "detail": "Query filters verified. The Conditional Split, however, keeps one row per customer, so only one account per run would get a POA, not every account.",
+   "evidence": "0029_POA.dtsx:12827 (row_number() over (partition by Gen_powerofattorneymain.gen_contactname order by createdon desc) computed over the POA Main x gen_customeraccount join), 10719 (POAMainOrder == 1; Default unconnected), 10752",
+   "wrongUnits": [
+    {
+     "unit": 2,
+     "problem": "'Would create account-level POAs for the customer's provident accounts' (plural, all accounts).",
+     "correct": "POAMainOrder is a row_number partitioned only by customer (gen_contactname) over the joined POA Main x customer-account rows. POAMainOrder==1 keeps exactly one row per customer: the latest POA Main paired with one (arbitrary) qualifying provident account. One account-level POA per customer per run.",
+     "evidence": "DTSX:12827, 10719"
+    },
+    {
+     "unit": 6,
+     "problem": "'Create gen_powerofattorney for each account'.",
+     "correct": "Only one gen_powerofattorney per customer per run (the POAMainOrder==1 row). Other accounts would only be covered in later runs, because the NOT EXISTS filter then excludes the account already covered.",
+     "evidence": "DTSX:12827, 10719, 10752"
+    }
+   ]
+  },
+  {
+   "id": "L|Package\\Create POA for future funds providant - allow action|short",
+   "hash": "19fc04097829",
+   "verdict": "WRONG",
+   "detail": "Disabled flag correct. The per-account wording is wrong.",
+   "evidence": "0029_POA.dtsx:10195, 12827, 10719",
+   "wrongUnits": [
+    {
+     "unit": 2,
+     "problem": "'For every provident account of a customer ... with no POA'.",
+     "correct": "Only one qualifying provident account per customer per run passes (row_number per gen_contactname over the POA Main x account join; POAMainOrder==1).",
+     "evidence": "DTSX:12827, 10719"
+    }
+   ]
+  },
+  {
+   "id": "L|Package\\Create POA for future funds providant - allow action|detailed",
+   "hash": "f20210df0f47",
+   "verdict": "WRONG",
+   "detail": "Constraint 6 (45660), WHERE (incl. Gen_startdate<getdate()), Set columns =1, Create POA 1 (component name has ' 1') batch 10 with faults logged to ErrorBuffer, and attribute list all verified. The decision in [3] is mis-described.",
+   "evidence": "0029_POA.dtsx:45660, 12827, 10719, 12935, 10752 main.cs:71-140",
+   "wrongUnits": [
+    {
+     "unit": 3,
+     "problem": "The decision is described as 'is this the latest POA Main created for the customer?'.",
+     "correct": "The row_number is over (POA Main x qualifying account) rows per customer, ordered by POA Main createdon desc. POAMainOrder==1 selects one row: the latest POA Main with one arbitrary account. Other accounts of the same customer, even under the latest POA Main, are skipped in this run.",
+     "evidence": "DTSX:12827, 10719"
+    }
+   ]
+  },
+  {
+   "id": "L|Package\\Create POA for future funds providant - allow action|detail",
+   "hash": "65a0aff5cc7c",
+   "verdict": "INCOMPLETE",
+   "detail": "Units are technically correct (population as queried, NOT EXISTS, join by gen_contactname, POAMainOrder==1, currentstate=1, SDK create). Missing: the business effect that POAMainOrder==1 limits creation to one account per customer per run.",
+   "evidence": "0029_POA.dtsx:12827, 10719",
+   "wrongUnits": [
+    {
+     "unit": 0,
+     "problem": "Missing the one-row-per-customer effect of the split.",
+     "correct": "Only one account-level POA per customer is created per run (row_number partitioned by gen_contactname over the POA Main x account join), despite [1] listing all accounts as population.",
+     "evidence": "DTSX:12827, 10719"
+    }
+   ]
+  },
+  {
+   "id": "L|Package\\Create POA for future funds providant - allow action|decisions",
+   "hash": "8d6d139fc92a",
+   "verdict": "WRONG",
+   "detail": "[1] and [2] verified. [3] meaning is incomplete.",
+   "evidence": "0029_POA.dtsx:10195, 12827, 10719",
+   "wrongUnits": [
+    {
+     "unit": 3,
+     "problem": "meaning_he 'latest POA Main for the customer' together with [2] ('attached to all accounts') implies all accounts of the latest POA Main get a POA.",
+     "correct": "POAMainOrder==1 keeps exactly one (POA Main, account) row per customer: latest POA Main + one account.",
+     "evidence": "DTSX:12827, 10719"
+    }
+   ]
+  },
+  {
+   "id": "L|Package\\Create POA for future funds providant - allow action|crm",
+   "hash": "412d84170c40",
+   "verdict": "CONFIRMED",
+   "detail": "Create gen_powerofattorney via ExecuteMultipleExtension (RequestType.Create), batch 10. Disabled flow.",
+   "evidence": "0029_POA.dtsx:10752 main.cs:45,74-104",
+   "wrongUnits": []
+  },
+  {
+   "id": "L|Package\\Create POA for future funds studing - allow action|title",
+   "hash": "9613360513bf",
+   "verdict": "WRONG",
+   "detail": "Query filters verified (gen_type=2, isnull(gen_exclludetrainingfunds,2)=2, no start-date filter). Same one-row-per-customer issue as the provident action flow.",
+   "evidence": "0029_POA.dtsx:18415, 16299, 16332",
+   "wrongUnits": [
+    {
+     "unit": 2,
+     "problem": "Implies POAs for all of the customer's study-fund accounts.",
+     "correct": "POAMainOrder (row_number per gen_contactname over POA Main x account) ==1 keeps one account per customer per run.",
+     "evidence": "DTSX:18415, 16299"
+    },
+    {
+     "unit": 6,
+     "problem": "'Create gen_powerofattorney for each account'.",
+     "correct": "One per customer per run.",
+     "evidence": "DTSX:18415, 16299, 16332"
+    }
+   ]
+  },
+  {
+   "id": "L|Package\\Create POA for future funds studing - allow action|short",
+   "hash": "0e8e234c217b",
+   "verdict": "WRONG",
+   "detail": "Same issue as the provident action short.",
+   "evidence": "0029_POA.dtsx:18415, 16299",
+   "wrongUnits": [
+    {
+     "unit": 2,
+     "problem": "'For every study-fund account of a customer'.",
+     "correct": "Only one qualifying account per customer per run (POAMainOrder==1).",
+     "evidence": "DTSX:18415, 16299"
+    }
+   ]
+  },
+  {
+   "id": "L|Package\\Create POA for future funds studing - allow action|detailed",
+   "hash": "9d0454dcc115",
+   "verdict": "WRONG",
+   "detail": "Constraint 7 (45661), SQL, Set columns =1, Create POA batch 1000 with faults to ErrorBuffer verified. The decision [3] is mis-described.",
+   "evidence": "0029_POA.dtsx:45661, 18415, 16299, 18522, 16332",
+   "wrongUnits": [
+    {
+     "unit": 3,
+     "problem": "Described as 'latest POA Main of the customer'.",
+     "correct": "POAMainOrder==1 keeps one (latest POA Main, one account) row per customer.",
+     "evidence": "DTSX:18415, 16299"
+    }
+   ]
+  },
+  {
+   "id": "L|Package\\Create POA for future funds studing - allow action|detail",
+   "hash": "d1c19056fd3c",
+   "verdict": "INCOMPLETE",
+   "detail": "Technically correct units, but the one-account-per-customer-per-run effect of POAMainOrder==1 is missing.",
+   "evidence": "0029_POA.dtsx:18415, 16299",
+   "wrongUnits": [
+    {
+     "unit": 0,
+     "problem": "Missing effect of the split.",
+     "correct": "Only one account-level POA per customer per run.",
+     "evidence": "DTSX:18415, 16299"
+    }
+   ]
+  },
+  {
+   "id": "L|Package\\Create POA for future funds studing - allow action|decisions",
+   "hash": "25b9cb6738bc",
+   "verdict": "WRONG",
+   "detail": "[1] and [2] verified. [3] meaning incomplete.",
+   "evidence": "0029_POA.dtsx:15775, 18415, 16299",
+   "wrongUnits": [
+    {
+     "unit": 3,
+     "problem": "meaning 'latest POA Main for the customer'.",
+     "correct": "One (latest POA Main, one account) row per customer.",
+     "evidence": "DTSX:18415, 16299"
+    }
+   ]
+  },
+  {
+   "id": "L|Package\\Create POA for future funds studing - allow action|crm",
+   "hash": "412d84170c40",
+   "verdict": "CONFIRMED",
+   "detail": "Create gen_powerofattorney via ExecuteMultiple, batch 1000. Disabled flow.",
+   "evidence": "0029_POA.dtsx:16332",
+   "wrongUnits": []
+  },
+  {
+   "id": "L|Package\\Create POA for future funds providant - allow info|title",
+   "hash": "3fe8588383f3",
+   "verdict": "CONFIRMED",
+   "detail": "Query: currentstate=1, futurefund=1, isnull(IsAllowAction,0)=0, appendix<>4, provident not excluded, gen_type=1, startdate<getdate, no existing POA on the account. No split, so every row creates a POA ('for each account' is correct here).",
+   "evidence": "0029_POA.dtsx:13047, 15553, 15661, 13571",
+   "wrongUnits": []
+  },
+  {
+   "id": "L|Package\\Create POA for future funds providant - allow info|short",
+   "hash": "19fc04097829",
+   "verdict": "CONFIRMED",
+   "detail": "Correct for this flow (no split).",
+   "evidence": "0029_POA.dtsx:15553, 13571",
+   "wrongUnits": []
+  },
+  {
+   "id": "L|Package\\Create POA for future funds providant - allow info|detailed",
+   "hash": "905fe21a7259",
+   "verdict": "CONFIRMED",
+   "detail": "Constraint 8 (45662), SQL, no Conditional Split (duplicates labelled a hypothesis), Set columns 'gen_startdate > GETDATE() ? 3 : 1' (the query already requires startdate<getdate()), Create POA batch 1000 verified.",
+   "evidence": "0029_POA.dtsx:45662, 15553, 15661, 13571",
+   "wrongUnits": []
+  },
+  {
+   "id": "L|Package\\Create POA for future funds providant - allow info|detail",
+   "hash": "ef2715612829",
+   "verdict": "CONFIRMED",
+   "detail": "Verified. gen_customeraccount creation in 0005 verified.",
+   "evidence": "0029_POA.dtsx:15553, 15661, 13571; 0005_Customer Account.dtsx:18341",
+   "wrongUnits": []
+  },
+  {
+   "id": "L|Package\\Create POA for future funds providant - allow info|decisions",
+   "hash": "7626f49b327e",
+   "verdict": "CONFIRMED",
+   "detail": "Verified.",
+   "evidence": "0029_POA.dtsx:13047, 15553",
+   "wrongUnits": []
+  },
+  {
+   "id": "L|Package\\Create POA for future funds providant - allow info|crm",
+   "hash": "412d84170c40",
+   "verdict": "CONFIRMED",
+   "detail": "Verified.",
+   "evidence": "0029_POA.dtsx:13571",
+   "wrongUnits": []
+  },
+  {
+   "id": "L|Package\\Create POA for future funds studing - allow info|title",
+   "hash": "cfb8c7697bc5",
+   "verdict": "CONFIRMED",
+   "detail": "Query (gen_type=2, training not excluded, no start-date filter) and no split verified.",
+   "evidence": "0029_POA.dtsx:18634, 21140, 21247, 19158",
+   "wrongUnits": []
+  },
+  {
+   "id": "L|Package\\Create POA for future funds studing - allow info|short",
+   "hash": "0e8e234c217b",
+   "verdict": "CONFIRMED",
+   "detail": "Correct for this flow (no split).",
+   "evidence": "0029_POA.dtsx:21140, 19158",
+   "wrongUnits": []
+  },
+  {
+   "id": "L|Package\\Create POA for future funds studing - allow info|detailed",
+   "hash": "cea821aedcb1",
+   "verdict": "CONFIRMED",
+   "detail": "Constraint 9 (45663), SQL, no split, Set columns 3/1 expression, Create POA batch 1000 verified.",
+   "evidence": "0029_POA.dtsx:45663, 21140, 21247, 19158",
+   "wrongUnits": []
+  },
+  {
+   "id": "L|Package\\Create POA for future funds studing - allow info|detail",
+   "hash": "54369c212c09",
+   "verdict": "CONFIRMED",
+   "detail": "Verified.",
+   "evidence": "0029_POA.dtsx:21140, 21247, 19158",
+   "wrongUnits": []
+  },
+  {
+   "id": "L|Package\\Create POA for future funds studing - allow info|decisions",
+   "hash": "55a5789baf14",
+   "verdict": "CONFIRMED",
+   "detail": "Verified.",
+   "evidence": "0029_POA.dtsx:18634, 21140",
+   "wrongUnits": []
+  },
+  {
+   "id": "L|Package\\Create POA for future funds studing - allow info|crm",
+   "hash": "412d84170c40",
+   "verdict": "CONFIRMED",
+   "detail": "Verified.",
+   "evidence": "0029_POA.dtsx:19158",
+   "wrongUnits": []
+  }
+ ]
+}

@@ -1,0 +1,195 @@
+{
+  "verifier": "ssis-verifier",
+  "package": "0037_MeetTheCustomerGemel",
+  "scope": "mapping-A.json",
+  "checked": 30,
+  "results": [
+    {
+      "id": "update meet the customer by customer account|gen_meetthecustomer|UPDATE|gen_status",
+      "verdict": "CONFIRMED",
+      "detail": "Re-derived from the raw DTSX. Constants are private int FINISH = 3, WRONG = 4 (DTSX:10288-10289). The writer checks Row.genstatus == WRONG (DTSX:10392-10393). Otherwise gen_status = FINISH when !gencalculatescore_IsNull (DTSX:10406-10407). Match rows carry source gen_status in (1,2) (source WHERE DTSX:9944-9950). No-match rows get 'Set Status To Wrong' = DATEADD(\"DD\",-180,GETDATE()) <= createdon ? gen_status : 8 (DTSX:10001-10002). Only gen_status == 8 passes 'Wrong Records' (DTSX:9849-9850); the default output has no path. So 4 can never occur, and 3 is the only value written, also for unmatched rows older than 180 days. Rows with NULL gen_calculatescore on the no-match path are still added to the batch as an Entity with only an Id, i.e. an empty Update. Note: the DB-source list does not show gen_precustomeridnumber (the lookup key) as an influence on gen_status, although match/no-match decides whether recent rows are written at all. The write-condition text does cover it.",
+      "evidence": "DTSX:9944-9950, 10001-10002, 9849-9850, 10288-10289, 10389-10414; paths list (no path from Default Output / writer outputs)"
+    },
+    {
+      "id": "update meet the customer by customer account|gen_meetthecustomer|UPDATE|gen_customerprogram",
+      "verdict": "CONFIRMED",
+      "detail": "if (!Row.GenprogrammainId_IsNull) gen_customerprogram = EntityReference(\"gen_programmain\", Row.GenprogrammainId), inside the else-branch of genstatus == WRONG (DTSX:10397-10400). The value is the Lookup 'Get Customer Program Details' output Gen_programmainId (CopyFromReferenceColumn), reference SQL Gen_programmain join product where producttypecode = 200004 (DTSX:9872-9874). The join key is gen_precustomeridnumber -> gen_customeridnumber, both REPLACE(STR(x,9),' ','0') nvarchar(9). Union All Input 2 (no-match) has no Gen_programmainId column (DTSX:10023+), so the value is NULL there. Full cache (CacheType 0) and NoMatchBehavior 1 confirmed.",
+      "evidence": "DTSX:9872-9874, 9896-9898 (JoinToReferenceColumn), 9914-9916, 10397-10400"
+    },
+    {
+      "id": "update meet the customer by customer account|gen_meetthecustomer|UPDATE|gen_contactname",
+      "verdict": "CONFIRMED",
+      "detail": "if (!Row.gencustomername_IsNull) gen_contactname = EntityReference(\"contact\", Row.gencustomername) (DTSX:10401-10404). gencustomername = Lookup output gen_customername (DT_GUID per ReferenceMetadataXml), copied from Gen_programmain.gen_customername. Only Match rows (Union All Input 1) carry it.",
+      "evidence": "DTSX:9885 (ReferenceMetadataXml gen_customername DT_GUID), 9919-9921, 10401-10404"
+    },
+    {
+      "id": "update meet the customer by customer Account|gen_meetthecustomer|UPDATE|gen_status",
+      "verdict": "CONFIRMED",
+      "detail": "Code matches: STATUS_NO_ACCOUNT 8 -> 8. Otherwise, if all four key columns are non-NULL: on equality and non-NULL gen_calculatescore -> FINISH 3; if bank equal and id different -> WORNG 4. If any key column is NULL -> WORNG 4 (DTSX:8702-8704, 8806-8835). Match rows come via Union All Input 3 (Lookup Match). No-match rows older than 180 days come via 'Set Status To No Account' + Conditional Split gen_status == 8 (DTSX:8375-8376, 8155-8156). The lookup keys are gen_precustomeridnumber -> gen_customeridnumber and gen_pregemelaccountnumber (LTRIM/RTRIM in SQL, then PadLeft(12,'0') in place when Length <= 12, Add Zeros main.cs DTSX:7555-7558) -> gen_bankaccountnumber. productsubcustomeraccount (CASE 2<->4) is returned but is neither a join key nor used in code. The analyst labels the NULL-key path to 4 as a hypothesis, which is correct. By documented SSIS behaviour, a full-cache Lookup matches NULL to NULL, so this path is plausible when gen_pregemelaccountnumber is NULL.",
+      "evidence": "DTSX:8178-8195, 8230-8245 (JoinToReferenceColumn), 8313-8322, 7555-7558, 8702-8704, 8803-8835"
+    },
+    {
+      "id": "update meet the customer by customer Account|gen_meetthecustomer|UPDATE|gen_gemelaccountnumber",
+      "verdict": "CONFIRMED",
+      "detail": "gen_gemelaccountnumber = EntityReference(\"gen_customeraccount\", Row.GencustomeraccountId) when non-NULL. This sits inside the branch status != 8, all four keys non-NULL, bank == pregemel and precustomerid == customerid (DTSX:8810-8818). The value is Gen_customeraccount.Gen_customeraccountId from Lookup 'Get Customer Account Details' via Union All Input 3.",
+      "evidence": "DTSX:8178-8195, 8810-8818; Union All Input 3 lineage Get Customer Account Details.Outputs[Lookup Match Output].Columns[Gen_customeraccountId]"
+    },
+    {
+      "id": "update meet the customer by customer Account|gen_meetthecustomer|UPDATE|gen_contactname",
+      "verdict": "CONFIRMED",
+      "detail": "gen_contactname = EntityReference(\"contact\", Row.Gencontactname) when non-NULL, in the same matched branch (DTSX:8819-8822). The value is Gen_customeraccount.Gen_contactname from the lookup.",
+      "evidence": "DTSX:8179-8180, 8819-8822"
+    },
+    {
+      "id": "Update MeetTheCustomers|gen_meetthecustomer|UPDATE|gen_status [Link Meet The Customer To Customer Account By Automated Joining]",
+      "verdict": "CONFIRMED",
+      "detail": "STATUS_FINISH = 3 and STATUS_WRONG = 4 (DTSX:3551-3552). if (genstatus == STATUS_WRONG) -> 4; else ... if (!gencalculatescore_IsNull) -> 3 (DTSX:3592-3607). 'Derived Column' sets DATEADD(-180) <= CreatedOn ? gen_status : 8, and the Conditional Split keeps gen_status == 8 (DTSX:3153-3154, 3125-3126). Union All Input 2 carries gen_calculatescore. So 4 is never reached, and 3 is written also for unmatched rows older than 180 days. Rows with NULL score get an empty update.",
+      "evidence": "DTSX:3125-3126, 3153-3154, 3179-3185, 3551-3552, 3589-3607"
+    },
+    {
+      "id": "Update MeetTheCustomers|gen_meetthecustomer|UPDATE|gen_gemelaccountnumber [Link Meet The Customer To Customer Account By Automated Joining]",
+      "verdict": "CONFIRMED",
+      "detail": "if (!automatedJoiningcustomeraccountid_IsNull) gen_gemelaccountnumber = EntityReference(gen_customeraccount, ...) (DTSX:3597-3598). The Lookup joins meetTheCustomerAutomatedJoiningId (= gen_meetthecustomer.gen_automatedjoining) to gen_automatedjoiningid. The reference is gen_automatedjoining join Gen_customeraccount on gen_bankaccountnumber = right(REPLICATE('0',12)+LTRIM(gen_bankaccountnumberName),12), where gen_joiningstatus = 8 (DTSX:3228-3232). Only Match rows carry it.",
+      "evidence": "DTSX:3228-3232, 3277 (JoinToReferenceColumn gen_automatedjoiningid), 3597-3598"
+    },
+    {
+      "id": "Update MeetTheCustomers|gen_meetthecustomer|UPDATE|gen_contactname [Link Meet The Customer To Customer Account By Automated Joining]",
+      "verdict": "CONFIRMED",
+      "detail": "if (!automatedJoiningContactId_IsNull) gen_contactname = EntityReference(contact, ...) (DTSX:3600-3601). The value is Gen_customeraccount.gen_contactname AS automatedJoiningContactId.",
+      "evidence": "DTSX:3229, 3600-3601"
+    },
+    {
+      "id": "Update MeetTheCustomers|gen_meetthecustomer|UPDATE|gen_identitynumber",
+      "verdict": "CONFIRMED",
+      "detail": "if (!gencustomeridnumber_IsNull) gen_identitynumber = Row.gencustomeridnumber (DTSX:3603-3604). The value is Gen_customeraccount.gen_customeridnumber, lookup output wstr length 20, with no padding or trim in SQL or code.",
+      "evidence": "DTSX:3229, Lookup output column gen_customeridnumber wstr/20, 3603-3604"
+    },
+    {
+      "id": "Update MeetTheCustomers|gen_meetthecustomer|UPDATE|gen_status [Link Meet The Customer To Customer Account By Mini Automated Joining]",
+      "verdict": "CONFIRMED",
+      "detail": "The task is disabled: DTS:Disabled=\"True\" on the Executable (DTSX:4642), the only Disabled flag in the file. If it were enabled: genstatus == STATUS_WRONG (4) -> 4 (DTSX:5107-5108), with 'Derived Column' DATEADD(\"DD\",-3,GETDATE()) < CreatedOn ? 4 : gen_status and Conditional Split gen_status == 4 (DTSX:4688-4689, 4660-4661). The writer never sets 3.",
+      "evidence": "DTSX:4642, 4660-4661, 4688-4689, 5066-5067, 5104-5116"
+    },
+    {
+      "id": "Update MeetTheCustomers|gen_meetthecustomer|UPDATE|gen_gemelaccountnumber [Link Meet The Customer To Customer Account By Mini Automated Joining]",
+      "verdict": "CONFIRMED",
+      "detail": "Disabled task (DTSX:4642). The code is if (!automatedJoiningcustomeraccountid_IsNull) -> EntityReference(gen_customeraccount) (DTSX:5112-5113). The lookup reference is gen_customeraccountid AS automatedJoiningcustomeraccountid from gen_miniautomatedjoining join gen_automatedjoining where gen_joiningstatus = 8, key meetTheCustomerAutomatedJoiningId -> gen_automatedjoiningid (DTSX:4760).",
+      "evidence": "DTSX:4642, 4760, 5112-5113"
+    },
+    {
+      "id": "Update MeetTheCustomers|gen_meetthecustomer|UPDATE|gen_contactname [Link Meet The Customer To Customer Account By Mini Automated Joining]",
+      "verdict": "CONFIRMED",
+      "detail": "Disabled task. The value is gen_automatedincident_contactId AS automatedJoiningContactId (DTSX:4760), and the code is if not NULL -> EntityReference(contact) (DTSX:5115-5116).",
+      "evidence": "DTSX:4642, 4760, 5115-5116"
+    },
+    {
+      "id": "Update Meet The Customer|gen_meetthecustomer|UPDATE|gen_status",
+      "verdict": "CONFIRMED",
+      "detail": "STATUS_NO_ACCOUNT = 8 and STATUS_FINISH = 3 (DTSX:6462-6463). if genstatus == 8 -> 8, else gen_status = 3 unconditionally, with no score check (DTSX:6488-6498). Rows reach the writer by Lookup Match on keys gen_pregemelaccountnumber -> CAbankaccountnumberNoZeros and gen_preaccountnumber -> Account.accountnumber, or by no-match + 'On > 180 Days Change Status' + 'Pass > 180 To Update' == 8. The source has no gen_precustomer filter (DTSX:6008-6021).",
+      "evidence": "DTSX:6008-6021, 6067-6079, lookup join keys, 6159-6160, 6192-6193, 6462-6498"
+    },
+    {
+      "id": "Update Meet The Customer|gen_meetthecustomer|UPDATE|gen_gemelaccountnumber",
+      "verdict": "CONFIRMED",
+      "detail": "if (!gencustomeraccountId_IsNull) gen_gemelaccountnumber = EntityReference(gen_customeraccount, ca.Gen_customeraccountId), inside the genstatus != 8 branch (DTSX:6491-6496). The lookup reference is filtered to estate type '0149' and gen_fundcreationdate >= '2019-01-01', and joins Account on AccountId = ca.Gen_accountname (DTSX:6067-6079).",
+      "evidence": "DTSX:6067-6079, 6491-6496"
+    },
+    {
+      "id": "LOGIC scopeNote_he",
+      "verdict": "CONFIRMED",
+      "detail": "Connections [CRM] and [qsql] both point to Data Source=psql;Initial Catalog=ALTSHULER_MSCRM (DTSX:6, 11). All business sources and lookups use [qsql]; only the End ETL lookup uses [CRM]. There is no DTS:Configuration element (grep count 0; evidence.configurations = []). The package has no SQL DML. All CRM writes go through CrmProxy/ExecuteMultipleExtension.",
+      "evidence": "DTSX:4-16; connection refs per component; grep '<DTS:Configuration' = 0"
+    },
+    {
+      "id": "LOGIC summary_he",
+      "verdict": "CONFIRMED",
+      "detail": "Two flows (Customer Account, Pre Account Number) write 8. The other two active flows (Customer Program, Automated Joining) write 3 or an empty update for rows that should get 8. Status meanings are attributed to SQL comments and constant names.",
+      "evidence": "DTSX:6462-6498, 8702-8835, 10288-10407, 3551-3607"
+    },
+    {
+      "id": "LOGIC executionOrder",
+      "verdict": "CONFIRMED",
+      "detail": "Constraints DTSX:11245-11251 have no DTS:Value or EvalOp attributes, so all are default Success. The chain is Get Organization Variables -> Create ETL -> Customer Program -> Customer Account -> Automated Joining -> Mini (disabled) -> Pre Account Number -> End ETL. Continuation past the disabled task is correctly labelled as general SSIS knowledge.",
+      "evidence": "DTSX:11245-11251, 4642"
+    },
+    {
+      "id": "LOGIC Link Pre Meet The Customer To Customer Program",
+      "verdict": "CONFIRMED",
+      "detail": "Population, lookup, 180-day rule, unconnected default output, the WRONG = 4 mismatch, the empty update and the unconnected ErrorBuffer all match the DTSX.",
+      "evidence": "DTSX:9831-11244"
+    },
+    {
+      "id": "LOGIC Link Pre Meet The Customer To Customer Account",
+      "verdict": "CONFIRMED",
+      "detail": "Re-check: the status-4 text now separates the two cases. \"Different ID\" is not expected because the Lookup enforces equality. \"Missing value\" is possible: the source has no NOT NULL filter on gen_pregemelaccountnumber (DTSX:8313-8322), the Lookup is full cache (CacheType 0 at DTSX:8218), and NULL matches NULL (labelled general SSIS behaviour). Such a row then reaches the else-branch and gets 4 (DTSX:8833-8834). The same wording is used in detail_he, decisions and crmEffects.",
+      "evidence": "DTSX:8218, 8313-8322, 8813-8834",
+      "previousVerdict": "INCOMPLETE"
+    },
+    {
+      "id": "LOGIC Link Meet The Customer To Customer Account By Automated Joining",
+      "verdict": "CONFIRMED",
+      "detail": "The source has no gen_miniautomatedjoining filter. The account is matched by bank number only (no ID). joiningstatus = 8 'Finish' comes from an SQL comment. The STATUS_WRONG mismatch is confirmed.",
+      "evidence": "DTSX:3179-3185, 3228-3232, 3551-3607"
+    },
+    {
+      "id": "LOGIC Link Meet The Customer To Customer Account By Mini Automated Joining",
+      "verdict": "CONFIRMED",
+      "detail": "Disabled (DTSX:4642). Source, lookup, 3-day rule and writer described correctly as inactive.",
+      "evidence": "DTSX:4642, 4660-4661, 4688-4689, 4711-4718, 4760, 5104-5116"
+    },
+    {
+      "id": "LOGIC Link Meet The Customer To Customer Account By Pre Account Number",
+      "verdict": "CONFIRMED",
+      "detail": "There is no gen_precustomer filter and the product types are (1,4). The two-key lookup with zero-stripped bank number and Account.accountnumber is correct. Status 3 is written regardless of score, and 8 for no-match rows older than 180 days. Exceptions go to ErrorBuffer (catch block DTSX:6507-6511).",
+      "evidence": "DTSX:6008-6021, 6067-6079, 6485-6511"
+    },
+    {
+      "id": "LOGIC findings_he[0]",
+      "verdict": "CONFIRMED",
+      "detail": "The status mismatch is confirmed in both flows: 8 is set in the stream but the writer tests for 4, so it writes 3 when a score is present and otherwise sends an empty update, and the record stays 1/2.",
+      "evidence": "DTSX:10002, 9850, 10288-10289, 10392-10407; DTSX:3154, 3126, 3551-3552, 3592-3607"
+    },
+    {
+      "id": "LOGIC findings_he[1]",
+      "verdict": "CONFIRMED",
+      "detail": "Re-check: the finding now covers both points. (a) The final ExcecuteBulk at end of rowset is outside try/catch, so a null response or exception fails the component and End ETL. (b) On a mid-stream failure, Clear() is skipped and Count passes 500, so later rows accumulate with the failed 500 and are sent as one large request, with the proxy limit labelled general knowledge. Re-verified in the Program writer (DTSX:10414-10460) and the same pattern in the AJ, Pre Account Number and Customer Account writers. Index unchanged (7 findings, same order).",
+      "evidence": "DTSX:10414-10460, 3612-3660, 6503-6550, 8836-8880",
+      "previousVerdict": "INCOMPLETE"
+    },
+    {
+      "id": "LOGIC findings_he[2]",
+      "verdict": "CONFIRMED",
+      "detail": "The default outputs of all four active Conditional Splits have no path. The 'waiting' intent is labelled as a hypothesis.",
+      "evidence": "paths list; DTSX:3126, 6193, 8156, 9850"
+    },
+    {
+      "id": "LOGIC findings_he[3]",
+      "verdict": "CONFIRMED",
+      "detail": "Full-cache lookups use keys that are not guaranteed unique: ID in Gen_programmain, and bank number in the automated-joining join.",
+      "evidence": "DTSX:9872, 3228, 8178, 6067"
+    },
+    {
+      "id": "LOGIC findings_he[4]",
+      "verdict": "CONFIRMED",
+      "detail": "The date thresholds differ: > '01/01/2018' (DTSX:8195) vs >= '2019-01-01' (DTSX:6079).",
+      "evidence": "DTSX:8195, 6079"
+    },
+    {
+      "id": "LOGIC findings_he[5]",
+      "verdict": "CONFIRMED",
+      "detail": "productsubcustomeraccount (CASE 2<->4) reaches the writer and is not referenced in its code.",
+      "evidence": "DTSX:8186-8189, writer inputs, 8803-8835"
+    },
+    {
+      "id": "LOGIC findings_he[6]",
+      "verdict": "CONFIRMED",
+      "detail": "The Mini task is disabled. There is no DTS:Configuration element, and the external config file is correctly labelled unknown.",
+      "evidence": "DTSX:4642"
+    }
+  ],
+  "missingWrites": [],
+  "recheck": {
+    "date": "2026-11-06",
+    "note": "Re-check of previously WRONG/INCOMPLETE items after analyst fixes; previousVerdict kept on changed items."
+  }
+}

@@ -1,0 +1,216 @@
+{
+  "verifier": "ssis-verifier",
+  "package": "0031_PoaAccountUpdateDaily",
+  "scope": "logic-claims re-check round 3",
+  "checkedAt": "2026-11-07",
+  "checked": 21,
+  "results": [
+    {
+      "id": "L|summary",
+      "hash": "897afabfcdeb",
+      "verdict": "WRONG",
+      "detail": "Verified: the 2/3/5 rule with +3h for cancel-receiving-date (DTSX:31302-31306), cancellation plus bank status 2, the Send Poa Emails stop/route logic, the PostExecute summary mail (labelled), the 2-day windows and the Pension dedupe by POA Main only. Three problems remain. (1) 'ייפויי כוח ממתינים' states that gen_currentstate = 3 means 'ממתין'. The only source for that is the data-flow name 'Handle Wait Status'. No code constant, SQL comment or StringMap value in the files gives it. (2) 'ב'1' is the meaning of Gen_appendixtype = 2 and comes only from the SQL comment '--appendix b1' (DTSX:3326/7621), but it is not attributed. (3) 'עבור מכתבים לסוכנים נשמרים נתוני JSON' depends on rows passing through the four mail script components, whose Input0_ProcessInput body is commented out and never calls NextRow. Rows reach Output 0 (sync, no exclusion group) only by documented SSIS behaviour that the files do not show, and the summary does not say so. The gen_currentstate ownership is referenced to the create-flow argument, which is acceptable.",
+      "evidence": "DTSX:27268 (poa.Gen_currentstate = 3, no label in files); DTSX:3326, 7621 ('--appendix b1'); Email - Start Date Poa main.cs:44-74 (commented loop), Output 0 [sync]",
+      "wrongUnits": [
+        {"unit": "'ייפויי כוח ממתינים'", "problem": "The meaning of state 3 comes from a task name.", "correct": "'ייפויי כוח בסטטוס 3 (השערה: ממתין, לפי שם הזרימה Handle Wait Status)'", "evidence": "DTSX:27268"},
+        {"unit": "'ב'1'", "problem": "The meaning is not attributed.", "correct": "'נספח 2 (לפי הערת ה-SQL \"appendix b1\", DTSX:3326)'", "evidence": "DTSX:3326, 7621"},
+        {"unit": "'נשמרים נתוני JSON'", "problem": "It depends on SSIS pass-through behaviour that is not marked.", "correct": "Add 'לפי התנהגות SSIS המתועדת, לא מוצג בקבצים: השורות עוברות דרך רכיבי המייל המושבתים (פלט סינכרוני)'.", "evidence": "Email components Output 0 [sync]; Input0_ProcessInput commented"}
+      ]
+    },
+    {
+      "id": "L|exec",
+      "hash": "d200d3487dc4",
+      "verdict": "WRONG",
+      "detail": "The order and triggers match DTSX:44824-44841. All 18 constraints are Success, with no EvalOp or Value. The step 7 label 'הפעלת ייפויי כוח ממתינים' gives state 3 the meaning 'ממתין', which comes only from the task name 'Handle Wait Status' and is not labelled השערה.",
+      "evidence": "DTSX:44824-44841; DTSX:27268",
+      "wrongUnits": [
+        {"unit": "step 7 label 'הפעלת ייפויי כוח ממתינים'", "problem": "The meaning comes from a task name.", "correct": "'הפעלת ייפויי כוח בסטטוס 3 (השערה: ממתין)'", "evidence": "DTSX:27268"}
+      ]
+    },
+    {
+      "id": "L|finding#4",
+      "hash": "8588b3b16dd1",
+      "verdict": "CONFIRMED",
+      "detail": "Send Email PostExecute (main.cs:25-28) calls CreateAndSendEmail. The 'to' address is queue Guid.Parse(MailingReportsCustomerTeamQueueId) (main.cs:59), and the queue meaning is labelled השערה. All 18 precedence constraints are Success. The behaviour with no rows is marked as SSIS behaviour.",
+      "evidence": "Send Email main.cs:25-28, 55-59 @DTSX:33987; DTSX:44824-44841",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|finding#10",
+      "hash": "c4985768d684",
+      "verdict": "CONFIRMED",
+      "detail": "Is Renewal (agentcyIdNumberPa == agentcyIdNumber) and AppendixType (!=2 && !=3 && !=5) both have errorRowDisposition=FailComponent (DTSX:27056, 22859). Sort By PoaId is upstream of the activation (Multicast → Update ACTIVE). The NULL occurrence is labelled השערה, and the NULL-condition semantics are marked as SSIS behaviour. The finding speaks only of activations, which is correct: the OLE DB Command updates upstream of Sort may already have run.",
+      "evidence": "DTSX:27045-27056, 22849-22859, 28819-28821; paths Sort By PoaId → Is emailDetailsJson Contains Data 1 → Multicast → Update gen_powerofattorney ACTIVE",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Handle Wait Status|detailed",
+      "hash": "546be8ad08cc",
+      "verdict": "WRONG",
+      "detail": "Verified: source WHERE (poa.Gen_startdate <= GETDATE() and poa.Gen_currentstate = 3) and the full-cache lookup on Gen_currentstate = 1 (first match marked as SSIS behaviour). Is Renewal and AppendixType conditions are FailComponent. The UPDATE Gen_powerofattorneyBase CASE (2,3,5) THEN ? END uses Param_0 = Gen_receivingdatePoa = dateadd(HH,3,poa.gen_receivingdate) and Param_1 = PowerOfAttorneyIdPa. Check Format: ISNULL || FALSE → format 1. Set Data main.cs:44-121: IsFirst only for the first row per main, JSON only when IsFirst, ProductType 4/3 labels from the POADetails.cs constants. Update Json has 'and isProcessed = 0 and emailDetailsJson is null'. The JSON rows are filtered by Is emailDetailsJson Contains Data 1. ACTIVE=1 (DTSX:30447), and the error output has no path. WRONG on three points. (a) [1] '(\"ממתין\")' for state 3 comes only from the flow name. (b) [2] and its tech rely on isnull(poa.Gen_CustomerAccount, gen_customerprogram) / isnull(pa.Gen_CustomerAccount, gen_customerprogram). gen_customerprogram is unqualified in multi-table queries (source: poa, poamain, Account, Contact, pm, p, ca; lookup: pa, Account, Contact). The ownership argument is not given, although the evidence exists: poa.gen_customerprogram is selected qualified in the same source query. (c) [15]-[18] state that rows in the 2/3/5 branch go on to the JSON and to activation. They pass the mail components only because Output 0 is synchronous; Input0_ProcessInput is commented out and never iterates the buffer. This is SSIS behaviour not shown in the files and is not marked.",
+      "evidence": "DTSX:27226-27268, 27081-27100, 31302-31306, 31256-31260, 22849-22886, 30447; Set Data For Start Date Poa Emails main.cs:44-121 @DTSX:27372; Email - Start Date Poa main.cs:44-74",
+      "wrongUnits": [
+        {"unit": "[1] 'בסטטוס 3 (\"ממתין\")'", "problem": "The meaning comes from the flow name.", "correct": "'בסטטוס 3 (השערה: ממתין, לפי שם הזרימה)'", "evidence": "DTSX:27268"},
+        {"unit": "[2] 'באותו חשבון לקוח או באותה תוכנית' / tech isnull(Gen_CustomerAccount, gen_customerprogram)", "problem": "Ownership of the unqualified gen_customerprogram is not argued.", "correct": "Add the ambiguity-rule argument with the evidence poa.gen_customerprogram (qualified in the same select, DTSX:~27236).", "evidence": "DTSX:27226-27268, 27081-27088"},
+        {"unit": "[15]-[18]", "problem": "Pass-through of rows via the disabled mail components is runtime behaviour that is not marked.", "correct": "Add 'לפי התנהגות SSIS המתועדת, לא מוצג בקבצים: השורות ממשיכות דרך הפלט הסינכרוני של רכיבי המייל אף שהקוד בהערה'.", "evidence": "Email - Start Date Poa / With Commission Appointment: Output 0 [sync], loop commented"}
+      ]
+    },
+    {
+      "id": "L|Package\\Handle Wait Status|detail",
+      "hash": "33eb77a4fa57",
+      "verdict": "WRONG",
+      "detail": "[1], [4] and [6] are correct (the 0030 load is labelled השערה). [5] is correct: the cancel date is read only in Handle Active Status (ISNULL split and RecievingDate in the JSON), and the 'elsewhere' part is labelled. WRONG: [2] matches on isnull(Gen_CustomerAccount, gen_customerprogram) without the ownership argument for the unqualified gen_customerprogram. [3] '2/3/5 → JSON מכתב ... → הפעלה' depends on rows passing through the commented-out mail components (sync output), which is runtime behaviour that is not marked.",
+      "evidence": "DTSX:27226-27268, 27081-27088; Email components main.cs Input0_ProcessInput commented",
+      "wrongUnits": [
+        {"unit": "[2]", "problem": "The ownership of gen_customerprogram is not argued.", "correct": "Add the ambiguity-rule argument with the evidence poa.gen_customerprogram.", "evidence": "DTSX:27226-27268"},
+        {"unit": "[3]", "problem": "SSIS pass-through behaviour is not marked.", "correct": "Mark it as 'לפי התנהגות SSIS המתועדת, לא מוצג בקבצים'.", "evidence": "Email components Output 0 [sync]"}
+      ]
+    },
+    {
+      "id": "L|Package\\Handle Active Status|detailed",
+      "hash": "837ec6baf294",
+      "verdict": "WRONG",
+      "detail": "Verified: source WHERE (poa.Gen_enddate <= GETDATE() and poa.Gen_currentstate = 1); NoMail = ISNULL(gen_receivingdateofcancelpoa); Check Format True → format 3 (commission appointment), else 8; RecievingDate = genreceivingdateofcancelpoa; Update Json without the isProcessed/null conditions; Update CANCELED main.cs:65-95 with CANCELED=2 and WAITING_SENDING_TO_BANK=2 (DTSX:21822-21823), sets bank status when NULL or != 2; the error output has no path. WRONG: [6]-[9] and [12] treat rows with a cancel date as reaching the JSON and the cancellation. Their path is Check Format → Email - Cancel Poa … (Input0_ProcessInput commented out, Output 0 sync) → Union All → Set Data → Union All Data → Sort → Multicast → Update. These rows reach the cancellation only through SSIS sync-output pass-through, which is not shown in the files and is not marked.",
+      "evidence": "DTSX:18171-18215, 18070, 13739, 21822-21823; Handle Active Status paths; Email - Cancel Poa To Perform Actions / With Commission Appointment Output 0 [sync], loop commented",
+      "wrongUnits": [
+        {"unit": "[6]-[9], [12] (for rows with a cancel date)", "problem": "SSIS pass-through behaviour is not marked.", "correct": "Add 'לפי התנהגות SSIS המתועדת, לא מוצג בקבצים: השורות עוברות דרך הפלט הסינכרוני של רכיבי המייל שהקוד שלהם בהערה'.", "evidence": "Email - Cancel Poa … main.cs Input0_ProcessInput"}
+      ]
+    },
+    {
+      "id": "L|Package\\Handle Active Status|detail",
+      "hash": "0b3aa8ec0a65",
+      "verdict": "WRONG",
+      "detail": "[1], [2], [4], [5] and [6] are correct. [3] says 'אחרת → נוסח 3 (מינוי סוכן) או 8 → JSON. סטטוס שונה מ-2 → ביטול'. For rows with a cancel date, both the JSON and the cancellation depend on pass-through of the commented-out mail components (sync output). That is runtime behaviour and is not marked.",
+      "evidence": "Handle Active Status paths; Email - Cancel Poa components Output 0 [sync]",
+      "wrongUnits": [
+        {"unit": "[3]", "problem": "SSIS pass-through behaviour is not marked.", "correct": "Mark it as 'לפי התנהגות SSIS המתועדת, לא מוצג בקבצים'.", "evidence": "Email - Cancel Poa … Input0_ProcessInput commented"}
+      ]
+    },
+    {
+      "id": "L|Package\\Send Poa Emails|title",
+      "hash": "552a78a82237",
+      "verdict": "CONFIRMED",
+      "detail": "Verified: the source isProcessed = 0; the lookup chain Agent → Agencie → Power Of Attorney → Contact → Pension → Provident Fund, where each no-match has no path and the row stays isProcessed = 0; StatusAfterUpdate == 2 → Get Reciving Date (labelled השערה); email → POA File, no email → Error POA File; isProcessed = 1 → gen_SentToPrintOn → Send Email. The queue meaning is labelled.",
+      "evidence": "DTSX:31417, 31450, 31557-33929 lookups, 36554, 36592; Send Email main.cs:25-99",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Send Poa Emails|short",
+      "hash": "21fa035b5215",
+      "verdict": "CONFIRMED",
+      "detail": "[1] stop conditions match the lookup paths. [2]-[6] email split (ISNULL || \"\"). [7] Union All → Update IsProcessed True → Update sentToPrintOn covers both files. [8] from LibaSystemQueueId to MailingReportsCustomerTeamQueueId, labelled. [9] file name with date and time.",
+      "evidence": "DTSX:31417, 36554, 36592; Send Email main.cs:55-59",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Send Poa Emails|detailed",
+      "hash": "ec7d62e219ea",
+      "verdict": "WRONG",
+      "detail": "Verified: all lookups no-cache (CacheType=2) with NoMatchBehavior=1 and no-match paths only Agent→Agencie and Pension→Provident Fund; Get Reciving Date NoMatchBehavior=0 with Lookup Match Output IgnoreFailure; Proccess Data main.cs:27-68 (agency wins, account number = provident account if present, else identity number; date fallback Gen_receivingdatePoa → ReceivingDate, yyyy-MM-dd); Status from the StringMap gen_currentstate LangId 1037 (qualified Gen_powerofattorney.gen_currentstate); updates and Send Email lines. WRONG: [11] says the phones ('לא קיים' when missing) and the customer name are taken. In Get Contact (from Gen_powerofattorney join contact on gen_contactname = contactid), the columns mobilephone, telephone2, telephone1 and Gen_contactnameName are unqualified, and their ownership is neither argued nor stated as unknown. Only contact.Gen_identitynumber is qualified.",
+      "evidence": "DTSX:31715-31740 (Get Contact SQL); Proccess Data main.cs:27-68 @DTSX:32186; DTSX:31981, 32013",
+      "wrongUnits": [
+        {"unit": "[11] 'הטלפונים (\"לא קיים\" כשאין), ת\"ז ושם הלקוח'", "problem": "The ownership of the unqualified mobilephone/telephone1/telephone2/Gen_contactnameName in a two-table query is not argued.", "correct": "Add the ambiguity-rule argument with evidence of which table has each column, or state that ownership is unknown.", "evidence": "DTSX:31717-31726"}
+      ]
+    },
+    {
+      "id": "L|Package\\Send Poa Emails|detail",
+      "hash": "f7b905e8846d",
+      "verdict": "CONFIRMED",
+      "detail": "[1] the source and the 0030 hypothesis are labelled. [2] the lookups key on Gen_powerofattorneyid (no-cache); Get Reciving Date uses the 9-digit identity number plus the account or program name against an active POA. [3] the decisions and the StatusAfterUpdate hypothesis are labelled. [4] Unsupported SQL gen_SentToPrintOn, SDK email Create + SendEmail, staging isProcessed. [5] has the label.",
+      "evidence": "DTSX:31813, 31981, 31450, 36554, 36592",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Send Poa Emails|decisions",
+      "hash": "b20fb84ef4c9",
+      "verdict": "CONFIRMED",
+      "detail": "[1]-[5] match the source WHERE, the lookup no-match wiring, the Conditional Split StatusAfterUpdate == 2 (labelled) and Check If Exists Agent_cy Email Address ISNULL(EmailSohen) || EmailSohen == \"\".",
+      "evidence": "DTSX:31813, 31557, 31636, 32089, 33900, 31450, 31417",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Create Power Of Attorney|title",
+      "hash": "e92042e83319",
+      "verdict": "WRONG",
+      "detail": "title_he says 'מכוח ייפוי כוח ראשי ב'1'. short_he and flow_he[1] say 'ייפוי כוח ראשי ב'1 פעיל' / 'POA Main ב'1 פעיל'. They state the gen_currentstate = 1 'פעיל' condition as a POA Main property without the ownership argument or label (gen_currentstate is unqualified at DTSX:3327). 'ב'1' (Gen_appendixtype = 2) is also unattributed; it comes from the SQL comment '--appendix b1'. Everything else is correct: the 2-day window, the skip if a POA exists, the annotation move, dedupe by account + main, SDK create.",
+      "evidence": "DTSX:3326-3327 (SQL comments '--appendix b1', '--active'); DTSX:858, 3431, 4799-4840, 1781",
+      "wrongUnits": [
+        {"unit": "short_he / flow_he[1] 'ב'1 פעיל'", "problem": "The gen_currentstate ownership is stated without the argument or a label, and the ב'1 meaning is unattributed.", "correct": "Add the ownership argument or a reference to it, and attribute 'ב'1' and 'פעיל' to the SQL comments at DTSX:3326-3327.", "evidence": "DTSX:3290-3335; DTSX:40447-40449"}
+      ]
+    },
+    {
+      "id": "L|Package\\Create Power Of Attorney|short",
+      "hash": "9e8a3db9e1c5",
+      "verdict": "WRONG",
+      "detail": "[1] says 'ייפוי כוח ראשי ב'1 פעיל'. It assigns the unqualified gen_currentstate = 1 to POA Main without the ownership argument or label, and the ב'1 meaning is unattributed. [2]-[8] are correct.",
+      "evidence": "DTSX:3326-3327",
+      "wrongUnits": [
+        {"unit": "[1] 'ב'1 פעיל'", "problem": "No ownership argument or label, and no attribution.", "correct": "Add the argument (or a reference to it) and the SQL-comment attribution.", "evidence": "DTSX:3326-3327, 40447-40449"}
+      ]
+    },
+    {
+      "id": "L|Package\\Create Power Of Attorney|detailed",
+      "hash": "0526c2978a2e",
+      "verdict": "WRONG",
+      "detail": "Verified: the SQL (ROW_NUMBER per account by signaturedate desc, the conditions, the gen_currentstate ownership argued with DTSX:40447-40449). The lookup is on Gen_customeraccount with Match unconnected. Move Annotation main.cs:122-143 (sync Output 0, last row wins, no ORDER BY). Remove Duplicates sorts on gen_customeraccountid + Gen_powerofattorneymainId with EliminateDuplicates=true. Create main.cs:131-231: currentstate 1 '//ACTIVE', valid-option checks, bank status 2, product != 2 '//gemel to invest' gating the advisory fields. WRONG on three points. (a) [13] says 'תאריך סיום (מייפוי הכוח הראשי, או קבלה + 10 שנים)', but the code writes genenddate.AddHours(3) or genreceivingdate.AddHours(3).AddYears(10) (main.cs:188-192), so the +3h on the end date is missing. The counselling dates are also +3h (main.cs:206, 215). (b) [7]-[9] say 'הערה של ייפוי הכוח הראשי', which relies on the unqualified ObjectId / AnnotationId in a three-table query, and the ownership is not argued. annotation has objectid per Move Annotation main.cs:132. (c) [1] gives the meanings ב'1, [השתלמות] and [גמל, גמל להשקעה, פיצויים] for codes 2/4/1,2,5 without attribution. They come from the SQL comments '--appendix b1', '--training' and '--gemel , gemel to invest , Compensation'.",
+      "evidence": "Create POA Account - Agent main.cs:181-217 @DTSX:1781; DTSX:3326-3333 (SQL comments); DTSX:3323-3324 (ObjectId join)",
+      "wrongUnits": [
+        {"unit": "[13] end date", "problem": "The +3 hours manipulation is omitted.", "correct": "'תאריך סיום = תאריך הסיום של הראשי + 3 שעות, או קבלה + 3 שעות + 10 שנים'", "evidence": "main.cs:188-192"},
+        {"unit": "[7]-[9] annotation of POA Main", "problem": "The ownership of the unqualified ObjectId/AnnotationId is not argued.", "correct": "Add the ambiguity-rule argument with the evidence annotation['objectid'] (Move Annotation main.cs:132).", "evidence": "DTSX:3323-3324"},
+        {"unit": "[1] meanings ב'1 / השתלמות / גמל…", "problem": "No attribution.", "correct": "Attribute them to the SQL comments at DTSX:3326, 3330, 3332.", "evidence": "DTSX:3326-3333"}
+      ]
+    },
+    {
+      "id": "L|Package\\Create Power Of Attorney|detail",
+      "hash": "90d24160c270",
+      "verdict": "WRONG",
+      "detail": "The ownership argument for gen_currentstate is present and verified (DTSX:40447-40449 updates gen_powerofattorneymain.gen_currentstate). [2]-[6] are correct, including the 0005 and 0029 creator references. WRONG: [1] and [5] use 'ב'1' and '(4 → השתלמות; 1/2/5 → גמל)' without attributing them to the SQL comments.",
+      "evidence": "DTSX:3326-3333",
+      "wrongUnits": [
+        {"unit": "[1] 'ב'1', '4 → השתלמות; 1/2/5 → גמל'", "problem": "The meanings are unattributed.", "correct": "Attribute them to the SQL comments '--appendix b1', '--training', '--gemel , gemel to invest , Compensation' (DTSX:3326-3333).", "evidence": "DTSX:3326-3333"}
+      ]
+    },
+    {
+      "id": "L|Package\\Create Power Of Attorney - Pension|title",
+      "hash": "dd4830d03c93",
+      "verdict": "WRONG",
+      "detail": "short_he 'ייפוי כוח ראשי ב'1 פעיל' and flow_he[1] 'POA Main ב'1 פעיל' assign the unqualified gen_currentstate = 1 (DTSX:7622) to POA Main without the ownership argument or label. 'ב'1' is also unattributed (SQL comment '--appendix b1', DTSX:7621). The rest is correct: the one-plan-per-main dedupe (DTSX:9068-9089, key Gen_powerofattorneymainId), skip, annotation, SDK create.",
+      "evidence": "DTSX:7621-7622, 9068-9089",
+      "wrongUnits": [
+        {"unit": "short_he / flow_he[1] 'ב'1 פעיל'", "problem": "No ownership argument or label, and no attribution.", "correct": "Add the argument (or a reference to it) and the SQL-comment attribution.", "evidence": "DTSX:7621-7622, 40447-40449"}
+      ]
+    },
+    {
+      "id": "L|Package\\Create Power Of Attorney - Pension|short",
+      "hash": "126befbd9f5c",
+      "verdict": "WRONG",
+      "detail": "[1] 'ייפוי כוח ראשי ב'1 פעיל' gives no ownership argument or label for gen_currentstate and does not attribute ב'1. [2]-[8] are correct.",
+      "evidence": "DTSX:7621-7622",
+      "wrongUnits": [
+        {"unit": "[1] 'ב'1 פעיל'", "problem": "No ownership argument or label, and no attribution.", "correct": "Add the argument and the attribution.", "evidence": "DTSX:7621-7622"}
+      ]
+    },
+    {
+      "id": "L|Package\\Create Power Of Attorney - Pension|detailed",
+      "hash": "b79747e1ad1d",
+      "verdict": "WRONG",
+      "detail": "Verified: the Get Policies SQL with the ownership argument for gen_currentstate; the lookup on gen_customerprogram; Move Annotation To Policies main.cs:123-144 (gen_policies); Remove Duplicates on Gen_powerofattorneymainId only with EliminateDuplicates=true; the create code with advisory data always copied. WRONG on three points. (a) [13] omits the +3h on the end date (main.cs:189, 192: genenddate.AddHours(3), genreceivingdate.AddHours(3).AddYears(10)). (b) [7]-[9] rely on the unqualified ObjectId/AnnotationId (four-table query) without an ownership argument. (c) [1] 'ב'1', '\"מקיפה\"', '\"כללית\"' are unattributed; they come from the SQL comments '--appendix b1', '--mekifa' and '--clalit'.",
+      "evidence": "Create POA Account - Agent main.cs:182-217 @DTSX:6102; DTSX:7618-7629",
+      "wrongUnits": [
+        {"unit": "[13] end date", "problem": "The +3 hours manipulation is omitted.", "correct": "'תאריך הסיום של הראשי + 3 שעות, או קבלה + 3 שעות + 10 שנים'", "evidence": "main.cs:189-192"},
+        {"unit": "[7]-[9]", "problem": "The ObjectId ownership is not argued.", "correct": "Add the ambiguity-rule argument with the evidence annotation['objectid'] (Move Annotation To Policies main.cs:133).", "evidence": "DTSX:7617-7618"},
+        {"unit": "[1] meanings", "problem": "No attribution.", "correct": "Attribute them to the SQL comments at DTSX:7621, 7625, 7627.", "evidence": "DTSX:7621-7627"}
+      ]
+    },
+    {
+      "id": "L|Package\\Create Power Of Attorney - Pension|detail",
+      "hash": "a073fa6f9677",
+      "verdict": "WRONG",
+      "detail": "The ownership argument for gen_currentstate is present and verified. [2]-[6] are correct (the Gen_programmain creator is labelled השערה). WRONG: [1] and [5] use 'ב'1' without attributing it to the SQL comment '--appendix b1' (DTSX:7621).",
+      "evidence": "DTSX:7621",
+      "wrongUnits": [
+        {"unit": "[1], [5] 'ב'1'", "problem": "The meaning is unattributed.", "correct": "'נספח 2 (לפי הערת ה-SQL \"appendix b1\")'", "evidence": "DTSX:7621"}
+      ]
+    }
+  ]
+}

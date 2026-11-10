@@ -1,0 +1,182 @@
+{
+  "verifier": "ssis-verifier",
+  "package": "0036_TransferRequest",
+  "scope": "logic-claims all",
+  "checkedAt": "2026-11-07T11:40:42.182Z",
+  "checked": 19,
+  "results": [
+    {
+      "id": "L|summary",
+      "hash": "4568bf91ec22",
+      "verdict": "CONFIRMED",
+      "detail": "Re-derived: Get Transfer Requests From DB selects gen_transferrequest with gen_tanferinstatus = 7, gen_SendToBankDate not null, datediff(day, @LastThreeWorkingDays, gen_SendToBankDate) <= 0; Set Status = 11; Update Transfer Requests sets gen_tanferinstatus = OptionSetValue(11) via CrmProxy.GetCrmService().Update. Threshold from CalendarRule rows named Friday/Saturday/Holiday. Meaning correctly labelled unproven (only component labels say 'SuspicionAsEmitted'; no supplied package defines 7 or 11; 0005 only labels 8 = 'הסתיים'). Scope note: the only CM is [Psql] (DTSX:4-6), used by Get NonWorkingDays, Get Transfer Requests and the gen_etlvariable / gen_etlprocess lookups (reads only); writes go through the SDK. Evidence shows configurations [] and logProviders []; no EventHandlers element.",
+      "evidence": "0036_TransferRequest.dtsx:4-6, 2257-2262, 3579-3592, 3616, 3643; Update Transfer Requests main.cs:114-133; grep tanferinstatus in all packages",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|exec",
+      "hash": "153fbdc4de11",
+      "verdict": "WRONG",
+      "detail": "Order and triggers are correct: 5 constraints, all Success / LogicalAnd, chain Get Variables -> Create ETL -> Get NonWorkingDays -> Update LastThreeWorkingDays -> Update SuspicionAsEmitted -> End ETL (DTSX:4549-4553), and none is disabled. The step-5 label 'marking transfer requests that were not handled within three working days' states a business meaning as fact. The code only proves that requests still in gen_tanferinstatus 7, with a send-to-bank date on or before the threshold, are set to 11. The meaning of status 7 ('not handled') is not in the files.",
+      "evidence": "DTSX:4549-4553; DTSX:3584-3592",
+      "wrongUnits": [
+        {
+          "unit": 5,
+          "problem": "label asserts 'not handled' (unproven meaning of status 7)",
+          "correct": "Set status 11 on transfer requests still in status 7 whose send-to-bank date is on/before the 3rd working day before today (meaning of 7/11 unproven).",
+          "evidence": "DTSX:3584-3592, 3616"
+        }
+      ]
+    },
+    {
+      "id": "L|ignored",
+      "hash": "6d93409dfb8d",
+      "verdict": "CONFIRMED",
+      "detail": "Get Variables From Etl Variables reads gen_etlvariable (scope 'global' or parameter) into ServerName/OrganizationName etc.; Create ETL Process record creates gen_etlprocess; End ETL Process record looks up gen_etlprocess/gen_etlprocesswarning and updates gen_etlprocess. No business entity written, no business filter.",
+      "evidence": "Get SystemConfigurations SQL; Create ETL Process record ScriptMain.cs:46-52; ETL Record Finish main.cs:120-129",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|finding#1",
+      "hash": "2071c8c66500",
+      "verdict": "CONFIRMED",
+      "detail": "Update Transfer Requests catches SoapException/Exception, sets ErrorDescription and DirectRowToError; the data flow has only 2 paths (source -> derived column -> script), so the Error output is unconnected and nothing is logged.",
+      "evidence": "Update Transfer Requests main.cs:124-133; data flow paths (2)",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|finding#2",
+      "hash": "8577cadd091e",
+      "verdict": "CONFIRMED",
+      "detail": "catch sets TaskResult = Failure (line 100) and logs, but line 104 unconditionally sets Success; the variable is then left at its design value 10/3/2017 1:52:22 PM (DTSX:20-21; no configurations to override it), and Constraint 3 (Success) lets the update data flow run with that threshold.",
+      "evidence": "Update LastThreeWorkingDays ScriptMain.cs:94-104; DTSX:20-21, 4552",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|finding#3",
+      "hash": "433c84dff284",
+      "verdict": "CONFIRMED",
+      "detail": "0036: counter = 2; on each working day break if 0 else decrement. 0027: counter = 1; break if 3 else increment. Both start at yesterday and step back one day per iteration. Traced with no holidays: both return today-3; with a non-working day at d-2: both return d-4, i.e. the 3rd working day before today. Same CalendarRule query in both.",
+      "evidence": "0036 ScriptMain.cs:111-134; 0027 ScriptMain.cs:111-133; 0027_AutomatedJoining.dtsx:4090",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Update LastThreeWorkingDays Variable|title",
+      "hash": "f72e1e7ac306",
+      "verdict": "CONFIRMED",
+      "detail": "CalendarRule starttime between GetutcDate()-21 and GetutcDate() with Name in Friday/Saturday/Holiday; count back from yesterday; result stored in User::LastThreeWorkingDays and used as the parameter of Get Transfer Requests.",
+      "evidence": "DTSX:2260; ScriptMain.cs:92-134; DTSX:3592",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Update LastThreeWorkingDays Variable|short",
+      "hash": "c5bf8fe00049",
+      "verdict": "CONFIRMED",
+      "detail": "Matches SQL and the loop logic.",
+      "evidence": "DTSX:2260; ScriptMain.cs:111-134",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Update LastThreeWorkingDays Variable|detailed",
+      "hash": "7e814b9e0baa",
+      "verdict": "CONFIRMED",
+      "detail": "All units verified, including DateTime.Now.AddDays(-1).Date, dt.Select on starttime, the counter semantics, the 21-iteration cap, and the swallowed failure leaving the design value.",
+      "evidence": "DTSX:2257-2262, 20-21; ScriptMain.cs:94-134",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Update LastThreeWorkingDays Variable|detail",
+      "hash": "d057fd800e4b",
+      "verdict": "CONFIRMED",
+      "detail": "Source CalendarRule (UTC window), no CRM write, result only in the variable.",
+      "evidence": "DTSX:2260; ScriptMain.cs:96",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Update LastThreeWorkingDays Variable|decisions",
+      "hash": "2af845891b3b",
+      "verdict": "CONFIRMED",
+      "detail": "Condition at ScriptMain.cs:121-129 quoted correctly.",
+      "evidence": "ScriptMain.cs:121-129",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Update LastThreeWorkingDays Variable|open",
+      "hash": "202633932f4f",
+      "verdict": "CONFIRMED",
+      "detail": "Correctly labelled as hypothesis; storage/time-of-day of CalendarRule.starttime is data and not in the files. Additional unknown on the same line: the filter string is built with currDate.ToString() (culture-dependent format) and parsed by DataTable.Select. A culture mismatch could also make the match fail, or throw, which is then swallowed by the catch (see finding#2).",
+      "evidence": "ScriptMain.cs:121",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Update SuspicionAsEmitted Transfer Request|title",
+      "hash": "e9c7b31e21c1",
+      "verdict": "WRONG",
+      "detail": "short_he [2] and flow units [3]-[4] match the SQL and the update. title_he [1] ('marking transfer requests that were not handled within three working days') states the business meaning of status 7 ('not handled') as fact. The files only show that status 7 is selected and set to 11. No supplied label, comment or OptionSet text defines 7; only 11 is labelled 'SuspicionAsEmitted' by component names.",
+      "evidence": "DTSX:3584-3592, 3616; grep gen_tanferinstatus across packages (only 0005: 8 = 'הסתיים')",
+      "wrongUnits": [
+        {
+          "unit": 1,
+          "problem": "'not handled' is an unproven meaning of status 7",
+          "correct": "Set transfer requests still in status 7, sent to the bank on/before the 3rd working day before today, to status 11 ('SuspicionAsEmitted' per component names; meaning unproven).",
+          "evidence": "DTSX:3584-3592, 3616"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Update SuspicionAsEmitted Transfer Request|short",
+      "hash": "6cb956b368df",
+      "verdict": "CONFIRMED",
+      "detail": "Population, per-row SDK update to 11, and the hedged meaning are correct ('did not progress' = remained in status 7).",
+      "evidence": "DTSX:3584-3592; main.cs:118-122",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Update SuspicionAsEmitted Transfer Request|detailed",
+      "hash": "5e1e22bcd322",
+      "verdict": "CONFIRMED",
+      "detail": "Query, parameter mapping {BCF4D8B7} = User::LastThreeWorkingDays, derived constant 11, Update with only gen_tanferinstatus, per-row catch to the unconnected Error output (request stays 7), no further split.",
+      "evidence": "DTSX:3584-3592, 3616; main.cs:114-133; data flow paths",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Update SuspicionAsEmitted Transfer Request|detail",
+      "hash": "69afd43c79f0",
+      "verdict": "WRONG",
+      "detail": "[1]-[4] verified. [5] calls the result 'marking of \"stuck\" (תקועות) transfer requests'. That presumes status 7 is a waiting/stuck state, and no supplied label or OptionSet text says so. The proven fact is that requests still in status 7 three working days after the send-to-bank date are set to 11.",
+      "evidence": "DTSX:3584-3592; main.cs:121",
+      "wrongUnits": [
+        {
+          "unit": 5,
+          "problem": "'stuck' is an unproven business meaning",
+          "correct": "Requests remaining in status 7 with send-to-bank date on/before the threshold are set to status 11 (meaning of 7/11 unproven).",
+          "evidence": "DTSX:3584-3592"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Update SuspicionAsEmitted Transfer Request|decisions",
+      "hash": "9ce29b825422",
+      "verdict": "CONFIRMED",
+      "detail": "Condition verbatim; meaning text stays literal (status 7, sent to bank 3+ working days ago).",
+      "evidence": "DTSX:3584-3592",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Update SuspicionAsEmitted Transfer Request|crm",
+      "hash": "6d7d0bc04259",
+      "verdict": "CONFIRMED",
+      "detail": "gen_transferrequest Update gen_tanferinstatus = 11 via IOrganizationService.Update (Supported), for status-7 rows with send-to-bank date up to the threshold.",
+      "evidence": "main.cs:118-122",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Update SuspicionAsEmitted Transfer Request|open",
+      "hash": "3003aa51ab55",
+      "verdict": "CONFIRMED",
+      "detail": "No supplied file defines gen_tanferinstatus 7 or 11 (0005 only labels 8); the UTC/local day-shift is correctly a hypothesis depending on stored data.",
+      "evidence": "grep gen_tanferinstatus source/DailyProcess/*.dtsx; DTSX:3584-3592; ScriptMain.cs:116",
+      "wrongUnits": []
+    }
+  ]
+}

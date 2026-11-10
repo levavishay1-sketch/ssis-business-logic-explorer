@@ -1,0 +1,263 @@
+{
+  "verifier": "ssis-verifier",
+  "package": "0012_LeumiFile_CHN_Daily",
+  "scope": "logic-claims re-check round 3",
+  "checkedAt": "2026-11-08",
+  "checked": 29,
+  "results": [
+    {
+      "id": "L|summary",
+      "hash": "26143f0bc340",
+      "verdict": "WRONG",
+      "detail": "Re-derived and correct:\n- The file gate: PC 108916 has EvalOp=3 with @[User::isFileExist] == TRUE. The variable defaults to 0 (DataType 11). The script sets it true only when GetFiles(\"*\"+FileName+\"*\") returns files, and the newest by LastWriteTime is chosen.\n- 28 constraints, all LogicalAnd, form one serial chain: 27 Success and one expression+Success. There is no ForceExecutionResult, so a failed step stops all later steps.\n- The reset/close predicates and the NULL-flag case are correct.\n- The SDK writers are the gen_beneficiaries Delete/Create/Update and contact Create. Every other CRM write is SQL on the CRM connection.\n- There are no configurations, no disabled items, and coverage allMatch=true. OnError is at 108940 and the SQL log provider is at 112.\n- CRM = PSQL/ALTSHULER_MSCRM (95-97) and Staging = PSRS/GENERIX_STAGING (100-102).\n\nOne unit states a data-dependent value as fact. summary_he says 'וממלאת gen_closedate (יום העסקים האחרון)'. The value written is User::LastBusinessDate. This package's own Get Last Business Date claims say two things about it. First, the term comes only from the variable name ('לפי שם המשתנה בקוד'). Second, the result is only the last business day if CalendarRule.starttime is stored as exact local midnight, which was not supplied. The summary drops both qualifications, so it asserts the CRM value's meaning unconditionally and is inconsistent with those claims.",
+      "evidence": "PC DTSX:108903-108930 (108916 EvalOp=3); variable isFileExist DTSX:167-169; Check File Existence script DTSX:440-472; Update close date SQL DTSX:92741, parameter DTSX:92742 <- User::LastBusinessDate; Get Last Business Date main.cs DTSX:89141-89163 (dt.Select on starttime string)",
+      "wrongUnits": [
+        {
+          "unit": 1,
+          "problem": "'gen_closedate (יום העסקים האחרון)' is stated as fact. The value is LastBusinessDate. The term comes from the variable name, and its correctness depends on how CRM stores starttime, which was not supplied.",
+          "correct": "וממלאת gen_closedate ב-LastBusinessDate (\"יום העסקים האחרון\" – לפי שם המשתנה בקוד; מותנה באופן שמירת starttime ב-CalendarRule)",
+          "evidence": "DTSX:92741-92742; DTSX:89151-89163"
+        }
+      ]
+    },
+    {
+      "id": "L|exec",
+      "hash": "6766e23bcde3",
+      "verdict": "CONFIRMED",
+      "detail": "There are 29 top-level executables. I mapped all 28 constraint lines individually, and each step's predecessor and PC line match the DTSX. Examples: 108910 is CalendarRule after systemuser, 108920 is LBD after CalendarRule, 108923 is Delete after Write CHN, and 108929 is Disabled after contactlink. The only expression constraint is 108916. Nothing is disabled. Step 10 is hedged as an open question, and step 16 labels 'ביטול' as השערה. Step labels 6 and 7 ('רשימת ימים לא-עובדים', 'חישוב יום העסקים האחרון') render the variable/task names NonWorkingDays / 'Get Last Business Date'. As step names they are acceptable, and the caveats live in the component claims.",
+      "evidence": "DTSX:108903-108930; executables list (31 DTS:Executable incl. Package and OnError task); no DTS:Disabled in file",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|finding#6",
+      "hash": "fd894deafa61",
+      "verdict": "CONFIRMED",
+      "detail": "The link reset is 'update gen_contactlinkBase set gen_existsinfile = 0' with no WHERE. Disable is 'set gen_Status = 2 where gen_existsinfile = 0'. The note reset applies only WHERE gen_existinfile = 1, and the close applies WHERE gen_existinfile = 0 AND gen_closedate IS NULL. None of them filters by bank or source. A NULL-flag note is neither reset nor closed. Links and notes that were not confirmed because a row failed, including the Update Contact error path (Union All Error 5 -> ETL warning, no link check), stay at 0. The finding is stated conditionally ('אם קיימות...') and is not framed as a bug.",
+      "evidence": "SQL DTSX:92723, 87344, 92729, 92741; path DTSX:51052 Union All Error 5 -> Failed to update customer account 1 -> Row Error Update Count -> Union All error -> ETL warning (51039, 51053)",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Get Last Business Date|title",
+      "hash": "a2ea670f6db1",
+      "verdict": "CONFIRMED",
+      "detail": "The SQL selects starttime FROM CalendarRule WHERE LTRIM(RTRIM(ISNULL(Name,''))) in ('Friday','Saturday','Holiday') on the CRM connection, into NonWorkingDays. The script starts from DateTime.Today.AddDays(-1). It loops while dt.Select(\"starttime = '\" + date.ToString() + \"'\") returns rows, which is an exact DateTime equality at 00:00. It then stores lastWorkingDate.ToUniversalTime(). The term 'יום העסקים האחרון' is attributed to the variable name in short_he, and the starttime-storage dependency is stated conditionally. The only consumer is the @lastBusinessDate parameter of 'Update close date where not exist in file'.",
+      "evidence": "DTSX:89090-89096 (SQL, ResultBinding NonWorkingDays); main.cs DTSX:89141-89163; DTSX:92742 (only reference to LastBusinessDate besides the variable and the script)",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Get Last Business Date|short",
+      "hash": "4e8116788f36",
+      "verdict": "CONFIRMED",
+      "detail": "All three steps match the CalendarRule SQL, the exact-equality loop from yesterday 00:00, and the use as gen_closedate for flag-0 notes with no close date. The name-based term is attributed, and the data dependency is conditional.",
+      "evidence": "DTSX:89094; main.cs DTSX:89141-89163; DTSX:92741-92742",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Get Last Business Date|detailed",
+      "hash": "e99250cd1a7f",
+      "verdict": "CONFIRMED",
+      "detail": "Re-derived and correct:\n- The source rows are CalendarRule (CRM connection).\n- The start point is DateTime.Today-1, which is server local time.\n- The decision is dt.Select with a culture-formatted string, which is a full DateTime equality.\n- Yes means AddDays(-1) and loop; no means the date is chosen.\n- The result is stored with ToUniversalTime.\n- The consumer is the @lastBusinessDate binding.\nThe starttime-storage dependency is stated conditionally.",
+      "evidence": "DTSX:89094-89095; main.cs DTSX:89141-89163; DTSX:92742",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Get Last Business Date|detail",
+      "hash": "027e7b77807c",
+      "verdict": "CONFIRMED",
+      "detail": "Source, matching (exact date+time equality via ToString), decision, no CRM write, and use for closing warning notes all match the code.",
+      "evidence": "DTSX:89094; main.cs DTSX:89141-89163; DTSX:92742",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Get Last Business Date|decisions",
+      "hash": "c9c3368257d5",
+      "verdict": "CONFIRMED",
+      "detail": "Condition 'result == null || result.Length <= 0' leads to the date being chosen. Otherwise AddDays(-1). The meaning is attributed to the code's variable names.",
+      "evidence": "main.cs DTSX:89151-89163",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Delete Beneficiaries|title",
+      "hash": "bd18f5d8bc08",
+      "verdict": "CONFIRMED",
+      "detail": "Re-derived and correct:\n- The file source reads 7 columns. The Is Valid Beneficiary outputs are, in order: Subject != 01 / NULL or 0 percent; identity type not NULL and != 1; id NULL or blank; License != 1. The default output is the only one connected.\n- 5006 becomes 1025 (Convert funtTypeId) and ExistsInFile = 1 (Add additional Columns).\n- CRM side: Gen_beneficiaries statecode = 0 LEFT JOIN customeraccount and accounttype (bank account, cat.gen_id), with no bank filter.\n- Merge Join: JoinType=1, NumKeyColumns=3, TreatNullsAsEqual=true. The path into 'Merge Join Left Input' comes from Sort 2 (file) and 'Right' from Sort 1 (CRM). The <input> elements are written Right then Left. I counted across all supplied packages: this is the only one of 10 Merge Join components written that way.\n- The delete branch is ISNULL(ExistsInFile) -> service.Delete on gen_beneficiaries in 5 copies (dupes.json).\nThe open question is stated as open.",
+      "evidence": "DTSX:85298-85315, 85144, 80484, 79661, 84961-84978, 85205-85232, 85012; paths 87328/87329; Delete Beneficiaries 1 main.cs:41 (DTSX:81419); grep of componentClassID=\"Microsoft.MergeJoin\" in source/DailyProcess/*.dtsx (10 components)",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Delete Beneficiaries|detailed",
+      "hash": "4958441d4ba1",
+      "verdict": "CONFIRMED",
+      "detail": "Every unit was re-derived: the source aliases, the split conditions and order, the unconnected reject outputs, 5006->1025, ExistsInFile=1, and the CRM source with statecode=0 and all banks. The Sort keys are (account, id, fund) and (account, id, gen_id). The Merge Join properties and paths match. Both resolutions of the open question are stated correctly: by name the branch is dead, by position every unmatched active CRM beneficiary goes to delete. ISNULL(ExistsInFile) leads to service.Delete, and the 'exists' output is unconnected. The copy-1 error output has no path, which is plumbing and correct. The intent is labelled השערה.",
+      "evidence": "DTSX:85303, 85144, 80484, 79661, 84966, 86063, 86127, 85205-85232, 85012; paths 87328/87329; Delete Beneficiaries main.cs:35-59; Delete Beneficiaries 1 Error unconnected (list of paths)",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Create and update Beneficiaries|title",
+      "hash": "50a1c4f08f5b",
+      "verdict": "CONFIRMED",
+      "detail": "Re-derived and correct:\n- The validity split is the same as in Delete, and the specific-case condition is 9846/9844/9845 or (''/0000 and 5015).\n- Specific lookup: account + Gen_producttypeid = fund. General lookup: account + Gen_fundfinanceid = FinanceNumber, with Product joined on gen_id = ProductNumber. Both use ca.StateCode = 0 and bank 10.\n- Ownership argument: Product.Gen_FundFinanceID appears in 0008:57316 and cat.gen_id in this package at 84966.\n- The duplicate check on id + account guid has its Duplicate output unconnected.\n- Is Beneficiary Exists (id + account) leads to Update, through Helpers.CheckIfToUpdate2. No match leads to Create.\n- All writes go through SDK ExecuteMultiple.",
+      "evidence": "DTSX:13552, 13035, 13069-13115, 13189-13233, 2370 (main.cs:58-66), 13772, 13406-13448; Create beneficiary main.cs:40-73 (DTSX:3235); Update beneficiary 1 main.cs:40-83 (DTSX:16481); 0008_LeumiFile-PY.dtsx:57316",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Create and update Beneficiaries|detailed",
+      "hash": "c09f0da28731",
+      "verdict": "CONFIRMED",
+      "detail": "Every unit was re-derived:\n- The source aliases, the split order, and the unconnected reject outputs.\n- TRIM, then Format Dates, then Dates ToUniveral.\n- The specific/general condition.\n- The specific lookup (Full cache) and the general lookup (CacheType 2 = None). Both use StateCode 0 and bank 10, and their No Match outputs are unconnected.\n- The ambiguity argument for Gen_fundfinanceid/gen_id holds: Product.Gen_FundFinanceID is at 0008:57316 and cat.gen_id at 84966. 0015:42637 is CP.gen_fundfinanceid of gen_coursepartition with the comment 'מסםר אישור מ\"ה'.\n- The argument for ContactId/firstname/lastname/Gen_Identitynumber (Contact: c.ContactId at 13084; update Contact SET LastName/FirstName/Gen_Identitynumber at 50071-50077) and for Gen_customeraccountId (Gen_customeraccount.Gen_customeraccountId at 40338) holds.\n- The duplicate key is id + account.\n- Set Fields: (DT_DECIMAL,2)/100, TRIM(name) + ' (' + account name + ')', and blank address becomes NULL.\n- Is Beneficiary Exists uses Partial cache and no status filter.\n- Create attributes match main.cs:43-65, in batches of 10. Copy 1 differs only by the two ErrorBuffer.genname lines, which I diffed.\n- The Update changed-field list matches main.cs:45-69, with date comparison by day and decimal comparison within 0.01.\nObservation, not a defect: 'התאריכים מומרים לפורמט תאריך' summarises Format Dates. In that step, 8-digit values become yyyy/MM/dd, 6-digit values become the 1st of the month, and anything else or anything before 1900 becomes NULL. Dates To Local / Dates To Local 1 then reverse the ToUniversal step before the writes.",
+      "evidence": "DTSX:13663, 13552, 14670, 12167 (main.cs:54-79), 11354, 13035, 13069-13115, 13189-13233, 2370, 13772, 13406-13448, 9440, 10341; Create beneficiary main.cs:36-122; Update beneficiary 1 main.cs:36-131 + Helpers.cs:8-101; 0008:57316; 0015:42637",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Create and update Beneficiaries|detail",
+      "hash": "0bbd0ac47b64",
+      "verdict": "CONFIRMED",
+      "detail": "Population, both account matches with the ownership argument referenced, the beneficiary match (id + account, no status filter), the decisions, and the SDK Create/Update writes all match.",
+      "evidence": "DTSX:13552, 13035, 13069, 13189, 13406; Create beneficiary / Update beneficiary 1 main.cs",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Set contactlink existinfile false|title",
+      "hash": "f036c79d4374",
+      "verdict": "CONFIRMED",
+      "detail": "The SQL is 'update gen_contactlinkBase set gen_existsinfile = 0' with no WHERE, on the CRM connection {4DF7FE1A}. Successfully processed rows re-mark the link (Update ContactLink sets 1) or insert it with 1. The rest are set to Status 2 by 'Disabled contactlink'. 'ביטול' is labelled השערה.",
+      "evidence": "DTSX:92720-92723; 50700; 37068; 87344",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Set contactlink existinfile false|short",
+      "hash": "fc592495583c",
+      "verdict": "CONFIRMED",
+      "detail": "All links are set to 0 (SQL), then re-marked on success, and the remainder get gen_Status = 2. Correct, and the meaning is labelled.",
+      "evidence": "DTSX:92723, 50700, 37068, 87344",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Set contactlink existinfile false|detailed",
+      "hash": "605506d67f2c",
+      "verdict": "CONFIRMED",
+      "detail": "Order: PC 108925 (after Write Errors Step 2) and PC 108927 (before Create and update contactlink). There is no filter. Re-marking happens through Update ContactLink and Create Contact link, and 0 leads to Status 2 at 87344. The end statement correctly covers both absent and failed rows.",
+      "evidence": "PC DTSX:108925, 108927; SQL 92723, 50700, 37068, 87344",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Create and update contactlink|detailed",
+      "hash": "0f61d6c1ffd9",
+      "verdict": "WRONG",
+      "detail": "Re-derived and correct:\n- The source aliases, the phone CAST/NULL and email '' -> NULL.\n- The Aggregate: 17 GroupBy columns plus CountAll.\n- The filter Subject 03 && 5015.\n- Trim, then Add 0 (PadLeft to field size, dots removed), then SUBSTRING(...,4,10).\n- Is Child Exists (Full cache, StatusCode 1/1). The ambiguity argument holds: Gen_Identitynumber/gen_identificationtype are at 50077/50087 and ca.gen_bankaccountnumber at 13077.\n- is Parent Exist (StatusCode 1, STATECODE 0) and the fileorigion split.\n- Set child saving fields and Derived Column 1. The compare logic is main.cs:119-150, and the identification-type override is main.cs:154-157, which does not affect NeedToUpdate.\n- Update Contact parameter order P0-P12. The 5 copies differ only in input-column order, so they are functionally identical.\n- The update error goes to Union All Error 5 and then the ETL warning, with no link check.\n- Duplicate check: a non-null repeat is not directed and so is dropped. NULL goes to NotNeedToCreate.\n- Create Contact attributes. The int.Parse(Type_20) is inside the try, so it ends in the ErrorBuffer.\n- Merge Join: JoinType 2, TreatNullsAsEqual, the left Sort has EliminateDuplicates.\n- Is ContactLink Exists on parent+child+account. The link Update sets existsinfile=1, status=1. The link Insert maps VALUES positions to P0-P8 correctly. Owner = SystemUserId (Set system variables main.cs:130) and BU = its BusinessUnitId.\n\nUnit 21 states a runtime NULL behaviour as fact, and it is not shown in the files. It says a blank bank customer ID 'מגיע להשוואה ולעדכון כמחרוזת אפסים' because Add 0 turns NULL into \"\" (main.cs:54). The order of steps works against this:\n(a) Trim String Fields runs first and converts every blank string to NULL (main.cs:46-47: if (str == \"\") str = null).\n(b) Add 0 then reads the column through the generated getter 'return Buffer.GetString(BufferColumnIndexes[0])' (DTSX:25223) before IsNullOrEmpty can run.\n(c) Per documented SSIS behaviour, PipelineBuffer.GetString on a NULL column throws ColumnIsNullException ('The column has a null value'). So a blank Entity_Id_19 (or a blank parent or child ID) does not become zeros. The exception is unhandled in Add 0 and would fail the data flow.\nThe sentence's conclusion still holds: the CRM fallbacks in Derived Column 1 cannot fire, because the value is non-null whenever processing continues. The claim that a blank ID reaches the compare/update as zeros is not proven, and per SSIS behaviour it is incorrect. The tech note 'String.IsNullOrEmpty → \"\" → PadLeft' makes the same unmarked assumption.",
+      "evidence": "Trim String Fields DTSX:44338 main.cs:41-49; Add 0 DTSX:25010 main.cs:33-58, generated getter DTSX:25219-25224 (Buffer.GetString); path Trim String Fields -> Add 0; Derived Column 1 DTSX:40072",
+      "wrongUnits": [
+        {
+          "unit": 21,
+          "problem": "It states, as fact and unmarked, that NULL reaching Add 0 becomes \"\" and is padded, so that a blank bank customer ID reaches the compare/update as zeros. Trim turns blanks into NULL first, and Add 0 reads them through Buffer.GetString, which per documented SSIS behaviour throws on NULL.",
+          "correct": "למזהה לקוח בבנק ולת.ז. ההורה אין בפועל השלמה מ-CRM: כשהעיבוד ממשיך הם אינם ריקים (מרופדים באפסים ב-Add 0). ערך ריק בקובץ הופך ל-NULL ב-Trim String Fields, ו-Add 0 קורא אותו דרך Buffer.GetString – לפי התנהגות SSIS המתועדת, לא מוצג בקבצים, קריאה כזו של NULL זורקת חריגה ומכשילה את השלב; לכן לא מוכח שערך ריק מגיע להשוואה כמחרוזת אפסים.",
+          "evidence": "DTSX:44338 (main.cs:46-47), DTSX:25219-25224, DTSX:25010 main.cs:54-58"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Create and update contactlink|detail",
+      "hash": "b4e6325a028c",
+      "verdict": "CONFIRMED",
+      "detail": "Population is the aggregated rows with Subject 03 and fund 5015.\n- Child: Contact StatusCode 1 + account StatusCode 1 on id_9 + account. Ownership is argued.\n- Parent: Contact StatusCode 1 / STATECODE 0 on id_9.\n- Link: on parent + child + account.\n- Writes: contact Update via SQL (view Contact), contact Create via SDK, gen_contactlink Update via SQL, and gen_contactlinkBase Insert via SQL.\n- The new-parent link is deferred to a later run. That is conditional and correct: the inner Merge Join cannot match. Next run, the SDK-created contact (default active) is found by is Parent Exist.",
+      "evidence": "DTSX:40961, 40678, 40336-40370, 40519-40565, 50070, 31081, 50700, 37068, 40712",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Disabled contactlink|title",
+      "hash": "2cd7f1c871f7",
+      "verdict": "CONFIRMED",
+      "detail": "The SQL is 'Update gen_contactlinkBase set gen_Status = 2 where gen_existsinfile = 0' on the CRM connection. Because the reset sets every link to 0, this hits every link not re-marked in this run. 'ביטול' is labelled השערה.",
+      "evidence": "DTSX:87340-87344; 92723",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Disabled contactlink|short",
+      "hash": "701fdf7a6c3d",
+      "verdict": "CONFIRMED",
+      "detail": "The population, the write and the end statement, including links whose rows failed, are correct. The OptionSet meaning is labelled as unknown.",
+      "evidence": "DTSX:87344; 92723",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Disabled contactlink|detailed",
+      "hash": "1e7af5e0f874",
+      "verdict": "WRONG",
+      "detail": "Units 1-7, 9 and 10 match: PC 108929, the predicate gen_existsinfile = 0 with no bank or source filter, the write gen_Status = 2, and failed rows included.\n\nUnit 8 states an inexact condition: 'קישור שקיבל gen_Status = 2 יחזור לסטטוס 1 אם יופיע בקובץ בריצה עתידית'. Appearing in the file is not enough. Update ContactLink (gen_status = 1) runs only for a row that passes all of these:\n- Subject_12 == '03' and fund 5015.\n- The child is found by Is Child Exists (active contact + active account with that account number).\n- The parent is found by is Parent Exist and is the same contact as the link's gen_Parent.\n- If the parent has fileorigion 2 and needs an update, Update Contact succeeds (an error goes to Union All Error 5, with no link check).\n- Is ContactLink Exists matches parent+child+account.\n- Update ContactLink itself succeeds.\nUnit 9 of the same claim lists exactly these failure cases as staying at status 2, so unit 8 also contradicts its neighbour.",
+      "evidence": "Update ContactLink SQL DTSX:50700; Is Valid ContactLink DTSX:40678; Is Child Exists DTSX:40336-40370; is Parent Exist DTSX:40519-40565; Conditional Split DTSX:30947; Union All Error 5 path DTSX:51052; Is ContactLink Exists DTSX:40436-40462",
+      "wrongUnits": [
+        {
+          "unit": 8,
+          "problem": "Appearance in a future file is given as sufficient for the link to return to status 1. The real condition is that the row is processed successfully up to Update ContactLink.",
+          "correct": "קישור שקיבל gen_Status = 2 יחזור לסטטוס 1 אם בריצה עתידית שורת קישור בקובץ (נושא 03, קופה 5015) תעבור בהצלחה עד אישור הקישור (Update ContactLink) עם אותם הורה, ילד וחשבון לקוח.",
+          "evidence": "DTSX:50700, 40678, 40336, 40519, 30947, 40436"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Disabled contactlink|detail",
+      "hash": "24ad4e1ea00f",
+      "verdict": "CONFIRMED",
+      "detail": "The population, the bulk update with no matching, the predicate, the SQL write and the hedged outcome all match.",
+      "evidence": "DTSX:87344",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Disabled contactlink|decisions",
+      "hash": "94dafa7aaccc",
+      "verdict": "CONFIRMED",
+      "detail": "The condition is 'where gen_existsinfile = 0', its meaning is 'not re-marked in this run' (after the unconditional reset at 92723), and the outcome is gen_Status = 2.",
+      "evidence": "DTSX:87344; 92723",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Disabled contactlink|crm",
+      "hash": "545d0a55b401",
+      "verdict": "CONFIRMED",
+      "detail": "Entity gen_contactlink (table gen_contactlinkBase), Update gen_Status = 2, by direct SQL on the CRM connection {4DF7FE1A} = PSQL/ALTSHULER_MSCRM. The 'when' condition is correct.",
+      "evidence": "DTSX:87340-87344; CM DTSX:95-97",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Create And Update Warning Notes|title",
+      "hash": "68190476602a",
+      "verdict": "CONFIRMED",
+      "detail": "Re-derived the flow:\n- TRIM, then PadLeft (9/12/4), then a 6-column GroupBy Aggregate.\n- Get customeraccountid (Full cache, RIGHT pad 12, no bank or status filter; No Match unconnected).\n- Filter 04/05/06/12 (default unconnected).\n- The subject becomes warningnotetypesubject, and a code that parses to 0 is replaced by Subject_12.\n- Type lookup on code+subject.\n- On no match: an in-run dictionary keyed on code only reuses the NewId through NoteTypeAlreadyExists. Otherwise it inserts gen_warningnotetypebase with 'לא ידוע' and goes straight to note creation.\n- Open-note lookup on comment+contact+type+account with gen_CloseDate IS NULL: Update existinfile=1, otherwise Insert.\n- ContactBase.gen_loaneligibilitycalculationrequired = 1 on the success outputs of both paths (78730 after insert, 78768 after update).\n- All writes are SQL on the CRM connection.",
+      "evidence": "DTSX:70813, 75171, 66107 (main.cs:117-119), 69294, 70482, 70447, 74011 (main.cs:119-124), 70631, 78998, 72878 (main.cs:64-73), 75048, 69907, 76116, 70554, 78806, 69423, 78730, 78768; paths in Create And Update Warning Notes",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Create And Update Warning Notes|short",
+      "hash": "939e6a68ff71",
+      "verdict": "CONFIRMED",
+      "detail": "The decisions match:\n- Account found or dropped.\n- Type exists on code+subject.\n- Reuse of a type created in the run, keyed on code only, or insert of 'לא ידוע'.\n- The new-type path creates a note without checking for an existing one.\n- Existing open identical note: Update, otherwise Insert.\n- ContactBase is flagged after a successful write.\nThe end statement covers only notes with an account, a valid subject and a successful write, and says that flag-0 notes with no close date are closed next. This is consistent with the rest of the package.",
+      "evidence": "DTSX:70482, 70447, 70631, 72878 main.cs:64-73, 75048, 69907, 70554, 78806, 69423, 78730, 78768, 92741",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Create And Update Warning Notes|detailed",
+      "hash": "aa349d852e22",
+      "verdict": "CONFIRMED",
+      "detail": "Every unit was re-derived:\n- The source aliases. FinanceNumber_11 and Account_Owner_Id_8 reach only the Aggregate and Union All, not a write.\n- The padding, the account lookup and the subject filter.\n- The 0000 -> subject replacement (main.cs:124).\n- The type lookup and the dictionary.\n- Type insert VALUES (?,1,?,?,?,?,0,1,?,?,?,?): code, isloanalowed 1, name, id, created, statecode 0 / statuscode 1, modified, org, subject.\n- Union All maps NewId to gen_warningnotetypeid.\n- The open-note lookup, Update existinfile=1, and then ContactBase (78768) via Count Updates Rows.\n- Insert VALUES (NEWID(),P0 comment,P1 contact,P2 account,1,P3 type,getutcdate(),P4 CreatedBy,0,1,P5 owner,getutcdate(),P6 ModifiedBy,P7 BU), with owner = SystemUserId.\n- The insert error goes to Union All 1 and then the ETL warning.",
+      "evidence": "DTSX:70813, 66107, 69294, 70482, 70447, 74011, 70631, 72878, 75048, 69907, 76116, 70554, 78806, 78768, 69423, 78730; Set system variables main.cs:127-132 (DTSX:91695)",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Create And Update Warning Notes|detail",
+      "hash": "76149b868cf6",
+      "verdict": "CONFIRMED",
+      "detail": "The population, the matching (padded account number only, type on code+subject, open note on 4 keys), the SQL writes (INSERT type, INSERT/UPDATE note, UPDATE ContactBase) and the result statement limited to successful writes all match.",
+      "evidence": "DTSX:70482, 70631, 70554, 69907, 69423, 78806, 78730, 78768",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Update close date where not exist in file|decisions",
+      "hash": "60191f137bd0",
+      "verdict": "CONFIRMED",
+      "detail": "The SQL is 'update gen_warningnotebase set gen_closedate = ? where gen_existinfile = 0 and gen_closedate is null', with the single parameter bound to User::LastBusinessDate. It runs on the CRM connection after Create And Update Warning Notes (PC 108917).",
+      "evidence": "DTSX:92738-92742; PC 108917",
+      "wrongUnits": []
+    }
+  ],
+  "missingWrites": []
+}

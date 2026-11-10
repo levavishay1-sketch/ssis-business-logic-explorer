@@ -1,0 +1,422 @@
+{
+  "package": "0018_EmployerCare",
+  "analyst": "ssis-business-logic",
+  "source": {
+    "file": "source/DailyProcess/0018_EmployerCare.dtsx",
+    "sha256": "D6F9EBA66CF8A0F5EA167A05EB2E97C324F912E0F3A421045651D73ACD049746",
+    "lines": 8519
+  },
+  "scopeNote_he": "נותח קוד המקור (C#) של רכיבי הסקריפט בלבד; ה-DLL המקומפל לא פוענח. CRM.Proxy / ExecuteMultipleExtension הם אסמבלי חיצוני (external_unknown). מנהל החיבורים היחיד [CRM] מוגדר בזמן התכנון כ-Data Source=Psql; Initial Catalog=ALTSHULER_MSCRM (DTSX:6) ומשמש לקריאה בלבד (מקורות ו-Lookup). זו מחרוזת החיבור של זמן התכנון בלבד: בחבילה EnableConfig=True (DTSX:1) ותצורת XML בנתיב C:\\Generix\\SSISConfigFile.dtsConfig (DTSX:11), קובץ שלא סופק ויכול לדרוס את החיבור בזמן ריצה. לכן מסד ה-CRM שאליו החבילה מתחברת בפועל הוא blocked_external_dependency. אין קובץ, Staging או SQL DML. בחבילה 8 כותבי SDK, כולם מבוססי סקריפט: 2 עסקיים, רכיבי הסקריפט Update employer care (DTSX:1946-1947) ו-Update CustomerCare (DTSX:7290-7291), ו-6 מסגרת: 3 רכיבי סקריפט בזרימות הנתונים (ETL Warning ×2 זהים, DTSX:821, 6226; ETL Record Finish, DTSX:3209) ו-3 Script Tasks (Create ETL Process record, DTSX:2669; Error ETL Process record ×2 במטפלי OnError, DTSX:247, 256, 5689, 5698). כל הכתיבה העסקית ל-CRM היא עדכון gen_employercare דרך ה-SDK (ExecuteMultiple, Supported). משמעויות הערכים (מצב 2, סיבות הפקדה 6,7,8,9,11, קבוצת תנועה 1, קוד '%99%') אינן מוגדרות בחבילה; '3 = Finished' מתועד בהערת קוד בלבד.",
+  "summary_he": "החבילה מטפלת ברשומות 'טיפול מעסיק' (gen_employercare). בשלב הראשון היא מעבירה למצב 3 (לפי הערת הקוד: Finished; לפי שם הרכיב: סגירה) רשומות במצב 2 שסיבת ההפקדה שלהן אינה 6/7/8/9/11 (או ריקה), כשלאחת מקופות חשבון הלקוח קיימת תנועה בטבלת gen_ftcurrentyear (לפי שמה: השנה הנוכחית – השערה) מקבוצת תנועה 1 שקוד סוג התנועה שלה (gen_transactiontypeid, עמודה לא מסויגת) קיים (אינו ריק) ואינו מכיל '99' (השערה: הפקדה). הקופה של התנועה מזוהה לפי העמודה gen_fundnumber, שאינה מסויגת בשאילתת ה-Lookup שמחברת את gen_ftcurrentyear ו-Gen_fundtransactiontype (DTSX:1364). ל-gen_ftcurrentyear יש עמודה כזו (gen_ftcurrentyear.gen_fundnumber מופיעה מסויגת ב-0009_LeumiFile-BY.dtsx:94722 וב-0015_TransferIn.dtsx:46170); אילו העמודה הייתה קיימת בשתי הטבלאות השאילתה הייתה נכשלת, ולפי המשתמש החבילה רצה בפרודקשן, ולכן זו gen_ftcurrentyear.gen_fundnumber. התנאי הוא NOT LIKE '%99%', ולכן גם תנועה שקוד הסוג שלה ריק (NULL) אינה נכללת; באותו עדכון נכתב גם gen_modifiedbybank = מועד הריצה (DateTime.Now). בשלב השני היא מעדכנת ברשומות טיפול מעסיק את השדה gen_employeroperationpersonname להפניה לאיש התפעול שמוגדר בחשבון המעסיק (account.gen_operationperson). מלבד התנאי ec.gen_employername = accountid, רשומה נבחרת רק כשבחשבון המעסיק יש ערך (a.gen_operationperson אינו ריק) והוא שונה מהערך בעמודה gen_employeroperationpersonname שבשאילתה, או כשהערך בעמודה זו ריק. העמודה gen_employeroperationpersonname אינה מסויגת בשאילתה שמחברת את gen_employercare ו-account, ולכן לא ידוע מאיזו משתי הטבלאות היא נלקחת (השערה: מרשומת הטיפול). ערך ריק בחשבון המעסיק אינו מנקה את הערך ברשומת הטיפול.",
+  "executionOrder": [
+    {
+      "step": 1,
+      "refId": "Package\\Get Organization Variables",
+      "title_he": "טעינת משתני ארגון (מסגרת)",
+      "trigger": "start (no incoming constraint)"
+    },
+    {
+      "step": 2,
+      "refId": "Package\\Create ETL Process record",
+      "title_he": "רשומת תהליך ETL (מסגרת)",
+      "trigger": "after Get Organization Variables · Success (DTSX:7925)"
+    },
+    {
+      "step": 3,
+      "refId": "Package\\Close Gen_employercare",
+      "title_he": "מעבר טיפולי מעסיק ממצב 2 למצב 3 (לפי הערת הקוד: Finished; לפי שם הרכיב: סגירה) כשלקופה כלשהי של חשבון הלקוח יש תנועה מתאימה",
+      "trigger": "after Create ETL Process record · Success (DTSX:7926)"
+    },
+    {
+      "step": 4,
+      "refId": "Package\\Update operation person",
+      "title_he": "סנכרון איש תפעול מחשבון המעסיק",
+      "trigger": "after Close Gen_employercare · Success (DTSX:7927)"
+    },
+    {
+      "step": 5,
+      "refId": "Package\\End ETL Process record",
+      "title_he": "סיום רשומת תהליך ETL (מסגרת)",
+      "trigger": "after Update operation person · Success (DTSX:7928)"
+    }
+  ],
+  "ignoredAsFramework": [
+    "Package\\Get Organization Variables",
+    "Package\\Create ETL Process record",
+    "Package\\End ETL Process record",
+    "Package\\Close Gen_employercare.EventHandlers[OnError]",
+    "Package\\Close Gen_employercare.EventHandlers[OnError]\\Error ETL Process record",
+    "Package\\Update operation person.EventHandlers[OnError]",
+    "Package\\Update operation person.EventHandlers[OnError]\\Error ETL Process record",
+    "Package\\Close Gen_employercare\\Union All",
+    "Package\\Close Gen_employercare\\Set Warning columns",
+    "Package\\Close Gen_employercare\\ETL Warning",
+    "Package\\Update operation person\\Union All",
+    "Package\\Update operation person\\Set Warning columns",
+    "Package\\Update operation person\\ETL Warning"
+  ],
+  "components": [
+    {
+      "refId": "Package\\Close Gen_employercare",
+      "title_he": "מעבר טיפולי מעסיק ממצב 2 למצב 3 (לפי הערת הקוד: Finished; לפי שם הרכיב: סגירה) כשלקופה כלשהי של חשבון הלקוח יש תנועה מתאימה",
+      "techName": "Close Gen_employercare",
+      "short_he": "רשומות טיפול מעסיק במצב 2 (Gen_CurrentState = 2) שסיבת ההפקדה שלהן ריקה או שאינה 6/7/8/9/11 עוברות למצב 3 כשלאחת מקופות חשבון הלקוח יש תנועה בטבלת gen_ftcurrentyear (לפי שמה: השנה הנוכחית – השערה) שסוג התנועה שלה שייך לקבוצה 1 וקוד סוג התנועה קיים (אינו ריק) ואינו מכיל '99' – כל תנועה כזו בכל קופה של חשבון הלקוח, בלי קשר למעסיק של הרשומה ובלי תנאי תאריך. הקופה של התנועה מזוהה לפי gen_fundnumber, שאינה מסויגת בשאילתה (DTSX:1364); ל-gen_ftcurrentyear יש עמודה כזו (מסויגת ב-0009_LeumiFile-BY.dtsx:94722 וב-0015_TransferIn.dtsx:46170), ואילו העמודה הייתה קיימת בשתי הטבלאות השאילתה הייתה נכשלת; לפי המשתמש החבילה רצה בפרודקשן, ולכן זו gen_ftcurrentyear.gen_fundnumber.",
+      "flow_he": [
+        "איתור טיפולי מעסיק במצב 2 שסיבת ההפקדה שלהם ריקה או שונה מ-6,7,8,9,11, יחד עם כל קופות חשבון הלקוח",
+        "בדיקה אם לקופה יש תנועה בטבלת gen_ftcurrentyear (לפי שמה: השנה הנוכחית – השערה) שסוג התנועה שלה שייך לקבוצה 1 וקוד סוג התנועה קיים (אינו ריק) ואינו מכיל '99' (קופת התנועה = gen_fundnumber, לא מסויגת בשאילתה; זו עמודת gen_ftcurrentyear: קיימת בה לפי 0009:94722 ו-0015:46170, ואילו הייתה גם ב-Gen_fundtransactiontype השאילתה הייתה נכשלת; לפי המשתמש החבילה רצה בפרודקשן)",
+        "צמצום לרשומת טיפול אחת (ללא כפילויות לפי מספר קופות)",
+        "עדכון ב-CRM: מצב 3 (לפי הערת הקוד: Finished) ו-gen_modifiedbybank = מועד הריצה (משמעות השדה – השערה)"
+      ],
+      "short": {
+        "nodes": [
+          {
+            "type": "step",
+            "text": "המערכת מאתרת רשומות טיפול מעסיק במצב 2 (Gen_CurrentState = 2) שסיבת ההפקדה שלהן ריקה או שונה מ-6/7/8/9/11, יחד עם קופות חשבון הלקוח שלהן."
+          },
+          {
+            "type": "decision",
+            "text": "האם באחת הקופות של חשבון הלקוח נרשמה תנועה מהסוג הרלוונטי (בטבלת תנועות השנה הנוכחית, לפי שם הטבלה – השערה): סוג תנועה מקבוצה 1, שקוד סוג התנועה שלו קיים (אינו ריק) ואינו מכיל את הרצף '99' בשום מקום?",
+            "branches": [
+              {
+                "label": "כן",
+                "nodes": [
+                  {
+                    "type": "write",
+                    "text": "רשומת הטיפול עוברת למצב 3 (לפי הערת הקוד: Finished) ומסומן מועד העדכון."
+                  }
+                ]
+              },
+              {
+                "label": "לא",
+                "nodes": [
+                  {
+                    "type": "step",
+                    "text": "רשומת הטיפול לא מתעדכנת ונשארת במצב 2."
+                  }
+                ]
+              }
+            ],
+            "tech": "קופת התנועה = gen_fundnumber, שאינה מסויגת בשאילתת ה-Lookup (DTSX:1364). ל-gen_ftcurrentyear יש עמודה כזו (gen_ftcurrentyear.gen_fundnumber ב-0009_LeumiFile-BY.dtsx:94722 וב-0015_TransferIn.dtsx:46170); אילו העמודה הייתה קיימת בשתי הטבלאות השאילתה הייתה נכשלת, ולפי המשתמש החבילה רצה בפרודקשן, ולכן זו gen_ftcurrentyear.gen_fundnumber."
+          },
+          {
+            "type": "end",
+            "text": "טיפולי מעסיק במצב 2 (סיבת הפקדה ריקה או שאינה 6/7/8/9/11) שלאחת מקופות החשבון שלהם יש תנועה מתאימה עוברים למצב 3."
+          }
+        ]
+      },
+      "detailed": {
+        "nodes": [
+          {
+            "type": "step",
+            "text": "האוכלוסייה היא רשומות טיפול מעסיק במצב 2 שסיבת ההפקדה שלהן ריקה או שונה מ-6, 7, 8, 9 ו-11.",
+            "tech": "get Gen_employercare · Gen_CurrentState = 2 AND (Gen_depositereason not IN (6,7,8,9,11) or Gen_depositereason is null)",
+            "evidence": "DTSX:1425-1432"
+          },
+          {
+            "type": "step",
+            "text": "כל רשומה מוכפלת לפי מספר הקופות של חשבון הלקוח שאליו היא משויכת.",
+            "tech": "INNER JOIN gen_customeraccount ca ON ca.Gen_customeraccountId = Gen_employercare.gen_customeraccount INNER JOIN Gen_fundmain ON Gen_fundmain.Gen_customeraccountname = ca.Gen_customeraccountId",
+            "evidence": "DTSX:1428-1430"
+          },
+          {
+            "type": "step",
+            "text": "רשימת הייחוס היא כל הקופות שיש להן תנועה בטבלת gen_ftcurrentyear (לפי שמה: השנה הנוכחית – השערה) שסוג התנועה שלה שייך לקבוצה 1 וקוד סוג התנועה קיים (אינו ריק) ואינו מכיל '99'. הקופה של כל תנועה נלקחת מהעמודה gen_fundnumber של טבלת התנועות (הנימוק לבעלות על העמודה הלא-מסויגת – בפרטים הטכניים).",
+            "tech": "Get All Transaction (Lookup, full cache) · gen_ftcurrentyear JOIN Gen_fundtransactiontype ON Gen_fundtransactiontype.Gen_fundtransactiontypeid = gen_ftcurrentyear.gen_transactiontypename WHERE Gen_fundtransactiontype.gen_transgrouptype = 1 AND gen_transactiontypeid NOT LIKE '%99%' GROUP BY gen_fundnumber · gen_fundnumber אינה מסויגת; ל-gen_ftcurrentyear יש עמודה כזו (gen_ftcurrentyear.gen_fundnumber ב-0009_LeumiFile-BY.dtsx:94722 וב-0015_TransferIn.dtsx:46170); אילו העמודה הייתה קיימת בשתי הטבלאות השאילתה הייתה נכשלת, ולפי המשתמש החבילה רצה בפרודקשן, ולכן זו gen_ftcurrentyear.gen_fundnumber",
+            "evidence": "DTSX:1362-1368"
+          },
+          {
+            "type": "decision",
+            "text": "האם הקופה מופיעה ברשימת הקופות עם תנועה מתאימה?",
+            "tech": "JoinToReferenceColumn gen_fundnumber = gen_fundmainid; NoMatchBehavior = 1 (No Match Output לא מחובר)",
+            "evidence": "DTSX:1379, DTSX:1384",
+            "branches": [
+              {
+                "label": "לא",
+                "nodes": [
+                  {
+                    "type": "step",
+                    "text": "שורת הקופה נזרקת; אם לאף קופה של החשבון אין תנועה, רשומת הטיפול לא תעודכן."
+                  }
+                ]
+              },
+              {
+                "label": "כן",
+                "nodes": [
+                  {
+                    "type": "step",
+                    "text": "שורת הקופה ממשיכה לשלב הבא."
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "type": "step",
+            "text": "השורות מצומצמות לרשומת טיפול מעסיק אחת לכל מזהה, כך שכל רשומה מעודכנת פעם אחת גם אם לכמה קופות יש תנועה.",
+            "tech": "Aggregate the Gen_employercare · Group by Gen_employercareid (AggregationType 0)",
+            "evidence": "DTSX:554, DTSX:580"
+          },
+          {
+            "type": "write",
+            "text": "רשומת הטיפול מעודכנת למצב 3 (לפי הערת הקוד: Finished), והשדה gen_modifiedbybank מקבל את מועד הריצה (המשמעות 'עודכן על ידי הבנק' נגזרת משם השדה בלבד – השערה).",
+            "tech": "gen_employercare · Update · SDK (ExecuteMultipleExtension RequestType.Update, מנות של 100): gen_currentstate = OptionSetValue(3) //Finished; gen_modifiedbybank = DateTime.Now",
+            "evidence": "Update employer care main.cs:130-133, 137-139, 150"
+          },
+          {
+            "type": "step",
+            "text": "אם עדכון של רשומה בודדת חוזר כתקלה בתשובת ה-ExecuteMultiple, החבילה לא רושמת אותו, כי הקוד שמעביר תקלות לפלט Error מוסתר בהערה. אם הבקשה כולה זורקת חריגה, זרימת הנתונים נכשלת ומטפל ה-OnError של השלב רושם את השגיאה ברשומת תהליך ה-ETL.",
+            "tech": "//ErrorBuffer.AddRow(); //ErrorBuffer.Description = resultItem.Fault.Message; · חריגה מ-ExecuteMultipleRequest → OnError → Error ETL Process record (gen_etlprocess + annotation)",
+            "evidence": "main.cs:167-168 (DTSX:1963-1964); OnError DTSX:33-41, 236-256"
+          },
+          {
+            "type": "end",
+            "text": "טיפולי מעסיק במצב 2 (סיבת הפקדה ריקה או שאינה 6/7/8/9/11) שלאחת מקופות החשבון שלהם נרשמה תנועה מתאימה (בטבלת תנועות השנה הנוכחית, לפי שם הטבלה – השערה) עוברים למצב 3.",
+            "tech": "התנועה קשורה לקופה דרך gen_ftcurrentyear.gen_fundnumber: העמודה אינה מסויגת בשאילתת ה-Lookup (DTSX:1364), קיימת ב-gen_ftcurrentyear (0009_LeumiFile-BY.dtsx:94722; 0015_TransferIn.dtsx:46170), ואילו הייתה קיימת בשתי הטבלאות השאילתה הייתה נכשלת; לפי המשתמש החבילה רצה בפרודקשן."
+          }
+        ]
+      },
+      "detail_he": [
+        {
+          "h": "מקור ואוכלוסייה",
+          "t": "gen_employercare במצב Gen_CurrentState = 2 שסיבת ההפקדה (Gen_depositereason) שלהן NULL או שאינה 6,7,8,9,11, מצורפות לכל קופות Gen_fundmain של חשבון הלקוח (DTSX:1425-1432)."
+        },
+        {
+          "h": "התאמה לרשומות קיימות",
+          "t": "Lookup על מזהה הקופה (gen_fundmainid = gen_fundnumber) מול קופות שיש להן תנועה ב-gen_ftcurrentyear שסוג התנועה שלה שייך לקבוצה 1 (Gen_fundtransactiontype.gen_transgrouptype = 1) וקוד סוג התנועה NOT LIKE '%99%'; קוד ריק (NULL) אינו עומד בתנאי (DTSX:1362-1384). gen_fundnumber אינה מסויגת בשאילתה, שמחברת את gen_ftcurrentyear ו-Gen_fundtransactiontype; ל-gen_ftcurrentyear יש עמודה כזו (gen_ftcurrentyear.gen_fundnumber ב-0009_LeumiFile-BY.dtsx:94722 וב-0015_TransferIn.dtsx:46170), ואילו העמודה הייתה קיימת בשתי הטבלאות השאילתה הייתה נכשלת; לפי המשתמש החבילה רצה בפרודקשן, ולכן זו gen_ftcurrentyear.gen_fundnumber. העדכון נעשה לפי Gen_employercareid שנשלף מ-CRM (main.cs:131)."
+        },
+        {
+          "h": "החלטות",
+          "t": "יש קופה תואמת → מעבר למצב 3 (לפי שם הרכיב: סגירה); אין → אין שינוי (No Match לא מחובר). אין תנאי תאריך: כל תנועה בטבלת gen_ftcurrentyear (לפי שמה: השנה הנוכחית – השערה) מספיקה, גם אם קדמה ליצירת רשומת הטיפול (הקופה של התנועה = gen_ftcurrentyear.gen_fundnumber; הנימוק לבעלות על העמודה הלא-מסויגת – בסעיף 'התאמה לרשומות קיימות')."
+        },
+        {
+          "h": "כתיבה ל-CRM",
+          "t": "Update ל-gen_employercare דרך ה-SDK: gen_currentstate = 3 (ערך קבוע מוכח, main.cs:132), gen_modifiedbybank = DateTime.Now (שעון שרת ה-SSIS; לא ערך קבוע)."
+        },
+        {
+          "h": "תוצאה עסקית",
+          "t": "מעבר אוטומטי של טיפולי מעסיק ממצב 2 למצב 3 (לפי הערת הקוד: Finished; לפי שם הרכיב: סגירה) כשבקופה כלשהי של חשבון הלקוח קיימת תנועה העונה לתנאי הקבוצה והקוד, בלי קשר למעסיק או לתאריך. תקלה ברמת רשומה בתשובת ה-ExecuteMultiple לא נרשמת בחבילה; חריגה של הבקשה כולה נרשמת דרך מטפל ה-OnError ברשומת תהליך ה-ETL."
+        }
+      ],
+      "decisions": [
+        {
+          "where": "get Gen_employercare (SQL)",
+          "condition": "Gen_employercare.Gen_CurrentState = 2 AND (Gen_employercare.Gen_depositereason not IN (6,7,8,9,11) or Gen_employercare.Gen_depositereason is null)",
+          "meaning_he": "טיפול מעסיק במצב 2 שאינו בסיבות הפקדה מוחרגות",
+          "outcome_he": "נכלל באוכלוסייה"
+        },
+        {
+          "where": "Get All Transaction (Lookup)",
+          "condition": "gen_fundmainid ∈ { gen_fundnumber FROM gen_ftcurrentyear JOIN Gen_fundtransactiontype ON Gen_fundtransactiontype.Gen_fundtransactiontypeid = gen_ftcurrentyear.gen_transactiontypename WHERE Gen_fundtransactiontype.gen_transgrouptype = 1 AND gen_transactiontypeid NOT LIKE '%99%' }",
+          "meaning_he": "לקופה יש תנועה בטבלת gen_ftcurrentyear (לפי שמה: השנה הנוכחית – השערה) שסוג התנועה שלה שייך לקבוצה 1 וקוד סוג התנועה קיים (אינו ריק) ואינו מכיל '99'. gen_fundnumber אינה מסויגת בשאילתה; ל-gen_ftcurrentyear יש עמודה כזו (gen_ftcurrentyear.gen_fundnumber ב-0009_LeumiFile-BY.dtsx:94722 וב-0015_TransferIn.dtsx:46170), ואילו העמודה הייתה קיימת בשתי הטבלאות השאילתה הייתה נכשלת; לפי המשתמש החבילה רצה בפרודקשן, ולכן זו gen_ftcurrentyear.gen_fundnumber",
+          "outcome_he": "התאמה → מעבר הרשומה למצב 3 (לפי שם הרכיב: סגירה); אי-התאמה → השורה נזרקת"
+        },
+        {
+          "where": "Update employer care main.cs:127",
+          "condition": "Row.Genemployercareid_IsNull → return",
+          "meaning_he": "שורה ללא מזהה",
+          "outcome_he": "מדולגת"
+        }
+      ],
+      "crmEffects": [
+        {
+          "entity": "gen_employercare",
+          "verb": "Update",
+          "mechanism": "SDK",
+          "when_he": "לכל רשומת טיפול מעסיק באוכלוסייה שלפחות לאחת מקופות החשבון שלה יש תנועה מתאימה: gen_currentstate = 3, gen_modifiedbybank = מועד הריצה"
+        }
+      ],
+      "evidence": [
+        "Package\\Close Gen_employercare\\get Gen_employercare · DTSX:1420, SqlCommand DTSX:1425-1436",
+        "Package\\Close Gen_employercare\\Get All Transaction · DTSX:1362, SqlCommand DTSX:1364, NoMatchBehavior DTSX:1379, ParameterMap DTSX:1384",
+        "Package\\Close Gen_employercare\\Aggregate the Gen_employercare · DTSX:554, AggregationType DTSX:580",
+        "Package\\Close Gen_employercare\\Update employer care · DTSX:1540, main.cs (code DTSX:1542, sha bee867f4fc3b) lines 125-189",
+        "precedence DTSX:7926, DTSX:7927"
+      ],
+      "openQuestions_he": [
+        "משמעות מצב 2 ומצב 3 של gen_currentstate (3 = 'Finished' לפי הערת קוד בלבד).",
+        "משמעות סיבות ההפקדה 6, 7, 8, 9, 11 – לא מוגדרת בחבילה.",
+        "משמעות gen_transgrouptype = 1 ומה מייצג קוד סוג תנועה המכיל '99' – לא מוגדר בחבילה (השערה: קבוצה 1 = הפקדות, '99' = ביטול/תיקון).",
+        "העמודה gen_transactiontypeid אינה מסויגת בשם טבלה; האם היא מ-gen_ftcurrentyear או מ-Gen_fundtransactiontype – לא הוכח.",
+        "משמעות השדה gen_modifiedbybank (נכתב תמיד עם DateTime.Now) – לא מוגדרת בחבילה."
+      ]
+    },
+    {
+      "refId": "Package\\Update operation person",
+      "title_he": "סנכרון איש תפעול מחשבון המעסיק",
+      "techName": "Update operation person",
+      "short_he": "רשומת טיפול מעסיק נבחרת כשבחשבון המעסיק מוגדר איש תפעול (a.gen_operationperson אינו ריק), והוא שונה מהערך בעמודה gen_employeroperationpersonname שבשאילתה או שערך זה ריק. העמודה אינה מסויגת, וטבלת המקור של העמודה לא ידועה. בכל רשומה כזו מועתק איש התפעול מחשבון המעסיק לשדה gen_employeroperationpersonname של רשומת הטיפול. ערך ריק בחשבון המעסיק אינו מועתק.",
+      "flow_he": [
+        "השוואת איש התפעול בחשבון המעסיק (a.gen_operationperson) לעמודה הלא-מסויגת gen_employeroperationpersonname (טבלת המקור של העמודה לא ידועה)",
+        "בחירת רשומות שבהן בחשבון יש ערך, והוא שונה מהעמודה שבשאילתה או שהעמודה ריקה; ערך ריק בחשבון אינו מועתק",
+        "עדכון ב-CRM: gen_employeroperationpersonname ברשומת טיפול המעסיק = איש התפעול מחשבון המעסיק"
+      ],
+      "short": {
+        "nodes": [
+          {
+            "type": "step",
+            "text": "המערכת משווה את איש התפעול שמוגדר בחשבון המעסיק לערך בעמודה gen_employeroperationpersonname שבשאילתה. העמודה אינה מסויגת, וטבלת המקור של העמודה לא ידועה."
+          },
+          {
+            "type": "decision",
+            "text": "האם בחשבון המעסיק מוגדר איש תפעול, והוא שונה מהעמודה שבשאילתה או שהעמודה ריקה?",
+            "branches": [
+              {
+                "label": "כן",
+                "nodes": [
+                  {
+                    "type": "write",
+                    "text": "איש התפעול מחשבון המעסיק מועתק לרשומת טיפול המעסיק."
+                  }
+                ]
+              },
+              {
+                "label": "לא",
+                "nodes": [
+                  {
+                    "type": "step",
+                    "text": "רשומת הטיפול לא משתנה. זה כולל את המקרה שבו בחשבון המעסיק אין איש תפעול: ערך ריק אינו מועתק."
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "type": "end",
+            "text": "רשומות שנבחרו מקבלות את איש התפעול מחשבון המעסיק. ערך ריק בחשבון אינו מועתק, והערך הקיים ברשומת הטיפול נשאר."
+          }
+        ]
+      },
+      "detailed": {
+        "nodes": [
+          {
+            "type": "step",
+            "text": "האוכלוסייה היא כל רשומות טיפול המעסיק, בכל מצב, שמשויך להן חשבון מעסיק.",
+            "tech": "get Gen_employercare · from gen_employercare ec left join account a on a.accountid = ec.gen_employername where ec.gen_employername = accountid · accountid אינה מסויגת. ל-account יש עמודה כזו (a.accountid בתנאי ה-ON, DTSX:6776); אילו העמודה הייתה קיימת בשתי הטבלאות השאילתה הייתה נכשלת, ולפי המשתמש החבילה רצה בפרודקשן, ולכן זו a.accountid. מכאן שהתנאי פוסל שורות בלי חשבון תואם (בפועל INNER JOIN)",
+            "evidence": "DTSX:6772-6777"
+          },
+          {
+            "type": "decision",
+            "text": "האם בחשבון המעסיק יש איש תפעול, והוא שונה מהעמודה gen_employeroperationpersonname שבשאילתה (לא מסויגת; טבלת המקור של העמודה לא ידועה) או שהעמודה ריקה?",
+            "tech": "gen_employeroperationpersonname != a.gen_operationperson or (gen_employeroperationpersonname is null and a.gen_operationperson is not null)",
+            "evidence": "DTSX:6778-6779",
+            "branches": [
+              {
+                "label": "כן",
+                "nodes": [
+                  {
+                    "type": "step",
+                    "text": "הרשומה נבחרת לעדכון, עם מזהה איש התפעול מחשבון המעסיק."
+                  }
+                ]
+              },
+              {
+                "label": "לא (העמודה שבשאילתה שווה לערך בחשבון, או שבחשבון אין ערך)",
+                "nodes": [
+                  {
+                    "type": "step",
+                    "text": "הרשומה אינה נבחרת. ערך ריק בחשבון המעסיק אינו מועתק, ולכן גם כשאיש התפעול נמחק מחשבון המעסיק, הערך הישן נשאר בטיפול."
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "type": "write",
+            "text": "שדה איש התפעול ברשומת טיפול המעסיק מתעדכן להפניה אל איש התפעול מחשבון המעסיק.",
+            "tech": "gen_employercare · Update · SDK (ExecuteMultipleExtension RequestType.Update, מנות של 100): gen_employeroperationpersonname = new EntityReference(\"account\", a.gen_operationperson)",
+            "evidence": "Update CustomerCare main.cs:130-132, 137-139, 150"
+          },
+          {
+            "type": "step",
+            "text": "תקלה שחוזרת כ-Fault בתשובת ExecuteMultiple מועברת לרישום אזהרות ה-ETL (מסגרת). חריגה מכשילה את זרימת הנתונים ומפעילה את מטפל ה-OnError. האופן שבו ספריית ExecuteMultipleExtension החיצונית מטפלת בתקלות לא ידוע (external_unknown).",
+            "tech": "ErrorBuffer.Description = resultItem.Fault.Message (main.cs:164-168) → Union All → Set Warning columns → ETL Warning; exception → OnError handler DTSX:5482; ExecuteMultipleExtension external_unknown"
+          },
+          {
+            "type": "end",
+            "text": "ברשומות שנבחרו איש התפעול מועתק מחשבון המעסיק (העתקה חד-כיוונית). ערך ריק בחשבון אינו מועתק ואינו מוחק ערך קיים."
+          }
+        ]
+      },
+      "detail_he": [
+        {
+          "h": "מקור ואוכלוסייה",
+          "t": "רשומות gen_employercare, ללא סינון מצב, שמקיימות ec.gen_employername = accountid. accountid אינה מסויגת; ל-account יש עמודה כזו (a.accountid, DTSX:6776), ואילו הייתה קיימת בשתי הטבלאות השאילתה הייתה נכשלת (לפי המשתמש החבילה רצה בפרודקשן). לכן נדרש חשבון מעסיק תואם (DTSX:6772-6779)."
+        },
+        {
+          "h": "התאמה לרשומות קיימות",
+          "t": "חשבון המעסיק מזוהה לפי ec.gen_employername = a.accountid. העדכון לפי Gen_employercareId שנשלף מ-CRM (main.cs:131)."
+        },
+        {
+          "h": "החלטות",
+          "t": "עדכון רק אם a.gen_operationperson אינו ריק, והעמודה gen_employeroperationpersonname שבשאילתה (לא מסויגת; טבלת המקור של העמודה לא ידועה) שונה ממנו או ריקה. ערך ריק בחשבון אינו מועתק."
+        },
+        {
+          "h": "כתיבה ל-CRM",
+          "t": "Update ל-gen_employercare דרך ה-SDK: gen_employeroperationpersonname = EntityReference(\"account\", a.gen_operationperson). ישות היעד 'account' קבועה בקוד."
+        },
+        {
+          "h": "תוצאה עסקית",
+          "t": "ברשומות טיפול המעסיק שנבחרו איש התפעול עוקב אחרי ערך קיים בחשבון המעסיק. ערך ריק בחשבון אינו מועתק."
+        }
+      ],
+      "decisions": [
+        {
+          "where": "get Gen_employercare (SQL)",
+          "condition": "ec.gen_employername = accountid and (gen_employeroperationpersonname != a.gen_operationperson or (gen_employeroperationpersonname is null and a.gen_operationperson is not null))",
+          "meaning_he": "יש חשבון מעסיק עם ערך באיש התפעול, והוא שונה מהעמודה gen_employeroperationpersonname שבשאילתה (לא מסויגת; טבלת המקור של העמודה לא ידועה) או שהעמודה ריקה. ערך ריק בחשבון אינו בוחר את הרשומה.",
+          "outcome_he": "הרשומה מעודכנת"
+        },
+        {
+          "where": "Update CustomerCare main.cs:127",
+          "condition": "Row.GenemployercareId_IsNull → return",
+          "meaning_he": "שורה ללא מזהה",
+          "outcome_he": "מדולגת"
+        }
+      ],
+      "crmEffects": [
+        {
+          "entity": "gen_employercare",
+          "verb": "Update",
+          "mechanism": "SDK",
+          "when_he": "כשאיש התפעול בחשבון המעסיק קיים, ושונה מהעמודה gen_employeroperationpersonname שבשאילתה (לא מסויגת; טבלת המקור של העמודה לא ידועה) או שהיא ריקה: gen_employeroperationpersonname של gen_employercare"
+        }
+      ],
+      "evidence": [
+        "Package\\Update operation person\\get Gen_employercare · DTSX:6767, SqlCommand DTSX:6772-6783",
+        "Package\\Update operation person\\Update CustomerCare · DTSX:6884, main.cs (code DTSX:6886, sha 55e9dbdc3d74) lines 125-189",
+        "precedence DTSX:7927, DTSX:7928"
+      ],
+      "openQuestions_he": [
+        "לאיזו ישות מפנה השדה account.gen_operationperson ולאיזו ישות מפנה gen_employercare.gen_employeroperationpersonname – לא ידוע מהחבילה. הקוד קובע ישות יעד 'account'; אם ישות היעד של השדה שונה (למשל systemuser או contact), צפוי שהעדכון ייכשל (התנהגות CRM, לא מוצגת בקבצים).",
+        "העמודה gen_employeroperationpersonname בשאילתה אינה מסויגת בשם טבלה; סביר שהיא מ-gen_employercare (השערה)."
+      ]
+    }
+  ],
+  "findings_he": [
+    {
+      "severity": "medium",
+      "text": "המעבר של טיפול מעסיק למצב 3 (לפי שם הרכיב: סגירה) אינו קשור לתאריך, למעסיק או לקופה מסוימת: כל תנועה מקבוצת תנועה 1 שקוד סוגה קיים (אינו ריק) ואינו מכיל '99', בכל קופה של חשבון הלקוח של הטיפול, מעבירה אותו למצב 3. זה כולל תנועה שאינה קשורה למעסיק של הטיפול (gen_employername אינו משתתף בהתאמה) ותנועה שקדמה לפתיחת הטיפול. ההיקף 'השנה הנוכחית' נגזר משם הטבלה gen_ftcurrentyear בלבד (השערה). הקישור בין התנועה לקופה הוא דרך gen_fundnumber, שאינה מסויגת בשאילתת ה-Lookup (DTSX:1364); ל-gen_ftcurrentyear יש עמודה כזו (מסויגת כ-gen_ftcurrentyear.gen_fundnumber ב-0009_LeumiFile-BY.dtsx:94722 וב-0015_TransferIn.dtsx:46170), ואילו העמודה הייתה קיימת בשתי הטבלאות השאילתה הייתה נכשלת; לפי המשתמש החבילה רצה בפרודקשן, ולכן זו עמודת gen_ftcurrentyear.",
+      "evidence": "Lookup SQL DTSX:1364-1368, ParameterMap DTSX:1384, source SQL DTSX:1425-1432; gen_ftcurrentyear.gen_fundnumber qualified: 0009_LeumiFile-BY.dtsx:94722, 0015_TransferIn.dtsx:46170"
+    },
+    {
+      "severity": "medium",
+      "text": "בזרם Close Gen_employercare, הקוד שמעביר תקלה ברמת רשומה (Fault בתשובת ExecuteMultiple) לפלט Error מוסתר בהערה. לכן, אם עדכון של רשומה בודדת חוזר כתקלה, החבילה עצמה לא רושמת אותו, ופלט ה-Error שמחובר ל-Union All לא מקבל שורות. אם הבקשה כולה זורקת חריגה, זרימת הנתונים נכשלת, ומטפל ה-OnError של השלב מעדכן את רשומת תהליך ה-ETL ויוצר הערה עם תיאור השגיאה. האם ספריית CRM.Proxy החיצונית רושמת תקלות בעצמה: לא ידוע (external_unknown).",
+      "evidence": "Update employer care main.cs:164-169 (DTSX:1960-1965); OnError handler DTSX:33-41, 236-256"
+    },
+    {
+      "severity": "medium",
+      "text": "ישות היעד של ההפניה לאיש התפעול קבועה בקוד כ-'account'. לא הוכח שזו ישות היעד של השדה. אם לא, צפוי שהעדכונים ייכשלו (התנהגות CRM, לא מוצגת בקבצים). תקלה שתחזור כ-Fault בתשובת ExecuteMultiple תועבר לפלט ה-Error ומשם לרישום אזהרת ETL; חריגה תכשיל את זרימת הנתונים ותפעיל את מטפל ה-OnError. האופן שבו ספריית CRM.Proxy (ExecuteMultipleExtension) החיצונית מטפלת בתקלות לא ידוע (external_unknown), ולכן לא ידוע איזה משני המקרים יקרה.",
+      "evidence": "Update CustomerCare main.cs:132, 150-169; OnError handler of Update operation person DTSX:5482"
+    },
+    {
+      "severity": "low",
+      "text": "סנכרון איש התפעול חד-כיווני וללא ניקוי: כשאיש התפעול נמחק מחשבון המעסיק, הערך הישן נשאר בטיפול (התנאי '!=' מול NULL אינו מתקיים).",
+      "evidence": "DTSX:6778-6779"
+    },
+    {
+      "severity": "info",
+      "text": "סדר הריצה: הסנכרון של איש התפעול רץ אחרי שלב Close Gen_employercare ועל כל רשומות טיפול המעסיק, כולל רשומות שעברו למצב 3 באותה ריצה.",
+      "evidence": "precedence DTSX:7927; SQL DTSX:6772-6779 ללא סינון מצב"
+    }
+  ]
+}

@@ -1,0 +1,317 @@
+{
+  "verifier": "ssis-verifier",
+  "package": "0013_Heir_Daily",
+  "scope": "logic-claims all",
+  "checkedAt": "2026-11-07T00:00:00Z",
+  "checked": 30,
+  "results": [
+    {
+      "id": "L|summary",
+      "hash": "8652acf36369",
+      "verdict": "CONFIRMED",
+      "detail": "Zip unpack (Shell32 CopyHere), Rasham* folders, split by SUG_REC 1/2, Merge Join on MACHOZ/MIS_TIK/MIS_BAKASHA, contact lookup by ID, gen_heir Create/Update via ExecuteMultiple, archive by yyyyMMdd, unused error-file connections all verified. [CRM] (Psql/ALTSHULER_MSCRM) is only used by OLEDBSource + 3 Lookups (reads); no OLE DB Command/Destination/ExecuteSQL in the package. Config file DTSX:138 not supplied. 'Rasham = inheritance registrar' is correctly labelled as a hypothesis.",
+      "evidence": "DTSX:138; DTSX:43-47 (CRM CM); componentClassID census (no OLEDBDestination/OLEDBCommand); Create Heir main.cs:207-236; Update Heir main.cs:245-274"
+    },
+    {
+      "id": "L|exec",
+      "hash": "03b87409a6c2",
+      "verdict": "CONFIRMED",
+      "detail": "All 10 steps and triggers re-derived from PrecedenceConstraints. 14521/14522/14524 have no DTS:LogicalAnd while the others carry LogicalAnd=\"True\"; no explicit \"False\" anywhere in source/DailyProcess. End ETL has two incoming constraints, both without LogicalAnd, so OR. No event handlers, no disabled executables.",
+      "evidence": "DTSX:13081-13083, 14519-14524"
+    },
+    {
+      "id": "L|ignored",
+      "hash": "4140c5b37404",
+      "verdict": "CONFIRMED",
+      "detail": "Get Variables (gen_etlvariable read into 7 path/server variables), Create/End ETL Process record (gen_etlprocess create/update only), Move Folder To Archive (file move only), and the 7 Derived Column sinks (no downstream paths) do no CRM business writes, apply no business filter, and pass no data on to CRM. The business decisions that feed those sinks (lookup no-match, Update DontNeedToUpdate) sit in non-ignored components.",
+      "evidence": "Create ETL ScriptMain.cs:43-57 @DTSX:1062; ETL Record Finish main.cs:115-133; Set Variables main.cs:43-71; --list paths of Create And Update Heir"
+    },
+    {
+      "id": "L|finding#1",
+      "hash": "bc621b11178d",
+      "verdict": "CONFIRMED",
+      "detail": "Heir source error output, Set Heir Columns error output, contact lookup No Match, and Update Heir CastingError/Error/DontNeedToUpdate/Result all end in Derived Column components with no downstream path. Create Heir Ok/CastingError/Error outputs have no paths at all. The connections Contact Don't Exist / Convertion Failed Error / Heir Load Failed Error are referenced by no component (connectionManagerRefId census). gen_etlprocesswarning is only read (End ETL lookup DTSX:3079), never written.",
+      "evidence": "Create And Update Heir paths; connectionManagerRefId census; DTSX:3079-3084"
+    },
+    {
+      "id": "L|finding#2",
+      "hash": "aecc7be9c175",
+      "verdict": "CONFIRMED",
+      "detail": "Update Heir main.cs:162 is `Row.gencountry_IsNull != Row.Gencountrydb_IsNull || (Row.gencity_IsNull == false && IsNeedToUpdate<String>(Row.gencountry, Row.Gencountrydb))`. When both country values are non-null and city is null, a changed country is not detected. When city is non-null, Row.gencountry is read even if it is null. Both consequences are stated correctly.",
+      "evidence": "Update Heir main.cs:162 @DTSX:9184"
+    },
+    {
+      "id": "L|finding#3",
+      "hash": "cdb1df75c5a7",
+      "verdict": "CONFIRMED",
+      "detail": "Update Heir has 25 input columns and gen_name is not among them; main.cs:123-231 never sets gen_name. Create Heir sets gen_name at main.cs:150-151. The consequence is worded conditionally (may not match).",
+      "evidence": "Update Heir input list (component.mjs); Create Heir main.cs:150-151"
+    },
+    {
+      "id": "L|finding#4",
+      "hash": "a3cc39d6f92a",
+      "verdict": "WRONG",
+      "detail": "It is correct that creation does not depend on SUG_PEULA. It is not true that every non-U/C action yields status 2.",
+      "evidence": "DTSX:6903 (gen_status FriendlyExpression); Trim All Input Columns 1 main.cs:53-57 @DTSX:8048; Create Heir main.cs:173-174",
+      "wrongUnits": [
+        {
+          "unit": 1,
+          "problem": "Says the heir is always created with status 2 when the action is not U or C.",
+          "correct": "gen_status = (SUG_PEULA == \"U\" || SUG_PEULA == \"C\") ? 1 : 2. Trim All Input Columns 1 turns an empty or blank SUG_PEULA into NULL. With a NULL operand the comparisons are NULL, so the conditional returns NULL, and Create Heir then skips gen_status (`if (!Row.genstatus_IsNull)`). Status 2 applies only to a non-empty value other than U/C. A blank action creates the heir without gen_status.",
+          "evidence": "DTSX:6903; Trim 1 main.cs:53-57; Create Heir main.cs:173-174"
+        }
+      ]
+    },
+    {
+      "id": "L|finding#5",
+      "hash": "a3496167a5c3",
+      "verdict": "CONFIRMED",
+      "detail": "(1) Get File From Folder takes arr[0] after Sort of GetFiles(\"Rasham*.txt\"), and Move Folder moves the whole folder. (2) If SelectedFilePath is empty, the expression-only constraint stops Split File, so nothing follows and the folder stays. (3) `if (!Directory.Exists(destinationDateFolder)) Directory.Move(...)`: a folder that already exists in the archive is left in the source.",
+      "evidence": "Get File From Folder ScriptMain.cs:48-57; DTSX:13082; Move Folder To Archive ScriptMain.cs:94-109"
+    },
+    {
+      "id": "L|finding#6",
+      "hash": "c86b280a4d46",
+      "verdict": "WRONG",
+      "detail": "Overstated. Not every exception in these steps is swallowed.",
+      "evidence": "Move Folder To Archive ScriptMain.cs:94-115 @DTSX:11556; Convert Zips ScriptMain.cs:98-136 @DTSX:380",
+      "wrongUnits": [
+        {
+          "unit": 1,
+          "problem": "Says both steps swallow every exception with an empty catch, so the run always continues.",
+          "correct": "Move Folder To Archive: only the Directory.Exists/Directory.Move block (lines 104-110) is inside try, and its catch is not empty (it sets TaskResult = Success, line 114). The variable reads and the creation of the ArchiveFiles\\yyyyMMdd folder (lines 94-102) are outside the try, so a failure there fails the task (and the loop). Convert Zips: the catch is empty (lines 115-118), but it wraps the whole foreach, so one failing zip skips all remaining zips in that run. When the task thread is not STA, UnZip runs on a separate STA thread (lines 129-135), and exceptions thrown inside that thread are not caught by Main's catch.",
+          "evidence": "Move Folder ScriptMain.cs:94-115; Convert Zips ScriptMain.cs:98-136"
+        }
+      ]
+    },
+    {
+      "id": "L|finding#7",
+      "hash": "62e67806cf6f",
+      "verdict": "WRONG",
+      "detail": "The technical fact is right: (DT_I4)gen_region_STR_INT has errorRowDisposition=FailComponent. The runtime consequence is stated unconditionally, but it depends on data volume, and one consequence is missing.",
+      "evidence": "DTSX:6912-6915; Create Heir main.cs:189-192; Update Heir main.cs:225-226",
+      "wrongUnits": [
+        {
+          "unit": 1,
+          "problem": "Says no heir from the file is ingested at all.",
+          "correct": "The failure stops the data flow at the failing buffer. Rows in earlier buffers may already have reached Create Heir/Update Heir, and any full 1000-row batch is sent by ExecuteMultiple immediately (main.cs:191-192 / 225-226). So the claim must be conditional: usually nothing is written, unless earlier buffers already completed a batch. Also missing: with default MaximumErrorCount (no override in the DTSX), the failure fails the Foreach Loop and the package, so the remaining Rasham folders are not processed in that run and End ETL (Success constraint 14521) does not run.",
+          "evidence": "DTSX:6912; Create Heir main.cs:191-192; DTSX:14521"
+        }
+      ]
+    },
+    {
+      "id": "L|finding#8",
+      "hash": "ccbc2d5d7570",
+      "verdict": "WRONG",
+      "detail": "The DTSX fact is right: 14521, 14522 and 14524 lack DTS:LogicalAnd, and no explicit \"False\" exists in any DailyProcess package. The statement about the extractor is wrong.",
+      "evidence": "tools/dtsx-extract.mjs:181; evidence/0013_Heir_Daily.json precedenceConstraints",
+      "wrongUnits": [
+        {
+          "unit": 1,
+          "problem": "Says the extractor (dtsx-extract.mjs:181) defaults a missing LogicalAnd to True.",
+          "correct": "dtsx-extract.mjs:181 now sets `logicalAnd: A(p,'DTS:LogicalAnd') === 'True'`, with the comment 'a missing attribute means OR'. evidence/0013_Heir_Daily.json shows logicalAnd=false for the constraints at lines 14521, 14522 and 14524. The extractor and the evidence already treat a missing attribute as OR, so there is no extractor discrepancy.",
+          "evidence": "tools/dtsx-extract.mjs:181; evidence precedenceConstraints lines 14521/14522/14524"
+        }
+      ]
+    },
+    {
+      "id": "L|Package (control flow)|title",
+      "hash": "dacf74ce8f39",
+      "verdict": "CONFIRMED",
+      "detail": "Title, short_he and flow_he[1-5] match the control flow and the script code.",
+      "evidence": "DTSX:14519-14524, 13081-13083; Convert Zips ScriptMain.cs:100-112; Get Heirs Folders ScriptMain.cs:48-56"
+    },
+    {
+      "id": "L|Package (control flow)|short",
+      "hash": "019cb22ae9c2",
+      "verdict": "INCOMPLETE",
+      "detail": "The steps shown are correct, but a branch is missing and the end statement overgeneralises.",
+      "evidence": "DTSX:13082, 13083; Move Folder ScriptMain.cs:106",
+      "wrongUnits": [
+        {
+          "unit": 0,
+          "problem": "Missing the per-folder branch with no Rasham*.txt (Split File does not run; the folder is neither ingested nor archived), and the failure/already-archived cases. Unit [8] says every found folder was ingested and archived.",
+          "correct": "A folder is ingested only if it contains a Rasham*.txt (constraint DTSX:13082), and archived only if Create And Update Heir succeeded and no folder of the same name exists in today's archive (DTSX:13083; ScriptMain.cs:106). Other folders stay in the source for the next run.",
+          "evidence": "DTSX:13082-13083; Move Folder To Archive ScriptMain.cs:106"
+        }
+      ]
+    },
+    {
+      "id": "L|Package (control flow)|detailed",
+      "hash": "5648af9a4139",
+      "verdict": "WRONG",
+      "detail": "Steps [2]-[19] and [21] are correct. Unit [20] misstates the evidence file, and the failure branch omits that the loop stops.",
+      "evidence": "evidence/0013_Heir_Daily.json precedenceConstraints; tools/dtsx-extract.mjs:181",
+      "wrongUnits": [
+        {
+          "unit": 20,
+          "problem": "Says the evidence file shows logicalAnd=true (the extractor's default) for these constraints.",
+          "correct": "evidence/0013_Heir_Daily.json has logicalAnd=false for the constraints at 14521 and 14522 (and 14524). The extractor treats a missing attribute as OR (dtsx-extract.mjs:181).",
+          "evidence": "evidence precedenceConstraints; dtsx-extract.mjs:181"
+        },
+        {
+          "unit": 19,
+          "problem": "The failure branch only says the folder is not archived.",
+          "correct": "A failure of Split File or Create And Update Heir also fails the Foreach Loop (default MaximumErrorCount, not overridden). The remaining folders are not processed in this run and End ETL is not reached (Success constraint 14521).",
+          "evidence": "DTSX:3144 (no MaximumErrorCount override), DTSX:14521"
+        }
+      ]
+    },
+    {
+      "id": "L|Package (control flow)|detail",
+      "hash": "2fdae6339d23",
+      "verdict": "CONFIRMED",
+      "detail": "Source, population, decisions (isFileExist, SelectedFilePath != \"\", Success of Create And Update Heir, archive-exists check), no CRM write in the control flow, and the re-ingest outcome all match. Note: the gen_etlvariable / config wording is acceptable only as hedged. The configuration is applied at load, and Set Variables later overwrites all 7 ReadWrite variables or throws (main.cs:46-53).",
+      "evidence": "Get Heirs Folders ScriptMain.cs:48-56; DTSX:13082-13083, 14522, 14524; Move Folder ScriptMain.cs:106"
+    },
+    {
+      "id": "L|Package (control flow)|decisions",
+      "hash": "190ffac55b8d",
+      "verdict": "CONFIRMED",
+      "detail": "All 6 decisions match code lines and constraint expressions/EvalOps exactly.",
+      "evidence": "Get Heirs Folders ScriptMain.cs:51-56; DTSX:14522, 14524, 13082; Get File From Folder ScriptMain.cs:54-57; Move Folder ScriptMain.cs:106-108"
+    },
+    {
+      "id": "L|Package (control flow)|open",
+      "hash": "bb27111f73a4",
+      "verdict": "CONFIRMED",
+      "detail": "The path variable values are not in the package (empty defaults, DTSX:141-186; gen_etlvariable data and config not supplied). Zip naming cannot be determined from the package.",
+      "evidence": "DTSX:141-186; DTSX:138"
+    },
+    {
+      "id": "L|Package\\Foreach Loop Container\\Split File|title",
+      "hash": "528ed5890a41",
+      "verdict": "CONFIRMED",
+      "detail": "Fixed-width (RaggedRight) read. Trim of MACHOZ, MIS_TIK, MIS_BAKASHA and SUG _BAKASHA (exactly the 4 readWrite inputs). The split outputs are named Contact Details (SUG_REC==\"1\") and Heir Details (\"2\"), and the default output is unconnected.",
+      "evidence": "DTSX:120-130; Split File Trim inputs; DTSX:12051"
+    },
+    {
+      "id": "L|Package\\Foreach Loop Container\\Split File|short",
+      "hash": "5740b22b9abe",
+      "verdict": "CONFIRMED",
+      "detail": "Matches the data flow: Read data -> Trim -> Conditional Split -> two flat file destinations; the default output is dropped.",
+      "evidence": "Split File paths; DTSX:12051"
+    },
+    {
+      "id": "L|Package\\Foreach Loop Container\\Split File|detailed",
+      "hash": "04be315005bb",
+      "verdict": "CONFIRMED",
+      "detail": "Source - Rasham: RaggedRight, cp1255, ColumnNamesInFirstDataRow=True, columns MACHOZ(1)/MIS_TIK(9)/MIS_BAKASHA(9)/SUG _BAKASHA(3)/SUG_REC(1)/Column 0. Read data has RetainNulls=true and FailComponent on error and truncation for all 6 columns. The destinations write all 6 columns to Contact/Heir Details with Overwrite. Source - Contact/Heir Details each have 14 columns.",
+      "evidence": "DTSX:120-130, 12152-12193, 12051, 12092-12124, 76-115"
+    },
+    {
+      "id": "L|Package\\Foreach Loop Container\\Split File|detail",
+      "hash": "b23f551c497c",
+      "verdict": "CONFIRMED",
+      "detail": "Population, decisions, no CRM write and outcome are correct. The contact record fields used later are MIS_ZEHUT_MORISH and TAARICH_MATAN_ZAV_RASHAM.",
+      "evidence": "DTSX:123, 12051, 4354-4360"
+    },
+    {
+      "id": "L|Package\\Foreach Loop Container\\Split File|decisions",
+      "hash": "42f5435c316a",
+      "verdict": "CONFIRMED",
+      "detail": "SUG_REC == \"1\" (order 0) goes to Contact File Destination, == \"2\" goes to Heir File Destination, and the default output has no path.",
+      "evidence": "DTSX:12051-12070; Split File paths"
+    },
+    {
+      "id": "L|Package\\Foreach Loop Container\\Split File|open",
+      "hash": "1f4194a38725",
+      "verdict": "CONFIRMED",
+      "detail": "Other SUG_REC meanings are not defined in any supplied file. Whether a header row exists cannot be known from the package; ColumnNamesInFirstDataRow=True is verified.",
+      "evidence": "DTSX:123"
+    },
+    {
+      "id": "L|Package\\Foreach Loop Container\\Create And Update Heir|title",
+      "hash": "e45c3d2db6ea",
+      "verdict": "WRONG",
+      "detail": "Everything except the status rule is correct.",
+      "evidence": "DTSX:6903; Trim All Input Columns 1 main.cs:53-57",
+      "wrongUnits": [
+        {
+          "unit": 5,
+          "problem": "Says the status is U/C -> 1, otherwise 2.",
+          "correct": "The status is 1 for U/C and 2 for any other non-empty value. An empty/blank SUG_PEULA becomes NULL in Trim All Input Columns 1, the conditional returns NULL, and no status is derived (Create Heir skips gen_status).",
+          "evidence": "DTSX:6903; Trim 1 main.cs:53-57; Create Heir main.cs:173-174"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Foreach Loop Container\\Create And Update Heir|short",
+      "hash": "cf2c800a2c66",
+      "verdict": "CONFIRMED",
+      "detail": "Inner Merge Join, contact lookup No Match to an undocumented sink, heir lookup No Match to Create, Match to Update of changed fields. The flow is correct at summary level.",
+      "evidence": "DTSX:6752-6758; DTSX:4254-4282; DTSX:4070-4118; Create And Update Heir paths"
+    },
+    {
+      "id": "L|Package\\Foreach Loop Container\\Create And Update Heir|detailed",
+      "hash": "961b8c512d5a",
+      "verdict": "WRONG",
+      "detail": "Units [1]-[4], [7]-[19] and [21]-[23] are verified (Heir RedirectRow on error and truncation, Contact FailComponent, Merge Join Inner/3 keys/TreatNullsAsEqual, lookups on contact.gen_identitynumber and gen_heir on 4 keys, Full cache, 1000-row batches, date compare with AddHours(3)). Units [5], [6] and [20] are wrong or incomplete.",
+      "evidence": "DTSX:6903; Append Zeros main.cs:57-66; Update Heir main.cs:131-218 + BufferWrapper.cs:51-56,381-387",
+      "wrongUnits": [
+        {
+          "unit": 5,
+          "problem": "Says status is 2 in every other case.",
+          "correct": "When SUG_PEULA is empty (NULL after Trim All Input Columns 1) the expression yields NULL, not 2.",
+          "evidence": "DTSX:6903; Trim 1 main.cs:53-57"
+        },
+        {
+          "unit": 6,
+          "problem": "Omits that a missing ID is turned into zeros.",
+          "correct": "FormatField sets a NULL or empty ID to \"\" and pads it to \"000000000\" (main.cs:59-64). A heir with no ID is looked up and created with gen_identitynumber 000000000, and a missing customer ID is looked up as 000000000.",
+          "evidence": "Append Zeros To Fields main.cs:57-66 @DTSX:3161"
+        },
+        {
+          "unit": 20,
+          "problem": "States as fact that a field emptied in the file is sent as empty to clear it, and that an empty or invalid order date is simply not sent.",
+          "correct": "In both cases the code reads the NULL column through the generated getter `Buffer.GetString(...)` (BufferWrapper.cs:55, 385): line 133 etc. for an emptied field, and line 209 unconditionally for the date. Whether this returns null or throws is not proven by the files (the analyst's own open question [4]). Under documented SSIS behaviour a NULL read throws, which sends the whole row to CastingError with no update at all. This unit must be labelled unverified/hypothesis, not stated as fact.",
+          "evidence": "Update Heir main.cs:131-134, 207-218; BufferWrapper.cs:51-56, 381-387"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Foreach Loop Container\\Create And Update Heir|detail",
+      "hash": "139a1eb409a8",
+      "verdict": "WRONG",
+      "detail": "Population, matching keys, Full cache, SDK Create/Update in 1000-row batches, no SQL DML and lookups on [CRM] are verified. Unit [3] has the status rule wrong.",
+      "evidence": "DTSX:6903; Create Heir main.cs:173-174",
+      "wrongUnits": [
+        {
+          "unit": 3,
+          "problem": "Says the status is derived as U/C -> 1, otherwise 2.",
+          "correct": "U/C gives 1, any other non-empty value gives 2, and an empty SUG_PEULA gives NULL (no status written on create).",
+          "evidence": "DTSX:6903; Trim 1 main.cs:53-57; Create Heir main.cs:173-174"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Foreach Loop Container\\Create And Update Heir|decisions",
+      "hash": "6bb93254fffe",
+      "verdict": "CONFIRMED",
+      "detail": "Decisions 1-6 match DTSX/code exactly: Merge Join properties, the status expression text, contact lookup on gen_identitynumber, heir lookup on 4 JoinToReferenceColumns (identitynumberdb, portfolionumberdb, requestnumberdb, regiondb), the per-field update condition with the line-162 anomaly, and the date sent only if TryParse succeeds.",
+      "evidence": "DTSX:6754-6756, 6903, 4254-4282, 4070-4118; Update Heir main.cs:131-218"
+    },
+    {
+      "id": "L|Package\\Foreach Loop Container\\Create And Update Heir|crm",
+      "hash": "49edb9da7211",
+      "verdict": "CONFIRMED",
+      "detail": "gen_heir Create (RequestType.Create) and Update (RequestType.Update) go through ExecuteMultipleExtension (SDK). The contact and gen_heir reads are Full-cache Lookups (CacheType=0) on [CRM].",
+      "evidence": "Create Heir main.cs:207-210; Update Heir main.cs:245-248; DTSX:4112, 4276"
+    },
+    {
+      "id": "L|Package\\Foreach Loop Container\\Create And Update Heir|open",
+      "hash": "309a7bc68ef3",
+      "verdict": "WRONG",
+      "detail": "Units [1], [3], [4] and [5] are genuine open points. Unit [2] can be answered from the supplied DTSX.",
+      "evidence": "DTSX:79-92 (Source - Contact Details columns), DTSX:4354-4360 (Contact source externalMetadata), DTSX:114 (KIRVA_EL_MANOCH)",
+      "wrongUnits": [
+        {
+          "unit": 2,
+          "problem": "Says it is unproven whether the SUG_REC=1 record represents the deceased/bequeather.",
+          "correct": "The flat file connection Source - Contact Details labels the type-1 record columns MIS_ZEHUT_MORISH, LAST_NAME_MORISH, FIRST_NAME_MORISH and TAARICH_PTIRA_MORISH (bequeather's ID, names, death date). The Contact source maps gen_customeridentitynumber <- MIS_ZEHUT_MORISH, and that is the ID used to find the CRM contact. The heir record has KIRVA_EL_MANOCH (relation to the deceased). The files therefore label the customer as the bequeather.",
+          "evidence": "DTSX:85-88; Contact source outputColumn gen_customeridentitynumber externalMetadataColumnId ...[MIS_ZEHUT_MORISH] (~DTSX:4360); DTSX:114"
+        }
+      ]
+    }
+  ]
+}

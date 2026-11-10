@@ -1,0 +1,550 @@
+{
+  "verifier": "ssis-verifier",
+  "package": "0029_POA",
+  "scope": "logic-claims re-check round 3",
+  "checkedAt": "2026-11-07",
+  "checked": 31,
+  "notes": "Recurring problems, labelled per claim:\n- LATEST. rowNumber = ROW_NUMBER() OVER (PARTITION BY gen_applicantidentitynumber ORDER BY gen_signaturedateofpowerofattorney DESC) (DTSX:26931). A window ORDER BY cannot see the SELECT alias of the same level, so it binds to the raw column, not to the alias convert(date, DATEADD(hour,3,isnull(gen_signaturedateofpowerofattorney, gen_signaturedate))) (DTSX:26954). The ranking ignores the gen_signaturedate fallback that the population filter uses (DTSX:26987). A NULL POA signature date ranks last (DESC). Ties are arbitrary. The partition covers all POA types fetched.\n- NOAGENT. On the PJ Match path, NULL agent/agency become Guid.Empty (Check If Poa Attached main.cs:52-53, DTSX:31595; CreatePOARows DTSX:31640), so the Create POA Main guard (main.cs:327, DTSX:34169) does not stop those rows.\n- OWN. Ownership of unqualified columns in multi-table queries is stated without the ownership argument that the standard requires.\n- Confirmed by re-derivation: the precedence chain (DTSX:45650-45663, all Success); disabled flags; the AJ and PJ path topology; the lookup SQL and parameter maps (DTSX:22205, 22026, 21620, 21816, 27982, 36518, 31273); the period-merge code (main.cs:117-136); create attributes for AJ (main.cs:167-264) and PJ (main.cs:146-265); the update scripts; the SQL update of gen_pensionjoiningbase (DTSX:36944); cross-package references 0027:1371/5936, 0006:9752, 0012:100190, 0033:15, 0031:40447-40453/31302, 0030:6661, 0028:8053-8058.",
+  "results": [
+    {
+      "id": "L|summary",
+      "hash": "6890190f40d6",
+      "verdict": "WRONG",
+      "detail": "scopeNote_he verified:\n- 14 pipelines, 10 disabled (DTSX 79, 2555, 4992, 7356, 10195, 13047, 15775, 18634, 37781, 43174).\n- [CRM] = Psql/ALTSHULER_MSCRM at design time (DTSX:4-6), with the config-file override caveat (DTSX:11).\n- The only direct DML is Update Pension Joining (gen_pensionjoiningbase, DTSX:36944) and, in a disabled flow, Update TransferRequest (UPDATE gen_transferrequest).\n- POAMainMonthsToAdd comes from gen_etlvariable (DTSX:42346) through Set Organization Variables.\nsummary_he has four wrong units (see wrongUnits).",
+      "evidence": "0029_POA.dtsx:4-11, 26931, 26954, 26984, 26987, 27968-27982, 31595, 31640, 34169, 36384, 36944, 45650-45663",
+      "wrongUnits": [
+        {
+          "unit": "[1] 'בב'1 חתימה שאינה האחרונה מבין ההצטרפויות של העמית שנשלפו בריצה'",
+          "problem": "LATEST. Rank 1 is the joining with the latest raw gen_signaturedateofpowerofattorney, not the latest effective signature (with the gen_signaturedate fallback). NULLs rank last and ties are arbitrary. So a joining can be marked without creation even when its signature is the latest, and one of two equally dated joinings is marked.",
+          "correct": "בב'1 ממשיכה רק ההצטרפות המדורגת ראשונה לפי gen_signaturedateofpowerofattorney הגולמי בסדר יורד (בלי החלופה gen_signaturedate; ריק — אחרון; בשוויון — לא מוגדר איזו), מבין כל ההצטרפויות של אותה ת״ז שנשלפו בריצה (מכל סוגי ייפוי הכוח).",
+          "evidence": "DTSX:26931, 26954, 26987, 22253"
+        },
+        {
+          "unit": "[1] 'בפנסיה נשארות לא מסומנות הצטרפות בלי סוכן ובלי סוכנות'",
+          "problem": "NOAGENT. This holds only when the ID has no active POA Main. On the Match path the agent and agency arrive as Guid.Empty. By the files, a POA Main is then created without agent or agency, and the joining is marked 3.",
+          "correct": "Make it conditional on the path. See the NOAGENT wording in the PJ claims.",
+          "evidence": "Check If Poa Attached main.cs:52-53, 97-98 (DTSX:31595, 31640); Create POA Main main.cs:154-162, 327 (DTSX:34169)"
+        },
+        {
+          "unit": "[1] the list of AJ paths that mark without create or link",
+          "problem": "The list omits B2 joinings that are already linked. Is Exists POA Main By Automated Joining (full cache on all Gen_powerofattorneymain.gen_automatedjoining) Match goes to Union All Input 6 and then Update Automated Joining, which marks without creating or linking. The enumeration reads as complete.",
+          "correct": "Add 'ב'2 שכבר מקושר לייפוי כוח ראשי' to the AJ paths that are marked.",
+          "evidence": "DTSX:27968-27982; path Is Exists POA Main By Automated Joining.Lookup Match Output -> Union All Automated Joining Id For Update.Input 6"
+        },
+        {
+          "unit": "[1] 'הצטרפויות ממוכנות בסטטוס 8' / 'הצטרפויות פנסיה בסטטוס 13'",
+          "problem": "OWN. gen_joiningstatus is unqualified in both multi-table source queries (AJ DTSX:26984, 6 sources; PJ DTSX:36384, 4 sources). The text attributes it to the joining without the ownership argument.",
+          "correct": "Add the ambiguity argument with evidence: aj.gen_joiningstatus (0028:3417, 0005, 0015), gen_automatedjoining.gen_joiningstatus (0037), and pj.gen_joiningstatus (0028:915).",
+          "evidence": "DTSX:26977-26984, 36380-36384"
+        }
+      ]
+    },
+    {
+      "id": "L|exec",
+      "hash": "cf6eadc1e4a6",
+      "verdict": "CONFIRMED",
+      "detail": "All 14 precedence constraints (DTSX 45650-45663) have no DTS:Value, so all are Success, LogicalAnd. They form exactly the stated chain. Get Organization Variables has no incoming constraint. The disabled flags and their DTSX lines match. Get ETL variable reads gen_etlvariable where gen_scope = 'global' OR = System::PackageName (DTSX:42346), and Set Organization Variables loads POAMainMonthsToAdd (ReadWriteVariables, DTSX:43144). The meanings of gen_type 1/2 are labelled השערה. The note that disabled tasks do not block is labelled SSIS behaviour.",
+      "evidence": "0029_POA.dtsx:45650-45663, 42341-42380, 43144",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|finding#3",
+      "hash": "eddf8ad59d3f",
+      "verdict": "CONFIRMED",
+      "detail": "Check If POA Of Customer Account Exists (DTSX:22176) has no path from its Match Output. If POA period merge sends non-redirected rows to Output 0 (sync, no exclusion group), and Output 0 has no path (main.cs:117-136). These rows never reach Update Automated Joining, gen_testedtocreatepoa stays NULL/0, and the source filter (DTSX:26983) fetches them again in later runs while they still meet its conditions. The text is neutral, not framed as a bug. Note: 'בכל ריצה' implicitly assumes the joining still meets the source filter.",
+      "evidence": "0029_POA.dtsx:22176-22205, 27154, 26983; AJ path list",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|finding#6",
+      "hash": "a0fe1665223c",
+      "verdict": "CONFIRMED",
+      "detail": "PJ Update POA Main Output 0 has synchronousInputId and no exclusionGroup (DTSX:37747), so every row passes to Union All 2 Input 2 and then Update Pension Joining. The catch only adds an Error row (main.cs:37-41). The message 'Pension Joining Id: ' (20 chars) + GUID (36 chars) + ... is longer than ErrorDescription wstr(50). The component failure is correctly labelled as documented SSIS runtime behaviour not shown in the files. The text is conditional and not framed as a bug.",
+      "evidence": "0029_POA.dtsx:36979, 37169, 37747-37752; Update POA Main main.cs:28-42",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Create POA Main For Automated Joining|title",
+      "hash": "5f9d6b5a29f9",
+      "verdict": "WRONG",
+      "detail": "The structure matches the paths and code. Three wrong units (see wrongUnits).",
+      "evidence": "0029_POA.dtsx:26931, 26954, 26977-26987, 23037-23045, 24449",
+      "wrongUnits": [
+        {
+          "unit": "short_he / flow_he[1]: status 8, POA type 1/2, signature date and 'לא נבדקו' stated as the joining's",
+          "problem": "OWN. gen_joiningstatus, gen_typeofpowerofattorney, gen_signaturedateofpowerofattorney, gen_signaturedate and gen_testedtocreatepoa are unqualified in a 6-source query (DTSX:26977-26987). Ownership is not argued. No supplied file qualifies gen_typeofpowerofattorney or gen_signaturedateofpowerofattorney.",
+          "correct": "Add the ambiguity argument with evidence where it exists: gen_joiningstatus (aj.* 0028:3417), gen_signaturedate (aj.* 0015:68557), gen_testedtocreatepoa (SDK write on gen_automatedjoining, Update Automated Joining main.cs:70). State the owner of gen_typeofpowerofattorney and gen_signaturedateofpowerofattorney as not proven.",
+          "evidence": "DTSX:26977-26987"
+        },
+        {
+          "unit": "flow_he[4] 'רק החתימה האחרונה מבין ההצטרפויות של העמית שנשלפו בריצה'",
+          "problem": "LATEST. Ranking is by the raw gen_signaturedateofpowerofattorney only: NULL last, ties arbitrary, across all POA types.",
+          "correct": "See the summary LATEST correction.",
+          "evidence": "DTSX:26931, 26954"
+        },
+        {
+          "unit": "flow_he[6] 'יצירת gen_powerofattorneymain והערת סריקה, ואז עדכון gen_testedtocreatepoa = true'",
+          "problem": "The order is stated as fact but is not guaranteed. Create POA Main's Success output is synchronous (DTSX:24449), so every row goes on to marking as soon as its buffer is released. Creation runs only when Buffer.EndOfRowset() is true (main.cs:452-455, DTSX:23043). Rows in earlier buffers are therefore marked before creation is attempted.",
+          "correct": "Drop 'ואז', or state that the marking does not wait for creation.",
+          "evidence": "DTSX:23037-23045, 24449"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Create POA Main For Automated Joining|short",
+      "hash": "7f2cc249d74b",
+      "verdict": "WRONG",
+      "detail": "Re-derived and correct:\n- The decision structure matches the paths: Check If POA Of Customer Account Exists Match has no path; Check Type of POA ==1 / ==2 / else.\n- B1: Check If Exists POA Main (full cache, latest active B1, by createdon) -> Bet 1 lookup ±7 -> link, or period merge -> stop or create.\n- B2: Is Exists -> marked; Bet 2 ±7 -> link, else create.\n- Marking via Update Automated Joining.\n- Failure behaviour is explicitly excluded.\nNote: [17] omits that in the agent branch the existing POA Main must also have an agent identity (main.cs:130-131). This matters only if a NULL agent identity matches NULL in the full-cache lookup, which is runtime behaviour, so it is noted, not flagged.",
+      "evidence": "0029_POA.dtsx:21936-22026, 21545-21620, 21740-21816, 22176-22205, 22253, 22286, 27154, 27968, 26931",
+      "wrongUnits": [
+        {
+          "unit": "[1] 'עם סוג ייפוי כוח מוגדר שאינו 3 ..., עם תאריך חתימה, שעדיין לא נבדקו' (status 8)",
+          "problem": "OWN. Unqualified columns are attributed to the joining without argument (DTSX:26983-26987).",
+          "correct": "Add the ownership argument, or state 'לא מוכח' for gen_typeofpowerofattorney and gen_signaturedateofpowerofattorney.",
+          "evidence": "DTSX:26977-26987"
+        },
+        {
+          "unit": "[23] 'בב'1, כשהחתימה אינה האחרונה מבין ההצטרפויות של העמית שנשלפו בריצה'",
+          "problem": "LATEST.",
+          "correct": "See the summary LATEST correction.",
+          "evidence": "DTSX:26931, 26954"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Create POA Main For Automated Joining|detailed",
+      "hash": "f0e3975b5d0e",
+      "verdict": "WRONG",
+      "detail": "Verified:\n- [3]-[9] lookups, splits and paths.\n- [14] full-cache keys Gen_identitynumberINT, gen_agentidentity, gen_agencyidentity, with rownumber = 1 by createdon desc after the WHERE (appendixtype 2, currentstate 1, signaturedate not null).\n- [18] Bet 1 parameterised SQL and parameter order (DTSX:21620), with null exclusions -> 2 from Add Column Bet 1.\n- [22] period-merge logic (main.cs:117-136, including the agent-branch identity requirement).\n- [28]-[36] Is Exists and Bet 2; ExcludeProvidentFunds is the raw joining value (DTSX:21816).\n- [39]-[43] early returns, duplicate check (B1 already collected, same ID, same agent or agency, signature <=) and Dictionary per joining (main.cs:319-335).\n- [44]-[45], [47]-[51] attributes, monthsToAdd TryParse else 3 (main.cs:137-140), PostExecute throw (main.cs:103-110), annotation text.\n- [52] marking: Success is sync and passes all rows.\nFour wrong units (see wrongUnits).",
+      "evidence": "0029_POA.dtsx:26931, 26954, 26973, 26977-26987, 21367-21620, 21936-22026, 22327 (main.cs:137-305, 317-456), 27154, 29486, 30374, 43144",
+      "wrongUnits": [
+        {
+          "unit": "[1] population stated as the joining's columns",
+          "problem": "OWN. gen_joiningstatus, gen_typeofpowerofattorney, gen_signaturedateofpowerofattorney, gen_signaturedate and gen_testedtocreatepoa are unqualified in a 6-source query. Ownership is not argued.",
+          "correct": "Add the argument, or state 'לא מוכח' as in |title.",
+          "evidence": "DTSX:26977-26987"
+        },
+        {
+          "unit": "[2] 'מספר סידורי לפי תאריך חתימה יורד לכל ת״ז'",
+          "problem": "In this claim's own terms ([1]), 'תאריך חתימה' is the fallback gen_signaturedate. The order actually uses only the raw gen_signaturedateofpowerofattorney (window ORDER BY binds to the base column, not the alias at DTSX:26954). NULLs rank last and ties are arbitrary.",
+          "correct": "מספר סידורי לפי gen_signaturedateofpowerofattorney הגולמי (תאריך חתימת ייפוי הכוח, בלי החלופה gen_signaturedate) בסדר יורד; ריק — אחרון; בשוויון — סדר לא מוגדר.",
+          "evidence": "DTSX:26931, 26954"
+        },
+        {
+          "unit": "[10], [52], [53] 'החתימה האחרונה מבין ההצטרפויות של העמית שנשלפו בריצה'",
+          "problem": "LATEST. The partition also mixes B1, B2 and other types, so a B1 joining can lose rank 1 to another type.",
+          "correct": "See the summary LATEST correction.",
+          "evidence": "DTSX:26931, 22253"
+        },
+        {
+          "unit": "[46] 'האם לסוכן או לסוכנות מוגדר ״תוקף 3 חודשים״?'",
+          "problem": "This reads as an OR of the two flags. The code uses ISNULL(Gen_agents.gen_validity3months, Gen_agencie.gen_validity3months) (DTSX:26973). When the joining has an agent whose flag is false, the agency flag is ignored, and the end date is +10 years even if the agency has the flag.",
+          "correct": "האם ״תוקף 3 חודשים״ של הסוכן מסומן — ואם אצל הסוכן הערך ריק (או שאין סוכן) — של הסוכנות?",
+          "evidence": "DTSX:26973; Create POA Main main.cs:256-264, 430-433"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Create POA Main For Automated Joining|detail",
+      "hash": "2441b999edb2",
+      "verdict": "WRONG",
+      "detail": "Verified:\n- [2] the three matching levels.\n- [3] period merge, including the agent-branch requirement, and POAMainMonthsToAdd behaviour.\n- [4] the four SDK writes.\n- [5] outcome.\n- [6] sourceTables cross-references: 0027:1371/5936 update gen_automatedjoining, and no creator was found; 0006:9752, 0012:100190, 0033:15; 0031:40252 / 40447-40453 SDK gen_currentstate; 0031:31302 and 0030:6661 update Gen_powerofattorneyBase.\nTwo wrong units (see wrongUnits).",
+      "evidence": "0029_POA.dtsx:26931, 26977-26987; cross-package lines as listed",
+      "wrongUnits": [
+        {
+          "unit": "[1] 'gen_automatedjoining פעילה, gen_joiningstatus = 8, gen_typeofpowerofattorney מוגדר ושונה מ-3, יש תאריך חתימה, ו-gen_testedtocreatepoa ריק או 0'",
+          "problem": "OWN. Unqualified columns are listed under gen_automatedjoining without the ownership argument. No file qualifies gen_typeofpowerofattorney or gen_signaturedateofpowerofattorney.",
+          "correct": "Add the argument, or state 'לא מוכח', as in |title.",
+          "evidence": "DTSX:26977-26987"
+        },
+        {
+          "unit": "[3] 'בב'1, חתימה אחרונה מבין ההצטרפויות של העמית שנשלפו בריצה (rowNumber = 1)'",
+          "problem": "LATEST.",
+          "correct": "See the summary LATEST correction.",
+          "evidence": "DTSX:26931, 26954"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Create POA Main For Automated Joining|decisions",
+      "hash": "77ef1af9a2dc",
+      "verdict": "WRONG",
+      "detail": "Condition texts [1]-[10] match the DTSX: SQL WHERE; lookup SQL and parameter maps at DTSX:22205, 22026, 21620, 21816, 27982; split expressions at DTSX:22253 and 22286; main.cs:117-136; main.cs:256-264. The [7] meaning is labelled השערה. Two meaning units are wrong (see wrongUnits).",
+      "evidence": "0029_POA.dtsx:26931, 26954, 26983-26987, 22253",
+      "wrongUnits": [
+        {
+          "unit": "[1] meaning_he 'הצטרפות בסטטוס 8 ... עם סוג ייפוי כוח מוגדר שאינו 3'",
+          "problem": "OWN. Unqualified gen_joiningstatus and gen_typeofpowerofattorney are attributed to the joining without argument.",
+          "correct": "Add the argument for gen_joiningstatus, and state 'לא מוכח' for gen_typeofpowerofattorney.",
+          "evidence": "DTSX:26977-26986"
+        },
+        {
+          "unit": "[4] meaning_he 'החתימה האחרונה מבין ההצטרפויות של העמית שנשלפו בריצה'",
+          "problem": "LATEST.",
+          "correct": "See the summary LATEST correction.",
+          "evidence": "DTSX:26931, 26954"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Create POA Main For Automated Joining|crm",
+      "hash": "0a7f3814e2ff",
+      "verdict": "WRONG",
+      "detail": "The four writes are verified:\n- Create POA Main: new Entity(gen_powerofattorneymain) + service.Create (main.cs:167, 266).\n- Annotation: objectid = the POA Main (main.cs:290-294).\n- Update POA Main: gen_automatedjoining (main.cs:32-35).\n- Update Automated Joining: gen_testedtocreatepoa = true (main.cs:67-72).\nThe marking list matches the Union All inputs 1, 2, 3, 4 and 6. One wrong unit (see wrongUnits).",
+      "evidence": "0029_POA.dtsx:22327, 29486, 30374, 26931",
+      "wrongUnits": [
+        {
+          "unit": "[4] when_he 'בב'1 חתימה שאינה האחרונה מבין ההצטרפויות של העמית שנשלפו בריצה'",
+          "problem": "LATEST.",
+          "correct": "See the summary LATEST correction.",
+          "evidence": "DTSX:26931, 26954"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Create POA Main For Pension Joining|title",
+      "hash": "7c24ac45a9d2",
+      "verdict": "WRONG",
+      "detail": "flow_he[2]-[5] verified:\n- Get POA Main: partial lookup, statecode = 0.\n- Check If Poa Attached main.cs:47-84: SDK mark; one candidate per ID; the attached joining evicts the candidate; NoMatch rows go straight to Union All Input 3.\n- Check If Exist POA ±7, then link or create.\n- SQL marking (DTSX:36944).\n'הסתיים' and 'נדרש' come from SQL comments (DTSX:36384, 36388). One wrong unit (see wrongUnits).",
+      "evidence": "0029_POA.dtsx:36380-36388, 36495-36518, 31387, 31194, 36944",
+      "wrongUnits": [
+        {
+          "unit": "short_he 'ויש בהן תאריך חתימת ייפוי כוח' / flow_he[1] 'בסטטוס 13 עם gen_createpoamain = 1 ותאריך חתימה'",
+          "problem": "OWN. gen_joiningstatus, gen_dateofpoasignature and gen_createpoamain are unqualified in a 4-source query (gen_pensionjoining, Gen_agencie, gen_agents, Contact; DTSX:36380-36388). The text treats them as the joining's columns without argument. No supplied file qualifies gen_dateofpoasignature.",
+          "correct": "Add the ambiguity argument with evidence: pj.gen_joiningstatus (0028:915), and the SDK write of gen_createpoamain on gen_pensionjoining (Check If Poa Attached main.cs:71-74). State the owner of gen_dateofpoasignature as not proven.",
+          "evidence": "DTSX:36380-36388"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Create POA Main For Pension Joining|short",
+      "hash": "1d12e318dbee",
+      "verdict": "WRONG",
+      "detail": "Steps [2]-[12] match the paths and code. The one-joining-per-ID rule and the eviction case in [13] are verified (main.cs:47-84, 88-121). Two wrong units (see wrongUnits).",
+      "evidence": "0029_POA.dtsx:31595, 31605, 31640, 34169, 36380-36388",
+      "wrongUnits": [
+        {
+          "unit": "[1] 'הצטרפויות פנסיה שהסתיימו, שנדרש ליצור להן ייפוי כוח ראשי, ושיש בהן תאריך חתימת ייפוי כוח'",
+          "problem": "OWN. Unqualified WHERE columns are attributed to the joining without argument.",
+          "correct": "As in |title.",
+          "evidence": "DTSX:36380-36388"
+        },
+        {
+          "unit": "[13] 'הצטרפות בלי סוכן ובלי סוכנות ... לא מקבלות ייפוי כוח ראשי ונשארות ״נדרש״'",
+          "problem": "NOAGENT. This is true only when the ID has no active POA Main (Get POA Main NoMatch, raw NULLs). On the Match path, Check If Poa Attached writes Guid.Empty (non-NULL) for a missing agent or agency (main.cs:52-53, 97-98). The Create POA Main guard 'genagencyname_IsNull && genagentname_IsNull' (main.cs:327) then does not fire. By the files, a POA Main without gen_agentname or gen_agencyname is created (main.cs:154-162 skip Guid.Empty), Success follows, and the joining is marked 3.",
+          "correct": "רק כשלת״ז אין ייפוי כוח ראשי פעיל: בלי סוכן ובלי סוכנות → אין יצירה ונשארת ״נדרש״. כשלת״ז יש ייפוי כוח ראשי פעיל, ההצטרפות המועמדת נוצרת לפי הקבצים בלי סוכן ובלי סוכנות ומסומנת (ואם גם הרישיונות ריקים — לפי התנהגות SSIS המתועדת, לא מוצג בקבצים, קריאת agentcyIdentityNumber הריק ב-main.cs:62 מכשילה את הרכיב).",
+          "evidence": "DTSX:31595, 31605, 31640, 34169, 34178; lineage Create POA Main.gen_agentname <- Union All Output 1 <- CreatePOARows"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Create POA Main For Pension Joining|detailed",
+      "hash": "92b7d15be67f",
+      "verdict": "WRONG",
+      "detail": "Verified:\n- [2] agentcyIdentityNumber = ISNULL(agent licence, agency licence).\n- [3]-[11] Get POA Main and Check If Poa Attached, including eviction.\n- [12] exclusion defaults: type == 2 on the Match path; NULL -> Derived NULL -> no match / 2 on create.\n- [13] Derived Column expressions.\n- [14] Check If Exist POA SQL and parameter order (DTSX:31223-31273); inner filter gen_currentstate = 1.\n- [16] Update POA Main uses the joining id (lineage: Union All gen_pensionjoiningid).\n- [24] attributes (main.cs:146-265).\n- [25] annotation and the Success row before CreateAnnotation (main.cs:271-275).\n- [26] marking, with the runtime part labelled.\nThree wrong units (see wrongUnits).",
+      "evidence": "0029_POA.dtsx:31194-31273, 31387 (main.cs:45-121), 33566 (main.cs:142-406), 35357, 36347-36388, 36906-36944, 36979, 37741, 37747",
+      "wrongUnits": [
+        {
+          "unit": "[1] population: status 13, signature date, 'נדרש' stated as the joining's",
+          "problem": "OWN. Unqualified columns are used without argument. No file qualifies gen_dateofpoasignature.",
+          "correct": "As in |title.",
+          "evidence": "DTSX:36380-36388"
+        },
+        {
+          "unit": "[19]-[21] 'האם יש בהצטרפות סוכן או סוכנות? לא → אין יצירה ואין סימון' and the matching sentence in [27]",
+          "problem": "NOAGENT. On the Match path the guard (main.cs:327) sees Guid.Empty, not NULL, so it does not stop the row. By the files, a POA Main without agent or agency is created and the joining is marked 3. The decision as drawn applies only to the NoMatch path.",
+          "correct": "Draw the agent/agency check only on the NoMatch path (no active POA Main for the ID). On the Match path, describe creation without agent or agency, with the documented runtime NULL-read failure when the licences are also empty.",
+          "evidence": "DTSX:31595, 31605, 31640, 34169, 34178"
+        },
+        {
+          "unit": "[12] NULL handling described for exclusions only",
+          "problem": "The same path-dependent NULL handling applies to the other match fields gen_includecomprehensivepension, gen_includegeneralpension and gen_cancelpoaforinformation. On the Match path, NULL -> false (Check If Poa Attached main.cs:56, 60). On the NoMatch path the raw NULL is passed as a Check If Exist POA parameter (DTSX:31273, from Union All), so no match is possible and a new POA Main is always created (written false, Create main.cs:254-258). This decides between link and create, and it is missing.",
+          "correct": "Extend [12] to these three fields.",
+          "evidence": "DTSX:31223-31273; Check If Poa Attached main.cs:56, 60; Create POA Main main.cs:254-258, 365-391"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Create POA Main For Pension Joining|detail",
+      "hash": "b96af81c3243",
+      "verdict": "WRONG",
+      "detail": "Verified:\n- [2] matching.\n- [3] appendix mapping, exclusion defaults by path, one candidate per ID with eviction.\n- [4] the five writes.\n- [6] sourceTables: no creator of gen_pensionjoining in the supplied packages; 0028 'Upate Pension Joining' update gen_pensionjoiningBase set gen_fundenrolmentid in an active flow (0028:8053-8058).\nThree wrong units (see wrongUnits).",
+      "evidence": "0029_POA.dtsx:31595, 31640, 34169, 36380-36388; 0028_Fund Enrolment.dtsx:8053-8058",
+      "wrongUnits": [
+        {
+          "unit": "[1] 'gen_pensionjoining פעילה, gen_joiningstatus = 13, gen_dateofpoasignature לא ריק, gen_createpoamain = 1'",
+          "problem": "OWN. Unqualified columns are listed under gen_pensionjoining without argument.",
+          "correct": "As in |title.",
+          "evidence": "DTSX:36380-36388"
+        },
+        {
+          "unit": "[3] 'בלי סוכן ובלי סוכנות → אין יצירה'",
+          "problem": "NOAGENT. This is true only on the NoMatch path.",
+          "correct": "As in |short [13].",
+          "evidence": "DTSX:31595, 31640, 34169"
+        },
+        {
+          "unit": "[5] 'הצטרפויות שלא הגיעו לשם (בלי סוכן ובלי סוכנות, ...) נשארות ״נדרש״'",
+          "problem": "NOAGENT. On the Match path, by the files, the candidate without agent and agency is created and marked.",
+          "correct": "Make it conditional on the path.",
+          "evidence": "DTSX:31595, 31640, 34169"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Create POA Main For Pension Joining|crm",
+      "hash": "8d99c774667a",
+      "verdict": "CONFIRMED",
+      "detail": "Writes verified:\n- [1] SDK update gen_pensionjoining.gen_createpoamain = 3 (Check If Poa Attached main.cs:71-74).\n- [2] Create POA Main (main.cs:146, 267).\n- [3] Annotation (main.cs:295-298).\n- [4] Update POA Main sets gen_pensionjoining to the joining id (main.cs:32-35; input lineage Union All gen_pensionjoiningid, DTSX:37741).\n- [5] SQL update of gen_pensionjoiningbase on [CRM] (DTSX:36944) after Union All 2 (Create Success + Update POA Main Output 0, sync, DTSX:37747). The runtime part is labelled.\nThe when_he texts make no ownership or agent claims. No other active business CRM write exists in the flow.",
+      "evidence": "0029_POA.dtsx:31387, 33566, 36906-36944, 36979, 37741, 37747",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Create POA for future funds providant - allow action|title",
+      "hash": "5cce50ea2ac5",
+      "verdict": "WRONG",
+      "detail": "Verified:\n- Disabled (DTSX:10195).\n- SQL (DTSX:12827-12861): row_number by Gen_powerofattorneymain.gen_contactname, createdon desc; Conditional Split POAMainOrder == 1 (DTSX:10719); Default output has no path. So at most one gen_powerofattorney per customer per run, and the account is undefined.\n- gen_type = 1 is qualified and its meaning is labelled השערה.\nOne wrong unit (see wrongUnits).",
+      "evidence": "0029_POA.dtsx:10195, 10719, 12822-12861, 22760-22811",
+      "wrongUnits": [
+        {
+          "unit": "short_he / flow_he[2]: filters stated as the POA mains' ('ייפויי כוח ראשיים פעילים, תקפים לקרנות עתידיות, עם הרשאת פעולה, נספח שונה מ-4, ש-gen_excludeprovidentfunds שלהם ריק או 2, שתאריך ההתחלה שלהם עבר')",
+          "problem": "OWN. In Gen_powerofattorneymain JOIN gen_customeraccount JOIN gen_customeraccounttype (DTSX:12846-12849), the columns gen_currentstate, Gen_isfuturefundvalid, Gen_IsAllowAction, gen_appendixtype, gen_excludeprovidentfunds and Gen_startdate are unqualified. Ownership is not argued. The flow is disabled, so the production ambiguity argument does not apply.",
+          "correct": "Argue it: this package writes these attributes via SDK to gen_powerofattorneymain (AJ Create POA Main main.cs:167-220, DTSX:22760-22811), and no supplied file shows them on gen_customeraccount or gen_customeraccounttype; note that the disabled query's validity is not proven. Or state the ownership as not proven.",
+          "evidence": "DTSX:12846-12861, 22760-22811"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Create POA for future funds providant - allow action|short",
+      "hash": "3a015f661135",
+      "verdict": "WRONG",
+      "detail": "Disabled, so no effect. One account without a POA per customer per run (POAMainOrder == 1). The gen_type = 1 meaning is labelled. One wrong unit (see wrongUnits).",
+      "evidence": "0029_POA.dtsx:10195, 10719, 12846-12861",
+      "wrongUnits": [
+        {
+          "unit": "[2] 'לכל לקוח שיש לו ייפוי כוח ראשי לקרנות עתידיות'",
+          "problem": "OWN. The unqualified Gen_isfuturefundvalid (and the other filters) are attributed to the POA Main without argument, in a disabled flow.",
+          "correct": "As in |title.",
+          "evidence": "DTSX:12846-12861"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Create POA for future funds providant - allow action|detailed",
+      "hash": "8927a9a14d61",
+      "verdict": "WRONG",
+      "detail": "Verified:\n- Constraint Canncel POA main -> this flow (Success, DTSX:45660).\n- SQL and split; the Default output has no path.\n- Set columns gen_currentstate = 1 (DTSX:12935).\n- Entity gen_powerofattorney (LogicalName, DTSX:10982), RequestType.Create, batch of 10, attributes as listed.\nTwo wrong units (see wrongUnits).",
+      "evidence": "0029_POA.dtsx:10195, 10719, 10752, 10952-11024, 12822-12861, 12935, 45660",
+      "wrongUnits": [
+        {
+          "unit": "[2] filters stated as the POA mains'",
+          "problem": "OWN. Unqualified gen_currentstate, Gen_isfuturefundvalid, Gen_IsAllowAction, gen_appendixtype, gen_excludeprovidentfunds and Gen_startdate. Ownership is not argued, and the flow is disabled.",
+          "correct": "As in |title.",
+          "evidence": "DTSX:12846-12861"
+        },
+        {
+          "unit": "[9] tech 'Create POA (DTSX:10752)'",
+          "problem": "The component at DTSX:10752 is named 'Create POA 1' in this data flow (refId Package\\Create POA for future funds providant - allow action\\Create POA 1).",
+          "correct": "Create POA 1 (DTSX:10752).",
+          "evidence": "DTSX:10752"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Create POA for future funds providant - allow action|detail",
+      "hash": "495f1901e635",
+      "verdict": "WRONG",
+      "detail": "[2]-[5] verified. [6] sourceTables cross-references verified: 0031:40252/40447-40453, 0006:9752, 0012:100190, 0033:15, 0031:31302, 0030:6661. One wrong unit (see wrongUnits).",
+      "evidence": "0029_POA.dtsx:12846-12861",
+      "wrongUnits": [
+        {
+          "unit": "[1] population: filters stated as the POA mains'",
+          "problem": "OWN. Unqualified columns are attributed without argument, in a disabled flow.",
+          "correct": "As in |title.",
+          "evidence": "DTSX:12846-12861"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Create POA for future funds studing - allow action|title",
+      "hash": "1ef566d85c31",
+      "verdict": "WRONG",
+      "detail": "Verified:\n- Disabled (DTSX:15775).\n- SQL (DTSX:18415-18448): isnull(gen_exclludetrainingfunds,2) = 2, gen_type = 2, no startdate filter.\n- Split POAMainOrder == 1 (DTSX:16299); Default output has no path.\nOne wrong unit (see wrongUnits).",
+      "evidence": "0029_POA.dtsx:15775, 16299, 18410-18448",
+      "wrongUnits": [
+        {
+          "unit": "short_he / flow_he[2]: filters stated as the POA mains'",
+          "problem": "OWN. Unqualified gen_currentstate, Gen_isfuturefundvalid, Gen_IsAllowAction, gen_appendixtype and gen_exclludetrainingfunds in a 3-table join (DTSX:18434-18437). Ownership is not argued, and the flow is disabled.",
+          "correct": "As in the providant-action |title.",
+          "evidence": "DTSX:18434-18448, 22760-22811"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Create POA for future funds studing - allow action|short",
+      "hash": "8f5d3e25499f",
+      "verdict": "WRONG",
+      "detail": "Disabled, so no effect. One type-2 account per customer per run. One wrong unit (see wrongUnits).",
+      "evidence": "0029_POA.dtsx:15775, 16299, 18434-18448",
+      "wrongUnits": [
+        {
+          "unit": "[2] 'לכל לקוח שיש לו ייפוי כוח ראשי לקרנות עתידיות'",
+          "problem": "OWN. The unqualified Gen_isfuturefundvalid is attributed to the POA Main without argument.",
+          "correct": "As in the providant-action |title.",
+          "evidence": "DTSX:18434-18448"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Create POA for future funds studing - allow action|detailed",
+      "hash": "422bf3cb6f76",
+      "verdict": "WRONG",
+      "detail": "Verified:\n- Constraint (Success, DTSX:45661).\n- SQL, split, Default output has no path.\n- Set columns = 1 (DTSX:18522).\n- Create POA (DTSX:16332): new Entity(gen_powerofattorney), RequestType.Create, batch of 1000, attributes as listed.\nOne wrong unit (see wrongUnits).",
+      "evidence": "0029_POA.dtsx:15775, 16299, 16332, 16592-16661, 18410-18448, 18522, 45661",
+      "wrongUnits": [
+        {
+          "unit": "[2] filters stated as the POA mains'",
+          "problem": "OWN. Unqualified columns are attributed without argument, in a disabled flow.",
+          "correct": "As in the providant-action |title.",
+          "evidence": "DTSX:18434-18448"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Create POA for future funds studing - allow action|detail",
+      "hash": "8cbd8cabc191",
+      "verdict": "WRONG",
+      "detail": "[2]-[6] verified. The sourceTables cross-references are as in the providant flows. One wrong unit (see wrongUnits).",
+      "evidence": "0029_POA.dtsx:18434-18448",
+      "wrongUnits": [
+        {
+          "unit": "[1] population: filters stated as the POA mains'",
+          "problem": "OWN. Unqualified columns are attributed without argument, in a disabled flow.",
+          "correct": "As in the providant-action |title.",
+          "evidence": "DTSX:18434-18448"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Create POA for future funds providant - allow info|title",
+      "hash": "004ac346e055",
+      "verdict": "WRONG",
+      "detail": "Verified:\n- Disabled (DTSX:13047).\n- SQL (DTSX:15553-15587): isnull(Gen_IsAllowAction,0) = 0, startdate filter, gen_type = 1.\n- No split: Get POA Main goes to Set columns and then to Create POA.\n- The 'מידע' and 'גמל' meanings are labelled השערה.\nOne wrong unit (see wrongUnits).",
+      "evidence": "0029_POA.dtsx:13047, 15548-15587",
+      "wrongUnits": [
+        {
+          "unit": "short_he / flow_he[2]: filters stated as the POA mains'",
+          "problem": "OWN. Unqualified gen_currentstate, Gen_isfuturefundvalid, Gen_IsAllowAction, gen_appendixtype, gen_excludeprovidentfunds and Gen_startdate in a 3-table join (DTSX:15572-15575). Ownership is not argued, and the flow is disabled.",
+          "correct": "As in the providant-action |title.",
+          "evidence": "DTSX:15572-15587, 22760-22811"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Create POA for future funds providant - allow info|short",
+      "hash": "45fe60bd9393",
+      "verdict": "WRONG",
+      "detail": "Disabled, so no effect. One gen_powerofattorney per matching row. One wrong unit (see wrongUnits).",
+      "evidence": "0029_POA.dtsx:13047, 15572-15587",
+      "wrongUnits": [
+        {
+          "unit": "[2] 'שיש לו ייפוי כוח ראשי לקרנות עתידיות'",
+          "problem": "OWN. The unqualified Gen_isfuturefundvalid is attributed to the POA Main without argument.",
+          "correct": "As in the providant-action |title.",
+          "evidence": "DTSX:15572-15587"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Create POA for future funds providant - allow info|detailed",
+      "hash": "7ce514b4078c",
+      "verdict": "WRONG",
+      "detail": "Verified:\n- Constraint (Success, DTSX:45662).\n- No Conditional Split.\n- Set columns gen_startdate > GETDATE() ? 3 : 1 (DTSX:15661). States 1 and 3 are attributed elsewhere by SQL comments.\n- Create POA (DTSX:13571): new Entity(gen_powerofattorney), batch of 1000, attributes as listed.\n- The duplicates hypothesis is labelled.\nOne wrong unit (see wrongUnits).",
+      "evidence": "0029_POA.dtsx:13047, 13571, 13872-13942, 15548-15587, 15661, 45662",
+      "wrongUnits": [
+        {
+          "unit": "[2] filters stated as the POA mains'",
+          "problem": "OWN. Unqualified columns are attributed without argument, in a disabled flow.",
+          "correct": "As in the providant-action |title.",
+          "evidence": "DTSX:15572-15587"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Create POA for future funds providant - allow info|detail",
+      "hash": "caac458a28ff",
+      "verdict": "WRONG",
+      "detail": "[2]-[6] verified. One wrong unit (see wrongUnits).",
+      "evidence": "0029_POA.dtsx:15572-15587, 15661",
+      "wrongUnits": [
+        {
+          "unit": "[1] population: filters stated as the POA mains'",
+          "problem": "OWN. Unqualified columns are attributed without argument, in a disabled flow.",
+          "correct": "As in the providant-action |title.",
+          "evidence": "DTSX:15572-15587"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Create POA for future funds studing - allow info|title",
+      "hash": "2d973c49c520",
+      "verdict": "WRONG",
+      "detail": "Verified:\n- Disabled (DTSX:18634).\n- SQL (DTSX:21140-21173): IsAllowAction = 0, isnull(gen_exclludetrainingfunds,2) = 2, gen_type = 2, no startdate filter, no split.\n- Meanings labelled.\nOne wrong unit (see wrongUnits).",
+      "evidence": "0029_POA.dtsx:18634, 21135-21173",
+      "wrongUnits": [
+        {
+          "unit": "short_he / flow_he[2]: filters stated as the POA mains'",
+          "problem": "OWN. Unqualified gen_currentstate, Gen_isfuturefundvalid, Gen_IsAllowAction, gen_appendixtype and gen_exclludetrainingfunds in a 3-table join (DTSX:21159-21162). Ownership is not argued, and the flow is disabled.",
+          "correct": "As in the providant-action |title.",
+          "evidence": "DTSX:21159-21173, 22760-22811"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Create POA for future funds studing - allow info|short",
+      "hash": "991d9ed5d6b2",
+      "verdict": "WRONG",
+      "detail": "Disabled, so no effect. One wrong unit (see wrongUnits).",
+      "evidence": "0029_POA.dtsx:18634, 21159-21173",
+      "wrongUnits": [
+        {
+          "unit": "[2] 'שיש לו ייפוי כוח ראשי לקרנות עתידיות'",
+          "problem": "OWN. The unqualified Gen_isfuturefundvalid is attributed to the POA Main without argument.",
+          "correct": "As in the providant-action |title.",
+          "evidence": "DTSX:21159-21173"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Create POA for future funds studing - allow info|detailed",
+      "hash": "e9763b41743b",
+      "verdict": "WRONG",
+      "detail": "Verified:\n- Constraint (Success, DTSX:45663).\n- No split.\n- Set columns ? 3 : 1 (DTSX:21247).\n- Create POA (DTSX:19158): new Entity(gen_powerofattorney), batch of 1000, attributes as listed.\nOne wrong unit (see wrongUnits).",
+      "evidence": "0029_POA.dtsx:18634, 19158, 19459-19529, 21135-21173, 21247, 45663",
+      "wrongUnits": [
+        {
+          "unit": "[2] filters stated as the POA mains'",
+          "problem": "OWN. Unqualified columns are attributed without argument, in a disabled flow.",
+          "correct": "As in the providant-action |title.",
+          "evidence": "DTSX:21159-21173"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Create POA for future funds studing - allow info|detail",
+      "hash": "8f603a8449c4",
+      "verdict": "WRONG",
+      "detail": "[2]-[6] verified. One wrong unit (see wrongUnits).",
+      "evidence": "0029_POA.dtsx:21159-21173, 21247",
+      "wrongUnits": [
+        {
+          "unit": "[1] population: filters stated as the POA mains'",
+          "problem": "OWN. Unqualified columns are attributed without argument, in a disabled flow.",
+          "correct": "As in the providant-action |title.",
+          "evidence": "DTSX:21159-21173"
+        }
+      ]
+    }
+  ],
+  "missingWrites": []
+}

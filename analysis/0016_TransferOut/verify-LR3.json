@@ -1,0 +1,18 @@
+{
+  "verifier": "ssis-verifier",
+  "package": "0016_TransferOut",
+  "scope": "logic-claims re-check round 3",
+  "checkedAt": "2026-11-08",
+  "checked": 1,
+  "results": [
+    {
+      "id": "L|Package\\Close Transfer Out|title",
+      "hash": "ba627ebd6311",
+      "verdict": "CONFIRMED",
+      "detail": "I re-derived every unit from the raw DTSX.\n- Population: the SQL selects Gen_customercare (Tout) with Gen_currentstate = 1. It inner-joins gen_accountcourses on gen_customercare, Gen_ftCurrentYear on ac.gen_fundnumber = ft.gen_fundnumber, and Gen_fundtransactiontype with gen_transgrouptype = 2. It also requires ft.Gen_EntryDate > Tout.CreatedOn. There is no predicate on care type, so 'ללא סינון לפי סוג הטיפול' is exact. 'ניוד יוצא' and 'פתוחים' are labelled השערה.\n- Full transfer: Gen_isfulltransfer == TRUE leads to transferCount > 0 and then to Union All. One transaction is enough.\n- Not-full branch: actual == expected, with both not NULL. expected = sum(ISNULL(ac.gen_transactionamount,0)) over the joined rows of a group (care, isfull, delivery date, account course, value date, appendix date). That equals the course amount times the number of transactions in the group, as flow_he[3] says.\n- The 'Sums Are Not Equal' and 'Has not thansactions' outputs are unconnected.\n- Aggregate: GroupBy (type 0) on Gen_customercareId, Gen_deliverydate and gen_appendixghissuingdate, with Minimum (type 6) on gen_valuedate. So there is one row per combination, and several updates per care are possible.\n- Write: gen_customercare is updated through SDK ExecuteMultiple (RequestType.Update). It sets gen_currentstate = OptionSetValue(3), named by the constant CURRENT_STATE_FINISHED, and gen_rejectreason = OptionSetValue(34). It also sets gen_fundreleasedate = min value date (ToLocalTime, only when not null), gen_appendixghissuingdate (ToLocalTime, only when not null) and gen_deliverydelay = DateDiff(Day, delivery, value) > 0 (only when both exist).\nNote, not a defect: a NULL Gen_isfulltransfer would be an evaluation error on IsFull (FailComponent). This is runtime plumbing and out of scope.",
+      "evidence": "source/DailyProcess/0016_TransferOut.dtsx: SQL 2119-2145; Is full transfer out 2081-2094; Check number of transactions 151-164; Compare sums 1275-1289; Aggregate 88-141 (AggregationType 0,0,6,0); paths 2412-2422; main.cs in DTSX 341-342 (constants 34/3), 375-396 (row code), 411-433 (ExecuteMultiple Update)",
+      "wrongUnits": []
+    }
+  ],
+  "missingWrites": []
+}

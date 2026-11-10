@@ -1,0 +1,293 @@
+{
+  "verifier": "ssis-verifier",
+  "package": "0031_PoaAccountUpdateDaily",
+  "scope": "logic-claims re-check",
+  "checkedAt": "2026-11-10",
+  "checked": 19,
+  "results": [
+    {
+      "id": "L|summary",
+      "hash": "26771170955a",
+      "verdict": "WRONG",
+      "detail": "Verified: the state-3 meaning is attributed (0029_POA.dtsx:3889 'where waiting.Gen_currentstate = 3 -- waiting'). The +3h / appendix 2/3/5 / NULL rule is verified (DTSX:31302-31306, Param_0 = Gen_receivingdatePoa). Cancellation sets CANCELED=2 and WAITING_SENDING_TO_BANK=2. The JSON is not read by this package, and the pass-through is marked. The Send Poa Emails stop and route logic and the PostExecute mail are correct, with the no-rows case marked. 'ב'1' and 'פעיל' are attributed, and the ownership pointer and the pension one-per-main logic with its conditional later runs are correct. scopeNote is correct. WRONG: (a) 'הערת הסריקה' says the moved annotation is the scan. The 0031 query takes any annotation whose ObjectId is the POA Main (DTSX:3323-3324, 7618-7619), and nothing in 0031 shows its content. In 0029 the notes created on POA Main read 'יפוי כח נסרק לחשבון …' / 'הסריקה נמצאת בישות חשבון פנסיה - …' (0029_POA.dtsx:22882, 34138). Those are notes about a scan, not the scan, and they are not attributed here. This must be labelled השערה or attributed. INCOMPLETE parts (business row filters) for the account creation: (b) the product and exclusion condition is missing. Only products 4 with gen_exclludetrainingfunds = 2, or products 1/2/5 with gen_excludeprovidentfunds = 2, qualify (DTSX:3329-3333). Accounts that already have any gen_powerofattorney are skipped (Check If POA Account Agent Exist, DTSX:858; only No Match is connected). (c) For pension, the inclusion flag (gen_includingcomprehensivepension / gen_includinggeneralpension = 1 for 200003 / 200004, DTSX:7624-7628) is missing. Precision note: 'שנפתחו' is the CRM record CreatedOn > DATEADD(dd,-2,GETDATE()), not a business opening date. The detailed claims correctly say 'שנוצרו'.",
+      "evidence": "source/DailyProcess/0031_PoaAccountUpdateDaily.dtsx:3295-3340, 3684-3690, 7589-7634, 7976-7980, 858-870; source/DailyProcess/0029_POA.dtsx:22881-22883, 34137-34139",
+      "wrongUnits": [
+        {
+          "unit": "[1] 'בשתי הזרימות הערת הסריקה מועברת מייפוי הכוח הראשי לחשבון או לתוכנית (SDK)'",
+          "problem": "Unproven meaning: the annotation is called the scan. It is any annotation on the POA Main.",
+          "correct": "The annotation (note) of the POA Main is moved (annotation.objectid). What it contains is not shown in 0031. השערה: these are the notes 0029 creates on POA Main ('יפוי כח נסרק לחשבון …', 0029_POA.dtsx:22882; 'הסריקה נמצאת בישות חשבון פנסיה - …', 0029_POA.dtsx:34138).",
+          "evidence": "DTSX:3323-3324, 3684-3690, 7618-7619; 0029_POA.dtsx:22882, 34138"
+        },
+        {
+          "unit": "[1] 'לחשבונות לקוח שנפתחו ביומיים האחרונים נוצרים ייפויי כוח מכוח ייפוי כוח ראשי מסוג נספח 2 ... במצב 1'",
+          "problem": "Missing row-selection conditions: the product code with the POA Main exclusion flag, and the skip when the account already has a POA.",
+          "correct": "Only accounts with product 4 and gen_exclludetrainingfunds = 2, or product 1/2/5 and gen_excludeprovidentfunds = 2, and with no existing gen_powerofattorney for the account. The record is the one created in CRM (CreatedOn) in the last 2 days.",
+          "evidence": "DTSX:3326-3333, 858-870"
+        },
+        {
+          "unit": "[1] 'לתוכניות פנסיה שנפתחו ביומיים האחרונים – תוכנית אחת לכל ייפוי כוח ראשי בכל ריצה'",
+          "problem": "Missing the inclusion condition.",
+          "correct": "Only product 200003 with gen_includingcomprehensivepension = 1, or 200004 with gen_includinggeneralpension = 1.",
+          "evidence": "DTSX:7624-7628"
+        }
+      ]
+    },
+    {
+      "id": "L|exec",
+      "hash": "9975559cd2b8",
+      "verdict": "CONFIRMED",
+      "detail": "All 18 precedence constraints (DTSX:44824-44841) are Success and LogicalAnd, with no expression. Each cited line matches its From/To pair, the order is linear as stated, and there is no disabled executable and no DTS:Configuration. The step 7 label attributes 'ממתין' to the flow name and to the 0029 SQL comment (0029_POA.dtsx:3889). The step 3 label matches Set Destinations Paths (DTSX:36911-36925) and Send Email main.cs:48-49.",
+      "evidence": "source/DailyProcess/0031_PoaAccountUpdateDaily.dtsx:44824-44841, 36911-36925",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Handle Wait Status|title",
+      "hash": "bb2edee5fae1",
+      "verdict": "WRONG",
+      "detail": "The structure is correct: source WHERE (DTSX:27226), the lookup on active state 1, Is Renewal, Update NeedToSendMailBit (CASE 2/3/5 THEN ? END, Param_0 = Gen_receivingdatePoa, Param_1 = PowerOfAttorneyIdPa), AppendixType on the new POA, Update Json (isProcessed = 0 and emailDetailsJson is null), and the SDK activation. The state-3 meaning is attributed. WRONG (unmarked runtime behaviour, the same issue fixed in the sibling detailed/detail/summary claims): for rows whose new appendix is 2/3/5, both the JSON and the activation are reached only through 'Email - Start Date Poa' / '... With Commission Appointment'. In those components Input0_ProcessInput is commented out (DTSX:23130, 24705). That the sync Output 0 (DTSX:24525, 26065) still passes every row on is SSIS behaviour not shown in the files. short_he ('נשמרים נתוני מכתב (JSON)'), flow_he[4] ('→ JSON למכתב ב-staging') and flow_he[5] state it without the mark 'לפי התנהגות SSIS המתועדת, לא מוצג בקבצים'.",
+      "evidence": "source/DailyProcess/0031_PoaAccountUpdateDaily.dtsx:22849-22900, 23128-23160, 24525, 24705, 26065, 27372, 31253-31267",
+      "wrongUnits": [
+        {
+          "unit": "short_he 'נשמרים נתוני מכתב (JSON) בשורה קיימת ...'; flow_he[4] 'נספח החדש 2/3/5 → JSON למכתב ב-staging'; flow_he[5] 'הפעלה'",
+          "problem": "Depends on rows passing through the commented-out mail scripts (sync output). This is runtime behaviour and it is not marked.",
+          "correct": "Add: the rows reach the JSON build and the activation through the mail components, whose code is commented out; לפי התנהגות SSIS המתועדת, לא מוצג בקבצים, their synchronous output passes every row on.",
+          "evidence": "DTSX:23130, 24525, 24705, 26065"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Handle Wait Status|short",
+      "hash": "164e99552d36",
+      "verdict": "WRONG",
+      "detail": "Branches [2]-[8] match the paths: No Match goes to Union All Data To Update Status (input 3), Renewal goes to the Union (input 1), and Not Renewal goes to Update NeedToSendMailBit and then AppendixType. The SQL write rule in [8] is exact. WRONG (unmarked runtime behaviour): [8] second sentence (JSON when the new appendix is 2/3/5), [9] (activation, which for 2/3/5 rows runs via the mail scripts) and [10] state outcomes that depend on the sync pass-through of the commented-out mail scripts, with no mark.",
+      "evidence": "source/DailyProcess/0031_PoaAccountUpdateDaily.dtsx:23130, 24525, 24705, 26065; Handle Wait Status paths (Email - Start Date Poa.Outputs[Output 0] → No Appointment Of Agent → Union All To Emails → Set Data …)",
+      "wrongUnits": [
+        {
+          "unit": "[8] 'אם הנספח של ייפוי הכוח החדש הוא 2, 3 או 5, נשמרים נתוני מכתב'; [9]; [10]",
+          "problem": "Pass-through of the commented-out mail components is runtime behaviour, and it is not marked.",
+          "correct": "Mark it as 'לפי התנהגות SSIS המתועדת, לא מוצג בקבצים' (as in the detailed claim [15]/[18]/[26]).",
+          "evidence": "DTSX:23130, 24525, 24705, 26065"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Handle Wait Status|detailed",
+      "hash": "43e801f1d5c6",
+      "verdict": "CONFIRMED",
+      "detail": "All 26 units were re-derived. [1]: WHERE (poa.Gen_startdate <= GETDATE() and poa.Gen_currentstate = 3). Ownership of the unqualified gen_customerprogram is argued (poa.gen_customerprogram DTSX:27233, pm join DTSX:27261, plus the ambiguity rule), and state 3 is attributed to 0029:3889. [2]: Lookup CacheType=0 (full), Gen_currentstate = 1, key isnull(pa.Gen_CustomerAccount, gen_customerprogram), with ownership argued. First-match is marked. [6]: Is Renewal FailComponent (DTSX:27056), with the NULL case marked. [10]: CASE without ELSE (DTSX:31302-31306), Param_0 = Gen_receivingdatePoa (dateadd(HH,3,poa.gen_receivingdate), DTSX:27244), Param_1 = PowerOfAttorneyIdPa. [11]: AppendixType FailComponent (DTSX:22859). [15]: Check Format ISNULL || FALSE → format 1. The mail scripts are commented out ('In Comment due to 13366', DTSX:23130/24705), and the pass-through is marked. [16]: Set Data main.cs:88-120 builds one JSON per genpowerofattorneymain. IsFirst is true only for the first row, and ProductType '4'/'3' gives the labels (POADetails.cs:35-41). [17]: Update Json (DTSX:31256-31259), Param_0 = emailDetailsJson, Param_1 = Gen_powerofattorneyId; No Data has no path. [19]: Sort By PoaId on Gen_powerofattorneyId with EliminateDuplicates=false; 'Is emailDetailsJson Contains Data 1' sends only No Data to Multicast. [20]-[24]: main.cs:34 sets gen_currentstate = ACTIVE(1), and ACTIVE is a code constant (main.cs:16). [25]: the outputs of Update ACTIVE have no paths, UnionErrors is fed only from the two EmailFormat errors, and both OLE DB Commands are FailComponent (DTSX:31267/31315). [26] is correct and marked.",
+      "evidence": "source/DailyProcess/0031_PoaAccountUpdateDaily.dtsx:22849-22900, 23130, 24525, 24705, 26065, 27012-27105, 27221-27269, 27372 (main.cs:44-121), 28819-29014, 30214 (main.cs:30-57), 31253-31315; 0029_POA.dtsx:3889",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Handle Wait Status|detail",
+      "hash": "35321920f785",
+      "verdict": "CONFIRMED",
+      "detail": "[1]: the source population is exact. [2]: the full-cache lookup with the ownership argument for gen_customerprogram and the marked first-match. 'חידוש' = the same isnull(Contact.Gen_Identitynumber, Account.AccountNumber). [3]: the decisions are correct, and the pass-through is marked. [4]: SDK gen_currentstate=1; SQL Gen_powerofattorneyBase.gen_receivingdateofcancelpoa on [CRM] (Unsupported); staging update. [5]: the old POA is not cancelled here. gen_receivingdateofcancelpoa is written only at DTSX:31303, and all other references are inside Handle Active Status (ISNULL split DTSX:18074, RecievingDate main.cs:99). [6]: the 0030 OLE DB Destinations 'Write To PowerOfAttorneySendEmails Table' exist on SQL.GENERIX_STAGING (0030:5219, 6701), and that link is labelled השערה.",
+      "evidence": "source/DailyProcess/0031_PoaAccountUpdateDaily.dtsx:18074, 27081-27105, 27226, 31253-31306; 0030_PoaAccountUpdateDailyTest.dtsx:5219-5234, 6701-6716",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Handle Wait Status|decisions",
+      "hash": "531c47f17b2b",
+      "verdict": "WRONG",
+      "detail": "[1]-[4] and [6]-[8] quote the conditions exactly. [5]'s condition is exact, but its outcome 'אחרת → נתוני מכתב' (and the following activation) is reached only through the commented-out mail scripts. That sync-output pass-through is runtime behaviour not shown in the files, and it is not marked. Note only: [2] quotes the unqualified gen_customerprogram and its meaning says 'באותו חשבון'; the key is account OR program. The ownership argument is in the detailed/detail claims.",
+      "evidence": "source/DailyProcess/0031_PoaAccountUpdateDaily.dtsx:22849-22900, 23130, 24525, 24705, 26065",
+      "wrongUnits": [
+        {
+          "unit": "[5] outcome_he 'אחרת → נתוני מכתב'",
+          "problem": "Unmarked runtime behaviour: this depends on the commented-out mail scripts passing rows through their sync output.",
+          "correct": "'אחרת → Check Format → רכיבי המייל (קוד בהערה; לפי התנהגות SSIS המתועדת, לא מוצג בקבצים, הפלט הסינכרוני מעביר את השורות) → נתוני מכתב → הפעלה'",
+          "evidence": "DTSX:23130, 24525, 24705, 26065"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Handle Wait Status|crm",
+      "hash": "cf46e9fc551f",
+      "verdict": "WRONG",
+      "detail": "Entities, verbs and mechanisms are correct. SDK proxy.Update gen_currentstate = 1. SQL UPDATE Gen_powerofattorneyBase on [CRM] (Unsupported), targeting the old active POA with the 2/3/5 → +3h else NULL rule. The staging UPDATE is on SQL.GENERIX_STAGING. WRONG (unmarked runtime behaviour): [1] when_he '(כל הענפים)' and [3] when_he 'נספח 2/3/5 של סוכן אחר' include the 2/3/5 branch. That branch reaches Set Data and Update ACTIVE only through the commented-out mail scripts (sync output pass-through), and this is not marked. Note only: [3] also omits that the JSON is written only on the first POA row per POA Main, and only if that staging row exists with isProcessed = 0 and emailDetailsJson NULL. This is a staging write, not CRM.",
+      "evidence": "source/DailyProcess/0031_PoaAccountUpdateDaily.dtsx:23130, 24525, 24705, 26065, 27372 (main.cs:56-65), 30214, 31253-31306",
+      "wrongUnits": [
+        {
+          "unit": "[1] when_he '(כל הענפים)'; [3] when_he",
+          "problem": "For the 2/3/5 branch, the write depends on the unmarked pass-through of the commented-out mail scripts.",
+          "correct": "Mark it: for appendix 2/3/5 rows of another agent, the rows reach the JSON and the activation through the mail components, whose code is commented out (לפי התנהגות SSIS המתועדת, לא מוצג בקבצים).",
+          "evidence": "DTSX:23130, 24525, 24705, 26065"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Handle Active Status|detailed",
+      "hash": "e75bdb6ddd7e",
+      "verdict": "CONFIRMED",
+      "detail": "[1]: WHERE (poa.Gen_enddate <= GETDATE() and poa.Gen_currentstate = 1) (DTSX:18171). [2]: NoMail = ISNULL(gen_receivingdateofcancelpoa). [6]: Check Format EmailFormatTrue (!ISNULL && TRUE) goes to With Commission Appointment (format 3), and False goes to To Perform Actions (format 8). The scripts are commented out (DTSX:13989, 15683), and the pass-through is marked. [7]: Set Data main.cs:86-126 builds one JSON per main, RecievingDate = genreceivingdateofcancelpoa (line 99), with phones, name and the account list. [8]: Update Json has no isProcessed/NULL condition (DTSX:22769-22771), IsFirst only, and No Data has no path. [9]: Sort and 'Contains Data 1' route No Data only to Multicast. [10]-[12]: CANCELED = 2 and WAITING_SENDING_TO_BANK = 2 (main.cs:27-28). The bank status is set when it is NULL or not 2 (main.cs:75), and the pass-through is marked. [15]: the Error output (DTSX:22746) has no path, and Union Error gets only Email Format3/8 errors. [16]: gen_receivingdateofcancelpoa is written only at DTSX:31303 (Handle Wait Status).",
+      "evidence": "source/DailyProcess/0031_PoaAccountUpdateDaily.dtsx:13739, 13989, 15683, 18004-18083, 18166-18215, 18330, 20667, 21671 (main.cs:27-97), 22746, 22766-22778, 31303",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Handle Active Status|detail",
+      "hash": "9c6910ccc26a",
+      "verdict": "CONFIRMED",
+      "detail": "[1]: the population is exact. [2]: the update is by Gen_powerofattorneyId, and the staging row by PowerOfAttorneyId. [3]: the decisions are correct, with the pass-through marked. [4]: SDK gen_currentstate = 2 and gen_statustransfertobank = 2, and staging emailDetailsJson. [5] is a paraphrase of WAITING_SENDING_TO_BANK (the code constant). [6]: the source tables and the 0030 hypothesis are labelled.",
+      "evidence": "source/DailyProcess/0031_PoaAccountUpdateDaily.dtsx:18171, 21671 (main.cs:27-90), 22766-22771; 0030_PoaAccountUpdateDailyTest.dtsx:5219",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Send Poa Emails|detailed",
+      "hash": "fba51c81e66e",
+      "verdict": "CONFIRMED",
+      "detail": "[1]: the source has isProcessed = 0 and a 9-digit padded identity number (DTSX:31813-31824). [2]-[10]: Get Agent and Get Agencie are no-cache (CacheType=2). Agent No Match goes to Agencie, and Agencie No Match has no path. [11]: Get Power Of Attorney uses StringMap LangId 1037 for objecttypecode 10103 gen_currentstate and 10101 gen_agentappointment. Get Contact's isnull(…, N'לא קיים') and the ownership argument are verified (DTSX:18195-18197, 18209, 27234, 27249, 27260, 27084). Both No Match outputs have no path. [12]-[20]: Pension No Match goes to Provident Fund, whose No Match has no path. [21]: StatusAfterUpdate == 2; the 0030 NewStatus = 2 on the cancel flow (0030:4064/4115/4453) is labelled השערה. [23]: Get Reciving Date has NoMatchBehavior=0 with Lookup Match Output IgnoreFailure (DTSX:32013), and its fallback is main.cs:56-68. [26]: Proccess Data main.cs:30-52 (agency overrides agent, provident account overrides identity number) and 15 columns to Create POA File. [27]-[31]: ISNULL || \"\", and Add Columns 'לא עודכנה כתובת מייל'. [32]-[33]: Union All → Update IsProcessed True → Update sentToPrintOn (GETUTCDATE, [CRM], Unsupported). [34]: Send Email PostExecute (main.cs:25-99), with from/to queues, subject and body text. The queue meanings are labelled. Note only: both letter-date sources carry +3h (DATEADD(HH,3,…), DTSX:31863/31966). That is a CSV value, not a CRM write.",
+      "evidence": "source/DailyProcess/0031_PoaAccountUpdateDaily.dtsx:31390-31510, 31557-31986, 32013, 32089-32123, 32186 (main.cs:27-69), 33900-33934, 33987 (main.cs:25-100), 36554-36595, 36911-36925",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Create Power Of Attorney|title",
+      "hash": "8b04c92751b6",
+      "verdict": "WRONG",
+      "detail": "ב'1, פעיל, the product codes and the 2-day window are attributed or correct, and flow_he[1]-[5] are structurally correct. WRONG: (a) short_he 'שאינו מחריג את סוג המוצר' and flow_he[1] 'שאינו מחריג את המוצר' give the value 2 of gen_exclludetrainingfunds / gen_excludeprovidentfunds (DTSX:3330, 3332) the meaning 'not excluded'. Nothing in 0031 proves that. The proof exists only in another package and is not attributed: 0029_POA.dtsx:34045/34054 '//כן = 1, לא = 2' and 22780/22785 '//no', on new Entity(\"gen_powerofattorneymain\") (0029:33988, 22758). (b) short_he 'הערת הסריקה מועברת' calls the annotation the scan, which is unproven (see the summary result).",
+      "evidence": "source/DailyProcess/0031_PoaAccountUpdateDaily.dtsx:3323-3333, 3684-3690; 0029_POA.dtsx:22758, 22780-22795, 22882, 33988, 34045-34058, 34138",
+      "wrongUnits": [
+        {
+          "unit": "short_he / flow_he[1] 'שאינו מחריג את (סוג) המוצר'",
+          "problem": "The meaning of option value 2 is stated as fact without attribution.",
+          "correct": "gen_exclludetrainingfunds / gen_excludeprovidentfunds = 2 ('לא' according to the code comment '//כן = 1, לא = 2' in 0029_POA.dtsx:34045, 34054 for gen_powerofattorneymain).",
+          "evidence": "DTSX:3330, 3332; 0029_POA.dtsx:34045, 34054"
+        },
+        {
+          "unit": "short_he 'הערת הסריקה מועברת מייפוי הכוח הראשי לחשבון'",
+          "problem": "Unproven meaning (the annotation content is not shown).",
+          "correct": "'ההערה (annotation) של ייפוי הכוח הראשי מועברת לחשבון' (meaning as a scan note: השערה, cf. 0029_POA.dtsx:22882).",
+          "evidence": "DTSX:3323-3324, 3684-3690"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Create Power Of Attorney|short",
+      "hash": "e34507c39707",
+      "verdict": "WRONG",
+      "detail": "Steps and branches are correct: lookup Match unconnected (skip), No Match → Move Annotation → Remove Duplicates → Create. WRONG: [1] 'שאינו מחריג את המוצר' (meaning of value 2, unattributed; proof only in 0029_POA.dtsx:34045/34054). [6] 'הערת הסריקה' (annotation called the scan, unproven).",
+      "evidence": "source/DailyProcess/0031_PoaAccountUpdateDaily.dtsx:858-870, 3326-3333, 3684-3690; 0029_POA.dtsx:34045, 34054, 22882",
+      "wrongUnits": [
+        {
+          "unit": "[1] 'שאינו מחריג את המוצר'",
+          "problem": "The meaning of exclude-flag value 2 is not attributed.",
+          "correct": "Attribute it to 0029_POA.dtsx:34045/34054 ('//כן = 1, לא = 2'), or label it השערה.",
+          "evidence": "DTSX:3330, 3332"
+        },
+        {
+          "unit": "[6] 'הערת הסריקה של ייפוי הכוח הראשי מועברת אל החשבון'",
+          "problem": "The annotation is called the scan without proof.",
+          "correct": "'ההערה (annotation) של ייפוי הכוח הראשי מועברת אל החשבון'",
+          "evidence": "DTSX:3323-3324, 3684-3690"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Create Power Of Attorney|detailed",
+      "hash": "52d4da65d52f",
+      "verdict": "WRONG",
+      "detail": "Verified: the SQL (DTSX:3295-3340: ROW_NUMBER per account by Gen_signaturedate desc with the Annotation join inside the subquery, the 2-day CreatedOn window, appendix 2, state 1). The ownership argument for gen_currentstate checks out (DTSX:40447-40449), and so does the one for ObjectId (annotation[\"objectid\"] DTSX:3687), with AnnotationId stated as unknown. The lookup is partial cache on Gen_customeraccount with Match unconnected. Move Annotation main.cs:122-143 runs per row with no check. Remove Duplicates keys are gen_customeraccountid(1) + Gen_powerofattorneymainId(2) with EliminateDuplicates=true. The create code main.cs:131-231 sets ACTIVE(1), the valid-option checks, WaitingTransferToBank(2), +3h dates, end date fallback receiving+3h+10y, start = DateTime.Now, and product != 2 ('//gemel to invest') gates the advisory fields. The warnings are verified. WRONG: [1] 'בלי החרגת השתלמות' / 'בלי החרגת גמל' give exclude-flag value 2 the meaning 'not excluded' without attribution (proof only in 0029_POA.dtsx:34045/34054). [7] 'הערה (סריקה)' and [21] 'וסריקת ייפוי הכוח מוצמדת אליו' call the annotation the scan without proof. Note only: the warning text is 'Error Creating POA Account  Agent' with a double space (DTSX:843).",
+      "evidence": "source/DailyProcess/0031_PoaAccountUpdateDaily.dtsx:816, 843, 858-870, 1781 (main.cs:131-231), 3290-3340, 3431 (main.cs:122-143), 4799-4801; 0029_POA.dtsx:34045, 34054, 22882",
+      "wrongUnits": [
+        {
+          "unit": "[1] 'בלי החרגת השתלמות' / 'בלי החרגת גמל'",
+          "problem": "The meaning of value 2 is not attributed.",
+          "correct": "'gen_exclludetrainingfunds = 2' / 'gen_excludeprovidentfunds = 2' (2 = 'לא' according to the code comment in 0029_POA.dtsx:34045, 34054).",
+          "evidence": "DTSX:3330, 3332"
+        },
+        {
+          "unit": "[7] 'האם לייפוי הכוח הראשי יש הערה (סריקה)?'; [21] 'וסריקת ייפוי הכוח מוצמדת אליו'",
+          "problem": "The annotation is called the scan without proof.",
+          "correct": "'יש הערה (annotation)'; '…וההערה (annotation) של ייפוי הכוח הראשי הועברה לחשבון' (scan meaning: השערה).",
+          "evidence": "DTSX:3318-3324, 3684-3690; 0029_POA.dtsx:22882"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Create Power Of Attorney|detail",
+      "hash": "31aabf22b158",
+      "verdict": "WRONG",
+      "detail": "[2], [4] and [6] are correct. In [6], the 0005 creator lines and the 0029 POA Main creation (0029_POA.dtsx:22758, new Entity(\"gen_powerofattorneymain\")) are verified. The gen_currentstate ownership argument in [1] is verified. WRONG: [1] 'שאינו מחריג את המוצר', [3] 'השתלמות/גמל לפי החרגה' and [5] 'שאינו מחריג את סוג המוצר של החשבון' rely on exclude-flag value 2 meaning 'not excluded'. That meaning is not attributed (proof only in 0029_POA.dtsx:34045/34054 '//כן = 1, לא = 2').",
+      "evidence": "source/DailyProcess/0031_PoaAccountUpdateDaily.dtsx:3326-3333; 0029_POA.dtsx:34045, 34054",
+      "wrongUnits": [
+        {
+          "unit": "[1], [3], [5] (exclusion wording)",
+          "problem": "The meaning of exclude-flag value 2 is not attributed.",
+          "correct": "Attribute it to 0029_POA.dtsx:34045/34054 ('//כן = 1, לא = 2' on gen_powerofattorneymain), or label it השערה.",
+          "evidence": "DTSX:3330, 3332"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Create Power Of Attorney - Pension|title",
+      "hash": "ecd20c788642",
+      "verdict": "WRONG",
+      "detail": "Attributions (ב'1, פעיל, mekifa/clalit), the ownership pointer, the one-per-main dedupe (Remove Duplicates key Gen_powerofattorneymainId only, EliminateDuplicates=true) and the SDK create are correct. WRONG: (a) short_he 'תוכנית אחת לכל ייפוי כוח ראשי בכל ריצה; השאר בריצות הבאות' is unconditional. The other programs are handled in later runs only if they are still within CreatedOn > DATEADD(dd,-2,GETDATE()) and still have no POA (DTSX:7620, 5184-5194). This depends on data and timing; the detail claim states it correctly. (b) short_he 'הערת הסריקה' calls the annotation the scan without proof.",
+      "evidence": "source/DailyProcess/0031_PoaAccountUpdateDaily.dtsx:5182-5194, 7589-7634, 7976-7980, 9066-9068",
+      "wrongUnits": [
+        {
+          "unit": "short_he 'השאר בריצות הבאות'",
+          "problem": "Unconditional; it is true only while the program is inside the 2-day CreatedOn window and still has no POA.",
+          "correct": "'תוכניות נוספות של אותו ייפוי כוח ראשי מטופלות רק בריצות הבאות, אם עדיין בטווח היומיים ועדיין אין להן ייפוי כוח'",
+          "evidence": "DTSX:7620, 5184-5194, 9066-9068"
+        },
+        {
+          "unit": "short_he 'הערת הסריקה מועברת מייפוי הכוח הראשי לתוכנית'",
+          "problem": "The annotation is called the scan without proof.",
+          "correct": "'ההערה (annotation) של ייפוי הכוח הראשי מועברת לתוכנית'",
+          "evidence": "DTSX:7618-7619, 7976-7980"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Create Power Of Attorney - Pension|short",
+      "hash": "3365087320e3",
+      "verdict": "WRONG",
+      "detail": "[1]-[5] are correct: the lookup is on gen_customerprogram with Match unconnected. WRONG: [6] 'הערת הסריקה' calls the annotation the scan without proof. [7] 'תוכניות נוספות שלו מטופלות בריצות הבאות' is unconditional; it holds only if the program is still within the 2-day CreatedOn window and still has no POA.",
+      "evidence": "source/DailyProcess/0031_PoaAccountUpdateDaily.dtsx:5182-5194, 7620, 7618-7619, 9066-9068",
+      "wrongUnits": [
+        {
+          "unit": "[6] 'הערת הסריקה של ייפוי הכוח הראשי מועברת אל התוכנית'",
+          "problem": "Unproven meaning.",
+          "correct": "'ההערה (annotation) של ייפוי הכוח הראשי מועברת אל התוכנית'",
+          "evidence": "DTSX:7618-7619, 7976-7980"
+        },
+        {
+          "unit": "[7] 'תוכניות נוספות שלו מטופלות בריצות הבאות'",
+          "problem": "Unconditional; it depends on the 2-day window and on run timing.",
+          "correct": "'… מטופלות רק בריצות הבאות, אם עדיין בטווח היומיים ועדיין אין להן ייפוי כוח'",
+          "evidence": "DTSX:7620, 5184-5194"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Create Power Of Attorney - Pension|detailed",
+      "hash": "6b626fa752a7",
+      "verdict": "WRONG",
+      "detail": "Verified: the Get Policies SQL (DTSX:7589-7634) with the attributions and the gen_currentstate ownership argument, and the ObjectId ownership (annotation[\"objectid\"] DTSX:7979) with AnnotationId unknown. The lookup is partial cache on gen_customerprogram. Move Annotation To Policies sets EntityReference(\"gen_policies\"). The dedupe is by main only. The create code main.cs:131-229 has +3h dates, the end-date fallback, and advisory data always copied (198-217). WRONG: (a) [7] 'הערה (סריקה)' and [17] 'וסריקת ייפוי הכוח מוצמדת אליו' call the annotation the scan without proof. (b) [16] quotes the warning texts as 'Error Creating POA Account Agent' / 'Error Updating Annotation ObjectId'. In this flow they are 'Error Creating POA Account  Agent (Pension)' and 'Error Updating Annotation ObjectId (Pension)' (DTSX:5140, 5167).",
+      "evidence": "source/DailyProcess/0031_PoaAccountUpdateDaily.dtsx:5140, 5167, 5182-5194, 6102 (main.cs:131-229), 7589-7634, 7722 (main.cs:123-142), 9066-9068",
+      "wrongUnits": [
+        {
+          "unit": "[7] '(סריקה)'; [17] 'וסריקת ייפוי הכוח מוצמדת אליו'",
+          "problem": "The annotation is called the scan without proof.",
+          "correct": "'הערה (annotation)'; scan meaning only as השערה (cf. 0029_POA.dtsx:34138 'הסריקה נמצאת בישות חשבון פנסיה - …').",
+          "evidence": "DTSX:7611-7619, 7976-7980"
+        },
+        {
+          "unit": "[16] warning texts",
+          "problem": "The literal text is wrong for the Pension flow.",
+          "correct": "'Error Creating POA Account  Agent (Pension)' / 'Error Updating Annotation ObjectId (Pension)'",
+          "evidence": "DTSX:5140, 5167"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Create Power Of Attorney - Pension|detail",
+      "hash": "e0a2095f1195",
+      "verdict": "CONFIRMED",
+      "detail": "[1]: 'שנוצר ביומיים האחרונים', with ב'1 and פעיל attributed and the gen_currentstate ownership argued. The inclusion flags are boolean (0029 writes true/false, 0029_POA.dtsx:22768-22769, 34096-34098), so '= 1' means included. 200003/200004 are attributed to --mekifa/--clalit. [2]: POA Main by contact (Gen_programmain.Gen_customername), latest signature, and skip when a gen_powerofattorney exists for gen_customerprogram. [3]: dedupe by POA Main and valid OptionSets. [4]: annotation Update objectid and gen_powerofattorney Create, both SDK. [5]: later runs are stated conditionally. [6]: no creator of Gen_programmain/gen_policies was found in the supplied packages, and this is labelled השערה.",
+      "evidence": "source/DailyProcess/0031_PoaAccountUpdateDaily.dtsx:5182-5194, 7589-7634, 9066-9068; 0029_POA.dtsx:22768-22769, 34096-34098",
+      "wrongUnits": []
+    }
+  ]
+}

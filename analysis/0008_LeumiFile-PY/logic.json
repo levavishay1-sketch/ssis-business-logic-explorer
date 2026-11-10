@@ -1,0 +1,2389 @@
+{
+ "package": "0008_LeumiFile-PY",
+ "analyst": "ssis-business-logic",
+ "source": {
+  "file": "0008_LeumiFile-PY.dtsx",
+  "relativePath": "DailyProcess/0008_LeumiFile-PY.dtsx",
+  "sha256": "52E0D3302757EBB5BDC6C0BB27C19205CDD1EA0AA6198EF98BD0F25308BEED2B",
+  "lines": 98213
+ },
+ "evidenceFile": "evidence/0008_LeumiFile-PY.json",
+ "evidenceConvention": "DTSX:<line> = שורה בקובץ source/DailyProcess/0008_LeumiFile-PY.dtsx (SHA256 למעלה); main.cs:<n> / main.vb:<n> / ScriptMain.cs:<n> = שורה בקוד המקור המוטמע של הרכיב (כפי ש-tools/component.mjs מציג); PC = Precedence Constraint; CM = Connection Manager.",
+ "scopeBoundary": "רק קובץ ה-DTSX הזה. לא סופקו: CRM2015.Proxy (CrmProxy, ExecuteMultipleExtension, RequestType); קובצי התצורה C:\\Generix\\SSISConfigFile.dtsConfig ו-C:\\Generix\\SSISConfigFileSrs.dtsConfig שעשויים לדרוס בזמן ריצה את מחרוזות החיבור CRM ו-Staging (DTSX:199–200); ערכי משתנים שנטענים מ-gen_etlvariable (DailyFilePath, FileName, DailyFileArchive, ServerName, CrmAdminId וכו׳); מטא-דאטה של CRM (תוויות optionset, סוגי שדות); טריגרים/Plugins במסד ALTSHULER_MSCRM. ניתוח הסקריפטים מבוסס על קוד המקור המוטמע; קבצי DLL מקומפלים לא פוענחו. התנהגות זמן-ריצה לא נבדקה.",
+ "technicalVerification": "pending_independent_verification",
+ "reviewDecision": "pending_user_approval",
+ "summary_he": "החבילה קולטת את קובץ ה-PY היומי של בנק לאומי (תנועות ובקשות בקופות של בנק 10), טוענת אותו ל-Staging ומעדכנת לפיו את CRM: מוסיפה תנועות חדשות לטבלת התנועות של השנה השוטפת (Gen_ftCurrentYear) בהכנסת SQL ישירה למסד CRM (Unsupported), כותבת לאיש הקשר gen_loaneligibilitycalculationrequired = 1, וכותבת לרשומת gen_demislikamonthsalary מתאימה gen_depositidentificationforreportedmonth = 1 עם תאריך (משמעות השדות לפי שמם בלבד, לא מוכחת). בנוסף, להעברות בין מסלולים באותו חשבון (פעולה 57, אותו חשבון ואותו סוג קופה) היא יוצרת דרך CRM SDK קופה במסלול היעד (gen_fundmain) ובקשת העברה נכנסת (gen_transferin). מסלולי חשבון ופיצולי מסלול (gen_accountcourses / gen_coursepartition) נוצרים דרך SDK לשורות בקובץ בלי סינון לפי סוג פעולה: לכל שורה שמזהה הבקשה (Request_ID_74) וחשבון היעד (Target_Fund_AccountNumber_47) שלה תואמים gen_transferin קיים ב-CRM, בלי סינון לפי מצב ההעברה או לפי התהליך שיצר אותה, ובתנאי שקיימת ב-CRM קופה (gen_fundmain) מתאימה בבנק 10 – בצד המקור (Action_Transfer_Direction_69 שאינו \"2\") לחשבון היעד ולמסלול המקור (Source_Fund_Course_17), ובצד היעד (Action_Transfer_Direction_69 = \"2\") לחשבון היעד ולמסלול היעד (Target_Fund_course_44) עם איש קשר וחוזה סוכן – ושעדיין אין ב-CRM מסלול חשבון לאותה העברה ולקופת המקור (gen_transferin + gen_fundnumber) או פיצול מסלול לאותה העברה ולקופת היעד (gen_transferin + gen_fundnumberdest). שורה שאינה עומדת בתנאים אלה נזרקת בלי יצירה.",
+ "executionOrder": [
+  {
+   "step": 1,
+   "refId": "Package\\Get Organization Variables",
+   "title_he": "טעינת משתני ארגון (תשתית)",
+   "trigger": "התחלה – אין אילוץ נכנס"
+  },
+  {
+   "step": 2,
+   "refId": "Package\\Get selected server to ServerName Variable",
+   "title_he": "בחירת שרת CRM (תשתית)",
+   "trigger": "אחרי 1 · Success (PC DTSX:89153)"
+  },
+  {
+   "step": 3,
+   "refId": "Package\\Check File Existence",
+   "title_he": "בחירת קובץ ה-PY",
+   "trigger": "אחרי 2 · Success (PC DTSX:89159)"
+  },
+  {
+   "step": 4,
+   "refId": "Package\\Create ETL Process record",
+   "title_he": "רשומת תהליך ETL (תשתית)",
+   "trigger": "אחרי 3 · Success AND @[User::isFileExist]==TRUE (PC DTSX:89154)"
+  },
+  {
+   "step": 5,
+   "refId": "Package\\Get Transaction Currency ID",
+   "title_he": "מטבע ראשוני (חלק מהגדרת זהות הכתיבה)",
+   "trigger": "אחרי 4 · Success (PC DTSX:89162)"
+  },
+  {
+   "step": 6,
+   "refId": "Package\\Get Sytem User Id",
+   "title_he": "זהות המשתמש, היחידה והמטבע",
+   "trigger": "אחרי 5 · Success (PC DTSX:89169)"
+  },
+  {
+   "step": 7,
+   "refId": "Package\\Truncate PY_FileData Table From Staging",
+   "title_he": "ריקון Staging (תשתית)",
+   "trigger": "אחרי 6 · Success (PC DTSX:89168)"
+  },
+  {
+   "step": 8,
+   "refId": "Package\\Write PY File To Staging",
+   "title_he": "טעינת הקובץ ל-Staging",
+   "trigger": "אחרי 7 · Success (PC DTSX:89161)"
+  },
+  {
+   "step": 9,
+   "refId": "Package\\FT",
+   "title_he": "קליטת תנועות בקופה",
+   "trigger": "אחרי 8 · Success (PC DTSX:89160)"
+  },
+  {
+   "step": 10,
+   "refId": "Package\\Write to ETLProcessCounter - Step 1",
+   "title_he": "מוני תהליך (תשתית)",
+   "trigger": "אחרי 9 · Success (PC DTSX:89164)"
+  },
+  {
+   "step": 11,
+   "refId": "Package\\Create fundmain for transferin",
+   "title_he": "יצירת קופה במסלול היעד",
+   "trigger": "אחרי 10 · Success (PC DTSX:89158)"
+  },
+  {
+   "step": 12,
+   "refId": "Package\\Write to ETLProcessCounter - Step 2",
+   "title_he": "מוני תהליך (תשתית)",
+   "trigger": "אחרי 11 · Success (PC DTSX:89155)"
+  },
+  {
+   "step": 13,
+   "refId": "Package\\Create transferin Maslulim",
+   "title_he": "יצירת העברה נכנסת בין מסלולים",
+   "trigger": "אחרי 12 · Success (PC DTSX:89166)"
+  },
+  {
+   "step": 14,
+   "refId": "Package\\Write to ETLProcessCounter - Step 3",
+   "title_he": "מוני תהליך (תשתית)",
+   "trigger": "אחרי 13 · Success (PC DTSX:89167)"
+  },
+  {
+   "step": 15,
+   "refId": "Package\\Create Acount Courses and course partition for transferin",
+   "title_he": "מסלולי חשבון ופיצולי מסלול",
+   "trigger": "אחרי 14 · Success (PC DTSX:89156)"
+  },
+  {
+   "step": 16,
+   "refId": "Package\\Write to ETLProcessCounter - Step 4",
+   "title_he": "מוני תהליך (תשתית)",
+   "trigger": "אחרי 15 · Success (PC DTSX:89163)"
+  },
+  {
+   "step": 17,
+   "refId": "Package\\Move File To Archive",
+   "title_he": "העברת הקובץ לארכיון (תשתית)",
+   "trigger": "אחרי 16 · Success (PC DTSX:89157)"
+  },
+  {
+   "step": 18,
+   "refId": "Package\\End ETL Process record",
+   "title_he": "סיום רשומת ETL (תשתית)",
+   "trigger": "אחרי 17 · Success (PC DTSX:89165)"
+  }
+ ],
+ "executionNotes_he": [
+  "כל 17 האילוצים הם Success עם LogicalAnd – שרשרת סדרתית אחת ללא ענפים מקבילים; כשל של שלב עוצר את כל השלבים שאחריו (DTSX:89153–89169).",
+  "אם לא נמצא קובץ, האילוץ Success AND @[User::isFileExist]==TRUE (DTSX:89154) חוסם את כל ההמשך.",
+  "אין Executables או רכיבים מושבתים (coverage: disabled 0; כל בדיקות הכיסוי תואמות).",
+  "Package.EventHandlers[OnError] → Error ETL Process record (תשתית, DTSX:89179).",
+  "הסדר העסקי: קודם תנועות (FT), אחר כך קופת יעד, אחר כך בקשת העברה נכנסת, ואחר כך מסלולים ופיצולים – כך שהמסלולים יכולים להיבנות גם על בקשות שנוצרו באותה ריצה."
+ ],
+ "ignoredAsFramework": [
+  "Package\\Get Organization Variables",
+  "Package\\Get selected server to ServerName Variable",
+  "Package\\Create ETL Process record",
+  "Package\\Write to ETLProcessCounter - Step 1",
+  "Package\\Write to ETLProcessCounter - Step 2",
+  "Package\\Write to ETLProcessCounter - Step 3",
+  "Package\\Write to ETLProcessCounter - Step 4",
+  "Package\\End ETL Process record",
+  "Package.EventHandlers[OnError]\\Error ETL Process record",
+  "Package\\Truncate PY_FileData Table From Staging",
+  "Package\\Move File To Archive",
+  "<בכל Data Flow> Set Task Name Variable, Count*/Row*Count, Multicast שמזין מונים, Add Column for etl process warning, insert etl process warning*, Set Error columns*, Set Warning columns*, Get Error Description, Union All Error*/Union All Errors"
+ ],
+ "components": [
+  {
+   "refId": "Package\\Check File Existence",
+   "title_he": "בחירת קובץ ה-PY לעיבוד",
+   "techName": "Check File Existence",
+   "short_he": "מאתר בתיקיית הקבצים היומית קבצים ששמם מכיל את שם קובץ ה-PY; אם נמצאו – בוחר לעיבוד את הקובץ שעודכן אחרון ומעביר את השאר לתיקיית NotProccessed בארכיון. אם אין קובץ – שאר החבילה לא רצה.",
+   "flow_he": [
+    "חיפוש קבצים *FileName* בתיקייה היומית",
+    "אין קובץ → עצירה (isFileExist נשאר false)",
+    "יש קבצים → האחרון לפי LastWriteTime נבחר",
+    "שאר הקבצים מועברים ל-NotProccessed ללא עיבוד"
+   ],
+   "short": {
+    "nodes": [
+     {
+      "type": "step",
+      "text": "המערכת מחפשת בתיקיית הקבצים היומית קבצי PY שהתקבלו מהבנק."
+     },
+     {
+      "type": "decision",
+      "text": "האם נמצא לפחות קובץ אחד?",
+      "branches": [
+       {
+        "label": "לא",
+        "nodes": [
+         {
+          "type": "end",
+          "text": "אין קובץ לעיבוד, ולכן שאר שלבי החבילה אינם מתבצעים."
+         }
+        ]
+       },
+       {
+        "label": "כן",
+        "nodes": [
+         {
+          "type": "step",
+          "text": "הקובץ שעודכן אחרון נבחר לעיבוד."
+         },
+         {
+          "type": "step",
+          "text": "קבצים ישנים יותר מועברים לארכיון כ\"לא עובדו\" ואינם נקלטים."
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "type": "end",
+      "text": "נקבע איזה קובץ יעדכן את CRM בריצה זו."
+     }
+    ]
+   },
+   "detailed": {
+    "nodes": [
+     {
+      "type": "step",
+      "text": "נתיב התיקייה ושם הקובץ נלקחים ממשתני החבילה שנטענים בזמן ריצה.",
+      "tech": "DailyFilePath, FileName, DailyFileArchive (ScriptMain.cs:35–38)"
+     },
+     {
+      "type": "step",
+      "text": "המערכת מחפשת בתיקייה את כל הקבצים ששמם מכיל את שם הקובץ המוגדר.",
+      "tech": "GetFiles(\"*\" + FileName + \"*\") (ScriptMain.cs:40)"
+     },
+     {
+      "type": "decision",
+      "text": "האם נמצא לפחות קובץ אחד?",
+      "tech": "files.Length > 0 (ScriptMain.cs:42)",
+      "branches": [
+       {
+        "label": "לא",
+        "nodes": [
+         {
+          "type": "step",
+          "text": "המשתנה isFileExist נשאר false, והאילוץ שאחרי המשימה אינו מתקיים.",
+          "tech": "PC DTSX:89154: Success AND @[User::isFileExist]==TRUE"
+         },
+         {
+          "type": "end",
+          "text": "החבילה מסתיימת ללא עדכון CRM."
+         }
+        ]
+       },
+       {
+        "label": "כן",
+        "nodes": [
+         {
+          "type": "step",
+          "text": "ממשיכים לבחירת הקובץ."
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "type": "step",
+      "text": "נוצרת תיקיית ארכיון לתאריך היום ותת-תיקייה NotProccessed.",
+      "tech": "DailyFileArchive\\yyyy.MM.dd\\NotProccessed (ScriptMain.cs:44–51)"
+     },
+     {
+      "type": "step",
+      "text": "הקבצים ממוינים לפי מועד העדכון האחרון בסדר יורד, והראשון נבחר כקובץ לעיבוד.",
+      "tech": "FullFileName = files[0]; isFileExist = true (ScriptMain.cs:54–56)"
+     },
+     {
+      "type": "step",
+      "text": "כל שאר הקבצים מועברים לתיקיית NotProccessed (קובץ קודם באותו שם נמחק שם) ואינם נקלטים.",
+      "tech": "ScriptMain.cs:58–63"
+     },
+     {
+      "type": "end",
+      "text": "רק הקובץ העדכני ביותר נקלט בריצה; קבצים נוספים שנמצאו אינם מעובדים כלל."
+     }
+    ]
+   },
+   "detail_he": [
+    {
+     "h": "מקור ואוכלוסייה",
+     "t": "קבצים בתיקייה DailyFilePath ששמם מכיל את FileName (ערכי משתנים שנטענים בזמן ריצה; הערכים עצמם לא סופקו)."
+    },
+    {
+     "h": "התאמה לרשומות קיימות",
+     "t": "אין – משימת קבצים בלבד."
+    },
+    {
+     "h": "החלטות",
+     "t": "יש/אין קובץ; בחירת הקובץ האחרון לפי LastWriteTime."
+    },
+    {
+     "h": "כתיבה ל-CRM",
+     "t": "אין כתיבה ל-CRM. (הסורק סימן \"crm-sdk-create/delete\" – אלה directory.Create ו-File.Delete של מערכת הקבצים.)"
+    },
+    {
+     "h": "תוצאה עסקית",
+     "t": "קובץ אחד בלבד מעובד; קבצים נוספים מועברים ל-NotProccessed ללא קליטה."
+    }
+   ],
+   "decisions": [
+    {
+     "where": "Check File Existence (ScriptMain.cs:42)",
+     "condition": "files.Length > 0",
+     "meaning_he": "נמצא קובץ PY",
+     "outcome_he": "כן → isFileExist = true וקובץ אחרון נבחר; לא → המשך החבילה חסום"
+    },
+    {
+     "where": "PC DTSX:89154",
+     "condition": "@[User::isFileExist]==TRUE (ExpressionAndConstraint, Success)",
+     "meaning_he": "יש קובץ",
+     "outcome_he": "רק אז ממשיכים ל-Create ETL Process record ולשאר השרשרת"
+    }
+   ],
+   "crmEffects": [],
+   "evidence": [
+    "DTSX:325 Check File Existence",
+    "ScriptMain.cs:33–68",
+    "PC DTSX:89154"
+   ],
+   "openQuestions_he": [
+    "ערכי DailyFilePath / FileName / DailyFileArchive נטענים בזמן ריצה ואינם בקובץ – לא ידוע."
+   ]
+  },
+  {
+   "refId": "Package\\Get Sytem User Id",
+   "title_he": "זהות המשתמש, היחידה והמטבע לכתיבה",
+   "techName": "Get Sytem User Id (+ Get Transaction Currency ID)",
+   "short_he": "מאתר את משתמש ה-CRM ששם הדומיין שלו שווה לערך UserDomainName שמוגדר בטבלת gen_etlvariable, את היחידה העסקית שלו, את הארגון ואת מטבע \"שקל חדש\". המשתמש והיחידה נרשמים כבעלים/יוצר/מעדכן רק ברשומות התנועה (Gen_ftCurrentYearBase); המטבע נרשם בתנועות ובבקשות ההעברה הנכנסות (gen_transferin).",
+   "flow_he": [
+    "Get Transaction Currency ID: מטבע אחד כלשהו (TOP 1 ללא ORDER BY) → TransactionCurrencyId (נדרס בסוף השלב הבא)",
+    "systemuser לפי domainname → UserId, BusinessUnitId",
+    "TransactionCurrency לפי \"שקל חדש\" → TransactionCurrencyId (דורס)",
+    "OrganizationBase לפי שם הארגון → OrganizationId"
+   ],
+   "short": {
+    "nodes": [
+     {
+      "type": "step",
+      "text": "המערכת מאתרת את משתמש ה-CRM ששם הדומיין שלו מוגדר בהגדרות הטעינה, ואת היחידה העסקית שלו."
+     },
+     {
+      "type": "step",
+      "text": "המערכת מאתרת את מזהה המטבע \"שקל חדש\" ואת מזהה הארגון."
+     },
+     {
+      "type": "end",
+      "text": "רשומות התנועה שנוספות בהמשך נרשמות על שם משתמש זה ויחידה זו ובמטבע זה. בקשות ההעברה הנכנסות מקבלות רק את המטבע, ושאר הרשומות שנוצרות דרך שירותי CRM לא מקבלות אף אחד מהם."
+     }
+    ]
+   },
+   "detailed": {
+    "nodes": [
+     {
+      "type": "step",
+      "text": "משימת SQL קוראת מטבע אחד כלשהו מטבלת המטבעות ושומרת אותו זמנית כמטבע לכתיבה. השאילתה לוקחת שורה אחת בלי סדר מוגדר, ולכן לא נקבע איזה מטבע יוחזר; הערך נדרס בסוף השלב הבא.",
+      "tech": "Get Transaction Currency ID: select top 1 TransactionCurrencyId from TransactionCurrency (ללא ORDER BY) → User::TransactionCurrencyId (DTSX:85587–85591); נדרס ב-Set Variables PostExecute (main.cs:49-56)"
+     },
+     {
+      "type": "step",
+      "text": "המערכת מאתרת את משתמש המערכת ששם הדומיין שלו (באותיות קטנות) שווה לשם הדומיין שהוגדר בהגדרות הטעינה, ושולפת את מזהה המשתמש והיחידה העסקית.",
+      "tech": "Get User Id: select systemuserid, BusinessUnitId from systemuser where lower(domainname) = ? (DTSX:84654); ? = User::UserDomainName (DTSX:84661), נטען מ-gen_etlvariable ב-Get Organization Variables (DTSX:82694)"
+     },
+     {
+      "type": "step",
+      "text": "המערכת מאתרת את המטבע ששמו \"שקל חדש\" ואת מזהה הארגון לפי שם הארגון.",
+      "tech": "System User Domain Name 1: TransactionCurrencyIdName = \"שקל חדש\"; Get Transaction Currency Id / Get Organization Id / Get Owner Type"
+     },
+     {
+      "type": "step",
+      "text": "הערכים נשמרים במשתני החבילה; מזהה המטבע מהשלב הקודם נדרס במטבע \"שקל חדש\".",
+      "tech": "Set Variables: BusinessUnitId, TransactionCurrencyId, UserId, OrganizationId"
+     },
+     {
+      "type": "step",
+      "text": "אם לא נמצא משתמש תואם, רכיב השמירה עדיין מציב את המשתנים בסיום: המשתמש, היחידה, הארגון והמטבע מקבלים מזהה ריק (Guid.Empty), וגם המטבע מהשלב הראשון נדרס. השלב לא נכשל במקרה כזה. אם נמצאו כמה משתמשים, נשמרים הערכים מהשורה האחרונה.",
+      "tech": "Set Variables main.cs:49-56: PostExecute מציב BusinessUnitId, TransactionCurrencyId, UserId, OrganizationId בלי תנאי; main.cs:68-77: הערכים נקבעים רק כשמגיעה שורה",
+      "evidence": "DTSX:84864-84866"
+     },
+     {
+      "type": "step",
+      "text": "בהמשך: UserId משמש כבעלים/יוצר/מעדכן ו-BusinessUnitId כיחידה הבעלים רק בהכנסת התנועות ל-Gen_ftCurrentYearBase. TransactionCurrencyId נכתב בתנועות ובבקשות ההעברה הנכנסות. הרשומות שנוצרות דרך SDK (קופות, בקשות העברה, מסלולי חשבון ופיצולי מסלול) לא מקבלות בעלים מהשלב הזה.",
+      "tech": "FT\\Create System Columns (DTSX:57723-57731); Create transferin Maslulim SDK Create gen_TransferIn main.cs:83-88 (DTSX:43947-43949, transactioncurrencyid בלבד)"
+     },
+     {
+      "type": "end",
+      "text": "התנועות נרשמות על שם המשתמש והיחידה שאותרו ובמטבע \"שקל חדש\"; בקשות ההעברה הנכנסות מקבלות את המטבע בלבד. הזהות שבה נוצרות רשומות ה-SDK נקבעת ברכיב החיצוני CrmProxy, שלא סופק – לא ידוע."
+     }
+    ]
+   },
+   "detail_he": [
+    {
+     "h": "מקור ואוכלוסייה",
+     "t": "טבלאות מערכת ב-CRM: systemuser, TransactionCurrency, OrganizationBase, OwnerBase."
+    },
+    {
+     "h": "התאמה לרשומות קיימות",
+     "t": "systemuser לפי lower(domainname); TransactionCurrency לפי CurrencyName = \"שקל חדש\"; OrganizationBase לפי LOWER(Name)."
+    },
+    {
+     "h": "החלטות",
+     "t": "אין החלטות עסקיות; ערכי Lookup בלבד."
+    },
+    {
+     "h": "כתיבה ל-CRM",
+     "t": "אין."
+    },
+    {
+     "h": "תוצאה עסקית",
+     "t": "משתמש ויחידה שבשמם נרשמות התנועות (Gen_ftCurrentYearBase), ומטבע שנרשם בתנועות ובבקשות ההעברה הנכנסות (gen_transferin). בקשות ההעברה לא נרשמות על שם המשתמש הזה. אם לא נמצא משתמש תואם, המשתנים מקבלים Guid.Empty."
+    }
+   ],
+   "decisions": [],
+   "crmEffects": [],
+   "evidence": [
+    "DTSX:84476 Get Sytem User Id",
+    "DTSX:84649 Get User Id",
+    "DTSX:85587 Get Transaction Currency ID",
+    "PC DTSX:89169, 89168"
+   ],
+   "openQuestions_he": [
+    "שם הדומיין שלפיו מאותר המשתמש מגיע ממשתנה (ParameterMapping DTSX:84661) שערכו נטען בזמן ריצה – לא ידוע."
+   ]
+  },
+  {
+   "refId": "Package\\Write PY File To Staging",
+   "title_he": "טעינת קובץ ה-PY ל-Staging",
+   "techName": "Write PY File To Staging",
+   "short_he": "קובץ ה-PY (רוחב קבוע, cp1255) נטען לטבלת PY_FileData בחיבור SRS.GENERIX_STAGING (בזמן התכנון Psrs/GENERIX_STAGING; קובץ התצורה SSISConfigFileSrs.dtsConfig, שלא סופק, עשוי לדרוס את היעד). לעמודות BankTransaction_ID_91 ו-Related_Action_ID_98 בטבלה נכתבים השדות FILLER1_29_BankTransactionId (עמודה 29 בקובץ) ו-Filler_83_RelatedActionId (עמודה 83) אחרי הסרת אפסים מובילים. השדות BankTransaction_ID_91 (עמודה 91) ו-Related_Action_ID_98 (עמודה 98) שבקובץ, ועוד 16 עמודות (146-148, 150-156, 158, 159, 202-204, Filler_205_211), אינם נטענים.",
+   "flow_he": [
+    "קובץ PY → Read \"PY\" File",
+    "Remove Leading Zero: FILLER1_29_BankTransactionId → BankTransaction_ID_91, Filler_83_RelatedActionId → Related_Action_ID_98 (שדות הקובץ BankTransaction_ID_91 / Related_Action_ID_98 ועוד 16 עמודות לא נטענים)",
+    "→ [dbo].[PY_FileData] בחיבור SRS.GENERIX_STAGING (זמן תכנון: Psrs/GENERIX_STAGING; עשוי להידרס מקובץ התצורה SSISConfigFileSrs.dtsConfig שלא סופק)"
+   ],
+   "short": {
+    "nodes": [
+     {
+      "type": "step",
+      "text": "הקובץ שנבחר נקרא שורה אחר שורה."
+     },
+     {
+      "type": "step",
+      "text": "ממזהה התנועה הבנקאי וממזהה הפעולה הקשורה מוסרים אפסים מובילים."
+     },
+     {
+      "type": "end",
+      "text": "כל שורות הקובץ זמינות בטבלת ה-Staging לשלבי העיבוד הבאים."
+     }
+    ]
+   },
+   "detailed": {
+    "nodes": [
+     {
+      "type": "step",
+      "text": "טבלת ה-Staging מרוקנת לפני הטעינה (משימת תשתית).",
+      "tech": "Truncate PY_FileData Table From Staging (DTSX:85603)"
+     },
+     {
+      "type": "step",
+      "text": "הקובץ נקרא בפורמט רוחב קבוע בקידוד cp1255.",
+      "tech": "Read \"PY\" File (DTSX:85978); CM PY source: RaggedRight, cp1255, 174 עמודות"
+     },
+     {
+      "type": "step",
+      "text": "ממזהה התנועה הבנקאי וממזהה הפעולה הקשורה מוסרים אפסים מובילים (אפסים פנימיים נשמרים; ערך שכולו אפסים הופך לריק). בנוסף, רווחים בתחילת הערך נמחקים, וכל רווח שהיה בערך המקורי אחרי החלק המוביל (באמצע או בסוף) הופך ל-0; אין חיתוך רווחים מהסוף. אם הבנק מרפד את המזהים ברווחים בסוף, הערך שנשמר משתנה – תלוי בנתונים, לא ידוע.",
+      "tech": "Remove Leading Zero (DTSX:87203): REPLACE(LTRIM(REPLACE(x,\"0\",\" \")),\" \",\"0\") על FILLER1_29_BankTransactionId, Filler_83_RelatedActionId"
+     },
+     {
+      "type": "step",
+      "text": "כל השורות, כולל שורת הסיום, נכתבות לטבלת ה-Staging, אבל לא כל העמודות. לעמודות BankTransaction_ID_91 ו-Related_Action_ID_98 בטבלה נכתבים השדות FILLER1_29_BankTransactionId (עמודה 29 בקובץ) ו-Filler_83_RelatedActionId (עמודה 83), אחרי הסרת האפסים המובילים. השדות BankTransaction_ID_91 (עמודה 91) ו-Related_Action_ID_98 (עמודה 98) שבקובץ אינם נטענים, וכך גם 16 עמודות נוספות: 146-148, 150-156, 158, 159, 202-204 ו-Filler_205_211. שלב FT כותב ל-CRM את BankTransaction_ID_91 של ה-Staging כ-Gen_transferid ואת Related_Action_ID_98 כ-gen_relatedactionidentifier, ולכן ערכים אלה מגיעים משדות 29 ו-83 בקובץ.",
+      "tech": "Insert To PY_FileData (DTSX:85616) → [dbo].[PY_FileData] (OpenRowset) בחיבור SRS.GENERIX_STAGING (DTSX:85631); מחרוזת החיבור בזמן התכנון: Data Source=Psrs; Initial Catalog=GENERIX_STAGING (DTSX:192-196). החבילה טוענת את קובץ התצורה C:\\Generix\\SSISConfigFileSrs.dtsConfig (SRS_STAGING, DTSX:200), שלא סופק ועשוי לדרוס את היעד בזמן ריצה. · מיפוי Insert To PY_FileData (DTSX:85616): 153 עמודות קלט מתוך 171 שהמקור מוציא; FILLER1_29_BankTransactionId → ext:BankTransaction_ID_91, Filler_83_RelatedActionId → ext:Related_Action_ID_98 · FT insert ftCurrentYearBase (DTSX:63118): Gen_transferid = Param_26, gen_relatedactionidentifier = Param_72"
+     },
+     {
+      "type": "step",
+      "text": "אין סינון, אין התאמה ל-CRM ואין החלטות עסקיות בשלב זה."
+     },
+     {
+      "type": "end",
+      "text": "נתוני הקובץ מוכנים לשלבי FT, יצירת קופות, העברות ומסלולים."
+     }
+    ]
+   },
+   "detail_he": [
+    {
+     "h": "מקור ואוכלוסייה",
+     "t": "כל שורות הקובץ שנבחר (FullFileName)."
+    },
+    {
+     "h": "התאמה לרשומות קיימות",
+     "t": "אין."
+    },
+    {
+     "h": "החלטות",
+     "t": "אין."
+    },
+    {
+     "h": "כתיבה ל-CRM",
+     "t": "אין – כתיבה ל-Staging בלבד."
+    },
+    {
+     "h": "תוצאה עסקית",
+     "t": "קובץ → PY_FileData."
+    }
+   ],
+   "decisions": [],
+   "crmEffects": [],
+   "evidence": [
+    "DTSX:85610 Write PY File To Staging",
+    "DTSX:85978 Read \"PY\" File",
+    "DTSX:87203 Remove Leading Zero",
+    "DTSX:85616 Insert To PY_FileData",
+    "CM DTSX:9 PY source"
+   ],
+   "openQuestions_he": []
+  },
+  {
+   "refId": "Package\\FT",
+   "title_he": "קליטת תנועות בקופה לשנה השוטפת (Gen_ftCurrentYear)",
+   "techName": "FT",
+   "short_he": "לכל תנועה בקובץ (Transfer_Type_2 = 2, פעולה שאינה 58) שעדיין לא קיימת ב-CRM ושהקופה שלה קיימת בבנק 10 – מוסיפה רשומת תנועה לשנה השוטפת ב-SQL ישיר, כותבת לאיש הקשר gen_loaneligibilitycalculationrequired = 1, ובפעולות 53 (הפקדה – השערה לפי שם הפלט) של שנת שכר שוטפת/קודמת כותבת gen_depositidentificationforreportedmonth = 1 לרשומת gen_demislikamonthsalary המתאימה (משמעות השדות לפי שמם בלבד).",
+   "flow_he": [
+    "PY_FileData → הסרת שורת סיום",
+    "רק \"תנועות והחזר דמי ניהול\": Action_Type_56 != 58 ו-Transfer_Type_2 = 2",
+    "תנועה קיימת (סוג+סוג פעולה+מזהה תנועה+גוף מנהל) → דילוג",
+    "המרת סכומים (/100) ושדות נגזרים; כיוון 1/2 קובע מי \"אנחנו\" ומי הצד השני",
+    "מוצר בנק 10 (אחרת אזהרה) → שם גוף שכנגד → קופה gen_fundmain (אחרת נזרק)",
+    "סוג קבוצת תנועה/הפרשה, סוג תנועה (אחרת אזהרה וממשיך), החזר יתר, שכר מדווח, מס, דרך מודול פיננסי",
+    "INSERT Gen_ftCurrentYearBase (SQL, ×5 מקביליים) → הצלחה: ContactBase.gen_loaneligibilitycalculationrequired = 1",
+    "ענף מקביל: פעולה 53 (הפקדה – השערה לפי שם הפלט) בשנת שכר שוטפת/קודמת → עדכון gen_demislikamonthsalary פתוח"
+   ],
+   "short": {
+    "nodes": [
+     {
+      "type": "step",
+      "text": "נקראות תנועות הקופה מהקובץ; שורת הסיום ושורות שאינן \"תנועות והחזר דמי ניהול\" אינן מטופלות."
+     },
+     {
+      "type": "decision",
+      "text": "האם התנועה כבר קיימת ב-CRM?",
+      "branches": [
+       {
+        "label": "כן",
+        "nodes": [
+         {
+          "type": "end",
+          "text": "התנועה מדולגת ואינה מתעדכנת."
+         }
+        ]
+       },
+       {
+        "label": "לא",
+        "nodes": [
+         {
+          "type": "step",
+          "text": "התנועה ממשיכה לקליטה."
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "type": "decision",
+      "text": "האם כיוון התנועה בקובץ הוא 1 או 2?",
+      "tech": "Split by trans direction (DTSX:69934): Action_Transfer_Direction_69 == \"1\" / == \"2\"; יציאת \"אחר\" לא מחוברת",
+      "branches": [
+       {
+        "label": "לא",
+        "nodes": [
+         {
+          "type": "end",
+          "text": "התנועה אינה נקלטת, ללא אזהרה."
+         }
+        ]
+       },
+       {
+        "label": "כן",
+        "nodes": [
+         {
+          "type": "step",
+          "text": "התנועה ממשיכה לקליטה."
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "type": "decision",
+      "text": "האם נמצאו ב-CRM המוצר והקופה של החשבון בבנק 10?",
+      "branches": [
+       {
+        "label": "לא",
+        "nodes": [
+         {
+          "type": "end",
+          "text": "התנועה אינה נקלטת (כשהמוצר חסר נרשמת אזהרה; כשהקופה חסרה – ללא אזהרה)."
+         }
+        ]
+       },
+       {
+        "label": "כן",
+        "nodes": [
+         {
+          "type": "step",
+          "text": "נקבעים סוג התנועה, סוג ההפרשה, הסכומים, סימון החזר יתר, שכר מדווח וסכומי מס."
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "type": "write",
+      "text": "נוספת רשומת תנועה חדשה לשנה השוטפת ב-CRM.",
+      "tech": "Gen_ftCurrentYearBase · Insert · SQL"
+     },
+     {
+      "type": "write",
+      "text": "לאיש הקשר של הקופה נכתב 1 בשדה gen_loaneligibilitycalculationrequired (לפי שם השדה: נדרש חישוב זכאות להלוואה – המשמעות לא מוכחת).",
+      "tech": "ContactBase · Update · SQL"
+     },
+     {
+      "type": "write",
+      "text": "בפעולה 53 (הפקדה – השערה לפי שם הפלט) לשנת שכר שוטפת או קודמת, לרשומת gen_demislikamonthsalary של חשבון הלקוח לאותו חודש, שהשדה gen_depositidentificationstatusdate שלה ריק, נכתבים gen_depositidentificationforreportedmonth = 1 ותאריך (לפי שמות השדות: זיהוי הפקדה לחודש המדווח – המשמעות לא מוכחת).",
+      "tech": "gen_demislikamonthsalary · Update · SQL"
+     },
+     {
+      "type": "end",
+      "text": "תנועות חדשות נקלטות ב-CRM; תנועה שכבר הייתה ב-CRM לפני הריצה מדולגת. אם אותה תנועה מופיעה פעמיים באותו קובץ, שתי השורות עוברות את בדיקת הקיום ונשלחות להכנסה. בנוסף מתעדכנים שדות הדגל ב-ContactBase וב-gen_demislikamonthsalary (משמעותם העסקית לא מוכחת)."
+     }
+    ]
+   },
+   "detailed": {
+    "nodes": [
+     {
+      "type": "step",
+      "text": "מקור הנתונים הוא כל שורות ה-PY שנטענו ל-Staging.",
+      "tech": "PY File Data From Staging (DTSX:65865); gen_TranstypeId ← Action_Type_56, gen_TransgroupTypeId ← Action_Operation_Type_57, gen_transferid ← BankTransaction_ID_91"
+     },
+     {
+      "type": "step",
+      "text": "לפני בדיקת שורת הסיום ולפני הסינונים והחיפושים, מוסרים רווחים מתחילת ומסוף כל ערך טקסט בעמודות שמוגדרות כקלט לשלב הזה. בעמודות האלה, ההשוואות והערכים שנכתבים בהמשך מבוססים על הערכים בלי רווחים מסביב.",
+      "tech": "Trim All Input Columns (DTSX:70288) main.cs:51-58: str.Trim() לכל עמודת string בקלט שאינה ריקה; בין היתר Transfer_Type_2, gen_TranstypeId, gen_transferid, מספרי חשבון ומסלול",
+      "evidence": "DTSX:70288"
+     },
+     {
+      "type": "decision",
+      "text": "האם זו שורת הסיום של הקובץ?",
+      "tech": "Check for last row (DTSX:55200): SUBSTRING(CheckLastRow,1,1) == \"@\" (CheckLastRow ← Revaluation_Date_1)",
+      "branches": [
+       {
+        "label": "כן",
+        "nodes": [
+         {
+          "type": "step",
+          "text": "השורה נזרקת (יציאת Last row לא מחוברת)."
+         }
+        ]
+       },
+       {
+        "label": "לא",
+        "nodes": [
+         {
+          "type": "step",
+          "text": "השורה ממשיכה."
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "type": "decision",
+      "text": "האם השורה היא \"תנועות והחזר דמי ניהול\"?",
+      "tech": "Split by trans group type (DTSX:69975): gen_TranstypeId != \"58\" && Transfer_Type_2 == \"2\"",
+      "branches": [
+       {
+        "label": "לא",
+        "nodes": [
+         {
+          "type": "step",
+          "text": "השורה אינה מטופלת (יציאת \"יתר\" לא מחוברת), ללא אזהרה."
+         }
+        ]
+       },
+       {
+        "label": "כן",
+        "nodes": [
+         {
+          "type": "step",
+          "text": "השורה ממשיכה לבדיקת קיום."
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "type": "decision",
+      "text": "האם התנועה כבר הייתה קיימת בטבלת התנועות של השנה השוטפת בקופות בנק 10 כשהזרימה התחילה?",
+      "tech": "Check if trans exists (DTSX:57313, Full cache): Gen_ftCurrentYearBase ⨝ Gen_fundmainBase ⨝ Product ⨝ gen_banks (Gen_BankNumber = 10, gen_transferid not null); מפתח: Gen_TransTypeID = Action_Type_56, Gen_transgrouptypeid = Action_Operation_Type_57, gen_transferid = BankTransaction_ID_91, Gen_FundFinanceID = (Action_Transfer_Direction_69 == \"2\" ? Target_Fund_FinanceID_45 : Source_Fund_FinanceID_18); המטמון נטען לפני מעבר השורות, ואין סינון כפילויות בתוך הקובץ",
+      "branches": [
+       {
+        "label": "כן",
+        "nodes": [
+         {
+          "type": "step",
+          "text": "התנועה מדולגת – אין עדכון לתנועה קיימת (יציאת Match לא מחוברת)."
+         }
+        ]
+       },
+       {
+        "label": "לא",
+        "nodes": [
+         {
+          "type": "step",
+          "text": "התנועה ממשיכה ליצירה."
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "type": "step",
+      "text": "סכומי הקובץ מחולקים ב-100 (DT_CY), וערך ריק (NULL) הופך ל-0 (יחידת המידה של הסכומים לא מוכחת), ומחושבים שדות נגזרים: סכום כולל ובקשה = עובד + מעביד + פיצויים; סכום החזר = סכום כולל פחות מס; תנועה יומית = כן; ממשק תשלומים = 1 כשיוצר הבקשה 7672; מודל תלוי גיל = 2 כשבקובץ 1, אחרת 1; קוד ליד 1092/1093 לסוג קופת יעד 0512/0513.",
+      "tech": "Format money fields (DTSX:61683); Set trans additional fields (DTSX:68823)"
+     },
+     {
+      "type": "step",
+      "text": "בין המרת הסכומים לחישוב השדות הנגזרים מעובדים שבעה שדות תאריך מהקובץ. ערך של 8 תווים נקרא כשנה-חודש-יום (YYYYMMDD), וערך של 6 תווים כשנה-חודש (YYYYMM) עם היום הראשון בחודש. ערך ריק, ערך באורך אחר, ערך שאינו תאריך תקין או תאריך שקודם לשנת 1900 הופך לריק. אחר כך כל תאריך שאינו ריק ואינו שווה לערך המשתנה CrmMinimumDate מומר משעון השרת המקומי ל-UTC. הערכים המומרים האלה הם שנכתבים לרשומת התנועה, ישירות או דרך שדות נגזרים.",
+      "tech": "Format money fields → Format Dates (DTSX:60676) main.cs:51-77 → Dates ToUniveral (DTSX:59787) main.cs:34-58: ToUniversalTime → \"yyyy/MM/dd HH:mm:ss\", ללא המרה לערך השווה ל-User::CrmMinimumDate → Set trans additional fields. עמודות: gen_EntryDate, gen_ValueDate, gen_SalaryMonthId, Escrow_Account_Deposit_Date_110, Creation_Deposit_Source_File_Date_145, Appendix_GH_Issuing_Date_157, Action_Expected_Date_54. נכתבות בין היתר כ-Param_14 (gen_EntryDate), Param_32 (gen_ValueDate), Param_24 (gen_SalaryMonthId), Param_31 (Escrow), Param_45 (FileReceivingDateNoga ← Creation_Deposit_Source_File_Date_145), Param_46 (gen_appendixghissuingdate ← Appendix_GH_Issuing_Date_157), ודרך gen_salarydate (Param_23), gen_actualexecutiondate (Param_49), gen_refunddate (Param_58) ו-gen_paymentdate (Param_67) (DTSX:63118)",
+      "evidence": "DTSX:60676, 59787, 68823, 70133"
+     },
+     {
+      "type": "decision",
+      "text": "האם קיים ב-CRM בנק שמספרו 10?",
+      "tech": "Get Bank Id (DTSX:61790): select gen_banksid from gen_banks where gen_banknumber = BankNumber; BankNumber = \"10\" קבוע (Set trans additional fields, DTSX:68896); NoMatchBehavior=0, errorRowDisposition=FailComponent",
+      "branches": [
+       {
+        "label": "כן",
+        "nodes": [
+         {
+          "type": "step",
+          "text": "מזהה הבנק נשמר, וזה הערך שנכתב לשדה הבנק (gen_bankname) ברשומת התנועה.",
+          "tech": "gen_banksid → Param_40 = gen_bankname (DTSX:63118)"
+         }
+        ]
+       },
+       {
+        "label": "לא",
+        "nodes": [
+         {
+          "type": "step",
+          "text": "אם בנק 10 לא נמצא, רכיב החיפוש נכשל וזרימת התנועות כולה נעצרת בכישלון; בשרשרת אילוצי Success השלבים הבאים בחבילה לא רצים."
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "type": "decision",
+      "text": "מה כיוון התנועה?",
+      "tech": "Split by trans direction (DTSX:69934): Action_Transfer_Direction_69 == \"1\" / == \"2\"",
+      "branches": [
+       {
+        "label": "1 – גמל מעביר",
+        "nodes": [
+         {
+          "type": "step",
+          "text": "הקופה שלנו היא צד המקור: מספר החשבון, המסלול וסוג הקופה נלקחים מצד המקור, והצד השני הוא היעד. מספר החשבון נלקח מחשבון העו״ש רק כשמספר חשבון הקופה בקובץ (אחרי הסרת רווחים) הוא בדיוק המחרוזת \"0\"; ערך מרופד באפסים, כמו \"000000000000\", אינו נחשב 0.",
+          "tech": "transfer (DTSX:70133): gen_bankaccountnumber = Source_Fund_AccountNumber_20 != \"0\" ? Source_Fund_AccountNumber_20 : Source_gen_CurrentAccountNumber (השוואת מחרוזת)"
+         }
+        ]
+       },
+       {
+        "label": "2 – גמל מקבל",
+        "nodes": [
+         {
+          "type": "step",
+          "text": "הקופה שלנו היא צד היעד, והצד השני הוא המקור.",
+          "tech": "recived (DTSX:66121)"
+         }
+        ]
+       },
+       {
+        "label": "אחר",
+        "nodes": [
+         {
+          "type": "step",
+          "text": "התנועה אינה מטופלת (יציאת \"אחר\" לא מחוברת), ללא אזהרה."
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "type": "decision",
+      "text": "האם קיים מוצר של בנק 10 עם מספר הגוף המנהל של הקופה שלנו?",
+      "tech": "Get fund type(product) (DTSX:62873): Product ⨝ gen_banks (10) לפי Gen_FundFinanceID = product_financeid",
+      "branches": [
+       {
+        "label": "לא",
+        "nodes": [
+         {
+          "type": "step",
+          "text": "התנועה אינה נקלטת ונרשמת אזהרת ETL.",
+          "tech": "No Match → Set Warning columns 1 → Union All Error"
+         }
+        ]
+       },
+       {
+        "label": "כן",
+        "nodes": [
+         {
+          "type": "step",
+          "text": "התנועה ממשיכה עם מזהה המוצר."
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "type": "step",
+      "text": "שם הגוף שכנגד וסימון \"קופה פנימית\" נשלפים מטבלת המתחרים לפי מספר הגוף המנהל של הצד השני; אם לא נמצא – השדות נשארים ריקים והתנועה ממשיכה.",
+      "tech": "Get Competitor fund name TX (DTSX:61847): NoMatchBehavior=0 + IgnoreFailure (DTSX:61890)"
+     },
+     {
+      "type": "step",
+      "text": "לפני איתור הקופה מוסרות נקודות ממספר החשבון, ממספר סוג הקופה וממספר המסלול, ואז הם מרופדים באפסים משמאל עד אורך השדה. ערך ריק הופך לאפסים בלבד.",
+      "tech": "Append Zeros To Fields (DTSX:54355) main.cs:57-66: gen_bankaccountnumber (12), gen_fundtypenumber (4), gen_coursenumber (4)"
+     },
+     {
+      "type": "decision",
+      "text": "האם קיימת ב-CRM קופה (gen_fundmain) של בנק 10 לחשבון ולמוצר?",
+      "tech": "Get fund main id (DTSX:62760): Gen_BankAccountNumber = gen_bankaccountnumber, gen_fundtypename = מזהה המוצר, Gen_banknumber = 10",
+      "branches": [
+       {
+        "label": "לא",
+        "nodes": [
+         {
+          "type": "step",
+          "text": "התנועה נזרקת ללא אזהרה (יציאת No Match לא מחוברת)."
+         }
+        ]
+       },
+       {
+        "label": "כן",
+        "nodes": [
+         {
+          "type": "step",
+          "text": "נשלפים הקופה, הבנק, איש הקשר, חשבון הלקוח, סוג מוצר משנה, קוד סוג עמית ומזהה מעסיק (שכיר/עצמאי – מספר חשבון המעסיק; כספי פיצולים – ת.ז. איש הקשר)."
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "type": "step",
+      "text": "נקבע סוג קבוצת התנועה לפי סוג הפעולה, Action_Type_56 (51→12, 52→13, 53→1, 54→19, 55→2, 56→3, 57→16, 59/61/63→17, 60→10, 62→11, אחר→18), וסוג ההפרשה לפי אילו רכיבי סכום (עובד/מעביד/פיצויים) שונים מאפס (1–7; אם כולם אפס – ריק).",
+      "tech": "Set trans group type and provision type picklist value main.vb:16–48"
+     },
+     {
+      "type": "decision",
+      "text": "האם צירוף סוג הפעולה (Action_Type_56) וסוג הפעולה המשני (Action_Operation_Type_57) מוגדר בטבלת סוגי התנועות של בנק 10?",
+      "tech": "Get trans type name (DTSX:62940): gen_actionid = Action_Type_56 AND Gen_TransactionTypeID = Action_Operation_Type_57",
+      "branches": [
+       {
+        "label": "כן",
+        "nodes": [
+         {
+          "type": "step",
+          "text": "לתנועה מקושר סוג התנועה."
+         }
+        ]
+       },
+       {
+        "label": "לא",
+        "nodes": [
+         {
+          "type": "step",
+          "text": "התנועה ממשיכה בלי סוג תנועה, ובמקביל נרשמת אזהרת ETL.",
+          "tech": "No Match → Multicast → Union All 1 + Set Warning columns"
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "type": "step",
+      "text": "סימון \"החזר יתר\" נקבע כ\"כן\" רק כאשר הסכום הכולל שלילי, סוג הפעולה המשני (Action_Operation_Type_57) 01 או 03, סוג הפעולה (Action_Type_56) 53, יוצר הבקשה 7672, קיים מזהה עובד בקובץ, קיים פרט כלשהו של חשבון עו״ש מקור, ו-Action_Type_196 = 5; אחרת \"לא\".",
+      "tech": "Check for overpayment main.cs:117–130"
+     },
+     {
+      "type": "decision",
+      "text": "האם סוג הפעולה (Action_Type_56) הוא 53 (הפקדה – השערה לפי שם הפלט FtCurrentOrPrevDepositCondition ברכיב Check Type And Year) לעמית שכיר (קוד סוג עמית 2) במוצר גמל (1) או קרן השתלמות (4)?",
+      "tech": "Split for Salary Reporting (DTSX:70009)",
+      "branches": [
+       {
+        "label": "כן",
+        "nodes": [
+         {
+          "type": "step",
+          "text": "מחושבים שכר לפיצויים (Compensation_Fee_78/100 – בגמל בלבד) ושכר לתגמולים (Royalties_Fee_77/100); ערך 0, וכן שכר לפיצויים בקרן השתלמות, נשמר כריק.",
+          "tech": "Set CompensationSalary and PensionFundSalary Amounts main.cs:115–151; Set Salary Amounts as NULL by Conditions (DTSX:67210)"
+         }
+        ]
+       },
+       {
+        "label": "לא",
+        "nodes": [
+         {
+          "type": "step",
+          "text": "שדות השכר נשארים ריקים."
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "type": "decision",
+      "text": "האם סוג הפעולה (Action_Type_56) הוא 54?",
+      "tech": "TranstypeId  is 54 (DTSX:70255): !ISNULL(gen_TranstypeId) && gen_TranstypeId == \"54\"",
+      "branches": [
+       {
+        "label": "כן",
+        "nodes": [
+         {
+          "type": "step",
+          "text": "כאשר סוג הפעולה המשני (Action_Operation_Type_57) הוא 01/02/04 (Withdrawals בקוד) או 05/06 (UndoWithdrawals בקוד), מחושבים שלושה סכומי מס מהקובץ חלקי 100 (לפי שמות השדות: מס רווחי הון, מס שבירה ומס פיצויים), וסכום נטו = סכום כולל פחות שלושת המסים.",
+          "tech": "Set Tax Fields main.cs:24–50"
+         }
+        ]
+       },
+       {
+        "label": "לא",
+        "nodes": [
+         {
+          "type": "step",
+          "text": "שדות המס נשארים ריקים."
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "type": "step",
+      "text": "\"דרך המודול הפיננסי\" = 1 כאשר סוג הפעולה (Action_Type_56) הוא 57 וסוג ההעברה בין מסלולים 08776, אחרת 0.",
+      "tech": "Set FinancialModuleWay (DTSX:67179): gen_TranstypeId == \"57\" && Type_Transfer_BetweenCourses_205 == \"08776\" ? 1 : 0"
+     },
+     {
+      "type": "write",
+      "text": "נוספת רשומת תנועה חדשה בטבלת התנועות של השנה השוטפת, עם הקופה, המוצר, הבנק, סוג התנועה, הסכומים, התאריכים, השכר, המס ושם הגוף שכנגד; הבעלים והיוצר הם המשתמש שבמשתנה UserId.",
+      "tech": "Gen_ftCurrentYearBase · Insert · SQL (insert ftCurrentYearBase 1–5, SQL DTSX:63118; ×5 מקביליים זהים, חלוקה סבבית Add Row Number main.cs:117–151)"
+     },
+     {
+      "type": "decision",
+      "text": "האם ההכנסה הצליחה?",
+      "tech": "OLE DB Command RedirectRow (DTSX:63150)",
+      "branches": [
+       {
+        "label": "כן",
+        "nodes": [
+         {
+          "type": "write",
+          "text": "ב-ContactBase של איש הקשר של הקופה השדה gen_loaneligibilitycalculationrequired מקבל 1 (לפי שם השדה: נדרש חישוב זכאות להלוואה – המשמעות לא מוכחת).",
+          "tech": "ContactBase · Update gen_loaneligibilitycalculationrequired = 1 WHERE ContactId = gen_contactname · SQL (DTSX:82566)"
+         }
+        ]
+       },
+       {
+        "label": "לא",
+        "nodes": [
+         {
+          "type": "step",
+          "text": "השורה נרשמת כאזהרת ETL, ו-ContactBase אינו מתעדכן.",
+          "tech": "Union All Error 2 → … → insert etl process warning"
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "type": "decision",
+      "text": "(ענף מקביל מיד אחרי איתור הקופה) האם סוג הפעולה (Action_Type_56) הוא 53 (הפקדה – השערה לפי שם הפלט FtCurrentOrPrevDepositCondition) שחודש השכר שלה בשנה הנוכחית או בקודמת?",
+      "tech": "Multicast 3 → Set SalaryMonthDate: DATEADD(\"hour\",3,(DT_DATE)gen_SalaryMonthId); Check Type And Year (DTSX:57393): (gen_TranstypeId == \"53\") && !ISNULL(gen_salaryDateLocalTime) && (YEAR(...) == YEAR(GETDATE()) || YEAR(...) == YEAR(GETDATE()) - 1)",
+      "branches": [
+       {
+        "label": "כן",
+        "nodes": [
+         {
+          "type": "decision",
+          "text": "האם קיימת לחשבון הלקוח רשומת gen_demislikamonthsalary (לפי שם הישות: חודש שכר מדווח) לאותה שנה ולאותו חודש, שהשדה gen_depositidentificationstatusdate שלה ריק?",
+          "tech": "Get DemiSlikaMonthSalary (DTSX:61917): gen_demislikamonthsalary WHERE gen_depositidentificationstatusdate IS NULL; gen_customeraccount = Gen_customeraccountname, שנה/חודש מ-gen_monthsalarytxt",
+          "branches": [
+           {
+            "label": "כן",
+            "nodes": [
+             {
+              "type": "write",
+              "text": "ברשומת gen_demislikamonthsalary שנמצאה נכתבים gen_depositidentificationforreportedmonth = 1 (בהערת ה-SQL: yes), gen_depositidentificationstatusdate = התאריך הנוכחי, ModifiedOn = התאריך הנוכחי ו-ModifiedBy = המשתמש שבמשתנה CrmAdminId (משתנה נפרד מ-UserId, שמשמש כבעלים וכיוצר של התנועה) (לפי שמות השדות: זיהוי הפקדה לחודש המדווח – המשמעות לא מוכחת).",
+              "tech": "gen_demislikamonthsalary · Update (gen_depositidentificationstatusdate = GETDATE(), ModifiedOn = GETDATE(), gen_depositidentificationforreportedmonth = 1 --yes, ModifiedBy = CrmAdminId) WHERE gen_demislikamonthsalaryId = ? · SQL (DTSX:82519)"
+             }
+            ]
+           },
+           {
+            "label": "לא",
+            "nodes": [
+             {
+              "type": "step",
+              "text": "אין עדכון."
+             }
+            ]
+           }
+          ]
+         }
+        ]
+       },
+       {
+        "label": "לא",
+        "nodes": [
+         {
+          "type": "step",
+          "text": "אין עדכון לחודש שכר."
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "type": "end",
+      "text": "תנועות חדשות נקלטות ב-CRM; תנועה שכבר הייתה ב-CRM לפני הריצה (לפי סוג הפעולה Action_Type_56, סוג הפעולה המשני Action_Operation_Type_57, BankTransaction_ID_91 ב-Staging (שמקורו בשדה FILLER1_29_BankTransactionId, עמודה 29 בקובץ) ומספר הגוף המנהל) מדולגת. אם אותה תנועה מופיעה פעמיים באותו קובץ, שתי השורות נשלחות להכנסה. אחרי הכנסה מוצלחת נכתב ל-ContactBase gen_loaneligibilitycalculationrequired = 1, ולרשומות gen_demislikamonthsalary שנמצאו נכתב gen_depositidentificationforreportedmonth = 1 עם תאריך (משמעות השדות לפי שמם בלבד, לא מוכחת)."
+     }
+    ]
+   },
+   "detail_he": [
+    {
+     "h": "מקור ואוכלוסייה",
+     "t": "שורות PY_FileData פרט לשורת הסיום (\"@\" בתו הראשון של Revaluation_Date_1), רק Action_Type_56 != 58 ו-Transfer_Type_2 = 2, וכיוון 1 או 2."
+    },
+    {
+     "h": "התאמה לרשומות קיימות",
+     "t": "קיום תנועה: Gen_ftCurrentYear (בנק 10) לפי סוג הפעולה (Action_Type_56), סוג הפעולה המשני (Action_Operation_Type_57), BankTransaction_ID_91 ב-Staging (שמקורו בשדה FILLER1_29_BankTransactionId, עמודה 29 בקובץ) ומספר גוף מנהל. מוצר: Product בנק 10 לפי Gen_FundFinanceID. גוף שכנגד: Competitor לפי Gen_FundFinanceID. קופה: Gen_fundmain בנק 10 לפי מספר חשבון + מוצר. סוג תנועה: gen_fundtransactiontype בנק 10. חודש שכר: gen_demislikamonthsalary עם gen_depositidentificationstatusdate ריק, לפי חשבון לקוח + שנה + חודש. בנק: gen_banks לפי gen_banknumber = '10' (Get Bank Id); מזהה הבנק נכתב ל-gen_bankname של התנועה, ואם הבנק לא נמצא – זרימת הנתונים נכשלת (FailComponent). לפני איתור הקופה מוסרות ממספר החשבון נקודות, ואז הוא מרופד באפסים לאורך 12 (Append Zeros To Fields). בדיקת קיום התנועה היא מול מצב הטבלה בתחילת הזרימה (Full cache), כך שכפילות בתוך אותו קובץ לא מזוהה."
+    },
+    {
+     "h": "החלטות",
+     "t": "ראה decisions: סינון שורת סיום ו-Transfer_Type_2 = 2 (עם Action_Type_56 != 58), דילוג על תנועה קיימת, כיוון, מוצר/קופה חסרים, מיפוי סוג קבוצת תנועה וסוג הפרשה, החזר יתר, שכר מדווח, מס כשסוג הפעולה (Action_Type_56) הוא 54, דרך מודול פיננסי, עדכון gen_demislikamonthsalary."
+    },
+    {
+     "h": "כתיבה ל-CRM",
+     "t": "INSERT ישיר ל-Gen_ftCurrentYearBase (80 עמודות, בעלים/יוצר = UserId, StateCode 0, StatusCode 1); UPDATE ContactBase SET gen_loaneligibilitycalculationrequired = 1 אחרי הכנסה מוצלחת; UPDATE gen_demislikamonthsalary SET gen_depositidentificationstatusdate = GETDATE(), ModifiedOn = GETDATE(), gen_depositidentificationforreportedmonth = 1, ModifiedBy = CrmAdminId (משמעות השדות לפי שמם בלבד, לא מוכחת). כולם ב-SQL ישיר על חיבור CRM (Unsupported)."
+    },
+    {
+     "h": "תוצאה עסקית",
+     "t": "תנועות חדשות מקובץ ה-PY שנקלט (קופות בנק 10; התנועות מסומנות gen_isdailytrans = כן) מופיעות ב-CRM. החבילה אינה בודקת שתאריך התנועה הוא היום; לאיש הקשר של הקופה נכתב gen_loaneligibilitycalculationrequired = 1, ולרשומות gen_demislikamonthsalary שנמצאו נכתב gen_depositidentificationforreportedmonth = 1 עם תאריך (המשמעות העסקית לא מוכחת)."
+    }
+   ],
+   "decisions": [
+    {
+     "where": "Check for last row (DTSX:55200)",
+     "condition": "SUBSTRING(CheckLastRow,1,1) == \"@\"",
+     "meaning_he": "שורת סיום",
+     "outcome_he": "נזרקת"
+    },
+    {
+     "where": "Split by trans group type (DTSX:69975)",
+     "condition": "gen_TranstypeId != \"58\" && Transfer_Type_2 == \"2\"",
+     "meaning_he": "תנועות והחזר דמי ניהול",
+     "outcome_he": "ממשיכה; אחרת (\"יתר\") נזרקת ללא אזהרה"
+    },
+    {
+     "where": "Check if trans exists (DTSX:57313)",
+     "condition": "[Gen_TransTypeID] = Action_Type_56 and [Gen_transgrouptypeid] = Action_Operation_Type_57 and [gen_transferid] = BankTransaction_ID_91 and [Gen_FundFinanceID] = Target_Fund_FinanceID_INT (Action_Transfer_Direction_69 == \"2\" ? Target_Fund_FinanceID_45 : Source_Fund_FinanceID_18)",
+     "meaning_he": "התנועה כבר נקלטה",
+     "outcome_he": "Match לא מחובר → דילוג; No Match → יצירה"
+    },
+    {
+     "where": "Split by trans direction (DTSX:69934)",
+     "condition": "Action_Transfer_Direction_69 == \"1\" (גמל מעביר) / Action_Transfer_Direction_69 == \"2\" (גמל מקבל)",
+     "meaning_he": "האם הקופה שלנו מעבירה או מקבלת",
+     "outcome_he": "1 → transfer, 2 → recived, אחר → נזרק"
+    },
+    {
+     "where": "transfer / recived (DTSX:70133 / 66121)",
+     "condition": "gen_bankaccountnumber = (Source|Target)_Fund_AccountNumber != \"0\" ? מספר קופה : מספר חשבון עו״ש",
+     "meaning_he": "חשבון הקופה שלנו",
+     "outcome_he": "מפתח לאיתור הקופה"
+    },
+    {
+     "where": "Get fund type(product) (DTSX:62873)",
+     "condition": "Product ⨝ gen_banks (Gen_BankNumber = 10) WHERE Gen_FundFinanceID = product_financeid",
+     "meaning_he": "מוצר בנק 10 קיים",
+     "outcome_he": "No Match → אזהרת ETL והתנועה לא נקלטת"
+    },
+    {
+     "where": "Get Competitor fund name TX (DTSX:61847, 61890)",
+     "condition": "Competitor.Gen_FundFinanceID = gen_fundFinanceIDtxrx; NoMatchBehavior = 0, errorRowDisposition = IgnoreFailure",
+     "meaning_he": "שם הגוף שכנגד",
+     "outcome_he": "לא נמצא → שדות ריקים, ממשיך"
+    },
+    {
+     "where": "Get fund main id (DTSX:62760)",
+     "condition": "[Gen_BankAccountNumber] = gen_bankaccountnumber and [gen_fundtypename] = gen_fundTypeName (Gen_banknumber = 10)",
+     "meaning_he": "קופה קיימת",
+     "outcome_he": "No Match לא מחובר → נזרק ללא אזהרה"
+    },
+    {
+     "where": "Set trans group type and provision type picklist value (main.vb:17–47)",
+     "condition": "Select Case genTranstypeId: 51→12, 52→13, 53→1, 54→19, 55→2, 56→3, 57→16, 59→17, 60→10, 61→17, 62→11, 63→17, Else→18; provisiontype 1–7 לפי (עובד≠0, מעביד≠0, פיצויים≠0)",
+     "meaning_he": "סוג קבוצת תנועה וסוג הפרשה",
+     "outcome_he": "gen_transgrouptype, gen_provisiontype"
+    },
+    {
+     "where": "Get trans type name (DTSX:62940)",
+     "condition": "[gen_actionid] = Action_Type_56 and [Gen_TransactionTypeID] = Action_Operation_Type_57 (בנק 10)",
+     "meaning_he": "סוג תנועה מוגדר",
+     "outcome_he": "Match → gen_transactiontypename; No Match → ממשיך ללא סוג + אזהרה"
+    },
+    {
+     "where": "Check for overpayment (main.cs:118–130)",
+     "condition": "gentranstotalamount < 0 && genTransgroupTypeId in (\"01\",\"03\") && genTranstypeId == \"53\" && genRequestCreator == \"7672\" && EmployeeIdInSourceFile149 לא ריק && (אחד מפרטי חשבון העו״ש של המקור לא ריק) && Action_Type_196 == 5",
+     "meaning_he": "החזר יתר",
+     "outcome_he": "gen_overpayment = true/false"
+    },
+    {
+     "where": "Split for Salary Reporting (DTSX:70009)",
+     "condition": "!ISNULL(gen_TranstypeId) && gen_TranstypeId == \"53\" && !ISNULL(gen_estatetypecode) && gen_estatetypecode == 2 && !ISNULL(gen_productsubcustomeraccount) && (gen_productsubcustomeraccount == 1 || gen_productsubcustomeraccount == 4)",
+     "meaning_he": "פעולה 53 (הפקדה – השערה לפי שם הפלט) של שכיר בגמל/השתלמות",
+     "outcome_he": "חישוב שכר לפיצויים/תגמולים"
+    },
+    {
+     "where": "Set Salary Amounts as NULL by Conditions (DTSX:67210)",
+     "condition": "gen_CompensationSalaryAmount: gen_productsubcustomeraccount == 4 || gen_CompensationSalaryAmount == 0 ? NULL : ערך; gen_PensionFundSalaryAmount: == 0 ? NULL : ערך",
+     "meaning_he": "ניקוי שכר אפס/לא רלוונטי",
+     "outcome_he": "NULL"
+    },
+    {
+     "where": "TranstypeId  is 54 + Set Tax Fields (DTSX:70255; main.cs:41–50)",
+     "condition": "gen_TranstypeId == \"54\" AND genTransgroupTypeId in {\"01\",\"02\",\"04\",\"05\",\"06\"}",
+     "meaning_he": "משיכה/ביטול משיכה",
+     "outcome_he": "מסים /100 ו-netoamountofaction = סכום כולל − מסים"
+    },
+    {
+     "where": "Set FinancialModuleWay (DTSX:67179)",
+     "condition": "gen_TranstypeId == \"57\" && Type_Transfer_BetweenCourses_205 == \"08776\" ? 1 : 0",
+     "meaning_he": "דרך המודול הפיננסי",
+     "outcome_he": "gen_financialmoduleway"
+    },
+    {
+     "where": "Check Type And Year (DTSX:57393)",
+     "condition": "(gen_TranstypeId == \"53\") && !ISNULL(gen_salaryDateLocalTime) && ((YEAR((DT_DATE)gen_salaryDateLocalTime) == YEAR(GETDATE())) || (YEAR((DT_DATE)gen_salaryDateLocalTime) == YEAR(GETDATE()) - 1))",
+     "meaning_he": "פעולה 53 (הפקדה – השערה לפי שם הפלט) לחודש שכר בשנה הנוכחית/קודמת",
+     "outcome_he": "ממשיך לאיתור חודש שכר מדווח"
+    },
+    {
+     "where": "Get DemiSlikaMonthSalary (DTSX:61917)",
+     "condition": "gen_depositidentificationstatusdate is null AND [salaryCustomerAccount] = Gen_customeraccountname AND [salaryYear] = ftSalaryYear AND [salaryMonth] = ftSalaryMonth",
+     "meaning_he": "חודש שכר מדווח פתוח",
+     "outcome_he": "Match → UPDATE; No Match לא מחובר"
+    },
+    {
+     "where": "Split Rows For MultiThread (DTSX:70044)",
+     "condition": "ProcessNumber == 1..4, אחרת Case Last; ProcessNumber = counter % 5 (Add Row Number main.cs:119–148)",
+     "meaning_he": "חלוקה סבבית – ללא משמעות עסקית",
+     "outcome_he": "5 ענפי INSERT זהים"
+    }
+   ],
+   "crmEffects": [
+    {
+     "entity": "gen_ftcurrentyear (Gen_ftCurrentYearBase)",
+     "verb": "Create",
+     "mechanism": "SQL",
+     "when_he": "תנועה חדשה (לא קיימת לפי מפתח התנועה), מוצר וקופה של בנק 10 נמצאו, כיוון 1/2"
+    },
+    {
+     "entity": "contact (ContactBase)",
+     "verb": "Update gen_loaneligibilitycalculationrequired = 1",
+     "mechanism": "SQL",
+     "when_he": "אחרי כל הכנסת תנועה מוצלחת – לאיש הקשר של הקופה"
+    },
+    {
+     "entity": "gen_demislikamonthsalary",
+     "verb": "Update (gen_depositidentificationstatusdate, gen_depositidentificationforreportedmonth = 1, ModifiedOn, ModifiedBy)",
+     "mechanism": "SQL",
+     "when_he": "תנועה חדשה מסוג 53 עם חודש שכר בשנה הנוכחית/קודמת וחודש שכר מדווח פתוח לחשבון הלקוח – בענף מקביל, ללא תלות בהצלחת ההכנסה"
+    }
+   ],
+   "evidence": [
+    "DTSX:53553 Data Flow FT",
+    "DTSX:65865 PY File Data From Staging",
+    "DTSX:55200, 69975, 57313, 61683, 68823, 61790, 69934, 70133, 66121, 62873, 61847/61890, 62760, 62940, 55233, 70009, 66258, 67210, 70255, 67898, 67179, 70044",
+    "DTSX:63115/63650/64185/64720/65255 insert ftCurrentYearBase 1–5 (SQL DTSX:63118; dupes.json: 1,2,3,5 זהים; 4 שונה רק בסדר עמודות הקלט, אותו מיפוי Param)",
+    "DTSX:82563 Update Loaneligibilitycalculationrequired In Contact To Yes (SQL 82566)",
+    "DTSX:61917 Get DemiSlikaMonthSalary; DTSX:82516 Update Dmei Slika Month Salary (SQL 82519)",
+    "Create System Columns main.cs:115–153 (UserId/BusinessUnitId/CrmAdminId/TransactionCurrencyId)",
+    "CM CRM DTSX:4–6 (Psql/ALTSHULER_MSCRM)"
+   ],
+   "hypotheses_he": [
+    "בדיקת הקיום נשענת על מטמון מלא שנטען בתחילת ה-Data Flow; אם אותה תנועה מופיעה פעמיים באותו קובץ, שתי השורות ייכנסו (השערה – תלוי בנתונים).",
+    "פירוש הקודים (53 = הפקדה, 54 = משיכה, 7672 = יוצר בקשה מסוים, 5015 וכד׳) נגזר משמות הרכיבים וההערות בקוד, לא מטבלת קודים שסופקה."
+   ],
+   "openQuestions_he": [
+    "האם קיימים טריגרים/Plugins על Gen_ftCurrentYear שמצפים לכתיבה דרך SDK? (מסד CRM לא סופק).",
+    "משמעות הערכים של gen_transgrouptype / gen_provisiontype (תוויות optionset) – לא סופקה."
+   ]
+  },
+  {
+   "refId": "Package\\Create fundmain for transferin",
+   "title_he": "יצירת קופה במסלול היעד להעברה בין מסלולים (gen_fundmain)",
+   "techName": "Create fundmain for transferin",
+   "short_he": "לבקשות העברה בין מסלולים באותו חשבון (פעולה 57, Transfer_Type_2 = 1, אותו סוג קופה, לא מודל תלוי גיל) – אם אין עדיין קופה במסלול היעד, יוצרת gen_fundmain חדשה במסלול היעד עם פרטי הלקוח, הסוכן והמעסיק המועתקים מקופת המקור.",
+   "flow_he": [
+    "PY_FileData → הסרת שורת סיום",
+    "סינון: Action_Type_56 = 57, Transfer_Type_2 = 1, חשבון מקור = חשבון יעד, סוג קופה זהה, Age_Dependent_Model_112 ≠ 1",
+    "הצמדת שורת כיוון 1 (מסלול מקור) לשורת כיוון 2 (מסלול יעד) לפי Request_ID_74 (Inner Join)",
+    "מוצר היעד (בנק 10) לפי מספר מסלול היעד; קופת יעד קיימת → אין פעולה",
+    "מספר קופה = \"מסלול-חשבון\"; הסרת כפולים",
+    "קופת מקור (בנק 10, gen_existinfile = 1) → העתקת פרטים",
+    "יצירת gen_fundmain ב-SDK (ExecuteMultiple, מנות 10, ×5 מקביליים זהים)"
+   ],
+   "short": {
+    "nodes": [
+     {
+      "type": "step",
+      "text": "נבחרות בקשות העברה בין מסלולים באותו חשבון ובאותו סוג קופה.",
+      "tech": "Filter for transfer between courses (DTSX:34026): Action_Type_56 == \"57\" && Transfer_Type_2 == \"1\" && gen_bankaccountnumber == Target_Fund_AccountNumber_47 && Source_Fund_FundType_16 == Target_Fund_FundType_43 && Age_Dependent_Model_112 != \"1\""
+     },
+     {
+      "type": "step",
+      "text": "שורת מסלול המקור ושורת מסלול היעד של אותה בקשה מוצמדות זו לזו; שורה שאין לה שורה תואמת בצד השני נזרקת.",
+      "tech": "Merge Join (DTSX:34586): JoinType=2 (Inner) על Request_ID_74"
+     },
+     {
+      "type": "decision",
+      "text": "האם קיים ב-CRM מוצר של בנק 10 למסלול היעד?",
+      "tech": "get dest fundtype (DTSX:34127): Product ⨝ gen_banks (gen_banknumber = 10) WHERE productnumber = gen_fundtypenumber; יציאת No Match לא מחוברת",
+      "branches": [
+       {
+        "label": "לא",
+        "nodes": [
+         {
+          "type": "end",
+          "text": "הבקשה נזרקת ולא נוצרת קופה."
+         }
+        ]
+       },
+       {
+        "label": "כן",
+        "nodes": [
+         {
+          "type": "step",
+          "text": "ממשיכים לבדוק את קופת היעד."
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "type": "decision",
+      "text": "האם כבר קיימת לחשבון קופה במסלול היעד?",
+      "branches": [
+       {
+        "label": "כן",
+        "nodes": [
+         {
+          "type": "end",
+          "text": "לא נוצרת קופה חדשה."
+         }
+        ]
+       },
+       {
+        "label": "לא",
+        "nodes": [
+         {
+          "type": "step",
+          "text": "ממשיכים לבדוק את קופת המקור."
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "type": "step",
+      "text": "מכל הבקשות שמובילות לאותו מספר קופה חדש (מספר מסלול-מספר חשבון) רק הראשונה ממשיכה; הכפולות נזרקות.",
+      "tech": "Derived Column (DTSX:33995): gen_fundnumber; remove duplicate (DTSX:34813) main.cs:30–42; יציאת duplicates לא מחוברת"
+     },
+     {
+      "type": "decision",
+      "text": "האם קיימת קופת המקור בבנק 10 שהדגל gen_existinfile שלה שווה 1 (משמעות הדגל לא מוכחת)?",
+      "branches": [
+       {
+        "label": "לא",
+        "nodes": [
+         {
+          "type": "end",
+          "text": "לא נוצרת קופה."
+         }
+        ]
+       },
+       {
+        "label": "כן",
+        "nodes": [
+         {
+          "type": "write",
+          "text": "נוצרת קופה חדשה במסלול היעד עם פרטי הלקוח, הסוכן, המעסיק והעמלות של קופת המקור, יתרות אפס וכתובת זמנית.",
+          "tech": "gen_fundmain · Create · SDK"
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "type": "end",
+      "text": "כשכל התנאים מתקיימים, נוצרת ללקוח קופה במסלול היעד."
+     }
+    ]
+   },
+   "detailed": {
+    "nodes": [
+     {
+      "type": "step",
+      "text": "מקור הנתונים הוא שורות ה-PY ב-Staging; שורת הסיום נזרקת.",
+      "tech": "PY File Data From Staging (DTSX:34681); Check For Last Row In FIle (DTSX:23539): SUBSTRING(CheckLastRow,1,1) == \"@\""
+     },
+     {
+      "type": "step",
+      "text": "לפני בדיקת שורת הסיום ולפני הסינונים והחיפושים, מוסרים רווחים מתחילת ומסוף כל ערך טקסט בעמודות שמוגדרות כקלט לשלב הזה. בעמודות האלה, ההשוואות והערכים שנכתבים בהמשך מבוססים על הערכים בלי רווחים מסביב.",
+      "tech": "Trim All Input Columns (DTSX:36458) main.cs:42-48: str.Trim() לכל עמודת string בקלט שאינה ריקה; בין היתר Transfer_Type_2, Action_Type_56, מספרי חשבון, Request_ID_74",
+      "evidence": "DTSX:36458"
+     },
+     {
+      "type": "decision",
+      "text": "האם זו בקשת העברה בין מסלולים באותו חשבון?",
+      "tech": "Filter for transfer between courses (DTSX:34026): Action_Type_56 == \"57\" && Transfer_Type_2 == \"1\" && gen_bankaccountnumber == Target_Fund_AccountNumber_47 && Source_Fund_FundType_16 == Target_Fund_FundType_43 && Age_Dependent_Model_112 != \"1\" (gen_bankaccountnumber ← Source_Fund_AccountNumber_20)",
+      "branches": [
+       {
+        "label": "לא",
+        "nodes": [
+         {
+          "type": "step",
+          "text": "השורה אינה מטופלת (Default Output לא מחובר)."
+         }
+        ]
+       },
+       {
+        "label": "כן",
+        "nodes": [
+         {
+          "type": "step",
+          "text": "השורה ממשיכה."
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "type": "step",
+      "text": "שורות כיוון 2 מספקות את מסלול היעד, ושאר השורות מספקות את החשבון ומסלול המקור; שתיהן מוצמדות לפי מזהה הבקשה, ורק בקשות שיש להן את שני הצדדים ממשיכות.",
+      "tech": "Split Transfer Direction (DTSX:36425): Action_Transfer_Direction_69 == \"2\"; Sort/Sort 1; Merge Join (DTSX:34586) JoinType=2 (Inner), NumKeyColumns=1 על Request_ID_74; gen_fundtypenumber ← Target_Fund_course_44"
+     },
+     {
+      "type": "step",
+      "text": "ממספר החשבון וממספרי המסלולים מוסרות נקודות, ואז הם מרופדים באפסים משמאל עד אורך השדה; ערך ריק הופך לאפסים בלבד. הערכים המעובדים הם המפתחות לחיפושים שבהמשך והם שנכתבים לקופה החדשה.",
+      "tech": "Append Zeros To Fields (DTSX:22694) main.cs:57-66: if (str.Contains(\".\")) str = str.Replace(\".\", \"\"); while (str.Length < fieldSize) str = \"0\" + str"
+     },
+     {
+      "type": "decision",
+      "text": "האם קיים מוצר של בנק 10 שמספרו כמספר מסלול היעד?",
+      "tech": "get dest fundtype (DTSX:34127): Product ⨝ gen_banks (10) WHERE productnumber = gen_fundtypenumber",
+      "branches": [
+       {
+        "label": "לא",
+        "nodes": [
+         {
+          "type": "step",
+          "text": "הבקשה אינה מטופלת (No Match לא מחובר)."
+         }
+        ]
+       },
+       {
+        "label": "כן",
+        "nodes": [
+         {
+          "type": "step",
+          "text": "נשמר מזהה מוצר היעד."
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "type": "decision",
+      "text": "האם כבר קיימת ב-CRM קופה של בנק 10 לחשבון ולמוצר היעד?",
+      "tech": "get dest fund (DTSX:34065, Partial cache): Gen_fundmain WHERE gen_banknumber = 10 AND gen_bankaccountnumber = ? AND gen_fundtypename = ?",
+      "branches": [
+       {
+        "label": "כן",
+        "nodes": [
+         {
+          "type": "step",
+          "text": "אין פעולה (Match לא מחובר)."
+         }
+        ]
+       },
+       {
+        "label": "לא",
+        "nodes": [
+         {
+          "type": "step",
+          "text": "ממשיכים ליצירת קופה."
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "type": "step",
+      "text": "מספר הקופה החדשה נבנה כ\"מספר מסלול-מספר חשבון\" (מספרים ללא אפסים מובילים), ובקשות כפולות לאותו מספר קופה מסוננות כך שכל קופה תיווצר פעם אחת.",
+      "tech": "Derived Column (DTSX:33995): (DT_WSTR,4)(DT_I4)gen_fundtypenumber + \"-\" + (DT_WSTR,12)(DT_I8)gen_bankaccountnumber; remove duplicate main.cs:30–42"
+     },
+     {
+      "type": "decision",
+      "text": "האם קיימת קופת מקור בבנק 10 שהשדה gen_existinfile שלה שווה 1 (משמעות הדגל לא מוכחת), לחשבון ולמסלול המקור?",
+      "tech": "get source fund (DTSX:34190): Gen_fundmain ⨝ product WHERE gen_banknumber = 10 AND gen_existinfile = 1 AND gen_bankaccountnumber = ? AND productnumber = Source_Fund_Course_17",
+      "branches": [
+       {
+        "label": "לא",
+        "nodes": [
+         {
+          "type": "step",
+          "text": "הקופה אינה נוצרת (No Match לא מחובר), ללא אזהרה."
+         }
+        ]
+       },
+       {
+        "label": "כן",
+        "nodes": [
+         {
+          "type": "step",
+          "text": "נשלפים מקופת המקור פרטי הלקוח, איש הקשר, הסוכן והסוכנות, הסניף, המעסיק, סוג העמית, העמלות ותבנית דמי הניהול."
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "type": "step",
+      "text": "לקופה החדשה נקבעת כתובת זמנית: \"נתוני קופה זמניים\", שם כתובת \"ראשי\".",
+      "tech": "Set Fields (DTSX:35598)"
+     },
+     {
+      "type": "step",
+      "text": "לפני היצירה, תאריך הפתיחה וכל שדות התאריך שהועתקו מקופת המקור מומרים לשעון המקומי של השרת; תאריך השווה לערך המשתנה CrmMinimumDate נשאר כמות שהוא. הערכים נשלחים ל-CRM בשעון המקומי, ולא כ-UTC. האופן שבו CRM שומר אותם תלוי ברכיב CrmProxy, שלא סופק.",
+      "tech": "Dates To Local (DTSX:32977) main.cs:40-75: ToLocalTime() לכל עמודת תאריך שאינה NULL ואינה שווה ל-User::CrmMinimumDate; עמודות: gen_fundcreationdate (getutcdate() ב-get source fund, DTSX:34192, Full cache), gen_brokerstartdate, gen_commissionexpirationdate, gen_commissionstartdate, gen_customerdateofbirth, gen_customerdeathdate, gen_customerverifieddate, gen_depositcommissionenddate, gen_depositcommissionstartdate; Set Fields → Multicast 1 → Dates To Local → Add Row Number → Split Rows For MultiThread → Create gen_fundmain (main.cs:50-58)",
+      "evidence": "DTSX:32977, 34192"
+     },
+     {
+      "type": "write",
+      "text": "נוצרת קופה חדשה במסלול היעד: מספר הקופה, מספר החשבון, מוצר ומספר מסלול היעד, פרטי הלקוח והסוכן מקופת המקור, gen_existinfile = true (משמעות הדגל לא מוכחת), מקור קליטה = 1, כל שדות היתרה וההפקדה = 0, אחוז דמי ניהול משוקלל = 0, תאריך עדכון בנק = עכשיו, תאריך פתיחה = הזמן שבו נטענו נתוני קופות המקור (getutcdate), אחרי המרה לשעון המקומי של השרת.",
+      "tech": "gen_fundmain · Create · SDK (Create gen_fundmain main.cs:40–120; ExecuteMultiple RequestType.Create במנות של 10, main.cs:140–169; ×5 מקביליים זהים)"
+     },
+     {
+      "type": "decision",
+      "text": "האם היצירה הצליחה?",
+      "tech": "יציאות Success / Error",
+      "branches": [
+       {
+        "label": "כן",
+        "nodes": [
+         {
+          "type": "step",
+          "text": "הקופה נספרת כנוצרה."
+         }
+        ]
+       },
+       {
+        "label": "לא",
+        "nodes": [
+         {
+          "type": "step",
+          "text": "השגיאה נרשמת כאזהרת ETL – פרט לעותק 3, שבו יציאת השגיאה מחוברת לאיחוד ה\"נוצרו\" ולכן השגיאה נספרת כהצלחה ואינה נרשמת.",
+          "tech": "Create gen_fundmain 3.Outputs[Error] → Union All Created (path DTSX:37737)"
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "type": "end",
+      "text": "לבקשת העברה בין מסלולים שאין לה קופת יעד, כשקיים מוצר יעד של בנק 10 וקיימת קופת מקור בבנק 10 עם gen_existinfile = 1, נוצרת קופה אחת במסלול היעד (פעם אחת לכל מספר קופה)."
+     }
+    ]
+   },
+   "detail_he": [
+    {
+     "h": "מקור ואוכלוסייה",
+     "t": "שורות PY_FileData (לא שורת סיום) עם Action_Type_56 = 57, Transfer_Type_2 = 1, אותו חשבון ואותו סוג קופה בשני הצדדים, Age_Dependent_Model_112 ≠ 1, שיש להן גם שורת כיוון 2 וגם שורה אחרת עם אותו Request_ID_74."
+    },
+    {
+     "h": "התאמה לרשומות קיימות",
+     "t": "מוצר יעד: Product בנק 10 לפי productnumber = מסלול היעד. קופת יעד קיימת: Gen_fundmain בנק 10 לפי חשבון + מוצר. קופת מקור: Gen_fundmain בנק 10, gen_existinfile = 1, לפי חשבון + productnumber = מסלול המקור."
+    },
+    {
+     "h": "החלטות",
+     "t": "סינון בקשה; צירוף שני הצדדים (Inner); קיום קופת יעד → אין פעולה; כפילות מספר קופה → פעם אחת; קופת מקור חסרה → אין יצירה."
+    },
+    {
+     "h": "כתיבה ל-CRM",
+     "t": "gen_fundmain Create דרך CRM SDK (Supported), עם שדות מקופת המקור וקבועים: gen_existinfile = true, gen_inputsource = 1, יתרות 0, gen_weightedmanagementfeepercentage = 0, כתובת זמנית."
+    },
+    {
+     "h": "תוצאה עסקית",
+     "t": "נפתחת קופה במסלול היעד לפני קליטת ההעברה בין המסלולים."
+    }
+   ],
+   "decisions": [
+    {
+     "where": "Check For Last Row In FIle (DTSX:23539)",
+     "condition": "SUBSTRING(CheckLastRow,1,1) == \"@\"",
+     "meaning_he": "שורת סיום",
+     "outcome_he": "נזרקת"
+    },
+    {
+     "where": "Filter for transfer between courses (DTSX:34026)",
+     "condition": "Action_Type_56 == \"57\" && Transfer_Type_2 == \"1\" && gen_bankaccountnumber == Target_Fund_AccountNumber_47 && Source_Fund_FundType_16 == Target_Fund_FundType_43 && Age_Dependent_Model_112 != \"1\"",
+     "meaning_he": "בקשת העברה בין מסלולים באותו חשבון",
+     "outcome_he": "TransferIn → המשך; אחרת נזרק"
+    },
+    {
+     "where": "Split Transfer Direction + Merge Join (DTSX:36425, 34586)",
+     "condition": "Action_Transfer_Direction_69 == \"2\" → צד ימין (מסלול יעד); אחרת צד שמאל; JoinType = 2 (Inner) על Request_ID_74",
+     "meaning_he": "הצמדת מקור ויעד של אותה בקשה",
+     "outcome_he": "רק בקשות עם שני הצדדים"
+    },
+    {
+     "where": "get dest fundtype (DTSX:34127)",
+     "condition": "productnumber = gen_fundtypenumber (בנק 10)",
+     "meaning_he": "מוצר היעד קיים",
+     "outcome_he": "No Match → נזרק"
+    },
+    {
+     "where": "get dest fund (DTSX:34065)",
+     "condition": "[gen_bankaccountnumber] = ? and [gen_fundtypename] = ? (gen_banknumber = 10)",
+     "meaning_he": "קופת יעד כבר קיימת",
+     "outcome_he": "Match → אין פעולה; No Match → יצירה"
+    },
+    {
+     "where": "remove duplicate (main.cs:32–40)",
+     "condition": "list.Contains(genfundnumber)",
+     "meaning_he": "אותה קופה כבר בתור",
+     "outcome_he": "duplicates לא מחובר → נזרק"
+    },
+    {
+     "where": "get source fund (DTSX:34190)",
+     "condition": "gen_banknumber = 10 and gen_existinfile = 1 and [gen_bankaccountnumber] = ? and [source_fundtypenumber] = Source_Fund_Course_17",
+     "meaning_he": "קופת מקור קיימת",
+     "outcome_he": "Match → יצירה; No Match → נזרק"
+    }
+   ],
+   "crmEffects": [
+    {
+     "entity": "gen_fundmain",
+     "verb": "Create",
+     "mechanism": "SDK",
+     "when_he": "בקשת העברה בין מסלולים שיש לה מוצר יעד בבנק 10 ואין לה קופת יעד, ויש לה קופת מקור בבנק 10 שהשדה gen_existinfile שלה = 1 (משמעות הדגל לא מוכחת); נוצרת פעם אחת לכל מספר קופה."
+    }
+   ],
+   "evidence": [
+    "DTSX:21892 Data Flow",
+    "DTSX:34681, 23539, 34026, 36425, 36273, 36326, 34586, 22694, 34127, 34065, 33995, 34813, 34190, 35598",
+    "DTSX:23617 Create gen_fundmain main.cs:36–182 (×5 זהים: 23617/25489/27361/29233/31105)",
+    "path DTSX:37737 (Create gen_fundmain 3 Error → Union All Created)"
+   ],
+   "openQuestions_he": [
+    "gen_fundcreationdate נלקח מ-getutcdate() בשאילתת קופת המקור ועובר דרך Dates To Local – ערך הזמן המדויק הנשמר תלוי בהמרת אזור הזמן (לא נבדק בהרצה)."
+   ]
+  },
+  {
+   "refId": "Package\\Create transferin Maslulim",
+   "title_he": "יצירת בקשת העברה נכנסת בין מסלולים (gen_transferin)",
+   "techName": "Create transferin Maslulim",
+   "short_he": "לתנועות העברה בין מסלולים באותו חשבון (סוג הפעולה Action_Type_56 = 57, Transfer_Type_2 = 2, סוג הפעולה המשני Action_Operation_Type_57 שאינו 04) שאין להן עדיין gen_transferin לפי מזהה הבקשה, ושתאריך הביצוע הצפוי שלהן מאוחר מהיום פחות חודשיים (כולל תאריכים עתידיים) – יוצרת בקשת העברה נכנסת מסוג 5 עם gen_currentstate = 1 על חשבון הלקוח.",
+   "flow_he": [
+    "PY_FileData → מיפוי סוג קופה 5006 → 1025 → הסרת שורת סיום",
+    "סינון: Action_Operation_Type_57 ≠ 04, Action_Type_56 = 57, Transfer_Type_2 = 2, אותו חשבון ואותו סוג קופה, Age_Dependent_Model_112 ≠ 1",
+    "gen_transferin קיים לפי Request_ID_74 → אין פעולה",
+    "הצמדת שורת מקור ושורת יעד (Inner Join על בקשה+חשבון+סוג קופה)",
+    "תאריך ביצוע צפוי > היום פחות חודשיים",
+    "חשבון לקוח לפי מספר חשבון + סוג חשבון (= סוג קופה)",
+    "יצירת gen_transferin ב-SDK (סוג 5, מצב 1; ExecuteMultiple מנות 10, ×5)"
+   ],
+   "short": {
+    "nodes": [
+     {
+      "type": "step",
+      "text": "נבחרות תנועות העברה בין מסלולים באותו חשבון ובאותו סוג קופה."
+     },
+     {
+      "type": "decision",
+      "text": "האם כבר קיימת ב-CRM בקשת העברה נכנסת עם אותו מזהה בקשה?",
+      "branches": [
+       {
+        "label": "כן",
+        "nodes": [
+         {
+          "type": "end",
+          "text": "אין פעולה."
+         }
+        ]
+       },
+       {
+        "label": "לא",
+        "nodes": [
+         {
+          "type": "step",
+          "text": "שורות המקור והיעד של הבקשה מוצמדות."
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "type": "decision",
+      "text": "האם תאריך הביצוע הצפוי מאוחר מהיום פחות חודשיים (כולל תאריך עתידי)?",
+      "branches": [
+       {
+        "label": "לא",
+        "nodes": [
+         {
+          "type": "end",
+          "text": "הבקשה אינה נוצרת."
+         }
+        ]
+       },
+       {
+        "label": "כן",
+        "nodes": [
+         {
+          "type": "step",
+          "text": "ממשיכים לאיתור חשבון הלקוח."
+         }
+        ]
+       },
+       {
+        "label": "תאריך ריק",
+        "nodes": [
+         {
+          "type": "end",
+          "text": "אם בקשה כזו מגיעה בלי תאריך ביצוע צפוי, רכיב עיבוד התאריכים נכשל וזרימת הנתונים נעצרת."
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "type": "decision",
+      "text": "האם נמצא חשבון הלקוח לפי מספר החשבון וסוג הקופה?",
+      "branches": [
+       {
+        "label": "לא",
+        "nodes": [
+         {
+          "type": "end",
+          "text": "הבקשה אינה נוצרת."
+         }
+        ]
+       },
+       {
+        "label": "כן",
+        "nodes": [
+         {
+          "type": "write",
+          "text": "נוצרת בקשת העברה נכנסת מסוג 5 במצב 1, שבה חשבון המקור וחשבון היעד הם אותו חשבון לקוח.",
+          "tech": "gen_transferin · Create · SDK"
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "type": "end",
+      "text": "העברות בין מסלולים שתאריך הביצוע הצפוי שלהן מאוחר מהיום פחות חודשיים נרשמות ב-CRM כבקשות העברה נכנסות מסוג 5 עם מצב נוכחי 1 (משמעות הערך 1 לא מופיעה בקבצים שסופקו)."
+     }
+    ]
+   },
+   "detailed": {
+    "nodes": [
+     {
+      "type": "step",
+      "text": "מקור הנתונים הוא שורות ה-PY ב-Staging.",
+      "tech": "PY File Data From Staging (DTSX:43587): gen_requestidentifier ← Request_ID_74, gen_deliverydate ← Action_Expected_Date_54"
+     },
+     {
+      "type": "step",
+      "text": "סוג קופה 5006 (\"גמל להשקעה\" לפי הבנק) מתורגם לקוד 1025 של CRM, גם בצד המקור וגם בצד היעד.",
+      "tech": "Handle Gemel To Invest Case main.cs:79–80, 120–124"
+     },
+     {
+      "type": "step",
+      "text": "לפני בדיקת שורת הסיום ולפני הסינונים והחיפושים, מוסרים רווחים מתחילת ומסוף כל ערך טקסט בעמודות שמוגדרות כקלט לשלב הזה. בעמודות האלה, ההשוואות והערכים שנכתבים בהמשך מבוססים על הערכים בלי רווחים מסביב.",
+      "tech": "Trim All Input Columns (DTSX:50487) main.cs:42-48: str.Trim() לכל עמודת string בקלט שאינה ריקה; בין היתר Transfer_Type_2, Action_Type_56, מספרי חשבון, gen_requestidentifier, gen_deliverydate",
+      "evidence": "DTSX:50487"
+     },
+     {
+      "type": "step",
+      "text": "שורת הסיום נזרקת.",
+      "tech": "Check For Last Row In FIle (DTSX:39380): SUBSTRING(CheckLastRow,1,1) == \"@\""
+     },
+     {
+      "type": "decision",
+      "text": "האם זו תנועת העברה בין מסלולים באותו חשבון?",
+      "tech": "Filter for transfer between courses (DTSX:40871): Action_Operation_Type_57 != \"04\" && Action_Type_56 == \"57\" && Transfer_Type_2 == \"2\" && Source_Fund_AccountNumber_20 == Target_Fund_AccountNumber_47 && Source_Fund_FundType_16 == Target_Fund_FundType_43 && Age_Dependent_Model_112 != \"1\"",
+      "branches": [
+       {
+        "label": "לא",
+        "nodes": [
+         {
+          "type": "step",
+          "text": "השורה אינה מטופלת."
+         }
+        ]
+       },
+       {
+        "label": "כן",
+        "nodes": [
+         {
+          "type": "step",
+          "text": "השורה ממשיכה."
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "type": "decision",
+      "text": "האם קיימת ב-CRM בקשת העברה נכנסת עם אותו מזהה בקשה (בכל מצב)?",
+      "tech": "get tranferin (DTSX:42492): Gen_transferin WHERE gen_requestidentifier = Request_ID_74",
+      "branches": [
+       {
+        "label": "כן",
+        "nodes": [
+         {
+          "type": "step",
+          "text": "אין פעולה (Match לא מחובר)."
+         }
+        ]
+       },
+       {
+        "label": "לא",
+        "nodes": [
+         {
+          "type": "step",
+          "text": "ממשיכים."
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "type": "step",
+      "text": "שורות כיוון 2 (צד היעד) ושאר השורות (צד המקור) ממוינות בנפרד, ובכל צד שורות כפולות מסוננות: בצד המקור נשארת שורה אחת לכל צירוף של מזהה בקשה, חשבון, סוג קופה ותאריך ביצוע צפוי, ובצד היעד שורה אחת לכל צירוף של מזהה בקשה, חשבון וסוג קופה. אחר כך שני הצדדים מוצמדים לפי מזהה בקשה, חשבון וסוג קופה; רק בקשות עם שני הצדדים ממשיכות, עם חשבון המקור, סוג הקופה ותאריך הביצוע הצפוי של צד המקור.",
+      "tech": "Conditional Split (DTSX:39413): Action_Transfer_Direction_69 == \"2\"; Sort (DTSX:50313) EliminateDuplicates=true (DTSX:50315), מפתחות: gen_requestidentifier, Source_Fund_AccountNumber_20, Source_Fund_FundType_16, gen_deliverydate; Sort 1 (DTSX:50377) EliminateDuplicates=true (DTSX:50379), מפתחות: gen_requestidentifier, Target_Fund_AccountNumber_47, Target_Fund_FundType_43 (בשני המיונים כל העמודות הן מפתחות); Merge Join (DTSX:43485) JoinType=2 (Inner), NumKeyColumns=3; gen_bankaccountnumber ← Source_Fund_AccountNumber_20, gen_id ← Source_Fund_FundType_16",
+      "evidence": "DTSX:50315, 50379, 43485"
+     },
+     {
+      "type": "step",
+      "text": "ממספר החשבון ומסוג הקופה מוסרות נקודות, ואז הם מרופדים באפסים משמאל עד אורך השדה (ערך ריק הופך לאפסים). מספר החשבון המעובד הוא שנכתב ל-gen_transferid ומשמש לאיתור חשבון הלקוח. תאריך הביצוע הצפוי מעובד: 8 תווים נקראים כשנה-חודש-יום (YYYYMMDD), ו-6 תווים כ-YYMMDD עם 20 בתחילת השנה. אורך אחר או תאריך לא תקין הופכים לריק, והתאריך מומר ל-UTC לצורך הסינון שבהמשך.",
+      "tech": "Append Zeros To Fields (DTSX:38575) main.cs:57-66: Replace(\".\", \"\") ואז ריפוד ב-\"0\"; Format Dates (DTSX:41626) main.cs:58-71; Dates ToUniveral"
+     },
+     {
+      "type": "decision",
+      "text": "האם תאריך הביצוע הצפוי ריק כשהבקשה מגיעה לעיבוד התאריכים?",
+      "tech": "Format Dates main.cs:55-58: if (String.IsNullOrEmpty(str)) str = null; switch (str.Trim().Length) → NullReferenceException שלא נתפס",
+      "branches": [
+       {
+        "label": "כן",
+        "nodes": [
+         {
+          "type": "step",
+          "text": "רכיב עיבוד התאריכים זורק חריגה, וזרימת הנתונים נכשלת; בשרשרת אילוצי Success השלבים הבאים בחבילה לא רצים."
+         }
+        ]
+       },
+       {
+        "label": "לא",
+        "nodes": [
+         {
+          "type": "step",
+          "text": "ממשיכים לבדיקת התאריך."
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "type": "decision",
+      "text": "האם תאריך הביצוע הצפוי מאוחר מהיום פחות חודשיים (כולל תאריך עתידי)?",
+      "tech": "Filter Last Two Month main.cs:31–40: DateTime.TryParse(gendeliverydate, he-IL) && date > DateTime.UtcNow.AddMonths(-2)",
+      "branches": [
+       {
+        "label": "לא",
+        "nodes": [
+         {
+          "type": "step",
+          "text": "השורה נזרקת. זה קורה גם כשהתאריך בקובץ לא היה תקין או באורך שאינו 6 או 8 תווים, כי בשלב הקודם הוא הפך לריק.",
+          "tech": "Filter Last Two Month main.cs:31: if (!Row.gendeliverydate_IsNull); תאריך שהיה ריק בקובץ לא מגיע לכאן – Format Dates נכשל עליו"
+         }
+        ]
+       },
+       {
+        "label": "כן",
+        "nodes": [
+         {
+          "type": "step",
+          "text": "ממשיכים."
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "type": "decision",
+      "text": "האם קיים חשבון לקוח עם מספר החשבון וסוג החשבון שמספרו כסוג הקופה?",
+      "tech": "Get source customer account (DTSX:42407): gen_customeraccount ⨝ gen_customeraccounttype WHERE gen_bankaccountnumber = ? AND gen_id = ?",
+      "branches": [
+       {
+        "label": "לא",
+        "nodes": [
+         {
+          "type": "step",
+          "text": "הבקשה אינה נוצרת (No Match לא מחובר), ללא אזהרה."
+         }
+        ]
+       },
+       {
+        "label": "כן",
+        "nodes": [
+         {
+          "type": "step",
+          "text": "נשלפים חשבון הלקוח, איש הקשר ות.ז. הלקוח."
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "type": "step",
+      "text": "סוג ההעברה נקבע ל-5 והמצב הנוכחי ל-1.",
+      "tech": "Set Additional fields (DTSX:49608): gen_transfertype = 5, gen_currentstate = 1"
+     },
+     {
+      "type": "step",
+      "text": "לפני היצירה תאריך הביצוע הצפוי מומר חזרה מ-UTC לשעון המקומי של השרת, והערך המקומי הוא שנשלח ל-CRM כתאריך המסירה.",
+      "tech": "Multicast 1 → Dates To Local (DTSX:39491) main.cs:53-57: ToLocalTime() → \"yyyy/MM/dd HH:mm:ss\" (ערך השווה ל-User::CrmMinimumDate לא מומר) → Add Row Number; SDK Create gen_TransferIn main.cs:46-48: gen_deliverydate = DateTime.Parse(Row.gendeliverydate)",
+      "evidence": "DTSX:39491"
+     },
+     {
+      "type": "write",
+      "text": "נוצרת בקשת העברה נכנסת: סוג 5, מצב 1, תאריך מסירה (תאריך הביצוע הצפוי בשעון המקומי של השרת), מזהה בקשה, ת.ז. הלקוח, חשבון מקור = חשבון יעד = חשבון הלקוח, איש קשר, מטבע; בשדה gen_transferid נשמר מספר החשבון.",
+      "tech": "gen_transferin · Create · SDK (SDK Create gen_TransferIn main.cs:32–92; ExecuteMultiple מנות 10; ×5 מקביליים זהים)"
+     },
+     {
+      "type": "end",
+      "text": "בקשות העברה בין מסלולים שתאריך הביצוע הצפוי שלהן מאוחר מהיום פחות חודשיים (כולל עתידי), ושלא היו ב-CRM לפני הריצה, נוצרות ב-CRM כבקשות העברה נכנסות. שורות כפולות בתוך הקובץ מסוננות לפני ההצמדה, ולכן חזרה על אותו זוג שורות יוצרת בקשה אחת. לאותו מזהה בקשה נוצרת יותר מבקשה אחת רק אם בצד המקור יש לו כמה צירופים שונים של חשבון, סוג קופה ותאריך ביצוע צפוי שלכל אחד מהם יש צד יעד תואם (למשל אותו מזהה עם תאריכי ביצוע צפויים שונים). בדיקת הקיום ב-CRM נשענת על מטמון שנטען בתחילת הזרימה, ולכן אינה רואה בקשות שנוצרו באותה ריצה."
+     }
+    ]
+   },
+   "detail_he": [
+    {
+     "h": "מקור ואוכלוסייה",
+     "t": "שורות PY_FileData (לא שורת סיום) עם פעולה 57, Transfer_Type_2 = 2, סוג פעולה ≠ 04, אותו חשבון ואותו סוג קופה (אחרי מיפוי 5006→1025), Age_Dependent_Model_112 ≠ 1, ותאריך ביצוע צפוי מאוחר מהיום פחות חודשיים (כולל תאריכים עתידיים). אם בקשה כזו מגיעה לעיבוד התאריכים בלי תאריך ביצוע צפוי, זרימת הנתונים נכשלת (Format Dates main.cs:55-58)."
+    },
+    {
+     "h": "התאמה לרשומות קיימות",
+     "t": "Gen_transferin לפי gen_requestidentifier (קיים → אין פעולה). gen_customeraccount לפי מספר חשבון + gen_customeraccounttype.gen_id = סוג הקופה."
+    },
+    {
+     "h": "החלטות",
+     "t": "סינון תנועה; קיום בקשה; צירוף מקור-יעד; תאריך ביצוע צפוי ריק (כישלון) או מאוחר מהיום פחות חודשיים; קיום חשבון לקוח."
+    },
+    {
+     "h": "כתיבה ל-CRM",
+     "t": "gen_transferin Create דרך SDK: gen_transfertype = 5, gen_currentstate = 1, gen_deliverydate, gen_requestidentifier, gen_identitynumber, gen_transferid = מספר החשבון, gen_accountnumbersrc = gen_customeraccountdest = חשבון הלקוח, gen_contactname, transactioncurrencyid."
+    },
+    {
+     "h": "תוצאה עסקית",
+     "t": "העברה בין מסלולים נרשמת כבקשת העברה נכנסת מסוג 5 עם gen_currentstate = 1 (משמעות הערך 1 לא מופיעה בקבצים שסופקו)."
+    }
+   ],
+   "decisions": [
+    {
+     "where": "Handle Gemel To Invest Case (main.cs:120–124)",
+     "condition": "FundType == \"5006\" → \"1025\" (מקור ויעד)",
+     "meaning_he": "תרגום סוג קופה גמל להשקעה",
+     "outcome_he": "משפיע על הסינון ועל איתור חשבון הלקוח"
+    },
+    {
+     "where": "Check For Last Row In FIle (DTSX:39380)",
+     "condition": "SUBSTRING(CheckLastRow,1,1) == \"@\"",
+     "meaning_he": "שורת סיום",
+     "outcome_he": "יציאת Last row לא מחוברת – השורה נזרקת; else → Filter for transfer between courses"
+    },
+    {
+     "where": "Filter for transfer between courses (DTSX:40871)",
+     "condition": "Action_Operation_Type_57 != \"04\" && Action_Type_56 == \"57\" && Transfer_Type_2 == \"2\" && Source_Fund_AccountNumber_20 == Target_Fund_AccountNumber_47 && Source_Fund_FundType_16 == Target_Fund_FundType_43 && Age_Dependent_Model_112 != \"1\"",
+     "meaning_he": "העברה בין מסלולים",
+     "outcome_he": "TransferIn BC → המשך"
+    },
+    {
+     "where": "get tranferin (DTSX:42492)",
+     "condition": "[gen_requestidentifier] = Request_ID_74",
+     "meaning_he": "הבקשה כבר קיימת",
+     "outcome_he": "Match → אין פעולה; No Match → המשך"
+    },
+    {
+     "where": "Sort / Sort 1 (DTSX:50313 / 50377)",
+     "condition": "EliminateDuplicates=true (DTSX:50315, 50379). Sort (צד המקור): gen_requestidentifier, Source_Fund_AccountNumber_20, Source_Fund_FundType_16, gen_deliverydate; Sort 1 (צד היעד, כיוון \"2\"): gen_requestidentifier, Target_Fund_AccountNumber_47, Target_Fund_FundType_43. בשני המיונים כל העמודות הן מפתחות מיון",
+     "meaning_he": "שורות כפולות בכל צד מסוננות לפני ההצמדה",
+     "outcome_he": "בכל צד נשארת שורה אחת לכל צירוף מפתחות; לאותו מזהה בקשה נוצרות לכל היותר בקשות כמספר הצירופים השונים בצד המקור שיש להם צד יעד תואם"
+    },
+    {
+     "where": "Merge Join (DTSX:43485)",
+     "condition": "Inner Join (JoinType=2) על gen_requestidentifier, חשבון, סוג קופה (NumKeyColumns=3); כיוון \"2\" בצד ימין",
+     "meaning_he": "יש גם צד מקור וגם צד יעד",
+     "outcome_he": "רק זוגות שלמים"
+    },
+    {
+     "where": "Filter Last Two Month (main.cs:31–40)",
+     "condition": "date > DateTime.UtcNow.AddMonths(-2)",
+     "meaning_he": "תאריך ביצוע צפוי מאוחר מהיום פחות חודשיים; אין גבול עליון, גם תאריך עתידי עובר",
+     "outcome_he": "עובר → המשך; תאריך ריק (NULL, כי לא היה תקין) או מוקדם יותר → נזרק. תאריך שהיה ריק בקובץ לא מגיע לכאן: Format Dates נכשל עליו לפני הסינון"
+    },
+    {
+     "where": "Get source customer account (DTSX:42407)",
+     "condition": "[gen_bankaccountnumber] = ? and [gen_id] = ?",
+     "meaning_he": "חשבון הלקוח קיים",
+     "outcome_he": "No Match → נזרק"
+    }
+   ],
+   "crmEffects": [
+    {
+     "entity": "gen_transferin",
+     "verb": "Create",
+     "mechanism": "SDK",
+     "when_he": "העברה בין מסלולים שאין לה gen_transferin עם אותו מזהה בקשה לפני הריצה, תאריך הביצוע הצפוי שלה מאוחר מהיום פחות חודשיים (כולל עתידי), וחשבון הלקוח נמצא"
+    }
+   ],
+   "evidence": [
+    "DTSX:37773 Data Flow",
+    "DTSX:43587, 42542, 39380, 40871, 42492, 39413, 50313, 50377, 43485, 38575, 40911, 42407, 49608",
+    "DTSX:43738 SDK Create gen_TransferIn main.cs:28–111 (×5 זהים: 43738/44984/46140/47296/48452)"
+   ],
+   "openQuestions_he": [
+    "gen_transferid מקבל את מספר החשבון (Source_Fund_AccountNumber_20) ולא מזהה תנועה – האם זו הכוונה העסקית? (main.cs:61–62)."
+   ]
+  },
+  {
+   "refId": "Package\\Create Acount Courses and course partition for transferin",
+   "title_he": "מסלולי חשבון ופיצולי מסלול להעברה נכנסת",
+   "techName": "Create Acount Courses and course partition for transferin",
+   "short_he": "לכל שורה בקובץ שמזהה הבקשה וחשבון היעד שלה תואמים gen_transferin קיים: בצד המקור יוצרת מסלול חשבון (gen_accountcourses) לקופת המקור עם היתרה ודגלי עיקול/שעבוד אם לא קיים; בצד היעד יוצרת פיצול מסלול (gen_coursepartition) לקופת היעד אם לא קיים.",
+   "flow_he": [
+    "PY_FileData → הסרת שורת סיום (ללא סינון לפי סוג פעולה)",
+    "gen_transferin לפי Request_ID_74 + מספר חשבון של חשבון היעד = Target_Fund_AccountNumber_47 (ללא סינון מצב)",
+    "סוג העברה: Action_Operation_Type_57 NULL או 2 → 1 / true; ערך מספרי אחר → 2 / false",
+    "כיוון ≠ 2 (מקור): קופת מקור בנק 10 → אין מסלול חשבון להעברה+קופה → יצירת gen_accountcourses",
+    "כיוון 2 (יעד): קופת יעד בנק 10 עם איש קשר וחוזה סוכן → אין פיצול להעברה+קופה → יצירת gen_coursepartition",
+    "SDK ExecuteMultiple מנות 10, ×5 מקביליים זהים לכל ישות"
+   ],
+   "short": {
+    "nodes": [
+     {
+      "type": "step",
+      "text": "כל שורות הקובץ נבדקות מול בקשות ההעברה הנכנסות הקיימות ב-CRM."
+     },
+     {
+      "type": "decision",
+      "text": "האם קיימת בקשת העברה נכנסת עם אותו מזהה בקשה וחשבון יעד?",
+      "branches": [
+       {
+        "label": "לא",
+        "nodes": [
+         {
+          "type": "end",
+          "text": "אין פעולה לשורה."
+         }
+        ]
+       },
+       {
+        "label": "כן",
+        "nodes": [
+         {
+          "type": "step",
+          "text": "השורה ממשיכה לפי הצד שלה בהעברה. אם חסר בה תאריך ביצוע צפוי, זרימת הנתונים נכשלת."
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "type": "decision",
+      "text": "האם השורה מייצגת את צד המקור או את צד היעד?",
+      "branches": [
+       {
+        "label": "מקור",
+        "nodes": [
+         {
+          "type": "decision",
+          "text": "האם קיימת קופת המקור ואין עדיין מסלול חשבון להעברה ולקופה?",
+          "branches": [
+           {
+            "label": "כן",
+            "nodes": [
+             {
+              "type": "write",
+              "text": "נוצר מסלול חשבון עם יתרת קופת המקור ודגלי עיקול, שעבוד, אזהרה וכינוס.",
+              "tech": "gen_accountcourses · Create · SDK"
+             }
+            ]
+           },
+           {
+            "label": "לא",
+            "nodes": [
+             {
+              "type": "step",
+              "text": "אין פעולה."
+             }
+            ]
+           }
+          ]
+         }
+        ]
+       },
+       {
+        "label": "יעד",
+        "nodes": [
+         {
+          "type": "decision",
+          "text": "האם קיימת קופת היעד (עם איש קשר וחוזה סוכן) ואין עדיין פיצול מסלול להעברה ולקופה?",
+          "branches": [
+           {
+            "label": "כן",
+            "nodes": [
+             {
+              "type": "write",
+              "text": "נוצר פיצול מסלול לקופת היעד עם המוצר, הסוכן, הסוכנות והמפקח.",
+              "tech": "gen_coursepartition · Create · SDK"
+             }
+            ]
+           },
+           {
+            "label": "לא",
+            "nodes": [
+             {
+              "type": "step",
+              "text": "אין פעולה."
+             }
+            ]
+           }
+          ]
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "type": "end",
+      "text": "להעברות נכנסות קיימות נוספים ב-CRM מסלולי החשבון המועברים ופיצולי המסלול המקבלים, כשהקופה המתאימה נמצאת. מסלול או פיצול שכבר היה קיים ב-CRM מדולג; אם כמה שורות באותה ריצה מתאימות לאותה העברה ולאותה קופה, יכולה להיווצר רשומה לכל אחת מהן."
+     }
+    ]
+   },
+   "detailed": {
+    "nodes": [
+     {
+      "type": "step",
+      "text": "מקור הנתונים הוא כל שורות ה-PY ב-Staging, ללא סינון לפי סוג פעולה; שורת הסיום נזרקת.",
+      "tech": "PY File Data From Staging (DTSX:6158); Check For Last Row In FIle (DTSX:3342)"
+     },
+     {
+      "type": "step",
+      "text": "לפני בדיקת שורת הסיום ולפני הסינונים והחיפושים, מוסרים רווחים מתחילת ומסוף כל ערך טקסט בעמודות שמוגדרות כקלט לשלב הזה. בעמודות האלה, ההשוואות והערכים שנכתבים בהמשך מבוססים על הערכים בלי רווחים מסביב.",
+      "tech": "Trim All Input Columns (DTSX:19996) main.cs:42-48: str.Trim() לכל עמודת string בקלט שאינה ריקה; Target_Fund_AccountNumber_47, Target_Fund_course_44, Source_Fund_Course_17, Action_Expected_Date_54, Request_ID_74, Action_Type_56, Action_Transfer_Direction_69, Action_Operation_Type_57",
+      "evidence": "DTSX:19996"
+     },
+     {
+      "type": "step",
+      "text": "ממספר חשבון היעד וממספרי המסלולים מוסרות נקודות, ואז הם מרופדים באפסים משמאל עד אורך השדה; ערך ריק הופך לאפסים. הערכים המעובדים הם המפתחות לאיתור ההעברה, קופת המקור וקופת היעד.",
+      "tech": "Append Zeros To Fields (DTSX:2437): Target_Fund_AccountNumber_47, Target_Fund_course_44, Source_Fund_Course_17 · main.cs:57-66: Replace(\".\", \"\") ואז ריפוד ב-\"0\""
+     },
+     {
+      "type": "decision",
+      "text": "האם קיימת בקשת העברה נכנסת עם אותו מזהה בקשה, שחשבון היעד שלה הוא חשבון היעד בשורה?",
+      "tech": "get tranferin (DTSX:5916, Partial cache): Gen_transferin ⨝ Gen_customeraccount (gen_customeraccountdest) WHERE Gen_bankaccountnumber = Target_Fund_AccountNumber_47 AND gen_requestidentifier = Request_ID_74 (ללא סינון מצב)",
+      "branches": [
+       {
+        "label": "לא",
+        "nodes": [
+         {
+          "type": "step",
+          "text": "השורה נזרקת (No Match לא מחובר)."
+         }
+        ]
+       },
+       {
+        "label": "כן",
+        "nodes": [
+         {
+          "type": "step",
+          "text": "נשמרים מזהה ההעברה, סוג ההעברה וחשבון הלקוח."
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "type": "decision",
+      "text": "האם תאריך הביצוע הצפוי בשורה ריק?",
+      "tech": "Format Dates (DTSX:4854) main.cs:55-71 → Dates ToUniveral; ערך ריק: str = null ואז str.Trim() → NullReferenceException שלא נתפס",
+      "branches": [
+       {
+        "label": "כן",
+        "nodes": [
+         {
+          "type": "step",
+          "text": "רכיב עיבוד התאריכים זורק חריגה וזרימת הנתונים נכשלת. זה חל על כל שורה שנמצאה לה העברה, בצד המקור או בצד היעד."
+         }
+        ]
+       },
+       {
+        "label": "לא",
+        "nodes": [
+         {
+          "type": "step",
+          "text": "התאריך מעובד: 8 תווים נקראים כ-YYYYMMDD ו-6 תווים כ-YYMMDD עם 20 בתחילת השנה; אורך אחר או תאריך לא תקין הופכים לריק. התאריך מומר ל-UTC. בענף היעד הוא מומר חזרה לשעון המקומי של השרת לפני יצירת פיצול המסלול."
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "type": "step",
+      "text": "נקבע סוג ההעברה: כשסוג הפעולה המשני (Action_Operation_Type_57) NULL או 2 – ערך 1 ו\"חישוב סכום\" = כן; כשהוא ערך מספרי אחר – ערך 2 ו\"חישוב סכום\" = לא.",
+      "tech": "set additional fields (DTSX:19093): IsFullTransfer = ISNULL(Action_Operation_Type_57) ? 1 : (((DT_I4)Action_Operation_Type_57) == 2 ? 1 : 2); AmountCalculationType = (DT_BOOL)(ISNULL(...) ? 1 : (... == 2 ? 1 : 0))"
+     },
+     {
+      "type": "decision",
+      "text": "האם השורה היא צד היעד (כיוון 2)?",
+      "tech": "Split Direction (DTSX:19849): Action_Transfer_Direction_69 == \"2\"",
+      "branches": [
+       {
+        "label": "לא – צד המקור",
+        "nodes": [
+         {
+          "type": "decision",
+          "text": "האם קיימת קופה של בנק 10 לחשבון היעד ולמסלול המקור?",
+          "tech": "get source fund (DTSX:5782): Gen_fundmain ⨝ Product WHERE gen_banknumber = 10 AND productnumber = Source_Fund_Course_17 AND gen_bankaccountnumber = Target_Fund_AccountNumber_47",
+          "branches": [
+           {
+            "label": "לא",
+            "nodes": [
+             {
+              "type": "step",
+              "text": "אין פעולה (No Match לא מחובר)."
+             }
+            ]
+           },
+           {
+            "label": "כן",
+            "nodes": [
+             {
+              "type": "decision",
+              "text": "האם כבר קיים מסלול חשבון להעברה ולקופת המקור?",
+              "tech": "Check for exist account courses (DTSX:3282, No cache): gen_accountcourses WHERE gen_transferin = ? AND gen_fundnumber = ?",
+              "branches": [
+               {
+                "label": "כן",
+                "nodes": [
+                 {
+                  "type": "step",
+                  "text": "אין פעולה."
+                 }
+                ]
+               },
+               {
+                "label": "לא",
+                "nodes": [
+                 {
+                  "type": "write",
+                  "text": "נוצר מסלול חשבון: סוג עסקה וסוג חישוב סכום, שם = מספר קופת המקור, מספר גוף מנהל, דגלי כינוס/אזהרה/עיקול/שעבוד מקופת המקור, קישור להעברה ולקופת המקור, ויתרה וסכום עסקה = יתרת קופת המקור.",
+                  "tech": "gen_accountcourses · Create · SDK (SDK Create gen_accountcourses main.cs:27–112; ×5 זהים)"
+                 }
+                ]
+               }
+              ]
+             }
+            ]
+           }
+          ]
+         }
+        ]
+       },
+       {
+        "label": "כן – צד היעד",
+        "nodes": [
+         {
+          "type": "decision",
+          "text": "האם קיימת קופה של בנק 10 לחשבון ולמסלול היעד, עם איש קשר וחוזה סוכן?",
+          "tech": "get dest fund (DTSX:5635): Gen_fundmain ⨝ Product ⨝ Contact ⨝ Gen_agentcontract WHERE gen_banknumber = 10 AND gen_bankaccountnumber = Target_Fund_AccountNumber_47 AND productnumber = Target_Fund_course_44",
+          "branches": [
+           {
+            "label": "לא",
+            "nodes": [
+             {
+              "type": "step",
+              "text": "אין פעולה (No Match לא מחובר)."
+             }
+            ]
+           },
+           {
+            "label": "כן",
+            "nodes": [
+             {
+              "type": "decision",
+              "text": "האם כבר קיים פיצול מסלול להעברה ולקופת היעד?",
+              "tech": "Check if exist course partition (DTSX:3375, Full cache): gen_coursepartition WHERE gen_transferin = ? AND gen_fundnumberdest = ?",
+              "branches": [
+               {
+                "label": "כן",
+                "nodes": [
+                 {
+                  "type": "step",
+                  "text": "אין פעולה."
+                 }
+                ]
+               },
+               {
+                "label": "לא",
+                "nodes": [
+                 {
+                  "type": "write",
+                  "text": "נוצר פיצול מסלול: סוג פיצול 2, תאריך יצירה = תאריך הביצוע הצפוי (אחרי המרה חזרה לשעון המקומי של השרת), ת.ז. המבקש, מספר גוף מנהל, מספר חוזה, קישור להעברה, ללקוח, לקופת היעד, למוצר, לסוכן, לסוכנות ולמפקח.",
+                  "tech": "gen_coursepartition · Create · SDK (SDK Create gen_coursepartition main.cs:27–112; ×5 זהים; לפני היצירה: Multicast 1 → Dates To Local (DTSX:3480) main.cs:53-57 ToLocalTime() על Action_Expected_Date_54 (ערך השווה ל-User::CrmMinimumDate לא מומר); gen_creationdate = DateTime.Parse(Row.ActionExpectedDate54))"
+                 }
+                ]
+               }
+              ]
+             }
+            ]
+           }
+          ]
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "type": "step",
+      "text": "היצירות נשלחות ל-CRM במנות של 10 בחמישה ענפים מקבילים; כשלונות נרשמים כאזהרות ETL.",
+      "tech": "ExecuteMultiple RequestType.Create; Split Rows For MultiThread / 1 (DTSX:19882 / 19939)"
+     },
+     {
+      "type": "end",
+      "text": "להעברות נכנסות קיימות נוספים ב-CRM מסלולי החשבון המועברים ופיצולי המסלול המקבלים, כשהקופה המתאימה נמצאת. מסלול או פיצול שכבר היה קיים ב-CRM מדולג; אם כמה שורות באותה ריצה מתאימות לאותה העברה ולאותה קופה, יכולה להיווצר רשומה לכל אחת מהן."
+     }
+    ]
+   },
+   "detail_he": [
+    {
+     "h": "מקור ואוכלוסייה",
+     "t": "כל שורות PY_FileData (לא שורת סיום) – ללא סינון לפי סוג פעולה או לפי Transfer_Type_2 – שיש להן gen_transferin תואם."
+    },
+    {
+     "h": "התאמה לרשומות קיימות",
+     "t": "gen_transferin לפי Request_ID_74 + מספר החשבון של חשבון היעד שלו (gen_customeraccountdest) = Target_Fund_AccountNumber_47, ללא סינון מצב. קופת מקור: Gen_fundmain בנק 10 לפי Target_Fund_AccountNumber_47 + productnumber = Source_Fund_Course_17. קופת יעד: Gen_fundmain בנק 10 לפי Target_Fund_AccountNumber_47 + productnumber = Target_Fund_course_44, רק עם Contact ו-Gen_agentcontract (Inner Join). קיום: gen_accountcourses לפי העברה + קופה; gen_coursepartition לפי העברה + קופת יעד."
+    },
+    {
+     "h": "החלטות",
+     "t": "ראה decisions: קיום העברה, כיוון, קיום קופה, קיום מסלול/פיצול; סוג העברה לפי Action_Operation_Type_57."
+    },
+    {
+     "h": "כתיבה ל-CRM",
+     "t": "gen_accountcourses Create ו-gen_coursepartition Create דרך SDK (ExecuteMultiple). פירוט שדות ב-detailed."
+    },
+    {
+     "h": "תוצאה עסקית",
+     "t": "להעברה הנכנסת נוספים המסלולים מהם מועבר הכסף ואליהם הוא נכנס."
+    }
+   ],
+   "decisions": [
+    {
+     "where": "Check For Last Row In FIle (DTSX:3342)",
+     "condition": "SUBSTRING(CheckLastRow,1,1) == \"@\"",
+     "meaning_he": "שורת סיום",
+     "outcome_he": "נזרקת"
+    },
+    {
+     "where": "get tranferin (DTSX:5916)",
+     "condition": "[Gen_bankaccountnumber] = Target_Fund_AccountNumber_47 and [gen_requestidentifier] = Request_ID_74",
+     "meaning_he": "קיימת העברה נכנסת לבקשה",
+     "outcome_he": "No Match → נזרק"
+    },
+    {
+     "where": "set additional fields (DTSX:19093)",
+     "condition": "IsFullTransfer = (DT_I4)(ISNULL(Action_Operation_Type_57) ? 1 : ((((DT_I4)Action_Operation_Type_57) == 2) ? 1 : 2)); AmountCalculationType = (DT_BOOL)(ISNULL(Action_Operation_Type_57) ? 1 : ((((DT_I4)Action_Operation_Type_57) == 2) ? 1 : 0))",
+     "meaning_he": "סוג הפעולה המשני (Action_Operation_Type_57) NULL או 2 → 1/true; ערך מספרי אחר → 2/false",
+     "outcome_he": "gen_transactiontype, gen_amauntcalculationtype"
+    },
+    {
+     "where": "Split Direction (DTSX:19849)",
+     "condition": "Action_Transfer_Direction_69 == \"2\"",
+     "meaning_he": "צד היעד",
+     "outcome_he": "כן → פיצול מסלול; אחרת → מסלול חשבון"
+    },
+    {
+     "where": "get source fund (DTSX:5782)",
+     "condition": "Gen_fundmain fm inner join Product p on p.ProductId = fm.gen_fundtypename where gen_banknumber = 10; [productnumber] = Source_Fund_Course_17 and [gen_bankaccountnumber] = Target_Fund_AccountNumber_47 (NoMatchBehavior=1; ל-No Match Output אין path)",
+     "meaning_he": "קיימת קופה של בנק 10 לחשבון היעד ולמסלול המקור",
+     "outcome_he": "Match → בדיקת קיום מסלול חשבון; No Match → השורה נזרקת ולא נוצר gen_accountcourses"
+    },
+    {
+     "where": "get dest fund (DTSX:5635)",
+     "condition": "Gen_fundmain fm join Product p on p.ProductId = fm.gen_fundtypename join Contact c on c.ContactId = fm.gen_contactname join Gen_agentcontract a on fm.gen_brokernumber = a.Gen_agentcontractId where gen_banknumber = 10; [gen_bankaccountnumber] = Target_Fund_AccountNumber_47 and [productnumber] = Target_Fund_course_44 (NoMatchBehavior=1; ל-No Match Output אין path)",
+     "meaning_he": "קיימת קופה של בנק 10 לחשבון ולמסלול היעד, עם איש קשר וחוזה סוכן",
+     "outcome_he": "Match → בדיקת קיום פיצול מסלול; No Match → השורה נזרקת ולא נוצר gen_coursepartition"
+    },
+    {
+     "where": "Check for exist account courses (DTSX:3282)",
+     "condition": "[gen_transferin] = gen_transferinid and [gen_fundnumber] = gen_source_fundmainid",
+     "meaning_he": "מסלול חשבון כבר קיים",
+     "outcome_he": "No Match → יצירה"
+    },
+    {
+     "where": "Check if exist course partition (DTSX:3375)",
+     "condition": "[gen_transferin] = gen_transferinid and [gen_fundnumberdest] = gen_dest_fundmainid_D",
+     "meaning_he": "פיצול מסלול כבר קיים",
+     "outcome_he": "No Match → יצירה"
+    }
+   ],
+   "crmEffects": [
+    {
+     "entity": "gen_accountcourses",
+     "verb": "Create",
+     "mechanism": "SDK",
+     "when_he": "שורת מקור (כיוון ≠ 2) של העברה קיימת, קופת המקור בבנק 10 קיימת, ואין עדיין מסלול חשבון להעברה+קופה"
+    },
+    {
+     "entity": "gen_coursepartition",
+     "verb": "Create",
+     "mechanism": "SDK",
+     "when_he": "שורת יעד (כיוון 2) של העברה קיימת, קופת היעד בבנק 10 עם איש קשר וחוזה סוכן, ואין עדיין פיצול להעברה+קופה"
+    }
+   ],
+   "evidence": [
+    "DTSX:899 Data Flow",
+    "DTSX:6158, 3342, 2437, 5916, 19093, 19849, 5782, 3282, 5635, 3375, 19882, 19939",
+    "DTSX:6338 SDK Create gen_accountcourses main.cs:27–175 (×5 זהים)",
+    "DTSX:12673 SDK Create gen_coursepartition main.cs:27–176 (×5 זהים)"
+   ],
+   "hypotheses_he": [
+    "ערך 1 ב-gen_transactiontype מייצג \"העברה מלאה\" ו-2 \"חלקית\" (שם המשתנה IsFullTransfer) – השערה; תוויות optionset לא סופקו."
+   ],
+   "openQuestions_he": [
+    "gen_accountbalance ו-gen_transactionamount מוצבים כ-decimal ולא כ-Money (main.cs:100–104) – אם השדות מסוג Money, ה-SDK ידחה את הרשומה; סוג השדות לא סופק.",
+    "gen_agent מוצב כ-EntityReference(\"gen_agents\") ו-gen_agency כ-EntityReference(\"gen_agencie\") מתוך gen_agentname/gen_agencyname של הקופה, בעוד שבתהליך יצירת הקופה אותם שדות מוצבים כ-contact/account (Create fundmain main.cs:72–73) – ייתכן אי-התאמה בסוג הישות; מטא-דאטה לא סופקה.",
+    "ההעברה מאותרת ללא סינון מצב – גם העברות סגורות יקבלו מסלולים חסרים. האם זו הכוונה?"
+   ]
+  }
+ ],
+ "findings_he": [
+  {
+   "severity": "high",
+   "text": "כתיבה ישירה ב-SQL למסד CRM (Unsupported): INSERT ל-Gen_ftCurrentYearBase, UPDATE ל-ContactBase (gen_loaneligibilitycalculationrequired) ו-UPDATE ל-gen_demislikamonthsalary – עוקפת את שכבת ה-SDK (Plugins, Audit, ולידציות). החיבור הוא CM CRM (Psql / ALTSHULER_MSCRM לפי מחרוזת זמן-תכנון; עשוי להידרס מקובץ תצורה שלא סופק).",
+   "evidence": "DTSX:63118 (×5), 82566, 82519; CM DTSX:4–6; Configurations DTSX:199–200"
+  },
+  {
+   "severity": "medium",
+   "text": "העדכון של gen_demislikamonthsalary (gen_depositidentificationforreportedmonth = 1 ותאריך) מתבצע בענף מקביל מיד אחרי איתור הקופה, ללא תלות בהצלחת הכנסת התנועה: אם ה-INSERT של התנועה נכשל (ונרשם כאזהרה), הרשומה עדיין מתעדכנת.",
+   "evidence": "FT: Get fund main id → Multicast 3 → Set SalaryMonthDate/Check Type And Year/Get DemiSlikaMonthSalary/Update Dmei Slika (DTSX:62760, 67244, 57393, 61917, 82516)"
+  },
+  {
+   "severity": "medium",
+   "text": "תנועות נזרקות בשקט (ללא אזהרת ETL) כאשר הקופה (gen_fundmain) לא נמצאה, כאשר כיוון התנועה אינו 1/2, או כאשר השורה אינה מסוג \"תנועות והחזר דמי ניהול\". רק מוצר חסר וסוג תנועה חסר מייצרים אזהרה.",
+   "evidence": "Get fund main id No Match לא מחובר (DTSX:62760); Split by trans direction \"אחר\" (DTSX:69934); Split by trans group type \"יתר\" (DTSX:69975)"
+  },
+  {
+   "severity": "medium",
+   "text": "בכל ריצה נקלט רק הקובץ העדכני ביותר; קבצי PY נוספים שנמצאו מועברים ל-NotProccessed ואינם נקלטים כלל.",
+   "evidence": "Check File Existence ScriptMain.cs:54–63"
+  },
+  {
+   "severity": "low",
+   "text": "ביצירת קופות היעד, יציאת השגיאה של העותק \"Create gen_fundmain 3\" מחוברת לאיחוד ההצלחות – כשלונות ביצירה בעותק זה נספרים כ\"נוצרו\" ואינם נרשמים כאזהרה.",
+   "evidence": "path DTSX:37737 (Create gen_fundmain 3.Outputs[Error] → Union All Created)"
+  },
+  {
+   "severity": "low",
+   "text": "בבקשת ההעברה הנכנסת בין מסלולים השדה gen_transferid מקבל את מספר החשבון (Source_Fund_AccountNumber_20) ולא מזהה תנועה.",
+   "evidence": "SDK Create gen_TransferIn main.cs:61–62; Merge Join DTSX:43485 (gen_bankaccountnumber ← Source_Fund_AccountNumber_20)"
+  },
+  {
+   "severity": "info",
+   "text": "בשאילתת קופת היעד של מסלולי החשבון חסר פסיק: \"c.Gen_Identitynumber gen_fundtypename\" – ת.ז. איש הקשר מקבלת את הכינוי gen_fundtypename. העמודה (gen_fundtypename_D) אינה בשימוש בקוד היצירה, ולכן אין השפעה עסקית.",
+   "evidence": "get dest fund SQL DTSX:5637; SDK Create gen_coursepartition main.cs:27–112"
+  },
+  {
+   "severity": "info",
+   "text": "קליטת התנועות אינה מעדכנת תנועות קיימות לעולם – תיקון בבנק לתנועה שכבר נקלטה (אותו מפתח) לא יגיע ל-CRM.",
+   "evidence": "Check if trans exists Match לא מחובר (DTSX:57313)"
+  }
+ ]
+}

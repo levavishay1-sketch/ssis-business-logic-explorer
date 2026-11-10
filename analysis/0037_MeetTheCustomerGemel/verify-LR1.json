@@ -1,0 +1,81 @@
+{
+  "verifier": "ssis-verifier",
+  "package": "0037_MeetTheCustomerGemel",
+  "scope": "logic-claims re-check after fixes",
+  "checkedAt": "2026-11-07T12:00:00Z",
+  "checked": 9,
+  "results": [
+    {
+      "id": "L|summary",
+      "hash": "d29eba39036e",
+      "verdict": "CONFIRMED",
+      "detail": "Unit 1: status in(1,2) with comment 'New Or InProcess' (DTSX:9944, 8313); gen_precustomer = 1 in Program (9944), Customer Account (8313) and Automated Joining (3179) sources; Pre Account Number source (6008) has no gen_precustomer condition. Four active link paths (Program 9831, Customer Account by ID+bank 7420 with lookup join gen_customeridnumber/gen_bankaccountnumber 8236/8242, Automated Joining 3107, Pre Account Number 5998; Mini AJ Disabled=True 4642). Status 8 written only by Customer Account (main.cs:34,136-137 STATUS_NO_ACCOUNT) and Pre Account Number (main.cs:29,55-56); Program and AJ check 4 (main.cs:34,137 / 32,72) so a no-match row of status 8 gets status 3 (score present) or an attribute-less Update. Unit 2: [CRM] and [qsql] both psql/ALTSHULER_MSCRM (DTSX:4-11); [CRM] used only by End ETL Proccess record\\Lookup (plumbing, DTSX:1389); all business sources/lookups on [qsql]; no OLE DB destination/command or SQL task; writes via CrmProxy + ExecuteMultipleExtension RequestType.Update; ServerName/OrganizationName read from gen_etlvariable (DTSX:2304); qsrs.SSIS_Logs used by the log provider only (DTSX:14-21); no DTS:Configuration, evidence.configurations = [].",
+      "evidence": "DTSX:4-21, 1389, 2304, 3179, 4642, 6008, 8236-8242, 8313, 9944; main.cs of the four writers",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|finding#2",
+      "hash": "d165ac6c71cd",
+      "verdict": "CONFIRMED",
+      "detail": "All four active writers add ExecuteMultiple faults to ErrorBuffer (Program main.cs:182-193, CA 190-201, AJ 113-124, PAN 86-97); no PATH leaves any writer (--list of all four data flows). CastingError exists only in Program, CA and AJ and is unconnected. Final ExcecuteBulk() in Input0_ProcessInput (Program 203-212, AJ 134-144, PAN 107-117, CA 211+) is outside try/catch; an exception there fails the component and data flow; the chain is all default Success constraints (DTSX:11245-11251), so subsequent tasks do not run. Mid-stream failure inside the per-row try skips myEntities.Clear() (Program 197/200), Count stays 500 and only rises, so Count == 500 never recurs and everything is flushed in one call at end of rowset. The outcome is correctly stated as conditional on row volume and the unsupplied ExecuteMultipleExtension. Minor wording note (not a fact error): in Pre Account Number the input row is not routed; a new row is added to the unconnected Error output (main.cs:75-79) - same effect.",
+      "evidence": "Program main.cs:160-212; AJ main.cs:91-144; PAN main.cs:69-117; CA main.cs (sha 4b281cbaa97c) 128-221; DTSX:11245-11251",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Link Pre Meet The Customer To Customer Program|detailed",
+      "hash": "b8acc95add43",
+      "verdict": "CONFIRMED",
+      "detail": "[1] source SQL matches DTSX:9944 exactly (status in(1,2), producttype = 3, precustomer = 1, customerprogram/automatedjoining/miniautomatedjoining Is Null, ID padded via REPLACE(STR(,9))). [2] lookup SQL DTSX:9872-9874 (Gen_programmain join product, producttypecode = 200004, reference ID padded the same way), CacheType 0 (Full) DTSX:9880, join on gen_customeridnumber DTSX:9898; cross-package labels verified: 0028_Fund Enrolment.dtsx:6920 'as GeneralPension', 0031_PoaAccountUpdateDaily.dtsx:7627 '--clalit', presented only as other-package labels. [3] no 'is not null' on the ID in 9944; STR/REPLACE of NULL is NULL on both sides; full-cache NULL=NULL matching stated as general SSIS behaviour and conditionally. [4]-[11] Match -> Union Input 1 -> script: gen_customerprogram, gen_contactname EntityReferences, status 3 only if gen_calculatescore not null (main.cs:142-152). [13] Set Status To Wrong replaces gen_status in place (DTSX:10002), split keeps gen_status == 8 (9850), Default Output unconnected. [15]-[16] script checks WRONG = 4 (main.cs:34,137); Union Input 2 lacks Gen_programmainId/gen_customername, so only status 3 (score) or an empty Update is sent. [18] no write; record stays status 1/2 and is re-selected. [19] consistent.",
+      "evidence": "DTSX:9850, 9872-9898, 9944, 10002, 10023; main.cs (sha 5eae2600bdb4) 129-213",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Link Pre Meet The Customer To Customer Program|detail",
+      "hash": "104cc030bdee",
+      "verdict": "CONFIRMED",
+      "detail": "[1] matches DTSX:9944 (comments 'New Or InProcess', 'Customer Program'). [2] lookup Full cache, producttypecode = 200004 with cross-package labels only, padded ID, no NULL filter, NULL=NULL full-cache match stated conditionally, TreatDuplicateKeysAsError=false so duplicate choice unknown. [3] DTSX:10002 expression, DTSX:9850 split, WRONG = 4 (main.cs:34,137). [4] ExecuteMultipleExtension Update, batches of 500 (main.cs:162-163, 178-201), attributes gen_customerprogram, gen_contactname, gen_status; ErrorBuffer unconnected. [5] consistent with finding#1.",
+      "evidence": "DTSX:9850, 9872-9898, 9944, 10002; main.cs 129-213",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Link Pre Meet The Customer To Customer Program|open",
+      "hash": "e5ee788f28dc",
+      "verdict": "CONFIRMED",
+      "detail": "[1] genuinely open; STATUS_NO_ACCOUNT = 8 confirmed in CA main.cs:34 and PAN main.cs:29. [2] genuinely open (ExecuteMultipleExtension not supplied). [3] cross-package labels verified at 0028_Fund Enrolment.dtsx:6918-6920 and 0031_PoaAccountUpdateDaily.dtsx:7627; correctly kept as not proven for this package.",
+      "evidence": "CA main.cs:34; PAN main.cs:29; 0028_Fund Enrolment.dtsx:6920; 0031_PoaAccountUpdateDaily.dtsx:7627",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Link Meet The Customer To Customer Account By Automated Joining|title",
+      "hash": "b6ebaa15bb5e",
+      "verdict": "CONFIRMED",
+      "detail": "[2] lookup DTSX:3228-3232: gen_automatedjoining joined to Gen_customeraccount on gen_bankaccountnumber = right(REPLICATE('0',12)+LTRIM(gen_automatedjoining.gen_bankaccountnumberName),12), where gen_joiningstatus = 8 ('--> Finish'); returns account id, gen_contactname, gen_customeridnumber; join key gen_automatedjoiningid (3258). Script writes gen_gemelaccountnumber, gen_contactname, gen_identitynumber (main.cs:77-84). [3] source DTSX:3179 (status 1,2; producttype 1,2,4; precustomer = 1; gemelaccountnumber null; automatedjoining not null). [4]-[6] match DTSX:3154, 3126, main.cs:72-87; Union Input 2 carries gen_calculatescore but no account/contact/ID columns.",
+      "evidence": "DTSX:3126, 3154, 3179, 3228-3258; main.cs (sha 6e6dd4954fa5) 65-144",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Link Meet The Customer To Customer Account By Automated Joining|short",
+      "hash": "feb50876e259",
+      "verdict": "CONFIRMED",
+      "detail": "[1] DTSX:3179 (comment 'Gemel Or Traning Funds'). [2]/[4] lookup requires joiningstatus = 8 and a bank-number match (3228); match writes account, contact, identity number and status 3 when score present (main.cs:77-87). [6]-[10] derived column in place (3154), split == 8 (3126), script tests 4 so 8 is not written: empty Update or status 3. [11] matches the bank-number-only match (no creation relation claimed).",
+      "evidence": "DTSX:3126, 3154, 3179, 3228; main.cs 72-87",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Link Meet The Customer To Customer Account By Automated Joining|detail",
+      "hash": "8a1e0f114b4d",
+      "verdict": "CONFIRMED",
+      "detail": "[1] source DTSX:3179 has no gen_miniautomatedjoining filter. [2] Full cache (CacheType 0, DTSX:3240), join on gen_automatedjoiningid (3258), customer account found only by 12-char padded bank number (3231), TreatDuplicateKeysAsError=false so choice among several accounts unknown. [3] DTSX:3154, 3126; STATUS_WRONG = 4 (main.cs:32,72). [4] main.cs:93-94, 109-132; Error output unconnected. [5] consistent.",
+      "evidence": "DTSX:3126, 3154, 3179, 3228-3258; main.cs 31-32, 65-144",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Link Meet The Customer To Customer Account By Pre Account Number|title",
+      "hash": "21944d005d45",
+      "verdict": "CONFIRMED",
+      "detail": "[2] lookup DTSX:6067-6081: Gen_customeraccount joined to Account on Account.AccountId = ca.Gen_accountname; join keys gen_preaccountnumber -> accountnumber and gen_pregemelaccountnumber -> CAbankaccountnumberNoZeros (DTSX:6108-6121); employer meaning correctly labelled השערה; match always sets status 3 (main.cs:58-65); no-match >180 days written as 8 (main.cs:29,55-56). [3] source DTSX:6008 (status 1,2; preaccountnumber not null; producttype 1,4; gemelaccountnumber/automatedjoining/miniautomatedjoining null). [4] estate type '0149', fundcreationdate >= '2019-01-01'; leading zeros removed on the customer-account side only (the detail claim states the record side is not stripped). [5]-[6] DTSX:6160, 6193, main.cs:55-65.",
+      "evidence": "DTSX:6008, 6067-6121, 6160, 6193; main.cs (sha e49d33debb93) 29-30, 48-117",
+      "wrongUnits": []
+    }
+  ]
+}

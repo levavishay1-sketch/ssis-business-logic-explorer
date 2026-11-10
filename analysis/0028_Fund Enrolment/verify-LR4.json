@@ -1,0 +1,135 @@
+{
+  "verifier": "ssis-verifier",
+  "package": "0028_Fund Enrolment",
+  "scope": "logic-claims re-check round 4",
+  "checkedAt": "2026-11-07T00:00:00Z",
+  "source": "source/DailyProcess/0028_Fund Enrolment.dtsx sha256 87DD97D507243E63D6B13EE4A556CC69891B1B15F2237AE362456304BB9FDA42",
+  "checked": 13,
+  "results": [
+    {
+      "id": "L|finding#2",
+      "hash": "3b18f78d1d09",
+      "verdict": "CONFIRMED",
+      "detail": "Re-derived. The 'No CreateRow' condition of Check If Rejects Null ends with '&& JoiningStatus != 2', and only the 'Create Row' (default) output has a path to Create gen_fundEnrolment (component --list). The source selects 'gen_joiningstatus AS JoiningStatus' unqualified (DTSX:3364) and filters 'aj.gen_joiningstatus = 2' (DTSX:3417). The ownership argument is now written in the accepted form: aj.gen_lastsyncdate (DTSX:3361) and aj.gen_joiningstatus (DTSX:3417) appear qualified in the same query, and the other sources (tr, ac, and productByCourse with only num/gen_automatedjoining/ProductId) would make an unqualified duplicate ambiguous. So JoiningStatus is always 2, and the AND chain is always false. The result sentence is limited to joinings that are fetched and have no Fund Enrolment. The finding ends as an open question, not as a bug. A creation can still fail (catch at main.cs:282-291), but that is runtime-failure detail (plumbing).",
+      "evidence": "DTSX:1463 (Check If Rejects Null); DTSX:3357-3417; DTSX:3612-3638; component --list Package\\Create Fundenrolment",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|finding#3",
+      "hash": "900329651839",
+      "verdict": "CONFIRMED",
+      "detail": "Create gen_fundEnrolment catches SoapException and Exception and routes the row to CastingError (main.cs:282-291). The pension Create Fund Enrolment catches Exception and routes it to CustingError (main.cs:330-334). Neither output has a path. In Update Reject Management With Fund Enrolment, the catch routes to Failure (main.cs:131-135), which goes to 'Derived Column' (DTSX:14623). That component has no input columns, no derived columns and no outgoing path. Re-fetch logic: the automated source has no Fund Enrolment condition (DTSX:3415-3417). Re-selection needs status 2 and the sync-date condition (ownership argued in the accepted form). A retry needs a Lookup no-match, and the Lookup matches any gen_fundenrolment with that gen_automatedjoining (DTSX:3614-3622). So a sibling transfer-request row that succeeded blocks the failed row in later runs. Pension: the link is written only on the Result path (Upate Pension Joining, DTSX:8056), and the source requires pj.gen_fundenrolmentid is null (DTSX:6934). Everything is stated conditionally.",
+      "evidence": "Create gen_fundEnrolment main.cs:282-291 (DTSX:1505); Create Fund Enrolment main.cs:330-334 (DTSX:4758); DTSX:14623; DTSX:3361, 3415-3417, 3612-3638; DTSX:6934, 8056",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|finding#9",
+      "hash": "4738c9a75026",
+      "verdict": "CONFIRMED",
+      "detail": "A case-insensitive grep for 'lastsync' over all 35 supplied DTSX (embedded C# included) finds only 0028 DTSX:3361 (SELECT DATEADD(hh,3,aj.gen_lastsyncdate)) and DTSX:3415-3416 (WHERE), plus column metadata. No write of gen_lastsyncdate exists in this package or any other package. The ownership argument is in the accepted form. In the automated flow, the only check against an existing Fund Enrolment is the full-cache Lookup (DTSX:3612-3638). The source query has no such condition.",
+      "evidence": "DTSX:3357-3417; grep -i lastsync source/DailyProcess/*.dtsx",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Create Fundenrolment|title",
+      "hash": "565cb528a5aa",
+      "verdict": "CONFIRMED",
+      "detail": "short_he: the population matches the WHERE clause (DTSX:3415-3417) plus the Lookup no-match (DTSX:3612-3638). Ownership of gen_joiningstatus and gen_lastsyncdate is argued in the accepted form. The 'no updater found' statement holds (see finding#9). The record is created only when the create succeeds (main.cs:279-291). A LEFT JOIN to gen_transferrequest (DTSX:3407) gives one row per transfer request. Owner: Update Owner sets OwnerIdType = 9 with RejectTeamId (DTSX:4696). 'רשימת הרשומות שנוצרו בריצה': TblFundEnrolments is truncated at the start (Truncate Table TblFundEnrolments DTSX:13741, Constraint 1/8) and filled by Insert To TemporaryTable (DTSX:3578). flow_he[1]-[6] match: notes main.cs:117-129; Lookup; the dead split; SDK Create; SQL owner update; staging insert. Not counted: with a LEFT JOIN, a joining with no transfer request still gives one row.",
+      "evidence": "DTSX:3357-3417, 1463, 1505 (main.cs:130-292), 3575/3578, 3612-3638, 3704, 4693/4696, 13741, 15641, 15647",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Create Fundenrolment|short",
+      "hash": "c25c5ce207d7",
+      "verdict": "CONFIRMED",
+      "detail": "[1]: the source and joins match DTSX:3357-3417, and the ownership argument is in the accepted form. [2]-[6]: the Lookup has CacheType 0 and NoMatchBehavior 1, and only the No Match output is connected. The 'no rejects' split is dead because JoiningStatus is always 2. [7]: the SDK Create field set is in main.cs:134-277. [8]: Update Owner sets OwnerIdType = 9 (DTSX:4696). [9]: the outcome is conditional on success. The ID goes to TblFundEnrolments, and Update FundEnrolment later sets gen_ismailsend = 0 for those IDs (DTSX:13756; main.cs:120-126 @DTSX:13785). The failure is silent (CastingError has no path). The 1:N case is stated.",
+      "evidence": "DTSX:3357-3417, 3612-3638, 1463, 1505, 4696, 3578, 13756, 13785",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Create Fundenrolment|detailed",
+      "hash": "8c844b5d746a",
+      "verdict": "WRONG",
+      "detail": "Most units match. [1] source and joins: DTSX:3357-3417, with the gen_coursepartition argument via 0015_TransferIn DTSX:42644 (cp.gen_automatedjoining) and the aj ownership argument. [3] notes: main.cs:117-129. [4]-[13] Lookup and dead split. [14]-[15] field set: main.cs:140-237. [17] CONVERT(...,103) of DATEADD(hh,3,...) with ParseExact 'dd/MM/yyyy' (main.cs:251-255), Money (259-260). [18]-[26] document type: 263-277, with the constants GEMEL = 1, STUDY_FUND = 2, GEMEL_INVEST = 4, CHILDSAVING = 5. [27]-[29] catch: 282-291. [31] Guid.Parse: main.cs:136. [32] Update Owner: DTSX:4696. [33] staging insert: DTSX:3578. The problem is unit [16]. 'סוג הפעולה נלקח מסוג ההצטרפות' attributes the source of gen_actiontype to the joining. The value is JoiningType = 'gen_joiningtype AS JoiningType', and it is UNQUALIFIED (DTSX:3365) in the same 4-source query (aj, tr, ac, productByCourse). The text gives no ownership argument for this column. The arguments in unit [1] cover only gen_joiningstatus and gen_lastsyncdate. Under the Accepted forms, ownership must be stated as unknown or argued. The argument is available: aj.gen_joiningtype exists qualified in 0015_TransferIn DTSX:68567 ('and aj.gen_joiningtype=1'), the same alias over gen_automatedjoining. Combined with the ambiguity rule, this proves the column is aj's. Note, not counted: the outer ON clause 'gen_automatedjoiningid = productByCourse.gen_automatedjoining' (DTSX:3414) is also unqualified, but the text does not name its owner.",
+      "evidence": "DTSX:3365 (gen_joiningtype AS JoiningType); main.cs:241-242 (gen_actiontype = new OptionSetValue(Row.JoiningType)); 0015_TransferIn DTSX:68567",
+      "wrongUnits": [
+        {
+          "unit": "[16] סוג הפעולה נלקח מסוג ההצטרפות",
+          "problem": "Attributes the unqualified gen_joiningtype (DTSX:3365) to the automated joining without the ownership argument.",
+          "correct": "State it as unknown, or add the argument: gen_joiningtype is aj's, because gen_automatedjoining has the column (aj.gen_joiningtype, 0015_TransferIn DTSX:68567), and if tr/ac also had it the query would fail as ambiguous; per the user the package runs in production.",
+          "evidence": "DTSX:3365; 0015_TransferIn DTSX:68567"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Create Fundenrolment|detail",
+      "hash": "9f57c3f23db2",
+      "verdict": "CONFIRMED",
+      "detail": "[1]: the population, joins, product subquery argument and aj ownership argument match DTSX:3357-3417. The 'no updater' statement matches the lastsync grep. [2]: Lookup on gen_fundenrolment.gen_automatedjoining, full cache (DTSX:3612-3638). [3]: decisions (Lookup skip; dead split; document type 1/2, 4, 5 per constants; gen_enrolmentstatus = 1 only if gen_closedate is not null, main.cs:244-245; SQL comment '1/*בתהליך*/' at DTSX:914 supports 'בתהליך'). [4]: SDK Create (Supported); update Gen_fundenrolmentBase OwnerId/OwnerIdType = 9 on [CRM] (Unsupported); staging insert. [5]: Guid.Parse(RejectTeamId) and ParseExact are inside the try (main.cs:136, 252, 255); routing to CastingError, which has no path. [6]: a grep finds no Create of gen_automatedjoining in any supplied DTSX. 0027_AutomatedJoining updates it (DTSX:1371, 5936; gen_joiningstatus/gen_customeraccountid). 0029_POA 'Create POA Main For Automated Joining' (not in 0029's disabled list), component 'Update Automated Joining' (0029 DTSX:29486), sets gen_testedtocreatepoa = true through SDK Update (0029 DTSX:29686-29691). It is labelled proven:false, with a hypothesis. The db name is a design-time value. The config-override caveat is in the package scopeNote_he (DTSX:16-17).",
+      "evidence": "DTSX:3357-3417, 3612-3638, 1505 main.cs:130-292, 4696, 3578; 0027 DTSX:1371/5936; 0029 DTSX:29486, 29686-29691",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Create Fundenrolment|open",
+      "hash": "3d964be644b6",
+      "verdict": "CONFIRMED",
+      "detail": "[1]: the reject check never holds, and the ownership argument for gen_joiningstatus/gen_lastsyncdate is now in the accepted form. [2]: the meaning of status 2 is left unknown, and the component name is given only as a name. [3]: no supplied package updates gen_lastsyncdate (grep). [4]: RejectTeamId has the default value 'From DB' (DTSX:32-33). It is overwritten by Set Organization Variables from gen_etlvariable (SELECT gen_key, gen_Value FROM gen_etlvariable where gen_scope='global' or gen_scope=PackageName, DTSX:12922-12926; ReadWriteVariables assignment DTSX:13109-13111). Its runtime value is not in the files.",
+      "evidence": "DTSX:32-33, 3357-3417, 12922-12926, 13109-13111",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Create FundEnrolment For Pension|title",
+      "hash": "1b4e38c836bb",
+      "verdict": "CONFIRMED",
+      "detail": "short_he matches the WHERE clause (DTSX:6934-6937): pj.gen_fundenrolmentid is null AND (status 2 or 4 or gen_passedandreject = 1) AND (reason 1-4, gen_rejectreasonsnotes, or an rm row). gen_passedandreject is argued (pj.gen_passedandreject at DTSX:6909). gen_rejectreasonsnotes is correctly stated as having an unknown owner: it appears only unqualified in the supplied files. Owner: referent (type 8) or RejectTeamId (type 9) (main.cs:136-151). The link back to the joining is Upate Pension Joining (DTSX:8056). flow_he[3]: status 17 = constant FUND_ENROLMENT_JOINING_STATUS_AVAR_BAKARA_AND_REJECT (main.cs:36, 140); otherwise status copied when not null. flow_he[4]-[6] match main.cs:166-173, 296-325, 327 and DTSX:8100/8056/7098. One row per joining: the joins go to primary keys, and rm is Row_Num = 1.",
+      "evidence": "DTSX:6872-6937, 4758 main.cs:130-335, 7153, 8056, 8100, 7098",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Create FundEnrolment For Pension|short",
+      "hash": "fd8666e0f1aa",
+      "verdict": "CONFIRMED",
+      "detail": "[1]: the population and the ownership treatment are as in |title. [2]-[6]: main.cs:136-151. [7]: field set main.cs:153-325. [8]: Update Fund Enrolment Owner (Param_0 OwnerId, Param_1 OwnerIdType, Param_2 FundEnrolmentId, DTSX:8100). Upate Pension Joining (Param_0 FundEnrolmentId, Param_1 gen_pensionjoiningid, DTSX:8056). [9]: the outcome is conditional on success. The NULL-read caveat is marked as documented SSIS behaviour. Set gen_note reads the five values inside IsNullOrWhiteSpace without _IsNull and has no try (main.cs:115-131). Constraint 4 is a Success constraint from Pension to Close (DTSX:15643).",
+      "evidence": "DTSX:6934-6937, 7153, 4758 main.cs:130-335, 8056, 8100, 15643",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Create FundEnrolment For Pension|detailed",
+      "hash": "2f253d9ab740",
+      "verdict": "WRONG",
+      "detail": "Units [1]-[16] and [18]-[36] match. [1]: WHERE and ownership treatment. [2]: product subqueries '200003'/'200004', labelled by the aliases and the code comments /*מקיפה*/ /*כללית*/ at main.cs:168/170. [3]: Set gen_note main.cs:115-131, no try, single output. The Success chain (Close, then the disabled TR flow, then Update Reject Management, then Update FundEnrolment) is shown by Constraints 4-7 (DTSX:15643-15646). [4]-[8]: main.cs:136-151. [9]-[15]: 166-173. [16]: field set 153-255, with competitor labelled as hypothesis. [18]: 281-294 with constants 3/4. [19]-[27]: 296-325 with comments No/Yes/אושר/אושר בהחרגה/בתהליך and FOLDER_NUMBER '123456'. [28]-[30]: try 132, catch 330-334; the only unchecked row reads in the try are main.cs:138 and 169/171. [33]-[35]: DTSX:8100, 8056, 7098. Close only sets gen_enrolmentstatus = 3 (Close Fund Enrolment main.cs:121-127), so the link is not undone. The problem is unit [17]. 'מונה ההצטרפויות נלקח מההצטרפות' gives gen_counter the meaning 'counter of joinings'. Nothing in the supplied files proves what gen_counter or pj.gen_count counts. The code has no comment there (main.cs:270-274 has only '//Whole Number'), and a grep finds no SQL or code comment on gen_count/gen_counter in any supplied DTSX. This is a meaning stated as fact without proof.",
+      "evidence": "Create Fund Enrolment main.cs:270-274 (DTSX:4758); DTSX:6908 (pj.gen_count)",
+      "wrongUnits": [
+        {
+          "unit": "[17] מונה ההצטרפויות נלקח מההצטרפות, ואם הוא ריק נקבע 1",
+          "problem": "The meaning 'joinings counter' for gen_counter / pj.gen_count is not shown in any supplied file.",
+          "correct": "gen_counter (Fund Enrolment) = pj.gen_count, or 1 when gen_count is NULL. Its meaning is unknown, or label it השערה.",
+          "evidence": "main.cs:271-274"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Create FundEnrolment For Pension|detail",
+      "hash": "0264d3994a63",
+      "verdict": "CONFIRMED",
+      "detail": "[1]: with nolock; the conditions and AND/OR grouping match DTSX:6934-6937. rm is the first gen_rejectmanagement by createdon (Row_Num = 1), with no statecode filter. gen_passedandreject is argued, and gen_rejectreasonsnotes is stated as having an unknown owner. [2]: no Lookup; de-duplication through pj.gen_fundenrolmentid is null plus the SQL update (DTSX:8056). [3]: main.cs:136-151, 166-173, 287-325. [4]: SDK Create is Supported; the two SQL updates on [CRM] are Unsupported; staging insert. [5]: the failure caveats are conditional and marked as documented SSIS behaviour. [6]: no supplied package creates gen_pensionjoining; this is labelled hypothesis / proven:false.",
+      "evidence": "DTSX:6872-6937, 4758 main.cs:130-335, 8056, 8100, 7098",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Create FundEnrolment For Transfer Request|decisions",
+      "hash": "1bb7c1d1944e",
+      "verdict": "WRONG",
+      "detail": "[1]: DTS:Disabled=True (DTSX:8160). [2]: the condition is quoted correctly (DTSX:10039-10042). The NULL note is correct: if tc is not null and gen_feedbackstatus is NULL, then NOT(UNKNOWN) = UNKNOWN and the row is excluded. [3]: the CASE and top 1 without ORDER BY match (DTSX:10020-10026). The referent isnull(agencie.gen_operationpersonname, agents.gen_operationpersonname) (DTSX:9998) is written to gen_referentname as a systemuser when not null (main.cs:268-270). Broker/agency/agent/supervisor come from main.cs:251-266. [4]: main.cs:145/183 matches. The problem is row [2]'s meaning_he, 'בקשת העברה בין מסלולים שנכשלה', which is stated as fact. 'שנכשלה' (gen_tanferinstatus = 2 means failed) has no proof in any supplied file. It comes only from the component name 'Get Failed Transfer Request', and names are not proof. All gen_tanferinstatus uses were grepped: comments exist only for 8 ('הסתיים' / 'finished', 0005 DTSX:70707, 0029 DTSX:40250), not for 2. 'בין מסלולים' for Gen_transferType = 5 IS provable from an SQL comment in another supplied package (0005_Customer Account DTSX:70706 'tr.Gen_transferType = 5--בין מסלולים'), but the text does not attribute it. Note, not counted separately: row [4] meaning 'לקוח פרטי / עסקי' is provable from the SQL comments in the same query ('--מיקוד לקוח פרטי', '--ת.ד. לקוח עסקי', DTSX:9959, 9966), but it is not attributed either.",
+      "evidence": "DTSX:9954 (Get Failed Transfer Request), 10039-10042; 0005_Customer Account DTSX:70706-70707; 0029_POA DTSX:40250",
+      "wrongUnits": [
+        {
+          "unit": "[2] meaning_he: בקשת העברה בין מסלולים שנכשלה",
+          "problem": "'שנכשלה' (status 2 = failed) is taken from the component name only, and 'בין מסלולים' is not attributed.",
+          "correct": "Mark status 2 as unknown or השערה (from the component name 'Get Failed Transfer Request'). Attribute 'בין מסלולים' to the SQL comment in 0005_Customer Account DTSX:70706.",
+          "evidence": "DTSX:10039; 0005 DTSX:70706"
+        }
+      ]
+    }
+  ]
+}

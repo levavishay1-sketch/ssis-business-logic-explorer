@@ -1,0 +1,126 @@
+{
+  "verifier": "ssis-verifier",
+  "package": "0027_AutomatedJoining",
+  "scope": "logic-claims re-check round 2",
+  "checkedAt": "2026-11-07T18:00:00.000Z",
+  "checked": 12,
+  "results": [
+    {
+      "id": "L|summary",
+      "hash": "ae0124d7dacb",
+      "verdict": "WRONG",
+      "detail": "Unit 1 says as fact that a matched request 'נסגרת' (is closed): 'בקשה שמספר חשבון הבנק שלה תואם לחשבון לקוח ב-CRM נסגרת: הסטטוס הופך ל-8'. The meaning of status 8 is not proven. Set columns only sets gen_joiningstatus = 8 (DTSX:1027), and 'closing' is suggested only by the component names Close Joining processes / Update to close joining. The component texts now label it 'לפי שמות הרכיבים: סגירה – השערה', so the summary contradicts them. Also, 'ונשלחה לבנק' interprets the column gen_sendtobankdate by its name only. No file in scope proves that the request was actually sent to a bank, and the project labels name-derived field meanings as השערה (e.g. gen_modifiedbybank in 0018). The rest is correct. The threshold is the 3rd day counting back from yesterday that is not a CalendarRule 'Friday'/'Saturday'/'Holiday' day (ScriptMain.cs:107-130, DTSX:4090), and the query uses datediff(day, ?, gen_sendtobankdate) <= 0 (DTSX:5543-5544). Unit 2 (scopeNote) is correct: the only components are 3 OLE DB Source, 2 Lookup, 3 Derived Column and 6 Script, with no SQL DML. ServerName and OrganizationName come from gen_etlvariable via Set Variables. The file configuration is at DTSX:17.",
+      "evidence": "DTSX:1027 (Expression 8), 984, 5543-5544, 4090, 5222-5260, 17, 4108-4110",
+      "wrongUnits": [
+        {
+          "unit": 1,
+          "problem": "Status 8 is called 'closed' as fact. 'Sent to the bank' is a meaning derived from the column name gen_sendtobankdate and is not labelled.",
+          "correct": "בקשה שמספר חשבון הבנק המנורמל שלה תואם לחשבון לקוח ב-CRM עוברת לסטטוס 8 (לפי שמות הרכיבים: סגירה – השערה) ומקושרת לחשבון הלקוח. בקשה שנשארה בסטטוס 7 ושתאריך gen_sendtobankdate שלה (לפי שם השדה: תאריך שליחה לבנק – השערה) אינו מאוחר מתאריך הסף (שלושה ימי עבודה אחורה) מסומנת בסטטוס 12 ...",
+          "evidence": "DTSX:1027, 5543-5544"
+        }
+      ]
+    },
+    {
+      "id": "L|finding#1",
+      "hash": "6bb6bca5e5f6",
+      "verdict": "CONFIRMED",
+      "detail": "NoMatchBehavior 1 (DTSX:927), and the No Match output has no path. The 5 paths at DTSX:1876-1880 are Source->Lookup, Match->Set columns, Set columns->Update, Update Error->Set Warning, and Set Warning->ETL Warning. The later query is gen_joiningstatus = 7 and gen_sendtobankdate is not null and datediff(day, ?, gen_sendtobankdate) <= 0, with ? = User::LastThreeWorkingDays (DTSX:5543-5549). 'רק אם' is stated correctly as a necessary condition. 'שלב הסגירה' names the data flow 'Close Joining processes' and does not give status 8 a meaning.",
+      "evidence": "DTSX:927, 1876-1880, 5543-5549",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|finding#2",
+      "hash": "30107487c724",
+      "verdict": "CONFIRMED",
+      "detail": "Update Joinings catches SoapException/Exception and calls DirectRowToError (main.cs:124-133). Only 2 paths exist in that data flow, Source->Set Status and Set Status->Update Joinings (DTSX:6498-6499), so the Error output is unconnected and failed rows are dropped without a warning. In Close Joining processes, the Error output goes to Set Warning columns 1 2 1 and then ETL Warning 1 2 1 (DTSX:1876-1880). 'שלב הסגירה' is used as the step name only.",
+      "evidence": "DTSX:6498-6499, 1876-1880, Update Joinings main.cs:114-134",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|finding#3",
+      "hash": "e06af9491a4e",
+      "verdict": "CONFIRMED",
+      "detail": "ScriptMain.cs:94-104 (DTSX:5224-5234): the catch sets Failure and calls Dts.Log, then line 104 unconditionally sets Success. The design value of User::LastThreeWorkingDays is '10/2/2017 5:29:05 PM' (DTSX:42-43). EnableConfig=True (DTSX:1), and the file configuration C:\\Generix\\SSISConfigFile.dtsConfig is at DTSX:17 (not supplied). The failure case is correctly stated as conditional/unknown.",
+      "evidence": "DTSX:5224-5234, 42-43, 1, 17",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|finding#4",
+      "hash": "c081aaa08278",
+      "verdict": "CONFIRMED",
+      "detail": "CacheType 0 = full (DTSX:926) and TreatDuplicateKeysAsError false (DTSX:934). The reference query has no ORDER BY, so which duplicate is used is not determined. The key is right('0000000000000' + x, 12) on both sides (DTSX:914-918, 980-984).",
+      "evidence": "DTSX:914-918, 926, 934, 980-984",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|finding#5",
+      "hash": "4e244bfab5ee",
+      "verdict": "WRONG",
+      "detail": "The order is correct: Close Joining processes -> Get NonWorkingDays -> Update LastThreeWorkingDays Variable -> Update SuspicionAsEmitted Joinings, all Success constraints. Status 12 therefore applies only to requests still in status 7 when the marking query runs. However, the text calls the 7->8 move 'הסגירה' and says 12 is applied to 'בקשות שלא נסגרו'. Both state as fact that status 8 means closed. That is only a hypothesis from component names, and it contradicts the component texts ('לפי שמות הרכיבים: סגירה – השערה').",
+      "evidence": "precedence constraints Close Joining processes->Get NonWorkingDays->Update LastThreeWorkingDays Variable->Update SuspicionAsEmitted Joinings (DTSX:6506-6511); DTSX:1027 (gen_joiningstatus = 8)",
+      "wrongUnits": [
+        {
+          "unit": 1,
+          "problem": "Status 8 is called 'closing' / 'closed' as fact.",
+          "correct": "סדר השלבים חשוב. המעבר 7→8 (שלב 'Close Joining processes'; לפי שמות הרכיבים: סגירה – השערה) רץ לפני הסימון 7→12, ולכן בסטטוס 12 מסומנות רק בקשות שעדיין בסטטוס 7 כשהסימון רץ (לא עברו ל-8, כולל כאלה שעדכונן נכשל).",
+          "evidence": "DTSX:6506-6511, 1027"
+        }
+      ]
+    },
+    {
+      "id": "L|finding#6",
+      "hash": "40069d5ddbb7",
+      "verdict": "CONFIRMED",
+      "detail": "DTS:Configuration ConfigurationType=1 (configuration file), C:\\Generix\\SSISConfigFile.dtsConfig (DTSX:17), EnableConfig=True (DTSX:1). The file is not supplied, so external_unknown is correct.",
+      "evidence": "DTSX:1, 17",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Close Joining processes|short",
+      "hash": "d4107da4f25b",
+      "verdict": "CONFIRMED",
+      "detail": "[1] where gen_joiningstatus = 7 (DTSX:984). [2] Lookup on the normalized key (DTSX:914-918, 980-984). [4] gen_joiningstatus = 8 (DTSX:1027) and EntityReference gen_customeraccount (main.cs:72-73). [5]-[6] No Match is unconnected. [7] 'מנורמל ל-12 תווים' is correct (right(...,12)), and status 8 = closing is labelled השערה. There is no date or causality check. The update-failure branch is not in this simplified view; it is described in detailed [8]-[12].",
+      "evidence": "DTSX:914-918, 927, 980-984, 1027, 1876-1880, main.cs:65-90",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Close Joining processes|detailed",
+      "hash": "20d21750a2e9",
+      "verdict": "CONFIRMED",
+      "detail": "[1] There is no filter besides status 7 (DTSX:980-984). [2]-[3] right('0000000000000' + x, 12) on both sides, with reference where Gen_bankaccountnumber is not null and CacheType 0. The Hebrew 'מנורמל ל-12 ספרות עם אפסים מובילים' simplifies this: right(...,12) also cuts longer values to their last 12 characters. The exact expression is quoted in the tech text, so this is accepted. [4] NoMatchBehavior 1 (DTSX:927). [6]-[7] Set columns 8 (DTSX:1027) and Update via SDK (main.cs:69-75). [8]-[12] catch -> DirectRowToError -> Set Warning columns 1 2 1 -> ETL Warning 1 2 1 (DTSX:1876-1880). [14] No Match has no path. [15] status 8 is labelled השערה. The rest go on to the later Success-chained steps (DTSX:6506-6511).",
+      "evidence": "DTSX:914-934, 980-984, 1027, 1876-1880, main.cs:65-90, DTSX:6506-6511",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Close Joining processes|detail",
+      "hash": "33324dd7b9ac",
+      "verdict": "CONFIRMED",
+      "detail": "[1] The design-time connection is Psql/ALTSHULER_MSCRM (DTSX:4-6), and the configuration override is external_unknown (DTSX:1, 17). [2] Normalized 12-character key, full cache, one match among duplicates (TreatDuplicateKeysAsError false, DTSX:934). [3] No Match is unconnected, and the failure goes to Error -> ETL warning (DTSX:1876-1880). [4] gen_joiningstatus = 8 and gen_customeraccountid = EntityReference via CrmProxy.GetCrmService().Update (main.cs:69-75). [5] No date check, and no meaning is asserted for status 8.",
+      "evidence": "DTSX:1, 4-6, 17, 914-934, 980-984, 1027, 1876-1880, main.cs:65-90",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Close Joining processes|decisions",
+      "hash": "4fd9f711a29f",
+      "verdict": "CONFIRMED",
+      "detail": "[1] where gen_joiningstatus = 7 (DTSX:984), with the meaning stated as unproven. [2] The condition is quoted exactly from both SQL texts (DTSX:914-918, 980-984), NoMatchBehavior 1 (DTSX:927), and No Match has no path. The outcome 'match -> 8 + linked' depends on the update succeeding; the failure case is covered in detail [3] and detailed [8]-[12].",
+      "evidence": "DTSX:914-918, 927, 980-984, 1876-1880",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Update SuspicionAsEmitted Joinings|detail",
+      "hash": "3a8d6dde883f",
+      "verdict": "WRONG",
+      "detail": "Units 1-4 match. [1] The query is gen_joiningstatus = 7 and gen_sendtobankdate is not null and datediff(day, ?, gen_sendtobankdate) <= 0, with ? = User::LastThreeWorkingDays (DTSX:5543-5549). [2] entity.Id = Row.genautomatedjoiningId (main.cs:120). [3] catch -> DirectRowToError, and the Error output is unconnected (only paths DTSX:6498-6499). [4] Set Status As SuspicionAsEmitted = 12 (DTSX:5584) -> OptionSetValue on gen_joiningstatus via SDK Update (main.cs:118-122). Unit 5 says as fact that the requests 'נשלחו לבנק עד תאריך הסף'. The only evidence is the column name gen_sendtobankdate. No supplied file shows what sets this field or that a send to the bank happened. Under the project rule, a name-derived field meaning must be labelled השערה, as was done for gen_modifiedbybank and gen_ftcurrentyear in 0018. The SuspicionAsEmitted part is correctly labelled.",
+      "evidence": "DTSX:5543-5549, 5584, 6498-6499, Update Joinings main.cs:114-134",
+      "wrongUnits": [
+        {
+          "unit": 5,
+          "problem": "'Sent to the bank' is inferred from the column name gen_sendtobankdate and stated as fact.",
+          "correct": "תוצאה עסקית: סימון בסטטוס 12 של בקשות שנשארו בסטטוס 7 ושתאריך gen_sendtobankdate שלהן (לפי שם השדה: תאריך שליחה לבנק – השערה) אינו ריק ואינו מאוחר מתאריך הסף. ...",
+          "evidence": "DTSX:5543-5544"
+        }
+      ]
+    }
+  ]
+}

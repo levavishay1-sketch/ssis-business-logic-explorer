@@ -1,0 +1,477 @@
+# 0031_PoaAccountUpdateDaily.dtsx · 1D9C0A0A0D405ED3B7114736358E142BB091823AC3A452112B2187D69D554475
+
+## Connection managers
+- [CRM] OLEDB Data Source=psql;Initial Catalog=ALTSHULER_MSCRM;Integrated Security=SSPI;  
+- [Error POA File] FLATFILE From DBFrom DB EXPR ConnectionString=@[User::ErrorStatusYpuieKoahPath] +  @[User::ErrorStatusYpuieKoahFileName] FLAT Delimited cp1255 cols=5
+- [Kingsway Connection] DynamicsCRM  EXPR ServerUrl=@[User::ConnStringKingsWay] 
+- [POA File] FLATFILE From DBFrom DB EXPR ConnectionString=@[User::StatusYpuieKoahPath] +  @[User::StatusYpuieKoahFileName] FLAT Delimited cp1255 cols=15
+- [SQL.GENERIX_STAGING] OLEDB Data Source=psql;Initial Catalog=GENERIX_STAGING;Integrated Security=SSPI;  
+- [SRS.SSIS_Logs] OLEDB Data Source=psrs;Initial Catalog=SSIS_Logs;Integrated Security=SSPI;  
+
+## Executables (disabled marked !)
+-   Create ETL Process Record | Microsoft.ScriptTask  
+-   Create Power Of Attorney | Microsoft.Pipeline  
+-   Create Power Of Attorney - Pension | Microsoft.Pipeline  
+-   End ETL Process Record | Microsoft.Pipeline  
+-   Get Base Fields Values | Microsoft.Pipeline  
+-   Get Organization Variables | Microsoft.Pipeline  
+-   Get Valid Optionsets Values | Microsoft.Pipeline  
+-   Handle Active Status | Microsoft.Pipeline  
+-   Handle Wait Status | Microsoft.Pipeline  
+-   Send Poa Emails | Microsoft.Pipeline  
+-   Set Destinations Paths | Microsoft.ScriptTask  
+-   Set Queue Id Variable | Microsoft.Pipeline  
+-   Update Power Of Attorney Main | Microsoft.Pipeline  
+-   Write To ETLProcessCounter - Wait Status | Microsoft.ScriptTask  
+-   Write To ETLProcessCounter 2 | Microsoft.ScriptTask  
+-   Write To ETLProcessCounter 3 | Microsoft.ScriptTask  
+-   Write To ETLProcessCounter 4 | Microsoft.ScriptTask  
+-   Write To ETLProcessCounter 5 | Microsoft.ScriptTask  
+-   Write To ETLProcessCounter End | Microsoft.ScriptTask  
+
+## Precedence
+- Get Organization Variables -> Create ETL Process Record | Success Constraint   
+- Create ETL Process Record -> Set Destinations Paths | Success Constraint   
+- Write To ETLProcessCounter End -> End ETL Process Record | Success Constraint   
+- Handle Active Status -> Write To ETLProcessCounter 2 | Success Constraint   
+- Get Valid Optionsets Values -> Set Queue Id Variable | Success Constraint   
+- Write To ETLProcessCounter 5 -> Update Power Of Attorney Main | Success Constraint   
+- Update Power Of Attorney Main -> Write To ETLProcessCounter 3 | Success Constraint   
+- Handle Wait Status -> Write To ETLProcessCounter - Wait Status | Success Constraint   
+- Get Base Fields Values -> Handle Wait Status | Success Constraint   
+- Set Destinations Paths -> Get Valid Optionsets Values | Success Constraint   
+- Set Queue Id Variable -> Get Base Fields Values | Success Constraint   
+- Write To ETLProcessCounter - Wait Status -> Handle Active Status | Success Constraint   
+- Create Power Of Attorney - Pension -> Write To ETLProcessCounter End | Success Constraint   
+- Write To ETLProcessCounter 2 -> Send Poa Emails | Success Constraint   
+- Send Poa Emails -> Write To ETLProcessCounter 5 | Success Constraint   
+- Write To ETLProcessCounter 3 -> Create Power Of Attorney | Success Constraint   
+- Create Power Of Attorney -> Write To ETLProcessCounter 4 | Success Constraint   
+- Write To ETLProcessCounter 4 -> Create Power Of Attorney - Pension | Success Constraint   
+
+## DataFlow Create Power Of Attorney
+  - Add Error Description | DerivedColumn  | conn   | in 0 out 1
+  - Add Error Description 2 | DerivedColumn  | conn   | in 0 out 1
+  - Check If POA Account Agent Exist | Lookup  | conn [CRM]  | in 1 out 0
+  - Create ETL Warning | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 2 out 0
+  - Create POA Account - Agent | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 22 out 1
+  - Get Customer Accounts | OLEDBSource  | conn [CRM]  | in 0 out 23
+  - Move Annotation To Customer Account | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 22 out 1
+  - Remove Duplicates | Sort  | conn   | in 22 out 22
+  - Union All | UnionAll  | conn   | in 4 out 2
+     path Add Error Description.Outputs[Derived Column Output] => Union All.Inputs[Union All Input 1]
+     path Add Error Description 2.Outputs[Derived Column Output] => Union All.Inputs[Union All Input 2]
+     path Create POA Account - Agent.Outputs[Error] => Add Error Description 2.Inputs[Derived Column Input]
+     path Move Annotation To Customer Account.Outputs[Error] => Add Error Description.Inputs[Derived Column Input]
+     path Check If POA Account Agent Exist.Outputs[Lookup No Match Output] => Move Annotation To Customer Account.Inputs[Input 0]
+     path Get Customer Accounts.Outputs[OLE DB Source Output] => Check If POA Account Agent Exist.Inputs[Lookup Input]
+     path Move Annotation To Customer Account.Outputs[Output 0] => Remove Duplicates.Inputs[Sort Input]
+     path Remove Duplicates.Outputs[Sort Output] => Create POA Account - Agent.Inputs[Input 0]
+     path Union All.Outputs[Union All Output 1] => Create ETL Warning.Inputs[Input 0]
+
+## DataFlow Create Power Of Attorney - Pension
+  - Add Error Description | DerivedColumn  | conn   | in 0 out 1
+  - Add Error Description 2 | DerivedColumn  | conn   | in 0 out 1
+  - Check If POA Account Agent | Lookup  | conn [CRM]  | in 1 out 0
+  - Create ETL Warning | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 2 out 0
+  - Create POA Account - Agent | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 21 out 1
+  - Get Policies | OLEDBSource  | conn [CRM]  | in 0 out 22
+  - Move Annotation To Policies | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 21 out 1
+  - Remove Duplicates | Sort  | conn   | in 21 out 21
+  - Union All | UnionAll  | conn   | in 4 out 2
+     path Add Error Description 2.Outputs[Derived Column Output] => Union All.Inputs[Union All Input 1]
+     path Add Error Description.Outputs[Derived Column Output] => Union All.Inputs[Union All Input 2]
+     path Create POA Account - Agent.Outputs[Error] => Add Error Description 2.Inputs[Derived Column Input]
+     path Move Annotation To Policies.Outputs[Error] => Add Error Description.Inputs[Derived Column Input]
+     path Check If POA Account Agent.Outputs[Lookup No Match Output] => Move Annotation To Policies.Inputs[Input 0]
+     path Get Policies.Outputs[OLE DB Source Output] => Check If POA Account Agent.Inputs[Lookup Input]
+     path Move Annotation To Policies.Outputs[Output 0] => Remove Duplicates.Inputs[Sort Input]
+     path Remove Duplicates.Outputs[Sort Output] => Create POA Account - Agent.Inputs[Input 0]
+     path Union All.Outputs[Union All Output 1] => Create ETL Warning.Inputs[Input 0]
+
+## DataFlow End ETL Process Record
+  - ETL Record Finish | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 2 out 0
+  - Get All ETLProcessID | Lookup  | conn [CRM]  | in 1 out 1
+  - Get ETLProcessID | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 0 out 1
+     path Get All ETLProcessID.Outputs[Lookup Match Output] => ETL Record Finish.Inputs[Input 0]
+     path Get ETLProcessID.Outputs[Output 0] => Get All ETLProcessID.Inputs[Lookup Input]
+
+## DataFlow Get Base Fields Values
+  - Get Any Temp Row | OLEDBSource  | conn [CRM]  | in 0 out 1
+  - Get Organization Id | Lookup  | conn [CRM]  | in 1 out 1
+  - Get System User Id | Lookup  | conn [CRM]  | in 1 out 1
+  - Set System User And Organization Id | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 2 out 0
+  - System Names | DerivedColumn  | conn   | in 0 out 2
+     path System Names.Outputs[Derived Column Output] => Get System User Id.Inputs[Lookup Input]
+     path Get System User Id.Outputs[Lookup Match Output] => Get Organization Id.Inputs[Lookup Input]
+     path Get Organization Id.Outputs[Lookup Match Output] => Set System User And Organization Id.Inputs[Input 0]
+     path Get Any Temp Row.Outputs[OLE DB Source Output] => System Names.Inputs[Derived Column Input]
+
+## DataFlow Get Organization Variables
+  - Get Organization Variables | OLEDBSource  | conn [CRM]  | in 0 out 2
+  - Set Variables | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 2 out 0
+     path Get Organization Variables.Outputs[OLE DB Source Output] => Set Variables.Inputs[Input 0]
+
+## DataFlow Get Valid Optionsets Values
+  - Build Valid Values Dictionary | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 2 out 0
+  - Get Valid Optionsets Values | OLEDBSource  | conn [CRM]  | in 0 out 2
+     path Get Valid Optionsets Values.Outputs[OLE DB Source Output] => Build Valid Values Dictionary.Inputs[Input 0]
+
+## DataFlow Handle Active Status
+  - Check Format | ConditionalSplit  | conn   | in 1 out 0
+  - Count - Camcel In Crm | RowCount  | conn   | in 0 out 0
+  - Count Error Rows | RowCount  | conn   | in 0 out 0
+  - Count Pipe Rows | RowCount  | conn   | in 0 out 0
+  - Email - Cancel Poa To Perform Actions | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 16 out 1
+  - Email - Cancel Poa With Commission Appointment | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 15 out 1
+  - Email Format3 - Error | DerivedColumn  | conn   | in 0 out 1
+  - Email Format8 - Error | DerivedColumn  | conn   | in 0 out 1
+  - Etl Warning | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 2 out 0
+  - Has Appointment Of Agent | DerivedColumn  | conn   | in 0 out 1
+  - Is emailDetailsJson Contains Data | ConditionalSplit  | conn   | in 1 out 0
+  - Is emailDetailsJson Contains Data 1 | ConditionalSplit  | conn   | in 1 out 0
+  - Is Need To Send Cancellation Mail | ConditionalSplit  | conn   | in 1 out 0
+  - Multicast | Multicast  | conn   | in 0 out 0
+  - Multicast 1 | Multicast  | conn   | in 0 out 0
+  - No Appointment Of Agent | DerivedColumn  | conn   | in 0 out 1
+  - OLE DB Source | OLEDBSource  | conn [CRM]  | in 0 out 31
+  - Set Data For Cancel Poa Emails | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 20 out 4
+  - Set Task Name Variable | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 0 out 0
+  - Sort By PoaId | Sort  | conn   | in 24 out 24
+  - Union All | UnionAll  | conn   | in 64 out 32
+  - Union All Data | UnionAll  | conn   | in 49 out 24
+  - Union Error | UnionAll  | conn   | in 4 out 2
+  - Update gen_powerofattorney CANCELED And Status Transfer To Bank | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 3 out 3
+  - Update Json To PowerOfAttorneySendEmails | OLEDBCommand  | conn [SQL.GENERIX_STAGING]  | in 2 out 0
+     path Is emailDetailsJson Contains Data.Outputs[Contains Data] => Update Json To PowerOfAttorneySendEmails.Inputs[OLE DB Command Input]
+     path Set Data For Cancel Poa Emails.Outputs[CustomOutput] => Is emailDetailsJson Contains Data.Inputs[Conditional Split Input]
+     path No Appointment Of Agent.Outputs[Derived Column Output] => Union All.Inputs[Union All Input 2]
+     path Has Appointment Of Agent.Outputs[Derived Column Output] => Union All.Inputs[Union All Input 1]
+     path Email Format3 - Error.Outputs[Derived Column Output] => Union Error.Inputs[Union All Input 4]
+     path Email Format8 - Error.Outputs[Derived Column Output] => Union Error.Inputs[Union All Input 1]
+     path Check Format.Outputs[EmailFormatFalse] => Email - Cancel Poa To Perform Actions.Inputs[Input 0]
+     path Check Format.Outputs[EmailFormatTrue] => Email - Cancel Poa With Commission Appointment.Inputs[Input 0]
+     path Email - Cancel Poa With Commission Appointment.Outputs[Error] => Email Format3 - Error.Inputs[Derived Column Input]
+     path Email - Cancel Poa To Perform Actions.Outputs[Error] => Email Format8 - Error.Inputs[Derived Column Input]
+     path Multicast.Outputs[Multicast Output 1] => Update gen_powerofattorney CANCELED And Status Transfer To Bank.Inputs[Input 0]
+     path Multicast.Outputs[Multicast Output 2] => Count - Camcel In Crm.Inputs[Row Count Input 1]
+     path Multicast 1.Outputs[Multicast Output 2] => Count Pipe Rows.Inputs[Row Count Input 1]
+     path Multicast 1.Outputs[Multicast Output 3] => Set Task Name Variable.Inputs[Input 0]
+     path Is Need To Send Cancellation Mail.Outputs[NeedToSendCancellationMail] => Check Format.Inputs[Conditional Split Input]
+     path Is emailDetailsJson Contains Data 1.Outputs[No Data] => Multicast.Inputs[Multicast Input 1]
+     path Is Need To Send Cancellation Mail.Outputs[NoMail] => Union All Data.Inputs[Union All Input 3]
+     path Update Json To PowerOfAttorneySendEmails.Outputs[OLE DB Command Output] => Union All Data.Inputs[Union All Input 1]
+     path OLE DB Source.Outputs[OLE DB Source Output] => Multicast 1.Inputs[Multicast Input 1]
+     path Etl Warning.Outputs[Output 0] => Count Error Rows.Inputs[Row Count Input 1]
+     path Set Task Name Variable.Outputs[Output 0] => Is Need To Send Cancellation Mail.Inputs[Conditional Split Input]
+     path Email - Cancel Poa With Commission Appointment.Outputs[Output 0] => Has Appointment Of Agent.Inputs[Derived Column Input]
+     path Set Data For Cancel Poa Emails.Outputs[Output 0] => Union All Data.Inputs[Union All Input 2]
+     path Email - Cancel Poa To Perform Actions.Outputs[Output 0] => No Appointment Of Agent.Inputs[Derived Column Input]
+     path Sort By PoaId.Outputs[Sort Output] => Is emailDetailsJson Contains Data 1.Inputs[Conditional Split Input]
+     path Union All Data.Outputs[Union All Output 1] => Sort By PoaId.Inputs[Sort Input]
+     path Union Error.Outputs[Union All Output 1] => Etl Warning.Inputs[Input 0]
+     path Union All.Outputs[Union All Output 1] => Set Data For Cancel Poa Emails.Inputs[Input 0]
+
+## DataFlow Handle Wait Status
+  - AppendixType | ConditionalSplit  | conn   | in 1 out 0
+  - Check Format | ConditionalSplit  | conn   | in 1 out 0
+  - Count - Activate In Crm | RowCount  | conn   | in 0 out 0
+  - Count Error Rows | RowCount  | conn   | in 0 out 0
+  - Count Pipe Rows | RowCount  | conn   | in 0 out 0
+  - Email - Start Date Poa | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 15 out 1
+  - Email - Start Date Poa With Commission Appointment | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 13 out 1
+  - EmailFormat1 - Error | DerivedColumn  | conn   | in 0 out 1
+  - EmailFormat2 - Error | DerivedColumn  | conn   | in 0 out 1
+  - Etl Warning | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 2 out 0
+  - Has Appointment Of Agent | DerivedColumn  | conn   | in 0 out 1
+  - Is emailDetailsJson Contains Data | ConditionalSplit  | conn   | in 1 out 0
+  - Is emailDetailsJson Contains Data 1 | ConditionalSplit  | conn   | in 1 out 0
+  - Is Renewal | ConditionalSplit  | conn   | in 2 out 0
+  - Lookup Match PowerOfAttorney By CustomerAccount Or CustomerProgram | Lookup  | conn [CRM]  | in 1 out 3
+  - Multicast | Multicast  | conn   | in 0 out 0
+  - Multicast 1 | Multicast  | conn   | in 0 out 0
+  - No Appointment Of Agent | DerivedColumn  | conn   | in 0 out 1
+  - OLE DB Source | OLEDBSource  | conn [CRM]  | in 0 out 27
+  - Set Data For Start Date Poa Emails | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 17 out 3
+  - Sort By PoaId | Sort  | conn   | in 30 out 30
+  - Union All Data To Update Status | UnionAll  | conn   | in 113 out 30
+  - Union All To Emails | UnionAll  | conn   | in 62 out 31
+  - UnionErrors | UnionAll  | conn   | in 4 out 2
+  - Update gen_powerofattorney ACTIVE | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 2 out 3
+  - Update Json To PowerOfAttorneySendEmails | OLEDBCommand  | conn [SQL.GENERIX_STAGING]  | in 2 out 0
+  - Update NeedToSendMailBit | OLEDBCommand  | conn [CRM]  | in 2 out 0
+     path AppendixType.Outputs[AppendixTypeNeedToSendMail] => Check Format.Inputs[Conditional Split Input]
+     path AppendixType.Outputs[AppendixTypeNoMail] => Union All Data To Update Status.Inputs[Union All Input 6]
+     path Is emailDetailsJson Contains Data.Outputs[Contains Data] => Update Json To PowerOfAttorneySendEmails.Inputs[OLE DB Command Input]
+     path Set Data For Start Date Poa Emails.Outputs[Custom Output] => Is emailDetailsJson Contains Data.Inputs[Conditional Split Input]
+     path EmailFormat2 - Error.Outputs[Derived Column Output] => UnionErrors.Inputs[Union All Input 3]
+     path EmailFormat1 - Error.Outputs[Derived Column Output] => UnionErrors.Inputs[Union All Input 1]
+     path No Appointment Of Agent.Outputs[Derived Column Output] => Union All To Emails.Inputs[Union All Input 1]
+     path Has Appointment Of Agent.Outputs[Derived Column Output] => Union All To Emails.Inputs[Union All Input 2]
+     path Check Format.Outputs[EmailFormat 1] => Email - Start Date Poa.Inputs[Input 0]
+     path Check Format.Outputs[EmailFormat 2] => Email - Start Date Poa With Commission Appointment.Inputs[Input 0]
+     path Email - Start Date Poa With Commission Appointment.Outputs[Error] => EmailFormat2 - Error.Inputs[Derived Column Input]
+     path Email - Start Date Poa.Outputs[Error] => EmailFormat1 - Error.Inputs[Derived Column Input]
+     path Lookup Match PowerOfAttorney By CustomerAccount Or CustomerProgram.Outputs[Lookup Match Output] => Is Renewal.Inputs[Conditional Split Input]
+     path Lookup Match PowerOfAttorney By CustomerAccount Or CustomerProgram.Outputs[Lookup No Match Output] => Union All Data To Update Status.Inputs[Union All Input 3]
+     path Multicast 1.Outputs[Multicast Output 1] => Lookup Match PowerOfAttorney By CustomerAccount Or CustomerProgram.Inputs[Lookup Input]
+     path Multicast.Outputs[Multicast Output 2] => Count - Activate In Crm.Inputs[Row Count Input 1]
+     path Multicast 1.Outputs[Multicast Output 2] => Count Pipe Rows.Inputs[Row Count Input 1]
+     path Multicast.Outputs[Multicast Output 3] => Update gen_powerofattorney ACTIVE.Inputs[Input 0]
+     path Is emailDetailsJson Contains Data 1.Outputs[No Data] => Multicast.Inputs[Multicast Input 1]
+     path Is Renewal.Outputs[Not Renewal] => Update NeedToSendMailBit.Inputs[OLE DB Command Input]
+     path Update Json To PowerOfAttorneySendEmails.Outputs[OLE DB Command Output] => Union All Data To Update Status.Inputs[Union All Input 2]
+     path Update NeedToSendMailBit.Outputs[OLE DB Command Output] => AppendixType.Inputs[Conditional Split Input]
+     path OLE DB Source.Outputs[OLE DB Source Output] => Multicast 1.Inputs[Multicast Input 1]
+     path Email - Start Date Poa With Commission Appointment.Outputs[Output 0] => Has Appointment Of Agent.Inputs[Derived Column Input]
+     path Etl Warning.Outputs[Output 0] => Count Error Rows.Inputs[Row Count Input 1]
+     path Email - Start Date Poa.Outputs[Output 0] => No Appointment Of Agent.Inputs[Derived Column Input]
+     path Set Data For Start Date Poa Emails.Outputs[Output 0] => Union All Data To Update Status.Inputs[Union All Input 4]
+     path Is Renewal.Outputs[Renewal] => Union All Data To Update Status.Inputs[Union All Input 1]
+     path Sort By PoaId.Outputs[Sort Output] => Is emailDetailsJson Contains Data 1.Inputs[Conditional Split Input]
+     path UnionErrors.Outputs[Union All Output 1] => Etl Warning.Inputs[Input 0]
+     path Union All To Emails.Outputs[Union All Output 1] => Set Data For Start Date Poa Emails.Inputs[Input 0]
+     path Union All Data To Update Status.Outputs[Union All Output 1] => Sort By PoaId.Inputs[Sort Input]
+
+## DataFlow Send Poa Emails
+  - Add Columns | DerivedColumn  | conn   | in 0 out 1
+  - Check If Exists Agent_cy Email Address | ConditionalSplit  | conn   | in 1 out 0
+  - Conditional Split | ConditionalSplit  | conn   | in 1 out 0
+  - Create Error POA File | FlatFileDestination  | conn [Error POA File]  | in 5 out 0
+  - Create POA File | FlatFileDestination  | conn [POA File]  | in 15 out 0
+  - Get Agencie | Lookup  | conn [CRM]  | in 1 out 3
+  - Get Agent | Lookup  | conn [CRM]  | in 1 out 3
+  - Get Contact | Lookup  | conn [CRM]  | in 1 out 5
+  - Get Not Proceessed PowerOfAttorneySendEmails Data | OLEDBSource  | conn [SQL.GENERIX_STAGING] | table [dbo].[PowerOfAttorneySendEmails] | in 0 out 5
+  - Get Power Of Attorney | Lookup  | conn [CRM]  | in 1 out 3
+  - Get Reciving Date | Lookup  | conn [CRM]  | in 2 out 1
+  - Multicast | Multicast  | conn   | in 0 out 0
+  - Multicast 1 | Multicast  | conn   | in 0 out 0
+  - Multicast 2 | Multicast  | conn   | in 0 out 0
+  - Pension | Lookup  | conn [CRM]  | in 1 out 2
+  - Pipe Count | RowCount  | conn   | in 0 out 0
+  - Proccess Data | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 25 out 13
+  - Provident Fund | Lookup  | conn [CRM]  | in 1 out 3
+  - Send Email | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 0 out 0
+  - Set Task Name Variable | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 0 out 0
+  - Union All | UnionAll  | conn   | in 64 out 32
+  - Union All 1 | UnionAll  | conn   | in 16 out 11
+  - Union All 2 | UnionAll  | conn   | in 43 out 24
+  - Union All 3 | UnionAll  | conn   | in 49 out 25
+  - Update IsProcessed True | OLEDBCommand  | conn [SQL.GENERIX_STAGING]  | in 1 out 0
+  - Update sentToPrintOn | OLEDBCommand  | conn [CRM]  | in 1 out 0
+     path Conditional Split.Outputs[Canceled] => Get Reciving Date.Inputs[Lookup Input]
+     path Conditional Split.Outputs[Conditional Split Default Output] => Union All 3.Inputs[Union All Input 2]
+     path Add Columns.Outputs[Derived Column Output] => Create Error POA File.Inputs[Flat File Destination Input]
+     path Check If Exists Agent_cy Email Address.Outputs[Exists] => Multicast 1.Inputs[Multicast Input 1]
+     path Get Contact.Outputs[Lookup Match Output] => Pension.Inputs[Lookup Input]
+     path Get Agencie.Outputs[Lookup Match Output] => Union All 1.Inputs[Union All Input 2]
+     path Get Power Of Attorney.Outputs[Lookup Match Output] => Get Contact.Inputs[Lookup Input]
+     path Get Agent.Outputs[Lookup Match Output] => Union All 1.Inputs[Union All Input 1]
+     path Provident Fund.Outputs[Lookup Match Output] => Union All 2.Inputs[Union All Input 2]
+     path Get Reciving Date.Outputs[Lookup Match Output] => Union All 3.Inputs[Union All Input 1]
+     path Pension.Outputs[Lookup Match Output] => Union All 2.Inputs[Union All Input 1]
+     path Pension.Outputs[Lookup No Match Output] => Provident Fund.Inputs[Lookup Input]
+     path Get Agent.Outputs[Lookup No Match Output] => Get Agencie.Inputs[Lookup Input]
+     path Multicast 1.Outputs[Multicast Output 1] => Create POA File.Inputs[Flat File Destination Input]
+     path Multicast.Outputs[Multicast Output 1] => Set Task Name Variable.Inputs[Input 0]
+     path Multicast.Outputs[Multicast Output 2] => Pipe Count.Inputs[Row Count Input 1]
+     path Multicast 1.Outputs[Multicast Output 3] => Union All.Inputs[Union All Input 2]
+     path Multicast 2.Outputs[Multicast Output 3] => Union All.Inputs[Union All Input 1]
+     path Multicast 2.Outputs[Multicast Output 4] => Add Columns.Inputs[Derived Column Input]
+     path Check If Exists Agent_cy Email Address.Outputs[Not Exists] => Multicast 2.Inputs[Multicast Input 1]
+     path Update sentToPrintOn.Outputs[OLE DB Command Output] => Send Email.Inputs[Input 0]
+     path Update IsProcessed True.Outputs[OLE DB Command Output] => Update sentToPrintOn.Inputs[OLE DB Command Input]
+     path Get Not Proceessed PowerOfAttorneySendEmails Data.Outputs[OLE DB Source Output] => Multicast.Inputs[Multicast Input 1]
+     path Proccess Data.Outputs[Output 0] => Check If Exists Agent_cy Email Address.Inputs[Conditional Split Input]
+     path Set Task Name Variable.Outputs[Output 0] => Get Agent.Inputs[Lookup Input]
+     path Union All 1.Outputs[Union All Output 1] => Get Power Of Attorney.Inputs[Lookup Input]
+     path Union All 2.Outputs[Union All Output 1] => Conditional Split.Inputs[Conditional Split Input]
+     path Union All.Outputs[Union All Output 1] => Update IsProcessed True.Inputs[OLE DB Command Input]
+     path Union All 3.Outputs[Union All Output 1] => Proccess Data.Inputs[Input 0]
+
+## DataFlow Set Queue Id Variable
+  - Get Queue Id | OLEDBSource  | conn [CRM]  | in 0 out 1
+  - Set Queue Variable | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 1 out 0
+     path Get Queue Id.Outputs[OLE DB Source Output] => Set Queue Variable.Inputs[Input 0]
+
+## DataFlow Update Power Of Attorney Main
+  - Count Error Rows | RowCount  | conn   | in 0 out 0
+  - Count Filtered Rows | RowCount  | conn   | in 0 out 0
+  - Count No Need To Update Rows | RowCount  | conn   | in 0 out 0
+  - Count No Need To Update Rows 1 | RowCount  | conn   | in 0 out 0
+  - Count Pipe Rows | RowCount  | conn   | in 0 out 0
+  - Count Updated Rows | RowCount  | conn   | in 0 out 0
+  - ETL Warning | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 2 out 0
+  - Get Power Of Attorney Main That Their Poa Modified On Last 36 Hours | OLEDBSource  | conn [CRM]  | in 0 out 2
+  - Get Related Power Of Attorney Count Of Statuses Types | Lookup  | conn [CRM]  | in 1 out 1
+  - Get The Related Current State | Lookup  | conn [CRM]  | in 1 out 1
+  - If All Statuses Are Same | ConditionalSplit  | conn   | in 1 out 0
+  - If Current State Is Canceled Or Wrong | ConditionalSplit  | conn   | in 1 out 0
+  - If Exists Active | Lookup  | conn [CRM]  | in 1 out 0
+  - Is Wrong | ConditionalSplit  | conn   | in 1 out 0
+  - Multicast | Multicast  | conn   | in 0 out 0
+  - Multicast 1 | Multicast  | conn   | in 0 out 0
+  - Set Error Columns | DerivedColumn  | conn   | in 0 out 2
+  - Set Related Current State To Canceled | DerivedColumn  | conn   | in 0 out 1
+  - Set Related CurrentState To Canceled | DerivedColumn  | conn   | in 1 out 0
+  - Set Task Name Variable | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 0 out 0
+  - Union All | UnionAll  | conn   | in 10 out 4
+  - Update Current State Poa Main | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 3 out 3
+     path Set Related CurrentState To Canceled.Outputs[Derived Column Output] => Union All.Inputs[Union All Input 4]
+     path Set Related Current State To Canceled.Outputs[Derived Column Output] => Union All.Inputs[Union All Input 2]
+     path Set Error Columns.Outputs[Derived Column Output] => ETL Warning.Inputs[Input 0]
+     path Update Current State Poa Main.Outputs[Error] => Set Error Columns.Inputs[Derived Column Input]
+     path If All Statuses Are Same.Outputs[False] => If Exists Active.Inputs[Lookup Input]
+     path Is Wrong.Outputs[False - Canceled] => Set Related CurrentState To Canceled.Inputs[Derived Column Input]
+     path Get Related Power Of Attorney Count Of Statuses Types.Outputs[Lookup Match Output] => If All Statuses Are Same.Inputs[Conditional Split Input]
+     path Get The Related Current State.Outputs[Lookup Match Output] => If Current State Is Canceled Or Wrong.Inputs[Conditional Split Input]
+     path If Exists Active.Outputs[Lookup No Match Output] => Set Related Current State To Canceled.Inputs[Derived Column Input]
+     path Multicast 1.Outputs[Multicast Output 1] => Get The Related Current State.Inputs[Lookup Input]
+     path Multicast.Outputs[Multicast Output 1] => Set Task Name Variable.Inputs[Input 0]
+     path Multicast.Outputs[Multicast Output 2] => Count Pipe Rows.Inputs[Row Count Input 1]
+     path Multicast 1.Outputs[Multicast Output 2] => Count Filtered Rows.Inputs[Row Count Input 1]
+     path Update Current State Poa Main.Outputs[No Need Update] => Count No Need To Update Rows 1.Inputs[Row Count Input 1]
+     path If Current State Is Canceled Or Wrong.Outputs[False] => Count No Need To Update Rows.Inputs[Row Count Input 1]
+     path Get Power Of Attorney Main That Their Poa Modified On Last 36 Hours.Outputs[OLE DB Source Output] => Multicast.Inputs[Multicast Input 1]
+     path ETL Warning.Outputs[Output 0] => Count Error Rows.Inputs[Row Count Input 1]
+     path Set Task Name Variable.Outputs[Output 0] => Get Related Power Of Attorney Count Of Statuses Types.Inputs[Lookup Input]
+     path Update Current State Poa Main.Outputs[Success] => Count Updated Rows.Inputs[Row Count Input 1]
+     path If All Statuses Are Same.Outputs[True] => Multicast 1.Inputs[Multicast Input 1]
+     path If Current State Is Canceled Or Wrong.Outputs[True] => Is Wrong.Inputs[Conditional Split Input]
+     path Is Wrong.Outputs[True - Wrong] => Union All.Inputs[Union All Input 3]
+     path Union All.Outputs[Union All Output 1] => Update Current State Poa Main.Inputs[Input 0]
+
+## SQL statements
+- Create Power Of Attorney\Check If POA Account Agent Exist | Microsoft.Lookup.SqlCommand | [CRM] 
+    select Gen_customeraccount from Gen_powerofattorney with (nolock)
+- Create Power Of Attorney\Check If POA Account Agent Exist | Microsoft.Lookup.SqlCommandParam | [CRM] 
+    select * from (select Gen_customeraccount from Gen_powerofattorney with (nolock)) [refTable] where [refTable].[Gen_customeraccount] = ?
+- Create Power Of Attorney\Get Customer Accounts | Microsoft.OLEDBSource.SqlCommand | [CRM] 
+    select * from ( select ROW_NUMBER() over (partition by Gen_customeraccount.gen_customeraccountid order by Gen_powerofattorneymain.Gen_signaturedate desc) as rowNumber, Gen_customeraccount.Gen_customeridnumber , Gen_customeraccount.gen_customeraccountid, Gen_customeraccount.gen_productsubcustomeraccount, Gen_powerofattorneymain.Gen_identitynumber, Gen_powerofattorneymain.Gen_appendixtype, Gen_power
+- Create Power Of Attorney - Pension\Check If POA Account Agent | Microsoft.Lookup.SqlCommand | [CRM] 
+    select gen_customerprogram from Gen_powerofattorney with (nolock)
+- Create Power Of Attorney - Pension\Check If POA Account Agent | Microsoft.Lookup.SqlCommandParam | [CRM] 
+    select * from (select gen_customerprogram from Gen_powerofattorney with (nolock)) [refTable] where [refTable].[gen_customerprogram] = ?
+- Create Power Of Attorney - Pension\Get Policies | Microsoft.OLEDBSource.SqlCommand | [CRM] 
+    select * from ( select ROW_NUMBER() over (partition by Gen_programmain.Gen_programmainid order by Gen_powerofattorneymain.Gen_signaturedate desc) as rowNumber, Gen_programmain.Gen_identitynumber programmainIdentityNumber , Gen_programmain.Gen_programmainid, Gen_powerofattorneymain.Gen_identitynumber, Gen_powerofattorneymain.Gen_appendixtype, Gen_powerofattorneymain.Gen_powerofattorneymainId, Gen_p
+- End ETL Process Record\Get All ETLProcessID | Microsoft.Lookup.SqlCommand | [CRM] 
+    select p.gen_etlprocessid , case when pw.gen_etlprocessid is null then 0 else 1 end as isWarningExist from gen_etlprocess p left join (select distinct gen_etlprocessId from gen_etlprocesswarning ) as pw on p.gen_etlprocessId = pw.gen_etlprocessId
+- End ETL Process Record\Get All ETLProcessID | Microsoft.Lookup.SqlCommandParam | [CRM] 
+    select * from (select p.gen_etlprocessid , case when pw.gen_etlprocessid is null then 0 else 1 end as isWarningExist from gen_etlprocess p left join (select distinct gen_etlprocessId from gen_etlprocesswarning ) as pw on p.gen_etlprocessId = pw.gen_etlprocessId) [refTable] where [refTable].[gen_etlprocessid] = ?
+- Get Base Fields Values\Get Any Temp Row | Microsoft.OLEDBSource.SqlCommand | [CRM] 
+    select top(1) null as tempField from OrganizationBase
+- Get Base Fields Values\Get Organization Id | Microsoft.Lookup.SqlCommand | [CRM] 
+    SELECT LOWER([Name]) as Name,OrganizationId FROM OrganizationBase
+- Get Base Fields Values\Get Organization Id | Microsoft.Lookup.SqlCommandParam | [CRM] 
+    select * from (SELECT LOWER([Name]) as Name,OrganizationId FROM OrganizationBase) [refTable] where [refTable].[Name] = ?
+- Get Base Fields Values\Get System User Id | Microsoft.Lookup.SqlCommand | [CRM] 
+    SELECT LOWER(DomainName) as DomainName, SystemUserId FROM SystemUser
+- Get Base Fields Values\Get System User Id | Microsoft.Lookup.SqlCommandParam | [CRM] 
+    select * from (SELECT LOWER(DomainName) as DomainName, SystemUserId FROM SystemUser) [refTable] where [refTable].[DomainName] = ?
+- Get Organization Variables\Get Organization Variables | Microsoft.OLEDBSource.SqlCommand | [CRM] 
+    SELECT gen_key ,gen_Value FROM gen_etlvariable where gen_scope ='global' or gen_scope = ?
+- Get Valid Optionsets Values\Get Valid Optionsets Values | Microsoft.OLEDBSource.SqlCommand | [CRM] 
+    select AttributeName,AttributeValue from StringMap where ObjectTypeCode = (select ObjectTypeCode from Entity where Name = 'Gen_powerofattorney') and langid = '1033' and AttributeName in('gen_appendixtype','gen_powerofattorneysource','gen_appendixd','gen_currentstate','gen_statustransfertobank')
+- Handle Active Status\OLE DB Source | Microsoft.OLEDBSource.SqlCommand | [CRM] 
+    select poa.Gen_powerofattorneyId, poa.gen_receivingdateofcancelpoa, poamain.gen_agentappointment as gen_appointmentofagent, dateadd(HH,3,poa.Gen_startdate) as Gen_startdate, dateadd(HH,3,poa.Gen_enddate) as Gen_enddate, poa.gen_currentstate, poa.Gen_CustomerAccount, gen_customerprogram, poa.Gen_contactname, poa.Gen_agencyname, poa.Gen_agentname, poa.gen_powerofattorneymain, poa.gen_appendixtype, p
+- Handle Active Status\Update Json To PowerOfAttorneySendEmails | Microsoft.OLEDBCommand.SqlCommand | [SQL.GENERIX_STAGING] 
+    update PowerOfAttorneySendEmails set emailDetailsJson = ? where PowerOfAttorneyId = ?
+- Handle Wait Status\Lookup Match PowerOfAttorney By CustomerAccount Or CustomerProgram | Microsoft.Lookup.SqlCommand | [CRM] 
+    select isnull(pa.Gen_CustomerAccount,gen_customerprogram) as CustomerAccountProgramPa, isnull(Contact.Gen_Identitynumber,Account.AccountNumber) as agentcyIdNumberPa, pa.Gen_powerofattorneyId as PowerOfAttorneyIdPa from Gen_powerofattorney as pa with (nolock) left join Account on Account.AccountId=pa.Gen_agencyname left join Contact on Contact.ContactId=pa.Gen_agentname where pa.Gen_currentstate = 
+- Handle Wait Status\Lookup Match PowerOfAttorney By CustomerAccount Or CustomerProgram | Microsoft.Lookup.SqlCommandParam | [CRM] 
+    select * from (select isnull(pa.Gen_CustomerAccount,gen_customerprogram) as CustomerAccountProgramPa, isnull(Contact.Gen_Identitynumber,Account.AccountNumber) as agentcyIdNumberPa, pa.Gen_powerofattorneyId as PowerOfAttorneyIdPa from Gen_powerofattorney as pa with (nolock) left join Account on Account.AccountId=pa.Gen_agencyname left join Contact on Contact.ContactId=pa.Gen_agentname where pa.Gen_
+- Handle Wait Status\OLE DB Source | Microsoft.OLEDBSource.SqlCommand | [CRM] 
+    select poa.Gen_powerofattorneyId, poamain.gen_agentappointment as gen_appointmentofagent, dateadd(HH,3,poa.Gen_startdate) as Gen_startdate, dateadd(HH,3,poa.Gen_enddate) as Gen_enddate, poa.gen_currentstate, poa.gen_statustransfertobank, poa.Gen_CustomerAccount, poa.gen_customerprogram, poa.Gen_contactname, poa.Gen_agencyname, poa.Gen_agentname, poa.gen_powerofattorneymain, poa.gen_appendixtype, i
+- Handle Wait Status\Update Json To PowerOfAttorneySendEmails | Microsoft.OLEDBCommand.SqlCommand | [SQL.GENERIX_STAGING] 
+    update PowerOfAttorneySendEmails set emailDetailsJson = ? where PowerOfAttorneyId = ? and isProcessed = 0 -- false and emailDetailsJson is null
+- Handle Wait Status\Update NeedToSendMailBit | Microsoft.OLEDBCommand.SqlCommand | [CRM] 
+    update Gen_powerofattorneyBase set gen_receivingdateofcancelpoa = case when ((Gen_appendixtype = 2) or (Gen_appendixtype = 3) or (Gen_appendixtype = 5)) then ? end where Gen_powerofattorneyId = ?
+- Send Poa Emails\Get Agencie | Microsoft.Lookup.SqlCommand | [CRM] 
+    select Gen_powerofattorney.Gen_powerofattorneyid, Replace(Gen_powerofattorney.Gen_agencynameName, ',', '-') as Gen_agencynameName, account.accountnumber, Gen_agencie.gen_emailaddressforoperativemessages from Gen_powerofattorney with(nolock) join account with(nolock) on gen_agencyname = accountid join Gen_agencie with(nolock) on Gen_agencie.gen_agencyname = Gen_powerofattorney.gen_agencyname
+- Send Poa Emails\Get Agencie | Microsoft.Lookup.SqlCommandParam | [CRM] 
+    select * from (select Gen_powerofattorney.Gen_powerofattorneyid, Replace(Gen_powerofattorney.Gen_agencynameName, ',', '-') as Gen_agencynameName, account.accountnumber, Gen_agencie.gen_emailaddressforoperativemessages from Gen_powerofattorney with(nolock) join account with(nolock) on gen_agencyname = accountid join Gen_agencie with(nolock) on Gen_agencie.gen_agencyname = Gen_powerofattorney.gen_ag
+- Send Poa Emails\Get Agent | Microsoft.Lookup.SqlCommand | [CRM] 
+    select Gen_powerofattorney.Gen_powerofattorneyid, Replace(Gen_powerofattorney.Gen_agentnameName, ',', '-') as Gen_agentnameName, contact.Gen_Identitynumber, Gen_agents.gen_emailaddressforoperativemessages from Gen_powerofattorney with(nolock) join contact with(nolock) on gen_agentname = contactid join Gen_agents with(nolock) on Gen_agents.gen_contactname = gen_agentname
+- Send Poa Emails\Get Agent | Microsoft.Lookup.SqlCommandParam | [CRM] 
+    select * from (select Gen_powerofattorney.Gen_powerofattorneyid, Replace(Gen_powerofattorney.Gen_agentnameName, ',', '-') as Gen_agentnameName, contact.Gen_Identitynumber, Gen_agents.gen_emailaddressforoperativemessages from Gen_powerofattorney with(nolock) join contact with(nolock) on gen_agentname = contactid join Gen_agents with(nolock) on Gen_agents.gen_contactname = gen_agentname) [refTable] 
+- Send Poa Emails\Get Contact | Microsoft.Lookup.SqlCommand | [CRM] 
+    select Gen_powerofattorneyid, isnull(mobilephone, N'לא קיים') as mobilephone, isnull(telephone2, N'לא קיים') as telephone2, isnull(telephone1, N'לא קיים') as telephone1, contact.Gen_identitynumber, Gen_contactnameName from Gen_powerofattorney with(nolock) join contact with(nolock) on gen_contactname = contactid
+- Send Poa Emails\Get Contact | Microsoft.Lookup.SqlCommandParam | [CRM] 
+    select * from (select Gen_powerofattorneyid, isnull(mobilephone, N'לא קיים') as mobilephone, isnull(telephone2, N'לא קיים') as telephone2, isnull(telephone1, N'לא קיים') as telephone1, contact.Gen_identitynumber, Gen_contactnameName from Gen_powerofattorney with(nolock) join contact with(nolock) on gen_contactname = contactid) [refTable] where [refTable].[Gen_powerofattorneyid] = ?
+- Send Poa Emails\Get Not Proceessed PowerOfAttorneySendEmails Data | Microsoft.OLEDBSource.SqlCommand | [SQL.GENERIX_STAGING] 
+    select PowerOfAttorneyId, LetterVersion, StatusAfterUpdate, RIGHT(REPLICATE('0', 9) + ContactIdentityNumber, 9) AS ContactIdentityNumber, AcountProgramNumber from PowerOfAttorneySendEmails where isProcessed = 0
+- Send Poa Emails\Get Power Of Attorney | Microsoft.Lookup.SqlCommand | [CRM] 
+    select Gen_powerofattorney.Gen_powerofattorneyid, DATEADD(HH,3, Gen_powerofattorney.gen_receivingdate) as gen_receivingdate, StringMap_currentstate_Poa.Value as gen_currentstate, StringMap_appointmentofagent_Poam.Value as gen_appointmentofagent from Gen_powerofattorney with(nolock) left join Gen_powerofattorneymain poamain with(nolock) on poamain.Gen_powerofattorneymainId = Gen_powerofattorney.Gen
+- Send Poa Emails\Get Power Of Attorney | Microsoft.Lookup.SqlCommandParam | [CRM] 
+    select * from (select Gen_powerofattorney.Gen_powerofattorneyid, DATEADD(HH,3, Gen_powerofattorney.gen_receivingdate) as gen_receivingdate, StringMap_currentstate_Poa.Value as gen_currentstate, StringMap_appointmentofagent_Poam.Value as gen_appointmentofagent from Gen_powerofattorney with(nolock) left join Gen_powerofattorneymain poamain with(nolock) on poamain.Gen_powerofattorneymainId = Gen_powe
+- Send Poa Emails\Get Reciving Date | Microsoft.Lookup.SqlCommand | [CRM] 
+    select RIGHT(REPLICATE('0', 9) + Gen_identitynumber, 9) AS Gen_identitynumber, isnull(Gen_CustomerAccountName,gen_customerprogramName ) as CustomerAccount, dateadd(HH,3,gen_receivingdate) as Gen_receivingdatePoa from Gen_powerofattorney with (nolock) where Gen_currentstate = 1
+- Send Poa Emails\Get Reciving Date | Microsoft.Lookup.SqlCommandParam | [CRM] 
+    select * from (select RIGHT(REPLICATE('0', 9) + Gen_identitynumber, 9) AS Gen_identitynumber, isnull(Gen_CustomerAccountName,gen_customerprogramName ) as CustomerAccount, dateadd(HH,3,gen_receivingdate) as Gen_receivingdatePoa from Gen_powerofattorney with (nolock) where Gen_currentstate = 1) [refTable] where [refTable].[Gen_identitynumber] = ? and [refTable].[CustomerAccount] = ?
+- Send Poa Emails\Pension | Microsoft.Lookup.SqlCommand | [CRM] 
+    select Gen_powerofattorney.Gen_powerofattorneyid, StringMap_productPension.Value as producttypecode, Gen_programmain.gen_fundbalance from Gen_powerofattorney with(nolock) join Gen_programmain with(nolock) on gen_customerprogram = Gen_programmainid join Product with(nolock) on gen_productid = productid left join stringmap StringMap_productPension on StringMap_productPension.objecttypecode = 1024 --
+- Send Poa Emails\Pension | Microsoft.Lookup.SqlCommandParam | [CRM] 
+    select * from (select Gen_powerofattorney.Gen_powerofattorneyid, StringMap_productPension.Value as producttypecode, Gen_programmain.gen_fundbalance from Gen_powerofattorney with(nolock) join Gen_programmain with(nolock) on gen_customerprogram = Gen_programmainid join Product with(nolock) on gen_productid = productid left join stringmap StringMap_productPension on StringMap_productPension.objecttyp
+- Send Poa Emails\Provident Fund | Microsoft.Lookup.SqlCommand | [CRM] 
+    select Gen_powerofattorney.Gen_powerofattorneyid, StringMap_productCustomerAccount.Value as gen_productsubcustomeraccount, Gen_powerofattorney.Gen_CustomerAccountName, Gen_customeraccount.gen_accountbalance from Gen_powerofattorney with(nolock) join Gen_customeraccount with(nolock) on gen_customeraccount = Gen_customeraccountid left join stringmap StringMap_productCustomerAccount on StringMap_prod
+- Send Poa Emails\Provident Fund | Microsoft.Lookup.SqlCommandParam | [CRM] 
+    select * from (select Gen_powerofattorney.Gen_powerofattorneyid, StringMap_productCustomerAccount.Value as gen_productsubcustomeraccount, Gen_powerofattorney.Gen_CustomerAccountName, Gen_customeraccount.gen_accountbalance from Gen_powerofattorney with(nolock) join Gen_customeraccount with(nolock) on gen_customeraccount = Gen_customeraccountid left join stringmap StringMap_productCustomerAccount on
+- Send Poa Emails\Update IsProcessed True | Microsoft.OLEDBCommand.SqlCommand | [SQL.GENERIX_STAGING] 
+    update PowerOfAttorneySendEmails set isProcessed = 1 where PowerOfAttorneyId = ?
+- Send Poa Emails\Update sentToPrintOn | Microsoft.OLEDBCommand.SqlCommand | [CRM] 
+    update Gen_powerofattorney set gen_SentToPrintOn = GETUTCDATE() where Gen_powerofattorneyid = ?
+- Set Queue Id Variable\Get Queue Id | Microsoft.OLEDBSource.SqlCommand | [CRM] 
+    select QueueId from Queue where name = ?
+- Update Power Of Attorney Main\Get Power Of Attorney Main That Their Poa Modified On Last 36 Hours | Microsoft.OLEDBSource.SqlCommand | [CRM] 
+    select distinct poam.Gen_powerofattorneymainId, poam.gen_currentstate from Gen_powerofattorneymain poam with (nolock) join Gen_powerofattorney poa with (nolock) on poam.Gen_powerofattorneymainId = poa.Gen_powerofattorneymain where poa.ModifiedOn >= dateadd(HH,-36 ,GETDATE())
+- Update Power Of Attorney Main\Get Related Power Of Attorney Count Of Statuses Types | Microsoft.Lookup.SqlCommand | [CRM] 
+    select Gen_powerofattorneymain ,count(distinct gen_currentstate) 'Count' from Gen_powerofattorney with (nolock) group by Gen_powerofattorneymain
+- Update Power Of Attorney Main\Get Related Power Of Attorney Count Of Statuses Types | Microsoft.Lookup.SqlCommandParam | [CRM] 
+    select * from (select Gen_powerofattorneymain ,count(distinct gen_currentstate) 'Count' from Gen_powerofattorney with (nolock) group by Gen_powerofattorneymain) [refTable] where [refTable].[Gen_powerofattorneymain] = ?
+- Update Power Of Attorney Main\Get The Related Current State | Microsoft.Lookup.SqlCommand | [CRM] 
+    select Gen_powerofattorneymain ,gen_currentstate from Gen_powerofattorney with (nolock)
+- Update Power Of Attorney Main\Get The Related Current State | Microsoft.Lookup.SqlCommandParam | [CRM] 
+    select * from (select Gen_powerofattorneymain ,gen_currentstate from Gen_powerofattorney with (nolock)) [refTable] where [refTable].[Gen_powerofattorneymain] = ?
+- Update Power Of Attorney Main\If Exists Active | Microsoft.Lookup.SqlCommand | [CRM] 
+    select Gen_powerofattorneymain ,gen_currentstate from Gen_powerofattorney with (nolock) where gen_currentstate = 1
+- Update Power Of Attorney Main\If Exists Active | Microsoft.Lookup.SqlCommandParam | [CRM] 
+    select * from (select Gen_powerofattorneymain ,gen_currentstate from Gen_powerofattorney with (nolock) where gen_currentstate = 1) [refTable] where [refTable].[Gen_powerofattorneymain] = ?
+
+## Code write candidates (per owner)
+- Create ETL Process Record {"variables-write":2,"sql-command":1,"crm-entity":1,"crm-sdk-create":1}
+- Create Power Of Attorney\Create ETL Warning {"crm-service":1,"sql-command":2,"crm-entity":2,"crm-sdk-create":1}
+- Create Power Of Attorney\Create POA Account - Agent {"crm-service":1,"sql-command":2,"crm-entity":15,"crm-sdk-create":1,"output-buffer":1}
+- Create Power Of Attorney\Move Annotation To Customer Account {"crm-service":1,"sql-command":2,"crm-entity":2,"crm-sdk-update":1,"output-buffer":1}
+- Create Power Of Attorney - Pension\Create ETL Warning {"crm-service":1,"sql-command":2,"crm-entity":2,"crm-sdk-create":1}
+- Create Power Of Attorney - Pension\Create POA Account - Agent {"crm-service":1,"sql-command":2,"crm-entity":15,"crm-sdk-create":1,"output-buffer":1}
+- Create Power Of Attorney - Pension\Move Annotation To Policies {"crm-service":1,"sql-command":2,"crm-entity":2,"crm-sdk-update":1,"output-buffer":1}
+- End ETL Process Record\ETL Record Finish {"crm-entity":3,"output-buffer":1,"crm-sdk-update":1}
+- End ETL Process Record\Get ETLProcessID {"output-buffer":2}
+- Get Valid Optionsets Values\Build Valid Values Dictionary {"sql-command":2}
+- Handle Active Status\Email - Cancel Poa To Perform Actions {"crm-service":1,"crm-entity":6,"crm-sdk-create":1,"crm-sdk-execute":1}
+- Handle Active Status\Email - Cancel Poa With Commission Appointment {"crm-service":1,"crm-entity":6,"crm-sdk-create":1,"crm-sdk-execute":1}
+- Handle Active Status\Etl Warning {"crm-service":1,"crm-entity":2,"crm-sdk-create":1}
+- Handle Active Status\Set Data For Cancel Poa Emails {"crm-service":1,"output-buffer":3}
+- Handle Active Status\Set Task Name Variable {"sql-command":2}
+- Handle Active Status\Update gen_powerofattorney CANCELED And Status Transfer To Bank {"crm-service":1,"crm-entity":3,"output-buffer":3,"crm-sdk-update":1}
+- Handle Wait Status\Email - Start Date Poa {"crm-service":1,"crm-entity":6,"crm-sdk-create":1,"crm-sdk-execute":1}
+- Handle Wait Status\Email - Start Date Poa With Commission Appointment {"crm-service":1,"crm-entity":6,"crm-sdk-create":1,"crm-sdk-execute":1}
+- Handle Wait Status\Etl Warning {"crm-service":1,"crm-entity":2,"crm-sdk-create":1}
+- Handle Wait Status\Set Data For Start Date Poa Emails {"crm-service":1,"output-buffer":3}
+- Handle Wait Status\Update gen_powerofattorney ACTIVE {"crm-service":1,"crm-entity":2,"crm-sdk-update":1,"output-buffer":3}
+- Send Poa Emails\Proccess Data {"output-buffer":19}
+- Send Poa Emails\Send Email {"crm-entity":5,"crm-sdk-create":1,"crm-sdk-execute":1}
+- Set Destinations Paths {"variables-write":4,"file-io":4}
+- Set Queue Id Variable\Set Queue Variable {"sql-command":2}
+- Update Power Of Attorney Main\ETL Warning {"crm-service":1,"crm-entity":2,"crm-sdk-create":1}
+- Update Power Of Attorney Main\Set Task Name Variable {"sql-command":2}
+- Update Power Of Attorney Main\Update Current State Poa Main {"crm-service":1,"crm-entity":2,"crm-sdk-update":1,"output-buffer":3}
+- Write To ETLProcessCounter - Wait Status {"variables-write":7,"crm-entity":2,"crm-sdk-create":1}
+- Write To ETLProcessCounter 2 {"variables-write":7,"crm-entity":2,"crm-sdk-create":1}
+- Write To ETLProcessCounter 3 {"variables-write":7,"crm-entity":2,"crm-sdk-create":1}
+- Write To ETLProcessCounter 4 {"variables-write":7,"crm-entity":2,"crm-sdk-create":1}
+- Write To ETLProcessCounter 5 {"variables-write":7,"crm-entity":2,"crm-sdk-create":1}
+- Write To ETLProcessCounter End {"variables-write":7,"crm-entity":2,"crm-sdk-create":1}
+
+## External refs (non-framework) CRM2015.Proxy, Microsoft.Office.Interop.Excel

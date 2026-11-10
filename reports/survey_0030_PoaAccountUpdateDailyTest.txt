@@ -1,0 +1,136 @@
+# 0030_PoaAccountUpdateDailyTest.dtsx · 95908C42C72F0D604243BF30C049A07C0C21CE9F97F1AECCF350C2F83DB2EA1C
+
+## Connection managers
+- [CRM] OLEDB Data Source=psql;Initial Catalog=ALTSHULER_MSCRM;Integrated Security=SSPI;  
+- [SQL.GENERIX_STAGING] OLEDB Data Source=psql;Initial Catalog=GENERIX_STAGING;Integrated Security=SSPI;  
+- [SRS.SSIS_Logs] OLEDB Data Source=psrs;Initial Catalog=SSIS_Logs;Integrated Security=SSPI;  
+
+## Executables (disabled marked !)
+-   Create ETL Process Record | Microsoft.ScriptTask  
+-   End ETL Process Record | Microsoft.Pipeline  
+-   Get Organization Variables | Microsoft.Pipeline  
+-   Get Valid Optionsets Values | Microsoft.Pipeline  
+-   Handle Active Status - For Cancel | Microsoft.Pipeline  
+-   Handle Wait Status - For Active | Microsoft.Pipeline  
+-   Set Queue Id Variable | Microsoft.Pipeline  
+-   Write To ETLProcessCounter End | Microsoft.ScriptTask  
+
+## Precedence
+- Get Organization Variables -> Create ETL Process Record | Success Constraint   
+- Create ETL Process Record -> Get Valid Optionsets Values | Success Constraint   
+- Write To ETLProcessCounter End -> End ETL Process Record | Success Constraint   
+- Get Valid Optionsets Values -> Set Queue Id Variable | Success Constraint   
+- Set Queue Id Variable -> Handle Wait Status - For Active | Success Constraint   
+- Handle Wait Status - For Active -> Handle Active Status - For Cancel | Success Constraint   
+- Handle Active Status - For Cancel -> Write To ETLProcessCounter End | Success Constraint   
+
+## DataFlow End ETL Process Record
+  - ETL Record Finish | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 2 out 0
+  - Get All ETLProcessID | Lookup  | conn [CRM]  | in 1 out 1
+  - Get ETLProcessID | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 0 out 1
+     path Get All ETLProcessID.Outputs[Lookup Match Output] => ETL Record Finish.Inputs[Input 0]
+     path Get ETLProcessID.Outputs[Output 0] => Get All ETLProcessID.Inputs[Lookup Input]
+
+## DataFlow Get Organization Variables
+  - Get Organization Variables | OLEDBSource  | conn [CRM]  | in 0 out 2
+  - Set Variables | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 2 out 0
+     path Get Organization Variables.Outputs[OLE DB Source Output] => Set Variables.Inputs[Input 0]
+
+## DataFlow Get Valid Optionsets Values
+  - Build Valid Values Dictionary | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 2 out 0
+  - Get Valid Optionsets Values | OLEDBSource  | conn [CRM]  | in 0 out 2
+     path Get Valid Optionsets Values.Outputs[OLE DB Source Output] => Build Valid Values Dictionary.Inputs[Input 0]
+
+## DataFlow Handle Active Status - For Cancel
+  - Cancel Email For Actions 8 | DerivedColumn  | conn   | in 0 out 5
+  - Cancel Email With Commission 3 | DerivedColumn  | conn   | in 0 out 5
+  - Check Format By Appointment Of Agent | ConditionalSplit  | conn   | in 1 out 0
+  - Get Active Poa | OLEDBSource  | conn [CRM]  | in 0 out 23
+  - Get Agency | Lookup  | conn [CRM]  | in 3 out 0
+  - Is Need To Send Cancellation Mail | ConditionalSplit  | conn   | in 1 out 0
+  - No Email | DerivedColumn  | conn   | in 0 out 4
+  - Union All | UnionAll  | conn   | in 80 out 27
+  - Union All 1 | UnionAll  | conn   | in 46 out 23
+  - Write To PowerOfAttorneySendEmails Table | OLEDBDestination  | conn [SQL.GENERIX_STAGING] | table [dbo].[PowerOfAttorneySendEmails] | in 14 out 0
+     path Cancel Email With Commission 3.Outputs[Derived Column Output] => Union All.Inputs[Union All Input 1]
+     path Cancel Email For Actions 8.Outputs[Derived Column Output] => Union All.Inputs[Union All Input 2]
+     path No Email.Outputs[Derived Column Output] => Union All.Inputs[Union All Input 3]
+     path Check Format By Appointment Of Agent.Outputs[EmailFormat Without Commission] => Get Agency.Inputs[Lookup Input]
+     path Check Format By Appointment Of Agent.Outputs[EmailFormat With Commission] => Union All 1.Inputs[Union All Input 1]
+     path Get Agency.Outputs[Lookup Match Output] => Union All 1.Inputs[Union All Input 2]
+     path Get Agency.Outputs[Lookup No Match Output] => Cancel Email For Actions 8.Inputs[Derived Column Input]
+     path Is Need To Send Cancellation Mail.Outputs[NeedToSendCancellationMail] => Check Format By Appointment Of Agent.Inputs[Conditional Split Input]
+     path Is Need To Send Cancellation Mail.Outputs[NoMail] => No Email.Inputs[Derived Column Input]
+     path Get Active Poa.Outputs[OLE DB Source Output] => Is Need To Send Cancellation Mail.Inputs[Conditional Split Input]
+     path Union All.Outputs[Union All Output 1] => Write To PowerOfAttorneySendEmails Table.Inputs[OLE DB Destination Input]
+     path Union All 1.Outputs[Union All Output 1] => Cancel Email With Commission 3.Inputs[Derived Column Input]
+
+## DataFlow Handle Wait Status - For Active
+  - AppendixType | ConditionalSplit  | conn   | in 1 out 0
+  - Check Format By Appointment Of Agent | ConditionalSplit  | conn   | in 1 out 0
+  - Get Waiting Poa | OLEDBSource  | conn [CRM]  | in 0 out 22
+  - Is Renewal | ConditionalSplit  | conn   | in 2 out 0
+  - Lookup Match PowerOfAttorney By CustomerAccount Or CustomerProgram | Lookup  | conn [CRM]  | in 1 out 3
+  - New Poa With Commission | DerivedColumn  | conn   | in 0 out 5
+  - New Poa Without Commssion | DerivedColumn  | conn   | in 0 out 5
+  - No Email | DerivedColumn  | conn   | in 0 out 4
+  - Union All | UnionAll  | conn   | in 70 out 24
+  - Union All Data | UnionAll  | conn   | in 86 out 29
+  - Update NeedToSendMailBit | OLEDBCommand  | conn [CRM]  | in 1 out 0
+  - Write To PowerOfAttorneySendEmails Table | OLEDBDestination  | conn [SQL.GENERIX_STAGING] | table [dbo].[PowerOfAttorneySendEmails] | in 14 out 0
+     path AppendixType.Outputs[AppendixTypeNeedToSendMail] => Check Format By Appointment Of Agent.Inputs[Conditional Split Input]
+     path AppendixType.Outputs[AppendixTypeNoMail] => Union All.Inputs[Union All Input 2]
+     path New Poa Without Commssion.Outputs[Derived Column Output] => Union All Data.Inputs[Union All Input 2]
+     path New Poa With Commission.Outputs[Derived Column Output] => Union All Data.Inputs[Union All Input 3]
+     path No Email.Outputs[Derived Column Output] => Union All Data.Inputs[Union All Input 1]
+     path Check Format By Appointment Of Agent.Outputs[EmailFormat 1 Without Commission] => New Poa Without Commssion.Inputs[Derived Column Input]
+     path Check Format By Appointment Of Agent.Outputs[EmailFormat 2 With Commission] => New Poa With Commission.Inputs[Derived Column Input]
+     path Lookup Match PowerOfAttorney By CustomerAccount Or CustomerProgram.Outputs[Lookup Match Output] => Is Renewal.Inputs[Conditional Split Input]
+     path Lookup Match PowerOfAttorney By CustomerAccount Or CustomerProgram.Outputs[Lookup No Match Output] => Union All.Inputs[Union All Input 3]
+     path Is Renewal.Outputs[Not Renewal] => Update NeedToSendMailBit.Inputs[OLE DB Command Input]
+     path Update NeedToSendMailBit.Outputs[OLE DB Command Output] => AppendixType.Inputs[Conditional Split Input]
+     path Get Waiting Poa.Outputs[OLE DB Source Output] => Lookup Match PowerOfAttorney By CustomerAccount Or CustomerProgram.Inputs[Lookup Input]
+     path Is Renewal.Outputs[Renewal] => Union All.Inputs[Union All Input 1]
+     path Union All.Outputs[Union All Output 1] => No Email.Inputs[Derived Column Input]
+     path Union All Data.Outputs[Union All Output 1] => Write To PowerOfAttorneySendEmails Table.Inputs[OLE DB Destination Input]
+
+## DataFlow Set Queue Id Variable
+  - Get Queue Id | OLEDBSource  | conn [CRM]  | in 0 out 1
+  - Set Queue Variable | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 1 out 0
+     path Get Queue Id.Outputs[OLE DB Source Output] => Set Queue Variable.Inputs[Input 0]
+
+## SQL statements
+- End ETL Process Record\Get All ETLProcessID | Microsoft.Lookup.SqlCommand | [CRM] 
+    select p.gen_etlprocessid , case when pw.gen_etlprocessid is null then 0 else 1 end as isWarningExist from gen_etlprocess p left join (select distinct gen_etlprocessId from gen_etlprocesswarning ) as pw on p.gen_etlprocessId = pw.gen_etlprocessId
+- End ETL Process Record\Get All ETLProcessID | Microsoft.Lookup.SqlCommandParam | [CRM] 
+    select * from (select p.gen_etlprocessid , case when pw.gen_etlprocessid is null then 0 else 1 end as isWarningExist from gen_etlprocess p left join (select distinct gen_etlprocessId from gen_etlprocesswarning ) as pw on p.gen_etlprocessId = pw.gen_etlprocessId) [refTable] where [refTable].[gen_etlprocessid] = ?
+- Get Organization Variables\Get Organization Variables | Microsoft.OLEDBSource.SqlCommand | [CRM] 
+    SELECT gen_key ,gen_Value FROM gen_etlvariable where gen_scope ='global' or gen_scope = ?
+- Get Valid Optionsets Values\Get Valid Optionsets Values | Microsoft.OLEDBSource.SqlCommand | [CRM] 
+    select AttributeName,AttributeValue from StringMap where ObjectTypeCode = (select ObjectTypeCode from Entity where Name = 'Gen_powerofattorney') and langid = '1033' and AttributeName in('gen_appendixtype','gen_powerofattorneysource','gen_appendixd','gen_currentstate','gen_statustransfertobank')
+- Handle Active Status - For Cancel\Get Active Poa | Microsoft.OLEDBSource.SqlCommand | [CRM] 
+    select * from (select poa.Gen_powerofattorneyId, poa.gen_iscancellationemailrequired, poamain.gen_agentappointment as gen_appointmentofagent, dateadd(HH,3,poa.Gen_startdate) as Gen_startdate, dateadd(HH,3,poa.Gen_enddate) as Gen_enddate, poa.gen_currentstate, poa.Gen_CustomerAccount, gen_customerprogram, poa.Gen_contactname, poa.Gen_agencyname, poa.Gen_agentname, poa.gen_powerofattorneymain, poa.g
+- Handle Active Status - For Cancel\Get Agency | Microsoft.Lookup.SqlCommand | [CRM] 
+    select Gen_powerofattorneyid, Gen_powerofattorney.Gen_agencyname, Gen_appendixtype, Gen_CustomerAccount, gen_customerprogram from Gen_powerofattorney with (nolock) join Gen_agencie with(nolock) on Gen_agencie.gen_agencyname = Gen_powerofattorney.Gen_agencyname where Gen_currentstate = 3 --waiting and Gen_agencie.Gen_ContractType = 1 --bank
+- Handle Active Status - For Cancel\Get Agency | Microsoft.Lookup.SqlCommandParam | [CRM] 
+    select * from (select Gen_powerofattorneyid, Gen_powerofattorney.Gen_agencyname, Gen_appendixtype, Gen_CustomerAccount, gen_customerprogram from Gen_powerofattorney with (nolock) join Gen_agencie with(nolock) on Gen_agencie.gen_agencyname = Gen_powerofattorney.Gen_agencyname where Gen_currentstate = 3 --waiting and Gen_agencie.Gen_ContractType = 1 --bank) [refTable] where [refTable].[Gen_CustomerA
+- Handle Wait Status - For Active\Get Waiting Poa | Microsoft.OLEDBSource.SqlCommand | [CRM] 
+    select * from (select poa.Gen_powerofattorneyId, poamain.gen_agentappointment as gen_appointmentofagent, dateadd(HH,3,poa.Gen_startdate) as Gen_startdate, dateadd(HH,3,poa.Gen_enddate) as Gen_enddate, poa.gen_currentstate, poa.Gen_CustomerAccount, gen_customerprogram, poa.Gen_contactname, poa.Gen_agencyname, poa.Gen_agentname, poa.gen_powerofattorneymain, poa.gen_appendixtype, isnull(Contact.Gen_I
+- Handle Wait Status - For Active\Lookup Match PowerOfAttorney By CustomerAccount Or CustomerProgram | Microsoft.Lookup.SqlCommand | [CRM] 
+    select isnull(pa.Gen_CustomerAccount,gen_customerprogram) as CustomerAccountProgramPa, isnull(Contact.Gen_Identitynumber,Account.AccountNumber) as agentcyIdNumberPa, pa.Gen_powerofattorneyId as PowerOfAttorneyIdPa from Gen_powerofattorney as pa with (nolock) left join Account on Account.AccountId=pa.Gen_agencyname left join Contact on Contact.ContactId=pa.Gen_agentname where pa.Gen_currentstate = 
+- Handle Wait Status - For Active\Lookup Match PowerOfAttorney By CustomerAccount Or CustomerProgram | Microsoft.Lookup.SqlCommandParam | [CRM] 
+    select * from (select isnull(pa.Gen_CustomerAccount,gen_customerprogram) as CustomerAccountProgramPa, isnull(Contact.Gen_Identitynumber,Account.AccountNumber) as agentcyIdNumberPa, pa.Gen_powerofattorneyId as PowerOfAttorneyIdPa from Gen_powerofattorney as pa with (nolock) left join Account on Account.AccountId=pa.Gen_agencyname left join Contact on Contact.ContactId=pa.Gen_agentname where pa.Gen_
+- Handle Wait Status - For Active\Update NeedToSendMailBit | Microsoft.OLEDBCommand.SqlCommand | [CRM] 
+    update Gen_powerofattorneyBase set gen_iscancellationemailrequired = case when Gen_appendixtype = 2 then 1 when Gen_appendixtype = 3 then 1 when Gen_appendixtype = 5 then 1 else 0 end where Gen_powerofattorneyId = ?
+- Set Queue Id Variable\Get Queue Id | Microsoft.OLEDBSource.SqlCommand | [CRM] 
+    select QueueId from Queue where name = ?
+
+## Code write candidates (per owner)
+- Create ETL Process Record {"variables-write":2,"sql-command":1,"crm-entity":1,"crm-sdk-create":1}
+- End ETL Process Record\ETL Record Finish {"crm-entity":3,"output-buffer":1,"crm-sdk-update":1}
+- End ETL Process Record\Get ETLProcessID {"output-buffer":2}
+- Get Valid Optionsets Values\Build Valid Values Dictionary {"sql-command":2}
+- Set Queue Id Variable\Set Queue Variable {"sql-command":2}
+- Write To ETLProcessCounter End {"variables-write":7,"crm-entity":2,"crm-sdk-create":1}
+
+## External refs (non-framework) CRM2015.Proxy

@@ -1,0 +1,272 @@
+{
+ "package": "0006_LeumiFile-MY-Distributor",
+ "dataFlows": [
+  "Package\\Foreach Loop Container\\Update Details from employer CustomerAccount"
+ ],
+ "analyst": "ssis-field-lineage",
+ "scriptOutputs": [
+  {
+   "component": "Package\\Foreach Loop Container\\Update Details from employer CustomerAccount\\Convert StopPaymentsReason And CompensationEligibility to Int",
+   "output": "Output 0",
+   "column": "StopPaymentsReasonValue",
+   "from": [
+    {
+     "column": "StopPaymentsReason",
+     "role": "value"
+    }
+   ],
+   "expression": "if (!Row.StopPaymentsReason_IsNull) Row.StopPaymentsReasonValue = GetValidValue(Row.StopPaymentsReason); else Row.StopPaymentsReasonValue = 0. GetValidValue: int.TryParse fails → -1; parsed int contained in {7701, 7700, 7699, 781, 5706, 6643, 6620, 6814, 773, 7203, 7350, 7560, 7559, 7558, 7666} → that int (e.g. \"0781\" → 781); any other int (incl. \"0\") → -1. Input StopPaymentsReason = file Stop_Provision_Reason_235 renamed by Aggregate and trimmed by 'Trim String Fields' (blank → NULL → 0).",
+   "condition": null,
+   "evidence": "main.cs:116-122,131-151 (component DTSX line 3949; code DTSX 4258-4293)"
+  },
+  {
+   "component": "Package\\Foreach Loop Container\\Update Details from employer CustomerAccount\\Convert StopPaymentsReason And CompensationEligibility to Int",
+   "output": "Output 0",
+   "column": "CompensationEligibilityValue",
+   "from": [
+    {
+     "column": "CompensationEligibility",
+     "role": "value"
+    }
+   ],
+   "expression": "if (!Row.CompensationEligibility_IsNull && Row.CompensationEligibility == \"1\") Row.CompensationEligibilityValue = 1; else Row.CompensationEligibilityValue = 0. Input CompensationEligibility = file Employer_Not_Eligible_Compensation_258 (wstr(1)) renamed by Aggregate; not trimmed (not an input of 'Trim String Fields').",
+   "condition": null,
+   "evidence": "main.cs:124-128 (component DTSX line 3949; code DTSX 4266-4270)"
+  },
+  {
+   "component": "Package\\Foreach Loop Container\\Update Details from employer CustomerAccount\\Convert indication fields to boolean",
+   "output": "Output 0",
+   "column": "isEndWorkDate",
+   "from": [
+    {
+     "column": "Is_Finish_Work_Date_150",
+     "role": "value"
+    }
+   ],
+   "expression": "if (!Row.IsFinishWorkDate150_IsNull && Row.IsFinishWorkDate150 == \"1\") Row.isEndWorkDate = true; else Row.isEndWorkDate = false (file Is_Finish_Work_Date_150, 1 char, untrimmed).",
+   "condition": null,
+   "evidence": "main.cs:118-122 (component DTSX line 3085; code DTSX 3327-3331)"
+  },
+  {
+   "component": "Package\\Foreach Loop Container\\Update Details from employer CustomerAccount\\Convert indication fields to boolean",
+   "output": "Output 0",
+   "column": "isProvisionDateUpdate",
+   "from": [
+    {
+     "column": "Is_Provision_Date_Update_131",
+     "role": "value"
+    }
+   ],
+   "expression": "if (!Row.IsProvisionDateUpdate131_IsNull && Row.IsProvisionDateUpdate131 == \"1\") Row.isProvisionDateUpdate = true; else Row.isProvisionDateUpdate = false (file Is_Provision_Date_Update_131, 1 char, untrimmed).",
+   "condition": null,
+   "evidence": "main.cs:124-128 (component DTSX line 3085; code DTSX 3333-3337)"
+  }
+ ],
+ "crmWrites": [
+  {
+   "component": "Package\\Foreach Loop Container\\Update Details from employer CustomerAccount\\Update Details from employer Fields CustomerAccount",
+   "identicalCopies": [],
+   "entity": "gen_customeraccount",
+   "verb": "UPDATE",
+   "mechanism": "SDK (CrmProxy(ServerName, OrganizationName).GetCrmService() → IOrganizationService.Update, one request per row, only attributes set in the Entity are sent)",
+   "status": "Supported",
+   "recordKey": "customerAccount.Id = Row.CustomerAccountID (main.cs:127-128). CustomerAccountID = gen_customeraccountid returned by full-cache Lookup 'Check CustomerAccount Exist' on Psql (Initial Catalog ALTSHULER_MSCRM): gen_customeraccount INNER JOIN gen_fundmain ON gen_customeraccountid = gen_fundmain.gen_customeraccountname, joined on gen_bankaccountnumber = RAW file Bank_Account_Number_27 (untrimmed, unpadded wstr(12)) AND gen_fundmain.gen_fundtypename = ProductId returned by Lookup 'Get fund type name(product)' (product JOIN gen_banks WHERE Gen_BankNumber = '10', ProductNumber = RAW file Course_Number_22) (DTSX 2961-3011, 7403-7439)",
+   "recordKeyColumns": [
+    "CustomerAccountID"
+   ],
+   "declaredRowFilters": [],
+   "condition": "Row read from 'Minhali Daily Source' (Read minhali data, 10 of 304 columns exposed) → Set Task Name Variable (pass-through) → Multicast Output 3; RAW Course_Number_22 must match ProductNumber of a product of bank '10' ('Get fund type name(product)' NoMatchBehavior=1, No Match output unconnected → row dropped silently); (RAW Bank_Account_Number_27, ProductId) must match a gen_customeraccount joined to gen_fundmain ('Check CustomerAccount Exist' No Match → Set Warning columns 1 → ETL Warning 1, no update); Aggregate groups by all 14 columns (AggregationType 0 = DISTINCT, DTSX 2836-2950); 'Get Source Account' does not filter (NoMatchBehavior 0 + IgnoreFailure, DTSX 7493/7519); service.Update only when isNeedToUpdate (≥1 attribute set), else DoNotNeedToUpdate output; any exception → Error output → ETL Warning (nothing written for that row)",
+   "attributes": [
+    {
+     "attribute": "gen_compensationeligibility",
+     "from": [
+      {
+       "column": "CompensationEligibilityValue",
+       "role": "value"
+      },
+      {
+       "column": "CompensationEligibility_DB",
+       "role": "condition"
+      }
+     ],
+     "expression": "new OptionSetValue(Row.CompensationEligibilityValue). Because of the guard (== 1) the only value ever written is OptionSetValue(1) = file Employer_Not_Eligible_Compensation_258 == \"1\"; file \"0\"/other/blank never writes (CRM value is never reset).",
+     "fixedValue": null,
+     "condition": "!Row.CompensationEligibilityValue_IsNull && Row.CompensationEligibilityValue == 1 && (Row.CompensationEligibilityDB_IsNull || Row.CompensationEligibilityValue != Row.CompensationEligibilityDB)",
+     "evidence": "main.cs:131-133 (DTSX 9756-9758)",
+     "upstream": "FILE Employer_Not_Eligible_Compensation_258 (#303, pos 1960, wstr(1)) → Get fund type name(product) / Check CustomerAccount Exist (key lookups, pass-through) → Aggregate group-by renamed CompensationEligibility → 'Convert StopPaymentsReason And CompensationEligibility to Int' CompensationEligibilityValue = (value == \"1\") ? 1 : 0 (main.cs:124-128). CompensationEligibility_DB = gen_customeraccount.gen_compensationeligibility from 'Check CustomerAccount Exist'."
+    },
+    {
+     "attribute": "gen_updateeligibilitydate",
+     "from": [
+      {
+       "column": "CompensationEligibilityValue",
+       "role": "condition"
+      },
+      {
+       "column": "CompensationEligibility_DB",
+       "role": "condition"
+      }
+     ],
+     "expression": "DateTime.Now (SSIS host local time, Kind Local) — set together with gen_compensationeligibility",
+     "fixedValue": null,
+     "condition": "same as gen_compensationeligibility: CompensationEligibilityValue == 1 && (CompensationEligibilityDB NULL or ≠ 1)",
+     "evidence": "main.cs:131,135 (DTSX 9756,9760)",
+     "upstream": null
+    },
+    {
+     "attribute": "gen_stoppaymentsreason",
+     "from": [
+      {
+       "column": "StopPaymentsReasonValue",
+       "role": "value"
+      },
+      {
+       "column": "StopPaymentsReason_DB",
+       "role": "condition"
+      }
+     ],
+     "expression": "(a) StopPaymentsReasonValue not NULL, ≠ 0, ≠ -1 (i.e. file code is one of the 15 accepted codes) and (StopPaymentsReasonDB NULL or ≠ value) → new OptionSetValue(Row.StopPaymentsReasonValue); (b) else if StopPaymentsReasonDB not NULL and StopPaymentsReasonValue == 0 (file blank → NULL) → null (clears the CRM value); value -1 (non-numeric or code not in list) → attribute not written.",
+     "fixedValue": null,
+     "condition": "(a) !StopPaymentsReasonValue_IsNull && value != 0 && value != -1 && (StopPaymentsReasonDB_IsNull || value != StopPaymentsReasonDB); (b) clear: !StopPaymentsReasonDB_IsNull && value == 0",
+     "evidence": "main.cs:139-152 (DTSX 9764-9777)",
+     "upstream": "FILE Stop_Provision_Reason_235 (#280, pos 1881-1884, wstr(4)) → lookups (pass-through) → Aggregate group-by renamed StopPaymentsReason → 'Trim String Fields' (Trim, \"\" → NULL, main.cs:36-58) → 'Convert StopPaymentsReason And CompensationEligibility to Int' StopPaymentsReasonValue: NULL → 0; int.TryParse fail → -1; int in {7701,7700,7699,781,5706,6643,6620,6814,773,7203,7350,7560,7559,7558,7666} → int; else -1 (main.cs:118-122,131-151). StopPaymentsReason_DB = gen_customeraccount.gen_stoppaymentsreason."
+    },
+    {
+     "attribute": "gen_stoppaymentsreportdate",
+     "from": [
+      {
+       "column": "StopPaymentsReportDate",
+       "role": "value"
+      },
+      {
+       "column": "StopPaymentsReportDate_DB",
+       "role": "condition"
+      }
+     ],
+     "expression": "DateTime.Parse(Row.StopPaymentsReportDate) (string 'yyyy/MM/dd' from Dates Format, DateTime Kind Unspecified) when the file date is not NULL and (CRM value NULL or (int)(fileDate − StopPaymentsReportDateDB).TotalDays != 0); when the file value is NULL (blank or invalid date nulled by Dates Format) and CRM has a value → null (clears CRM).",
+     "fixedValue": null,
+     "condition": "set: !StopPaymentsReportDate_IsNull && (StopPaymentsReportDateDB_IsNull || (int)((DateTime.Parse(file) − DB).TotalDays) != 0); clear: StopPaymentsReportDate_IsNull && !StopPaymentsReportDateDB_IsNull",
+     "evidence": "main.cs:154-168 (DTSX 9779-9793)",
+     "upstream": "FILE Stop_Provision_Date_236 (#281, pos 1885-1892, str(10) cp1255) → lookups (pass-through) → Aggregate group-by renamed StopPaymentsReportDate → 'Trim String Fields' (Trim, \"\" → NULL) → 'Dates Format' FormatYYYYMMDDtoDate: Trim().Length 8 'yyyyMMdd' → 'yyyy/MM/dd', 6 'yyyyMM' → 'yyyy/MM/01', other → NULL; NULL if !DateTime.TryParse or < 1900-01-01 (main.cs:46-88). StopPaymentsReportDate_DB = DATEADD(hour,3, gen_stoppaymentsreportdate) from 'Check CustomerAccount Exist'."
+    },
+    {
+     "attribute": "gen_endemploymentdate",
+     "from": [
+      {
+       "column": "EndEmploymentDate",
+       "role": "value"
+      },
+      {
+       "column": "EndEmploymentDate_DB",
+       "role": "condition"
+      }
+     ],
+     "expression": "DateTime.Parse(Row.EndEmploymentDate) (string 'yyyy/MM/dd' from Dates Format, Kind Unspecified). Never cleared: a NULL file value leaves CRM unchanged.",
+     "fixedValue": null,
+     "condition": "!EndEmploymentDate_IsNull && (EndEmploymentDateDB_IsNull || (int)((DateTime.Parse(file) − EndEmploymentDateDB).TotalDays) != 0)",
+     "evidence": "main.cs:170-178 (DTSX 9795-9803)",
+     "upstream": "FILE Employee_Work_End_Date_118 (#163, pos 1337-1344, wstr(10)) → lookups (pass-through) → Aggregate group-by renamed EndEmploymentDate (NOT trimmed: not an input of 'Trim String Fields') → 'Dates Format' FormatYYYYMMDDtoDate (main.cs:46-88; switch on str.Trim().Length but Substring on the untrimmed string). EndEmploymentDate_DB = DATEADD(hour,3, gen_endemploymentdate)."
+    },
+    {
+     "attribute": "gen_bankstoppaymentsreceivingdate",
+     "from": [
+      {
+       "column": "isProvisionDateUpdate",
+       "role": "condition"
+      },
+      {
+       "column": "isEndWorkDate",
+       "role": "condition"
+      }
+     ],
+     "expression": "DateTime.Now (SSIS host local time) — no comparison with CRM; re-stamped on every run while either file flag is \"1\".",
+     "fixedValue": null,
+     "condition": "(!isProvisionDateUpdate_IsNull && isProvisionDateUpdate == true) || (!isEndWorkDate_IsNull && isEndWorkDate == true), i.e. file Is_Provision_Date_Update_131 == \"1\" OR Is_Finish_Work_Date_150 == \"1\"",
+     "evidence": "main.cs:179-183 (DTSX 9804-9808)",
+     "upstream": "FILE Is_Provision_Date_Update_131 (#176, pos 1391) / Is_Finish_Work_Date_150 (#195, pos 1412) → lookups (pass-through) → Aggregate group-by → 'Convert indication fields to boolean' (== \"1\" → true else false, main.cs:118-128)."
+    },
+    {
+     "attribute": "gen_closingaccountdate",
+     "from": [
+      {
+       "column": "Fund_Cloase_Date_51",
+       "role": "value"
+      }
+     ],
+     "expression": "DateTime.TryParse(Row.FundCloaseDate51, out dateParseResult) → dateParseResult (string 'yyyy/MM/dd' from Dates Format). No comparison with CRM (no DB column read) → sent on every run for every row with a valid date; NULL never clears.",
+     "fixedValue": null,
+     "condition": "!Row.FundCloaseDate51_IsNull && DateTime.TryParse(Row.FundCloaseDate51, out dateParseResult)",
+     "evidence": "main.cs:185-189 (DTSX 9810-9814)",
+     "upstream": "FILE Fund_Cloase_Date_51 (#51, pos 425-432, wstr(10)) → lookups (pass-through) → Aggregate group-by (NOT trimmed) → 'Dates Format' FormatYYYYMMDDtoDate (main.cs:46-88)."
+    },
+    {
+     "attribute": "gen_sourceaccount",
+     "from": [
+      {
+       "column": "gen_sourceaccount",
+       "role": "value"
+      },
+      {
+       "column": "Source_Account_160",
+       "role": "condition"
+      },
+      {
+       "column": "gen_sourceaccountDB",
+       "role": "condition"
+      }
+     ],
+     "expression": "new EntityReference(\"gen_customeraccount\", Row.gensourceaccount) — gen_sourceaccount is Gen_customeraccountId returned by Lookup 'Get Source Account' (full cache, Gen_customeraccount, key right('000000000000'+Gen_bankaccountnumber, 12) = trimmed Source_Account_160). Never cleared.",
+     "fixedValue": null,
+     "condition": "!SourceAccount160_IsNull && !string.IsNullOrWhiteSpace(Row.SourceAccount160.Trim('0')) && !gensourceaccount_IsNull (lookup matched) && (gensourceaccountDB_IsNull || !gensourceaccountDB.Equals(gensourceaccount))",
+     "evidence": "main.cs:192-197 (DTSX 9817-9822); Get Source Account DTSX 7484-7498",
+     "upstream": "FILE Source_Account_160 (#205, pos 1429-1440, wstr(12)) → lookups (pass-through) → Aggregate group-by → 'Trim String Fields' (Trim, \"\" → NULL) → Lookup 'Get Source Account' (NoMatchBehavior 0, Match output IgnoreFailure → no match = NULL gen_sourceaccount, row continues). gen_sourceaccountDB = gen_customeraccount.gen_sourceaccount from 'Check CustomerAccount Exist'."
+    }
+   ],
+   "evidence": "main.cs:120-211 (component DTSX line 9501; code DTSX 9745-9836; Entity LogicalName \"gen_customeraccount\" main.cs:127; service.Update(customerAccount) main.cs:201)"
+  }
+ ],
+ "readWriteModifications": [
+  {
+   "component": "Package\\Foreach Loop Container\\Update Details from employer CustomerAccount\\Trim String Fields",
+   "column": "*",
+   "from": [],
+   "expression": "reflection over every string property of Input0Buffer (only StopPaymentsReason, StopPaymentsReportDate, Source_Account_160 are inputs): if (!String.IsNullOrEmpty(str)) str = str.Trim(); if (str == \"\") str = null; written back to the same column",
+   "condition": null,
+   "evidence": "main.cs:36-58 (component DTSX line 8688; code DTSX 8848-8870)"
+  },
+  {
+   "component": "Package\\Foreach Loop Container\\Update Details from employer CustomerAccount\\Dates Format",
+   "column": "*",
+   "from": [],
+   "expression": "FormatYYYYMMDDtoDate(str, input column length = 10) for StopPaymentsReportDate, EndEmploymentDate, Fund_Cloase_Date_51: length < 10 → NULL (not the case); NULL/\"\" → NULL; switch (str.Trim().Length) { 8: str.Substring(0,4) + \"/\" + str.Substring(4,2) + \"/\" + str.Substring(6,2); 6: str.Substring(0,4) + \"/\" + str.Substring(4,2) + \"/01\"; default: NULL }; NULL if !DateTime.TryParse(str) || date < 1900-01-01; written back",
+   "condition": null,
+   "evidence": "main.cs:26-34,46-88 (component DTSX line 4974; code DTSX 5124-5132,5144-5186)"
+  }
+ ],
+ "lookupBridges": [],
+ "unresolved": [
+  {
+   "where": "Update Details from employer Fields CustomerAccount (CrmProxy / GetCrmService)",
+   "reason": "blocked_external_dependency: CRM.Proxy assembly not supplied; target organisation comes from User::ServerName / User::OrganizationName set at runtime by 'Get Organization Variables' (plumbing). Only the Entity attribute assignments and the Update call in main.cs are proven."
+  },
+  {
+   "where": "gen_stoppaymentsreportdate / gen_endemploymentdate / gen_closingaccountdate / gen_updateeligibilitydate / gen_bankstoppaymentsreceivingdate",
+   "reason": "DateTime.Parse/TryParse depend on the SSIS host culture, and parsed values have DateTime.Kind Unspecified (DateTime.Now is Local); how the CRM SDK/proxy converts them to UTC is not provable from the DTSX. The comparison uses DATEADD(hour,3, CRM value), a fixed +3h offset regardless of DST."
+  },
+  {
+   "where": "Check CustomerAccount Exist / Get Source Account (full-cache lookups)",
+   "reason": "If several reference rows share the same key (same bank account + fund type across several gen_fundmain rows, or several customer accounts with the same right-12 zero-padded number) the row returned is not determined by the DTSX."
+  }
+ ],
+ "notes": [
+  "Scope: the lineage lists 4 CRM write components; only 'Update Details from employer Fields CustomerAccount' is business logic. 'ETL Warning' and 'ETL Warning 1' (Create gen_etlprocesswarning) and 'ETL Record Finish' (Update gen_etlprocess) are ETL plumbing and are not mapped; their open script outputs (ErrorText, gen_etlprocessid) are intentionally left unresolved.",
+  "Always-sent attributes: gen_closingaccountdate (any valid Fund_Cloase_Date_51) and gen_bankstoppaymentsreceivingdate (= DateTime.Now when Is_Provision_Date_Update_131 or Is_Finish_Work_Date_150 is \"1\") have no CRM comparison, so those rows send an Update on every run and the 'receiving date' is re-stamped with the run time daily while the flag stays \"1\".",
+  "Clearing asymmetry: gen_stoppaymentsreason is cleared (null) when the file reason is blank, and gen_stoppaymentsreportdate is cleared when the file date is blank OR invalid (Dates Format returns NULL for wrong length / unparsable / < 1900), whereas gen_endemploymentdate, gen_closingaccountdate, gen_sourceaccount and gen_compensationeligibility are never cleared. A reason code that is non-numeric or not in the 15-code list is silently ignored (-1), with no warning.",
+  "gen_compensationeligibility is only ever set to OptionSetValue(1), driven by file Employer_Not_Eligible_Compensation_258 == \"1\" (together with gen_updateeligibilitydate = DateTime.Now); it is never reset to another value. The business meaning of option 1 versus the field name 'Employer Not Eligible Compensation' is not provable (CRM metadata not supplied).",
+  "Inconsistent account-number normalisation: 'Check CustomerAccount Exist' matches the RAW 12-char Bank_Account_Number_27 (untrimmed, unpadded) to gen_bankaccountnumber as stored, while 'Get Source Account' matches TRIMMED (not zero-padded) Source_Account_160 to right('000000000000'+Gen_bankaccountnumber,12). Rows whose source account does not match are silently left without gen_sourceaccount (IgnoreFailure).",
+  "Aggregate groups by all 14 columns (DISTINCT): exact duplicate rows are collapsed, but two file rows for the same customer account with different values both reach the writer (two Updates, last processed wins), and both compare against the CRM values cached before the data flow ran.",
+  "'Trim String Fields' only receives StopPaymentsReason, StopPaymentsReportDate and Source_Account_160; Employee_Work_End_Date_118 and Fund_Cloase_Date_51 reach 'Dates Format' untrimmed (switch on Trim().Length, Substring on the untrimmed value).",
+  "Dead items: output columns 'Column 1' and 'Column' (i4) of 'Convert StopPaymentsReason And CompensationEligibility to Int' are never assigned or consumed; Multicast Output 2 is dangling; Multicast Output 1 only feeds a row counter.",
+  "No staging tables: all lookups read CRM (Psql / ALTSHULER_MSCRM) directly; no direct SQL DML to CRM in this package."
+ ]
+}

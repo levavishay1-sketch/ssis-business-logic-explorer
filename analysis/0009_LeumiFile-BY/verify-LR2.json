@@ -1,0 +1,223 @@
+{
+  "verifier": "ssis-verifier",
+  "package": "0009_LeumiFile-BY",
+  "scope": "logic-claims re-check round 2",
+  "checkedAt": "2026-11-07",
+  "checked": 16,
+  "results": [
+    {
+      "id": "L|summary",
+      "hash": "0dd87201ff5d",
+      "verdict": "WRONG",
+      "detail": "Re-derived: units 2-6 and 8-12 are correct. 25 precedence constraints in total (20 in the loop, 5 at package level); only DTSX:198639 has EvalOp 3 with @[User::isFileExist]; the rest are Success/LogicalAnd and form a single chain. isFileExist defaults to 0 (DTSX:664) and is set true only when files.Length > 0 (Set Files ScriptMain.cs:56, 82). The files are sorted ascending by LastWriteTime (ScriptMain.cs:69). There is no MaxErrorCount anywhere and no DTS:Disabled. Both OnError handlers have Propagate -1, and the FTR one is empty. The connection is CRM = ALTSHULER_MSCRM, and the package has no configurations. SQL DML on gen_ftrequestbase: INSERT x5, UPDATE existinfile x5, and 2 Execute SQL. All other CRM writes go through the SDK. Every side-output destination, its feeding point, its column list and Overwrite=true was checked, and MenualTN is not used by any component. Three units state meanings or effects as fact without proof. Unit 7 calls the Lookup Child Saving match 'חיסכון לילד'. Unit 13 calls the txt files 'עקבות אבחון' and says 'אינם משפיעים על CRM'. Unit 1 says the closing step affects 'בקשות פעילות'.",
+      "evidence": "DTSX:195311-195330, 198638-198642, 664, 42831-42838, 198645-198652, 189416, 189422, 94908 (Lookup Child Saving SQL), 346-571 (flat-file CMs), 106108/94865/106065/88180/93186/94136 (Overwrite=true); Set Files ScriptMain.cs:56-82; logic.json hypotheses_he of 'Create transferin from outside source'",
+      "wrongUnits": [
+        {
+          "unit": 7,
+          "problem": "'שורות שעברו את חלון התאריכים / חיסכון לילד' states as fact that the Lookup Child Saving match (gen_customeraccount.gen_productsubcustomeraccount = 3) means a child-savings account. The package's own hypotheses_he says this meaning comes only from the component name 'Lookup Child Saving' and that the label was not supplied.",
+          "correct": "Rows that passed the date window, or whose Dest_Account_Number_47 matched a gen_customeraccount with gen_productsubcustomeraccount = 3 (described as child savings only by the component name 'Lookup Child Saving', השערה).",
+          "evidence": "DTSX:94908-94928; Union All 2 inputs 1-2; logic.json hypotheses_he"
+        },
+        {
+          "unit": 13,
+          "problem": "'עקבות אבחון' gives a purpose that the files do not prove. 'אינם משפיעים על CRM' is a statement about consumers outside the supplied files (CLAUDE.md rules 4 and 13).",
+          "correct": "The txt files are written only (Overwrite=true, 3-4 columns). No component in any supplied package reads them, because these file names appear only in 0009. Whether they are diagnostic, and whether anything outside the supplied files reads them, is unknown (השערה).",
+          "evidence": "grep of the six file names over source/DailyProcess/*.dtsx: only 0009_LeumiFile-BY.dtsx; the only FlatFileSources in 0009 are the two BY sources"
+        },
+        {
+          "unit": 1,
+          "problem": "'סגירת בקשות פעילות' relies on the task name '1(active)' for the meaning of gen_status. It also omits that the closing SQL covers gen_status IS NULL as well.",
+          "correct": "Closing (gen_treatmentstatus=4, gen_status=0) of gen_ftrequest records with gen_status = 1 or NULL and gen_existinfile = 0. That 1 means 'active' is taken from the task name only.",
+          "evidence": "DTSX:189416 (WHERE gen_status = 1), 189422 (WHERE (gen_status=1 or gen_status is null) and gen_existinfile = 0)"
+        }
+      ]
+    },
+    {
+      "id": "L|finding#3",
+      "hash": "0d1ebd10eba0",
+      "verdict": "CONFIRMED",
+      "detail": "Inside the reject branch, GetRequestRejectReason always returns 45, 46 or 47, because the reason must be 7876, 7877 or 7878. Compare sets that value only when the DB value is not NULL and is different (main.cs:159-163). It sets -1 when the DB value is not NULL otherwise, which in practice means only when it equals the computed value (main.cs:164-168). Update TransferIn sends the attribute only when the value is -1 (as null, main.cs:134-135) or when the column is NULL (else-if, main.cs:136-139; runtime effect deferred to finding 2). A value of 45/46/47 matches neither branch, so it is never sent. No other component writes gen_requestrejectreason: the SDK Create code does not set it. All five Update TransferIn copies have the same code apart from whitespace.",
+      "evidence": "Compare Fields Before Update main.cs:158-168, 332-355 (DTSX:82621); Update TransferIn 1 main.cs:134-139 (DTSX:114633); grep gen_requestrejectreason in DTSX: only lookup/Compare/Update columns",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Foreach Loop Container\\Create transferin Maslulim|detailed",
+      "hash": "bbf9a8d3c569",
+      "verdict": "WRONG",
+      "detail": "Re-derived: Childe Saving handel replaces 5006 with 1025 on both sides (main.cs:120-129). The trailer filter is in place (DTSX:123013). The filter expression is exact (DTSX:125648). get tranferin has no state filter and its Match output is not connected. Conditional Split sends =='2' to the right input and everything else to the default 'Transfer Direction 1' on the left. Sort and Sort 1 have EliminateDuplicates=true. The Merge Join is JoinType 2 with 3 keys. Get source customer account matches on gen_id + gen_bankaccountnumber and its No Match output is not connected. Set Additional fields sets 5 and 1. SDK ExecuteMultiple runs in batches of 20 in five identical copies, and the outcome in unit 29 is conditional and correct. Two units are wrong. Unit 8 states the meaning 'מסלול פיננסי' as fact. Unit 19's paraphrase does not match the code.",
+      "evidence": "DTSX:123046, 123013, 125648, 125614, 126487, 123924, 133879, 133954, 126537, 125687, 126402, 133126, 126758; Filter Last Two Month main.cs:31-37",
+      "wrongUnits": [
+        {
+          "unit": 8,
+          "problem": "'האם מדובר במסלול פיננסי?' states that TransferBetweenCoursesType_208 = 8776 means a financial course. The only basis is the component/output name 'Filter Financial Course'. No code comment, constant or other supplied package says this: 0008 uses '08776' without explanation.",
+          "correct": "Is Subject_56 == \"57\" and TransferBetweenCoursesType_208 == \"8776\"? Calling this a financial course comes from the component name only (השערה).",
+          "evidence": "DTSX:125614; 0008_LeumiFile-PY.dtsx:67195"
+        },
+        {
+          "unit": 19,
+          "problem": "'האם תאריך הביצוע של הבקשה בחודשיים האחרונים?' excludes future dates, but the code passes every parsable date later than UtcNow minus 2 months, including future dates.",
+          "correct": "Is the execution date (parsed he-IL) later than the current UTC time minus two months? Future dates also pass. NULL or unparsable dates are dropped.",
+          "evidence": "Filter Last Two Month main.cs:31-37 (DTSX:125687)"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Foreach Loop Container\\Create transferin Maslulim|detail",
+      "hash": "dc7d33e2ce1c",
+      "verdict": "CONFIRMED",
+      "detail": "Source renames come from externalMetadataColumnId: Execution_Date_54 -> gen_deliverydate, Request_Id_73 -> gen_requestidentifier, Transaction_Id_91 -> gen_transferid, Revaluation_Date_1 -> CheckLastRow. Transaction_Id_91 is not a Merge Join input. In the Merge Join output, gen_bankaccountnumber comes from the left Source_Account_Number_20 and gen_id from the left Source_Fund_Type_16; Append Zeros pads both. TreatNullsAsEqual is true and there are 3 keys. SDK Create main.cs:72-133 writes exactly the listed attributes (TRANSFERIN_CREATION_SOURCE_LEUMI_BY=1). Unit 5's conditions for step 17 match: get tranferin uses gen_currentstate = 1 (DTSX:4991); get source fund is bank 10 with productnumber=Source_Course_Id_17 and account=Source_Account_Number_20 (DTSX:4850); get dest fund is bank 10 with inner joins to Contact and Gen_agentcontract on Dest_Account_Number_47/Dest_Course_Id_44 (DTSX:4691); the existence lookups are DTSX:2940 and 3033; and No Match on every lookup is not connected.",
+      "evidence": "DTSX:126651-126760, 126537-126650, 122208, 126402, 126758 main.cs:69-155; DTSX:4991, 4850, 4691, 2940, 3033, 20384",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Foreach Loop Container\\Create transferin from outside source|detailed",
+      "hash": "c5097aa15f08",
+      "verdict": "WRONG",
+      "detail": "Units 1-17, 19-73 and 75-81 were re-derived and are correct. That covers the trailer and subject filters; the 22/02/2020 DATEDIFF; Convert Data Types needing at least one TryParse to succeed, with Error -> Derived Column as a dead end; both lookups with IgnoreFailure (DTSX:94506, 94616); DaysCount precedence ((new || excluded) ? 10 : 120); the window with NULL/outside going to unconnected outputs; Get Contact BirthDate (style 103, IgnoreFailure) and Get Transactions (key Gen_transferinId, No Match -> NULL valuedate); the Approval -> Reject -> Deposit ifs and their override order (main.cs:139-188); the reject-reason handling; the needToUpdate split; Update TransferIn; annotations for update/no-update rows only (Union All Input 3 = ProcessNumber + TransferinID, DTSX:108245); competitor, customer-account and fund drops; and First / remove duplications. Two units are wrong. Unit 18 states the child-savings meaning as fact, against the package's own hypothesis label. Unit 74 says 'ריקים' (empty), but only NULL passes the check.",
+      "evidence": "DTSX:82553, 94058, 82520, 85259, 94465, 94543, 94908, 104469, 94094, 94832, 94195, 94713, 85226, 82586, 95159, 94250, 94315, 105151, 96201, 104324, 87181, 108245; Compare main.cs:127-313; Update TransferIn main.cs:122-191; Create Annotation main.cs:66-145; Trim All Input Columns main.cs:42-49",
+      "wrongUnits": [
+        {
+          "unit": 18,
+          "problem": "'האם חשבון היעד הוא חשבון חיסכון לילד?' states as fact that gen_productsubcustomeraccount = 3 means child savings. The component's own hypotheses_he says this rests only on the component name 'Lookup Child Saving'. This contradicts another claim of the same package.",
+          "correct": "Does Dest_Account_Number_47 match a gen_customeraccount with gen_productsubcustomeraccount = 3? The child-savings meaning comes only from the component name (השערה).",
+          "evidence": "DTSX:94908-94928; logic.json hypotheses_he (Create transferin from outside source)"
+        },
+        {
+          "unit": 74,
+          "problem": "'האם סיבת הסטטוס ומדד אישור ההעברה ריקים או מספריים?' says empty values pass. The code accepts only NULL (_IsNull). An empty string goes to int.TryParse, fails, and sets isValidRecord=false, so the row goes to the unconnected Error output. Trim All Input Columns keeps \"\" as \"\" and does not convert it to NULL.",
+          "correct": "Is each of Transfer_Status_Reason_89 and Transfer_Approval_Index_122 either NULL or an int.TryParse-able number? An empty or blank (\"\") value fails, and the request is not created.",
+          "evidence": "Convert gen_isActive from char to int main.cs:135-168 (DTSX:87181); Trim All Input Columns main.cs:44-48"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Foreach Loop Container\\Create transferin from outside source|detail",
+      "hash": "5470ba859ed9",
+      "verdict": "WRONG",
+      "detail": "Units 3-7 are correct. The create field list matches SDK Create main.cs:72-172 exactly: gen_clientstatus only when genIsActive is not NULL and != 0; statusleumi including 0; ToLocalTime on the appendix and cancellation dates but not on bankingreceiveddate; transferid, accountnumbersrctext and sourcefundnumber from Source_Account_Number_20; fundfinanceid from the competitor RIGHT(...,6); mislakanumber unconditional; currentdeposits; amounts 0.0; and the lookups. The update list matches Update TransferIn main.cs:128-178, including the else-if branch. The annotation behaviour matches Create Annotation main.cs:66-145: 12 code->subject mappings, AllDirectories, archive move, and stop at the first failing document. The match conditions in unit 2 are exact. Two meanings are stated as fact without proof.",
+      "evidence": "DTSX:94024, 94908, 94465, 94543, 94250, 94315; SDK Create gen_TransferIn 1 main.cs:63-217 (DTSX:96956); Update TransferIn 1 main.cs:122-191; Create Annotation main.cs:66-145",
+      "wrongUnits": [
+        {
+          "unit": 2,
+          "problem": "'חשבון חיסכון לילד: gen_customeraccount WHERE gen_productsubcustomeraccount = 3' states the child-savings meaning as fact. The package's hypotheses_he labels it as resting on the component name only.",
+          "correct": "Lookup Child Saving: gen_customeraccount WHERE gen_productsubcustomeraccount = 3 by Dest_Account_Number_47. The child-savings meaning comes from the component name only (השערה).",
+          "evidence": "DTSX:94908; logic.json hypotheses_he"
+        },
+        {
+          "unit": 1,
+          "problem": "'שאינן מסלול פיננסי' states as fact that TransferBetweenCoursesType_208 = 8776 means a financial course. The only basis is the component name 'Filter Financial Course'.",
+          "correct": "Rows that do not meet Subject_56 == \"57\" && TransferBetweenCoursesType_208 == \"8776\". This filter has no effect after the Subject_56 == \"56\" filter. 'Financial course' comes from the component name only.",
+          "evidence": "DTSX:94024"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Foreach Loop Container\\Create transferin from outside source|decisions",
+      "hash": "76f0c9687a96",
+      "verdict": "WRONG",
+      "detail": "Decisions 1-2, 4 and 6-23 match the DTSX and code exactly. That includes the conditions, the unconnected outputs, the DaysCount precedence, ProductTypeId, First / remove duplications, set additional fields, the Convert gen_isActive quote, the IsNationalInsuranceApproval/Reject/DepositRecivingCondition quotes and their override outcomes, the string date comparisons, the mislaka condition, status > 0, the MapLeumiStatus table (identical in Compare and in Create), the needToUpdate split, and round-robin ProcessNumber (Add Row Number code is identical across all copies). Decisions 3 and 5 give name-derived meanings as fact.",
+      "evidence": "DTSX:82553, 94058, 94024, 82520, 94908, 104469, 94094, 94832, 82586, 95159, 94250, 94315, 105151, 96201, 104324, 87181, 85226, 105894, 105951, 106008; Compare main.cs:27-35, 192-234, 238-313, 357-380; Add Row Number main.cs:117-151",
+      "wrongUnits": [
+        {
+          "unit": 3,
+          "problem": "meaning_he 'מסלול פיננסי' for TransferBetweenCoursesType_208 == \"8776\" is taken only from the component name 'Filter Financial Course'.",
+          "correct": "Mark it as the component name / השערה. The outcome text (no effect after the Subject_56 == \"56\" filter) is correct.",
+          "evidence": "DTSX:94024"
+        },
+        {
+          "unit": 5,
+          "problem": "meaning_he 'חשבון היעד הוא חשבון חיסכון לילד' states as fact a meaning that the package's hypotheses_he labels as coming from the component name only.",
+          "correct": "Dest_Account_Number_47 matches a gen_customeraccount with gen_productsubcustomeraccount = 3. Child savings comes from the component name 'Lookup Child Saving' only (השערה).",
+          "evidence": "DTSX:94908; logic.json hypotheses_he"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Foreach Loop Container\\Create transferout|detailed",
+      "hash": "159dc69dd5b2",
+      "verdict": "CONFIRMED",
+      "detail": "Flow re-derived from the paths: Trim -> Filter for transferout (exact) -> Sort with EliminateDuplicates=true on the key Mislaka_Number_152 only -> Convert Dates -> Append Zeros -> Get source customer account (Match -> Union All Input 2; No Match -> Get contact -> Set current state 5 -> Input 1; contact No Match not connected) -> Get source competitor (RIGHT('000000'+..,6) = Dest_Curator_Course_Id_45; No Match not connected) -> get tranferout by gen_clearinghousenumber (No Match -> create; Match -> !ISNULL && != 3; Default not connected). Create TransferOut main.cs:62-181: CastingError on NULL or empty mislaka; the currentstate/isfulltransfer logic; transferaction 2 and bankadvisingreason 10, whose meanings come from code comments in Update TransferOut main.cs:91, 93; customerstatus only when Is_Active_92 is not NULL; MapLeumiStatus returns null for unmapped codes; AddWorkingDays(10) with BlackHole and lastpreservationdate = -1. Update TransferOut main.cs:62-204 compares field by field; requestdate, deliverydate, lastpreservationdate and treasury number are always written; the update runs only when Attributes.Count > 0. Annotations go only to Created/Updated rows via Union All 1, which also carries the Doc columns from Created, with objectid gen_customercare. All 5 copies of each SDK script are identical.",
+      "evidence": "DTSX:156042, 155628, 156293, 155784, 155662, 156266, 155717, 155853, 139024; Create TransferOut 1 main.cs:62-244 (DTSX:145169); Update TransferOut 1 main.cs:62-204 (DTSX:163788); Create Annotations main.cs:66-117; DTSX:163408, 163473",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Foreach Loop Container\\Create transferout|detail",
+      "hash": "37e5ab6beaa9",
+      "verdict": "CONFIRMED",
+      "detail": "Create field list and rules match main.cs:64-169. That covers the mislaka requirement; isfulltransfer for 01/02; state 5/1/4; constants 2 and 10; the customerstatus guard on Is_Active_92 NULL and its chain; statusleumi = MapLeumiStatus whenever Request_Status_58 is not NULL, with null sent for unmapped or non-numeric codes (table checked at main.cs:223-240); requestdate; deliverydate (+10 working days with the BlackHole fix-up); lastpreservationdate; the other dates including originalreceiveddate from Revaluation_Date_1; the lookups; destbankaccountnumber; clearinghousenumber; and the TrimStart('0') treasury number. The update list matches Update main.cs:69-190. Each field is written only when it differs, except requestdate, deliverydate, lastpreservationdate and treasury number. State is recomputed and written when it differs. customerstatus requires Is_Active_92 not NULL, and the chain falls through when CRM already has 2. Unmapped statusleumi is not sent. The CalendarRule SQL reads the whole table, so the loop bound on dt.Rows.Count is not limiting in practice.",
+      "evidence": "Create TransferOut 1 main.cs:62-244; Update TransferOut 1 main.cs:62-204; DTSX:155784, 155662, 155717, 155853; Get closer dates from CalendarRule table SQL",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Foreach Loop Container\\Create transferout|decisions",
+      "hash": "3503e04261c2",
+      "verdict": "CONFIRMED",
+      "detail": "All 11 decisions match: the filter; the customer-account lookup (Match -> Union All, No Match -> Get contact); Get contact + Set current state = 5 with No Match not connected; competitor on the padded key with No Match not connected; get tranferout by clearing-house number; the state split, whose Default (3 or NULL) is not connected; CastingError on empty mislaka; the create state code quote (main.cs:74-90); AddWorkingDays and BlackHole (main.cs:184-207); round-robin split; and the Update state and customer-status quotes (main.cs:69-101).",
+      "evidence": "DTSX:155628, 155784, 155662, 156266, 155717, 155853, 139024; Create TransferOut 1 main.cs:64-90, 184-212; Update TransferOut 1 main.cs:69-101",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Foreach Loop Container\\Update Account|title",
+      "hash": "2cc1c5042cfb",
+      "verdict": "CONFIRMED",
+      "detail": "The flow order matches the paths: Rread BY_FileData_2 -> trailer filter -> Append Zeros (Source_CustomerID_4) -> Primary Conditions -> Select Employer ID -> Aggregate (13 group-by + count) -> Sort (Source_CustomerID_4 asc, Date_creation_deposit_source_file_125 desc) -> Trim -> Set Account Details (first row per employer) -> Get Account Details (No Match not connected) -> ExecuteMultiple in batches of 10, five copies. Copies 1=5 and 2=3=4 differ only in comments and whitespace. The short text matches the code. The names are not updated from the file, because Insert To BY_FileData_2 has no input for Employer_Details_First_Name_119/Last_Name_120 (finding 24). Action_Type_56 in layout 2 sits at the same bytes as Subject_56 in layout 1 (342-343).",
+      "evidence": "DTSX:179793, 179530, 178756, 179741, 179877, 178604, 181693, 182838, 179906, 179593, 182984; DTSX:190107-190108 (no input mapped), 331-332; flat-file widths (BY source / BY source 2)",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Foreach Loop Container\\Update Account|short",
+      "hash": "0a234afb15c8",
+      "verdict": "CONFIRMED",
+      "detail": "Population (subject 68, operation 01, source file 7844, with a phone), latest row per employer, the account lookup with No Match dropped, the update of phone, mobile and e-mail only when changed (mobile and e-mail also validated), and no name update from the file all match Update Account main.cs:48-73 and finding 24.",
+      "evidence": "DTSX:179741, 181693, 179906, 179593; Update Account 1 main.cs:48-73",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Foreach Loop Container\\Update Account|detailed",
+      "hash": "91dfb2b48201",
+      "verdict": "WRONG",
+      "detail": "Units 1-15 and 17-21 are correct. That covers the BY_FileData_2 trailer filter; the exact Primary Conditions expression with FailComponent on conversion error, where the failure branch is worded conditionally and labelled hypothesis; Select Employer ID; Aggregate/Sort/first row; the accountnumber lookup with No Match not connected; the write attributes with updatedate = DateTime.Now; and ExecuteMultiple in batches of 10. Unit 16 misstates the mobile validation.",
+      "evidence": "DTSX:179741-179758, 179877, 178604, 181693, 179906, 179593; Update Account 1 main.cs:48-73, 134-149",
+      "wrongUnits": [
+        {
+          "unit": 16,
+          "problem": "The tech text says 'נייד: 10 ספרות שמתחיל ב-05 אחרי הסרת מקפים'. fnSetMobilePhone checks only Length == 10 and Substring(0,2) == \"05\" after Replace(\"-\",\"\"). It never checks that the characters are digits.",
+          "correct": "Mobile: 10 characters after removing '-', starting with \"05\". There is no digit check, and the value written is the original file value, dashes included.",
+          "evidence": "Update Account 1 main.cs:60-62, 140-149"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Foreach Loop Container\\Update Account|detail",
+      "hash": "2c64e4a08d10",
+      "verdict": "CONFIRMED",
+      "detail": "Employer_Details_* exist only in layout 2. They sit at 0-based bytes 1764-1893, which is 1-based positions 1765-1894, computed from the BY source 2 column widths. Labelling the numbers as 0-based would avoid ambiguity, but they are correct as offsets. The lookup has no padding on the CRM side. Set Account Details outputs a row only when the employer number changes (main.cs:33-49). The attribute list and validation are exact: telephone has no validity check, mobile is length 10 starting 05 after removing dashes, e-mail is validated by Regex, and updatedate is set. The name branches exist in the code, but the staging columns receive no input (DTSX:190107-190108, finding 24). The DDL caveat is stated.",
+      "evidence": "DTSX:331-335 (widths), 179593, 179906 main.cs:33-68, 182984 main.cs:41-149, 190107-190108",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Foreach Loop Container\\Update Account|decisions",
+      "hash": "92f77b0ad73a",
+      "verdict": "WRONG",
+      "detail": "Decisions 1-4 and 6 are exact. That includes the equivalence Action_Type_56 = Subject_56, proven by both sitting at bytes 342-343 in the two layouts; FailComponent (DTSX:179755); the sort keys (1 asc, -2 desc); and round-robin. The decision 5 condition quote is exact, but its meaning text misstates the mobile check.",
+      "evidence": "DTSX:179530, 179741-179758, 179877, 181693; Update Account 1 main.cs:48-70, 134-149; layout offsets from BY source / BY source 2",
+      "wrongUnits": [
+        {
+          "unit": 5,
+          "problem": "meaning_he says 'נייד: ללא מקפים, 10 ספרות, מתחיל ב-\"05\"'. The code checks only length 10 and the \"05\" prefix after removing '-'. There is no digit check.",
+          "correct": "Mobile: after removing '-', length 10 and starting with \"05\". There is no check that the characters are digits.",
+          "evidence": "Update Account 1 main.cs:140-149"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Foreach Loop Container\\Update Account|crm",
+      "hash": "581d956ec93b",
+      "verdict": "CONFIRMED",
+      "detail": "The account Update goes through the SDK: an ExecuteMultipleExtension of RequestType.Update. It runs only when Attributes.Count > 0, that is when the employer was found and at least one of phone, mobile or e-mail changed (mobile and e-mail must also be valid). The name branches never fire from the file (finding 24).",
+      "evidence": "Update Account 1 main.cs:44-77, 90-93 (DTSX:182986); DTSX:179593",
+      "wrongUnits": []
+    }
+  ],
+  "missingWrites": []
+}

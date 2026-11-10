@@ -1,0 +1,120 @@
+# 0023_Employers.dtsx · D80294BF167175115A3B0CE62F8BDC659E4C43E3656D75BDF0AF83B208CFDF24
+
+## Connection managers
+- [CRM] OLEDB Data Source=Psql;Initial Catalog=ALTSHULER_MSCRM;Integrated Security=SSPI;  
+- [MF Source] FLATFILE C:\Banks Source Files\Leumi Source Files\הטבות מעסיקים.csv  FLAT Delimited cp1255 cols=8
+- [SRS.SSIS_Logs] OLEDB  EXPR ConnectionString=@[User::ConnStringSrsSsis_Logs] 
+
+## Executables (disabled marked !)
+-   Check File Existence | Microsoft.ScriptTask  
+-   Create ETL Process record | Microsoft.ScriptTask  
+-   End ETL Process record | Microsoft.Pipeline  
+-   Get Variables From SystemConfigurarion | Microsoft.Pipeline  
+-   Move FileTo Archive | Microsoft.FileSystemTask  
+-   Set MF on employers | Microsoft.Pipeline  
+-   Update employer amount | Microsoft.Pipeline  
+-   Package.EventHandlers[OnError] | EventHandler  
+-   Package.EventHandlers[OnError]\Error ETL Process record | Microsoft.ScriptTask  
+
+## Precedence
+- Get Variables From SystemConfigurarion -> Create ETL Process record | Success Constraint   
+- Create ETL Process record -> Check File Existence | Success Constraint   
+- Set MF on employers -> Move FileTo Archive | Success Constraint   
+- Update employer amount -> End ETL Process record | Success Constraint   
+- Check File Existence -> Set MF on employers | Success ExpressionAndConstraint @[User::isFileExist]  
+- Check File Existence -> Update employer amount | Success ExpressionAndConstraint !@[User::isFileExist]  
+- Move FileTo Archive -> Update employer amount | Success Constraint   
+
+## DataFlow End ETL Process record
+  - ETL Record Finish | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 2 out 0
+  - Get gen_etlprocessid | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 0 out 1
+  - Lookup | Lookup  | conn [CRM]  | in 1 out 1
+     path Lookup.Outputs[Lookup Match Output] => ETL Record Finish.Inputs[Input 0]
+     path Get gen_etlprocessid.Outputs[Output 0] => Lookup.Inputs[Lookup Input]
+
+## DataFlow Get Variables From SystemConfigurarion
+  - Get SystemConfigurations | OLEDBSource  | conn [CRM]  | in 0 out 2
+  - Set Variables | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 2 out 0
+     path Get SystemConfigurations.Outputs[OLE DB Source Output] => Set Variables.Inputs[Input 0]
+
+## DataFlow Set MF on employers
+  - Check Fund type | ConditionalSplit  | conn   | in 1 out 0
+  - Check If Date Valid | ConditionalSplit  | conn   | in 4 out 0
+  - Check if employer exist | ConditionalSplit  | conn   | in 1 out 0
+  - convert | DerivedColumn  | conn   | in 6 out 6
+  - Create | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 6 out 1
+  - ETL Warning 1 | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 4 out 0
+  - Get Employer Nunmer | OLEDBSource  | conn [CRM]  | in 0 out 3
+  - Merge Join | MergeJoin  | conn   | in 14 out 13
+  - MF Source File | FlatFileSource  | conn [MF Source]  | in 0 out 8
+  - Set Pension Fund Columns | DerivedColumn  | conn   | in 5 out 5
+  - Set Study Fund Columns | DerivedColumn  | conn   | in 5 out 5
+  - Set Warning columns 1 | DerivedColumn  | conn   | in 0 out 4
+  - Set Warning columns 1 1 | DerivedColumn  | conn   | in 1 out 4
+  - Set Warning columns 1 2 | DerivedColumn  | conn   | in 1 out 4
+  - Sort | Sort  | conn   | in 11 out 11
+  - Sort 1 | Sort  | conn   | in 3 out 3
+  - TRIM | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 8 out 0
+  - Union All | UnionAll  | conn   | in 14 out 7
+  - Union All 1 | UnionAll  | conn   | in 12 out 6
+  - Union All 2 | UnionAll  | conn   | in 21 out 11
+     path Check If Date Valid.Outputs[Default Output] => Set Warning columns 1.Inputs[Derived Column Input]
+     path Check If Date Valid.Outputs[Deposit Date Valid] => Union All 1.Inputs[Union All Input 1]
+     path convert.Outputs[Derived Column Output] => Sort.Inputs[Sort Input]
+     path Set Pension Fund Columns.Outputs[Derived Column Output] => Union All.Inputs[Union All Input 2]
+     path Set Study Fund Columns.Outputs[Derived Column Output] => Union All.Inputs[Union All Input 1]
+     path Set Warning columns 1 2.Outputs[Derived Column Output] => Union All 2.Inputs[Union All Input 3]
+     path Set Warning columns 1 1.Outputs[Derived Column Output] => Union All 2.Inputs[Union All Input 2]
+     path Set Warning columns 1.Outputs[Derived Column Output] => Union All 2.Inputs[Union All Input 1]
+     path Check if employer exist.Outputs[Employer exist] => Check Fund type.Inputs[Conditional Split Input]
+     path Check if employer exist.Outputs[Employer not exist] => Set Warning columns 1 1.Inputs[Derived Column Input]
+     path Create.Outputs[Error] => Set Warning columns 1 2.Inputs[Derived Column Input]
+     path MF Source File.Outputs[Flat File Source Output] => TRIM.Inputs[Input 0]
+     path Merge Join.Outputs[Merge Join Output] => Check if employer exist.Inputs[Conditional Split Input]
+     path Check If Date Valid.Outputs[MF Accumulation Date Valid] => Union All 1.Inputs[Union All Input 3]
+     path Get Employer Nunmer.Outputs[OLE DB Source Output] => Sort 1.Inputs[Sort Input]
+     path TRIM.Outputs[Output 0] => convert.Inputs[Derived Column Input]
+     path Check Fund type.Outputs[Pension Fund] => Set Pension Fund Columns.Inputs[Derived Column Input]
+     path Sort 1.Outputs[Sort Output] => Merge Join.Inputs[Merge Join Right Input]
+     path Sort.Outputs[Sort Output] => Merge Join.Inputs[Merge Join Left Input]
+     path Check Fund type.Outputs[Study Fund] => Set Study Fund Columns.Inputs[Derived Column Input]
+     path Union All 1.Outputs[Union All Output 1] => Create.Inputs[Input 0]
+     path Union All 2.Outputs[Union All Output 1] => ETL Warning 1.Inputs[Input 0]
+     path Union All.Outputs[Union All Output 1] => Check If Date Valid.Inputs[Conditional Split Input]
+
+## DataFlow Update employer amount
+  - Check if to update | ConditionalSplit  | conn   | in 4 out 0
+  - get employers | OLEDBSource  | conn [CRM]  | in 0 out 5
+  - Union All | UnionAll  | conn   | in 20 out 5
+  - Update Account | OLEDBCommand  | conn [CRM]  | in 3 out 0
+     path get employers.Outputs[OLE DB Source Output] => Check if to update.Inputs[Conditional Split Input]
+     path Union All.Outputs[Union All Output 1] => Update Account.Inputs[OLE DB Command Input]
+     path Check if to update.Outputs[Update] => Union All.Inputs[Union All Input 1]
+     path Check if to update.Outputs[Update2] => Union All.Inputs[Union All Input 2]
+     path Check if to update.Outputs[Update3] => Union All.Inputs[Union All Input 3]
+     path Check if to update.Outputs[Update4] => Union All.Inputs[Union All Input 4]
+
+## SQL statements
+- End ETL Process record\Lookup | Microsoft.Lookup.SqlCommand | [CRM] 
+    select p.gen_etlprocessid , case when pw.gen_etlprocessid is null then 0 else 1 end as isWarningExist from gen_etlprocess p left join (select distinct gen_etlprocessId from gen_etlprocesswarning ) as pw on p.gen_etlprocessId = pw.gen_etlprocessId
+- End ETL Process record\Lookup | Microsoft.Lookup.SqlCommandParam | [CRM] 
+    select * from (select p.gen_etlprocessid , case when pw.gen_etlprocessid is null then 0 else 1 end as isWarningExist from gen_etlprocess p left join (select distinct gen_etlprocessId from gen_etlprocesswarning ) as pw on p.gen_etlprocessId = pw.gen_etlprocessId) [refTable] where [refTable].[gen_etlprocessid] = ?
+- Get Variables From SystemConfigurarion\Get SystemConfigurations | Microsoft.OLEDBSource.SqlCommand | [CRM] 
+    SELECT gen_key ,gen_Value FROM gen_etlvariable where gen_scope ='global' or gen_scope = ?
+- Set MF on employers\Get Employer Nunmer | Microsoft.OLEDBSource.SqlCommand | [CRM] 
+    select gen_corporatenumber, Gen_employersid, product.ProductTypeCode from Gen_employers join product on productid = gen_fundtypename
+- Update employer amount\get employers | Microsoft.OLEDBSource.SqlCommand | [CRM] 
+    SELECT accountid , case when SUM(ISNULL(gen_fundmain.gen_accountbalance,0)) = 0 then 0 else ( SUM(ISNULL(gen_fundmain.Gen_AccountBalance,0) * gen_fundmain.Gen_managementFeePercentage) ) / SUM(ISNULL(gen_fundmain.gen_accountbalance,0)) end AS Gen_employeesweightedmanagementfee , SUM(ISNULL(gen_fundmain.gen_accountbalance,0)) AS Gen_EmployeesFundsValue, Gen_employeesweightedmanagementfee as Gen_empl
+- Update employer amount\Update Account | Microsoft.OLEDBCommand.SqlCommand | [CRM] 
+    UPDATE dbo.AccountBase SET Gen_EmployeesFundsValue = ?, Gen_employeesweightedmanagementfee = ? where accountid = ?
+
+## Code write candidates (per owner)
+- Check File Existence {"variables-write":3,"crm-sdk-create":1}
+- Create ETL Process record {"crm-entity":1,"crm-sdk-create":1,"variables-write":1}
+- End ETL Process record\ETL Record Finish {"sql-command":2,"crm-entity":3,"output-buffer":1,"crm-sdk-update":1}
+- End ETL Process record\Get gen_etlprocessid {"sql-command":2,"output-buffer":2}
+- Set MF on employers\Create {"sql-command":2,"crm-entity":1,"crm-sdk-execute":3,"output-buffer":1}
+- Set MF on employers\ETL Warning 1 {"crm-entity":3,"crm-sdk-create":1}
+- Package.EventHandlers[OnError]\Error ETL Process record {"crm-entity":4,"crm-sdk-update":1,"crm-sdk-create":1}
+
+## External refs (non-framework) CRM2015.Proxy

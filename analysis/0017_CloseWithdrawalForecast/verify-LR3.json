@@ -1,0 +1,136 @@
+{
+  "verifier": "ssis-verifier",
+  "package": "0017_CloseWithdrawalForecast",
+  "scope": "logic-claims re-check round 3",
+  "checkedAt": "2026-11-07",
+  "checked": 15,
+  "results": [
+    {
+      "id": "L|summary",
+      "hash": "e8f561641432",
+      "verdict": "WRONG",
+      "detail": "summary_he status logic verified against both main.cs (auto: default 14, 3 if min=max=4, 15 on partial + Truncate(Abs) mismatch; manual: default 3, 15 likewise), the 54/5 filter, partition requirement, five written attributes with ToLocalTime. Also missing from summary_he (INCOMPLETE on its own): the row-selection date condition - transactions count only if ft.gen_valuedate >= gen_datesenttothebank (auto; NULL never matches, ownership unknown) or gen_valuedate >= w.CreatedOn (manual, full datetime). scopeNote_he otherwise verified: single CM [CRM] (DTSX:4-7), EnableConfig=True (DTSX:1), config C:\\Generix\\SSISConfigFile.dtsConfig (DTSX:11), sources only (no OLE DB Command / Execute SQL / file / destination), only business write = SDK Update of gen_withdrawal (DTSX:191, 1485); other SDK calls are ETL framework (DTSX:2456, 2996, 5496, 5505).",
+      "evidence": "0017_CloseWithdrawalForecast.dtsx:1094-1138, 2176-2218, 122-229 (auto main.cs), 1414-1514 (manual main.cs), 1, 4-7, 11, 119, 1557",
+      "wrongUnits": [
+        {
+          "unit": "scopeNote_he 'CRM.Proxy / ExecuteMultipleExtension הם אסמבלי חיצוני'",
+          "problem": "CRM.Proxy is the namespace ('using CRM.Proxy;'), and ExecuteMultipleExtension is a class used from it. The referenced external assembly is CRM2015.Proxy (Reference Include=\"CRM2015.Proxy, Version=4.1.9.1, ... PublicKeyToken=711cada7bd1faa44\").",
+          "correct": "ExecuteMultipleExtension (namespace CRM.Proxy) מגיע מהאסמבלי החיצוני CRM2015.Proxy (גרסה 4.1.9.1, external_unknown)",
+          "evidence": "0017_CloseWithdrawalForecast.dtsx:119, 1557 (Reference); auto main.cs line 2, manual main.cs line 8 (using CRM.Proxy)"
+        }
+      ]
+    },
+    {
+      "id": "L|finding#1",
+      "hash": "90c72d00b27d",
+      "verdict": "CONFIRMED",
+      "detail": "Aggregation per request over all 54/5 transactions of all funds of the customer account (gen_AccountNumber -> Gen_customeraccount -> Gen_fundmain.Gen_customeraccountname -> ft.Gen_fundnumber), date windows as stated (manual = datetime comparison), no direct link to the request; consequence stated conditionally and hedged. Note (not a failure): the join-key ownership (unqualified Gen_customeraccountId, Gen_fundmainId) is provable - 0005_Customer Account.dtsx:2611 ca.Gen_customeraccountId with ca = gen_customeraccount (2609), 0009_LeumiFile-BY.dtsx:94323 Gen_fundmain.Gen_fundmainId, plus the ambiguity rule - but is not argued anywhere in the package's claims; recommend adding to the detailed claims.",
+      "evidence": "0017_CloseWithdrawalForecast.dtsx:1106-1123, 2186-2203",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|finding#3",
+      "hash": "60a70efd328a",
+      "verdict": "CONFIRMED",
+      "detail": "Math.Truncate(Math.Abs(a)) != Math.Truncate(Math.Abs(b)) in both scripts (auto main.cs:37, manual main.cs:38); examples correct; Abs makes opposite signs equal; gen_actualwithdrawalamount = new Money(Row.gentranstotalamount) keeps the sign (auto main.cs:54, manual 55).",
+      "evidence": "0017_CloseWithdrawalForecast.dtsx:158, 175, 1451, 1468",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|finding#4",
+      "hash": "b1de3bd7a2ca",
+      "verdict": "CONFIRMED",
+      "detail": "INNER JOIN of trans and flpart (flp.gen_feedbackstatus not in(5,6), NULL excluded); requests without such a partition are not selected; selected requests always get 3, 14 or 15 (default 14).",
+      "evidence": "0017_CloseWithdrawalForecast.dtsx:1126-1138; auto main.cs:30-39",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Close automaty sended withdrawals|title",
+      "hash": "8600d0a7ac61",
+      "verdict": "CONFIRMED",
+      "detail": "short_he and flow_he[1]-[4] match the SQL (state 8, 54/5, ft.gen_valuedate >= gen_datesenttothebank with NULL exclusion and unknown ownership, partitions not NULL and not 5/6) and the code (3/14/15, Abs+Truncate, five attributes).",
+      "evidence": "0017_CloseWithdrawalForecast.dtsx:1094-1138, 122-229",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Close automaty sended withdrawals|short",
+      "hash": "faa3f738c188",
+      "verdict": "CONFIRMED",
+      "detail": "All steps match; hypothesis labels present; end conditional on update success.",
+      "evidence": "0017_CloseWithdrawalForecast.dtsx:1094-1138, 122-229",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Close automaty sended withdrawals|detailed",
+      "hash": "1c2c0b5e4d2b",
+      "verdict": "CONFIRMED",
+      "detail": "All units re-derived: population, join chain, 54/5 + date filter with NULL semantics and unknown ownership, sums with ISNULL and min(ft.gen_valuedate) grouped by w.Gen_withdrawalId, Gen_withdrawalvalue; partitions not in(5,6) with min/max status and min(+0) flags; INNER JOIN; default 14, 3 if min=max=4, partial test (C# && before ||) then Abs/Truncate mismatch -> 15 overriding; Update of 5 attributes via ExecuteMultipleExtension, batches of 1000; Fault -> ErrorBuffer (main.cs:88-89) on output with no path (only path DTSX:1193); empty response -> no record, Clear (main.cs:72, 93). Note: 'באחד הפיצולים' for min(...+0) = 0 assumes no negative values in the partitions; the join-key ownership is not argued (see finding#1 note).",
+      "evidence": "0017_CloseWithdrawalForecast.dtsx:1094-1138, 122-229, 1193",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Close automaty sended withdrawals|detail",
+      "hash": "19b13b674d95",
+      "verdict": "CONFIRMED",
+      "detail": "[1] population and connection caveat; DTSX:1136 = not in(5,6). [2] update by gen_withdrawalid attribute (main.cs:44). [3] statuses with comment lines 30/33/39. [4] attributes and values. [5] Fault not stored (unconnected output); no record and list cleared when the response check at main.cs:72 fails (Clear at 93).",
+      "evidence": "0017_CloseWithdrawalForecast.dtsx:1094-1138, 4-7, 122-229",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Close automaty sended withdrawals|decisions",
+      "hash": "735d097c03a6",
+      "verdict": "CONFIRMED",
+      "detail": "Four conditions quoted exactly (SQL WHERE and flpart WHERE; main.cs:32; main.cs:35-37); meanings carry hypothesis labels and NULL semantics.",
+      "evidence": "0017_CloseWithdrawalForecast.dtsx:1117-1120, 1135-1136, 153, 156-158",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Close automaty sended withdrawals|open",
+      "hash": "5fc0404cede3",
+      "verdict": "CONFIRMED",
+      "detail": "[1]-[3],[5] genuine open questions. [4] 0014_AccountCourses.dtsx:3901 'left join Gen_withdrawal w ... w.Gen_currentstate = 1' verified; ambiguity argument correct; gen_datesenttothebank unresolved. [6] DTSX:1106 ISNULL(Gen_withdrawalvalue, 0); only other occurrence is 0020_Preservation.dtsx:3949 on a Dynamics CRM Destination with DestinationEntity gen_preservation (3181). [7] 0016_TransferOut.dtsx:2125 ft.gen_transtotalamount with 'Gen_ftCurrentYear as ft' (2132); gen_netoamountofaction appears elsewhere only in 0008_LeumiFile-PY.dtsx INSERT into Gen_ftCurrentYearBase (SqlCommand at 63118).",
+      "evidence": "0014_AccountCourses.dtsx:3901; 0016_TransferOut.dtsx:2125, 2132; 0008_LeumiFile-PY.dtsx:63118; 0020_Preservation.dtsx:3181, 3949",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Close manualy sended withdrawals|title",
+      "hash": "65634b92efb8",
+      "verdict": "CONFIRMED",
+      "detail": "short_he and flow_he match the manual SQL (state 10, 54/5, gen_valuedate >= w.CreatedOn datetime comparison, partition '! =5' with NULL excluded) and the manual main.cs (default 3, 15 on partial + Abs/Truncate mismatch). The unqualified gen_valuedate is ft's per the ambiguity argument in the package's manual open claim (min(ft.gen_valuedate) at DTSX:2189).",
+      "evidence": "0017_CloseWithdrawalForecast.dtsx:2176-2218, 1414-1514",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Close manualy sended withdrawals|short",
+      "hash": "5bd0d1fd8b1f",
+      "verdict": "CONFIRMED",
+      "detail": "All steps match; [8] lists both dates with ToLocalTime, amounts; end conditional.",
+      "evidence": "0017_CloseWithdrawalForecast.dtsx:2176-2218, 1414-1514",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Close manualy sended withdrawals|detailed",
+      "hash": "ef411d751022",
+      "verdict": "CONFIRMED",
+      "detail": "All units re-derived; [4] '! =' assumption hedged; [19] values incl. ToLocalTime of the SSIS host and the null guards (main.cs:46-59 = DTSX:1459-1472); [20] ExcecuteBulk (main.cs:70-88) has no Fault branch - correct.",
+      "evidence": "0017_CloseWithdrawalForecast.dtsx:2176-2218, 1414-1514, 2264",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Close manualy sended withdrawals|detail",
+      "hash": "bff619c9a869",
+      "verdict": "CONFIRMED",
+      "detail": "[1] DTSX:2176-2200 and 2213 verified; [2] main.cs:45; [3] main.cs:34-42, no status-4 check and no 14; [4] values verified (main.cs:46-59); [5] Faults not recorded.",
+      "evidence": "0017_CloseWithdrawalForecast.dtsx:2176-2218, 1414-1514",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Close manualy sended withdrawals|decisions",
+      "hash": "4259c67fec32",
+      "verdict": "CONFIRMED",
+      "detail": "[1] condition exact, meaning is a full datetime comparison; [2] '! =5' hedged, NULL excluded; [3] main.cs:36-38 quoted exactly, outcome 15 else 3.",
+      "evidence": "0017_CloseWithdrawalForecast.dtsx:2197-2200, 2213, 1449-1453",
+      "wrongUnits": []
+    }
+  ]
+}

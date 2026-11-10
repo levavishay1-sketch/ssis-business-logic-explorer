@@ -1,0 +1,193 @@
+{
+  "package": "0035_UpdateContactFromAutomatedJoining",
+  "dataFlows": [
+    "Package\\Update Contact From Joining"
+  ],
+  "analyst": "ssis-field-lineage",
+  "source": {
+    "file": "source/DailyProcess/0035_UpdateContactFromAutomatedJoining.dtsx",
+    "sha256": "5D5792761C97AC9510E7C97BAC41BF1D81FA93FF2122514A0A5DFB75B5050F1E"
+  },
+  "scriptOutputs": [],
+  "crmWrites": [
+    {
+      "component": "Package\\Update Contact From Joining\\Update Contact",
+      "identicalCopies": [],
+      "entity": "contact",
+      "verb": "UPDATE",
+      "mechanism": "SDK (IOrganizationService.Update via CrmProxy.GetCrmService)",
+      "status": "Supported",
+      "recordKey": "contact[\"contactid\"] = Row.ContactId (main.cs:128) - the primary-key attribute identifies the contact to update. ContactId = ContactId column of 'Get Automated Joinings' (gen_automatedjoining JOIN Contact ON gen_applicantidentitynumber = Contact.gen_identitynumber, DTSX:854-856; unqualified, Contact presumed). Rows with NULL ContactId are skipped (main.cs:121-122).",
+      "recordKeyColumns": [
+        "ContactId"
+      ],
+      "declaredRowFilters": [],
+      "condition": "One Update per DISTINCT source row (SELECT DISTINCT over all 8 columns, DTSX:843-859): WHERE gen_joiningstatus in(7,8) and (e-mail branch A) or (marketing branch B) - SQL operator precedence makes this (status in (7,8) AND A) OR B, so branch-B rows are selected for ANY joining status. Script skips NULL ContactId (main.cs:121-122). Exceptions -> Row.DirectRowToErrors() (main.cs:151-155); the Errors output has no path (only paths DTSX:1963-1964), so failed updates are silently discarded.",
+      "attributes": [
+        {
+          "attribute": "gen_notauthorizeforuse",
+          "from": [
+            {
+              "column": "NotAuthorizedToUseDataSource",
+              "role": "value"
+            }
+          ],
+          "expression": "if (!Row.NotAuthorizedToUseDataSource_IsNull) contact[\"gen_notauthorizeforuse\"] = new OptionSetValue(Row.NotAuthorizedToUseDataSource); else contact[\"gen_notauthorizeforuse\"] = null; NotAuthorizedToUseDataSource = Derived Column 'Set field by other': ISNULL(gen_notauthorizeforuse) && !ISNULL(gen_datechangeingfromauthorizedtonotautorized) && gen_notauthorizetousedatasource == 1 ? NULL(DT_I4) : gen_notauthorizetousedatasource, where gen_notauthorizeforuse and gen_datechangeingfromauthorizedtonotautorized are the CONTACT's current values (Contact.*) and gen_notauthorizetousedatasource is the JOINING's value. Net effect: written = joining.gen_notauthorizetousedatasource as option value (same integer), except NULL (attribute cleared) when the contact's gen_notauthorizeforuse is empty AND its gen_datechangeingfromauthorizedtonotautorized is set AND the joining value is 1; a NULL joining value also clears the attribute. Written on EVERY processed row (no condition), even rows selected only because of the e-mail/marketing agreement.",
+          "fixedValue": null,
+          "condition": null,
+          "evidence": "Update Contact main.cs:130-137 (code file DTSX:943, sha 89d0f471572f); Set field by other Expression DTSX:925-926; source columns DTSX:854",
+          "declaredSources": [
+            {
+              "db": "gen_automatedjoining.gen_notauthorizetousedatasource",
+              "role": "value",
+              "why": "Value of NotAuthorizedToUseDataSource (else-branch of the derived expression), written as OptionSetValue",
+              "evidence": "DTSX:854, 925-926; main.cs:132"
+            },
+            {
+              "db": "Contact.gen_notauthorizeforuse",
+              "role": "condition",
+              "why": "ISNULL(gen_notauthorizeforuse) is part of the derived condition that turns the value into NULL",
+              "evidence": "DTSX:854, 925-926"
+            },
+            {
+              "db": "Contact.gen_datechangeingfromauthorizedtonotautorized",
+              "role": "condition",
+              "why": "!ISNULL(gen_datechangeingfromauthorizedtonotautorized) is part of the derived condition that turns the value into NULL",
+              "evidence": "DTSX:854, 925-926"
+            },
+            {
+              "db": "gen_automatedjoining.gen_joiningstatus",
+              "role": "condition",
+              "why": "Source WHERE: gen_joiningstatus in(7,8) - but only AND-ed with the e-mail branch A (see notes: operator precedence)",
+              "evidence": "Get Automated Joinings SqlCommand DTSX:857"
+            },
+            {
+              "db": "gen_automatedjoining.gen_newcompanyemailagreement / donotsendmm / Contact.gen_emailagreementupdate / gen_automatedjoining.CreatedOn",
+              "role": "condition",
+              "why": "Source WHERE branch A: gen_newcompanyemailagreement = 1 and donotsendmm != 0 and (datediff(second, Contact.gen_emailagreementupdate, gen_automatedjoining.CreatedOn) > 0 or Contact.gen_emailagreementupdate is null). donotsendmm is unqualified in the SQL; its table is resolved by SQL Server name binding (Contact presumed, not proven - schema not supplied)",
+              "evidence": "DTSX:858"
+            },
+            {
+              "db": "gen_automatedjoining.gen_newmarketinginquiriesagreement / gen_quarterstatement / Contact.gen_marketingagreementupdate / gen_automatedjoining.CreatedOn",
+              "role": "condition",
+              "why": "Source WHERE branch B (OR): gen_newmarketinginquiriesagreement = 1 and gen_quarterstatement != 1 and (DATEDIFF(second, Contact.gen_marketingagreementupdate, gen_automatedjoining.CreatedOn) > 0 or Contact.gen_marketingagreementupdate is null). gen_quarterstatement is unqualified (Contact presumed, not proven)",
+              "evidence": "DTSX:859"
+            },
+            {
+              "db": "gen_automatedjoining.gen_applicantidentitynumber = Contact.gen_identitynumber",
+              "role": "key",
+              "why": "Inner JOIN that decides which contact(s) a joining updates; the ContactId of every contact with the applicant identity number becomes the record key",
+              "evidence": "DTSX:856"
+            }
+          ]
+        },
+        {
+          "attribute": "donotsendmm",
+          "from": [
+            {
+              "column": "gen_newcompanyemailagreement",
+              "role": "condition"
+            }
+          ],
+          "expression": "if (!Row.gennewcompanyemailagreement_IsNull && Row.gennewcompanyemailagreement == 1) contact[\"donotsendmm\"] = false; - literal false; attribute not sent otherwise. The SQL-computed UpdateEmailAgreement (date check) is NOT used by the code, so donotsendmm=false is sent whenever the joining's gen_newcompanyemailagreement = 1, even for rows selected only via marketing branch B whose e-mail agreement date check failed.",
+          "fixedValue": false,
+          "condition": "gen_newcompanyemailagreement is not NULL and == 1",
+          "evidence": "Update Contact main.cs:139-142 (DTSX:943)",
+          "declaredSources": [
+            {
+              "db": "gen_automatedjoining.gen_newcompanyemailagreement",
+              "role": "condition",
+              "why": "Decides whether donotsendmm=false is sent",
+              "evidence": "DTSX:854; main.cs:139"
+            },
+            {
+              "db": "gen_automatedjoining.gen_joiningstatus",
+              "role": "condition",
+              "why": "Source WHERE: gen_joiningstatus in(7,8) - but only AND-ed with the e-mail branch A (see notes: operator precedence)",
+              "evidence": "Get Automated Joinings SqlCommand DTSX:857"
+            },
+            {
+              "db": "gen_automatedjoining.gen_newcompanyemailagreement / donotsendmm / Contact.gen_emailagreementupdate / gen_automatedjoining.CreatedOn",
+              "role": "condition",
+              "why": "Source WHERE branch A: gen_newcompanyemailagreement = 1 and donotsendmm != 0 and (datediff(second, Contact.gen_emailagreementupdate, gen_automatedjoining.CreatedOn) > 0 or Contact.gen_emailagreementupdate is null). donotsendmm is unqualified in the SQL; its table is resolved by SQL Server name binding (Contact presumed, not proven - schema not supplied)",
+              "evidence": "DTSX:858"
+            },
+            {
+              "db": "gen_automatedjoining.gen_newmarketinginquiriesagreement / gen_quarterstatement / Contact.gen_marketingagreementupdate / gen_automatedjoining.CreatedOn",
+              "role": "condition",
+              "why": "Source WHERE branch B (OR): gen_newmarketinginquiriesagreement = 1 and gen_quarterstatement != 1 and (DATEDIFF(second, Contact.gen_marketingagreementupdate, gen_automatedjoining.CreatedOn) > 0 or Contact.gen_marketingagreementupdate is null). gen_quarterstatement is unqualified (Contact presumed, not proven)",
+              "evidence": "DTSX:859"
+            },
+            {
+              "db": "gen_automatedjoining.gen_applicantidentitynumber = Contact.gen_identitynumber",
+              "role": "key",
+              "why": "Inner JOIN that decides which contact(s) a joining updates; the ContactId of every contact with the applicant identity number becomes the record key",
+              "evidence": "DTSX:856"
+            }
+          ]
+        },
+        {
+          "attribute": "gen_quarterstatement",
+          "from": [
+            {
+              "column": "gen_newmarketinginquiriesagreement",
+              "role": "condition"
+            }
+          ],
+          "expression": "if (!Row.gennewmarketinginquiriesagreement_IsNull && Row.gennewmarketinginquiriesagreement == 1) contact[\"gen_quarterstatement\"] = true; - literal true; attribute not sent otherwise. The SQL-computed UpdateMarketingAgreement (date check) is NOT used by the code, so the same applies symmetrically to rows selected via e-mail branch A.",
+          "fixedValue": true,
+          "condition": "gen_newmarketinginquiriesagreement is not NULL and == 1",
+          "evidence": "Update Contact main.cs:144-147 (DTSX:943)",
+          "declaredSources": [
+            {
+              "db": "gen_automatedjoining.gen_newmarketinginquiriesagreement",
+              "role": "condition",
+              "why": "Decides whether gen_quarterstatement=true is sent",
+              "evidence": "DTSX:854; main.cs:144"
+            },
+            {
+              "db": "gen_automatedjoining.gen_joiningstatus",
+              "role": "condition",
+              "why": "Source WHERE: gen_joiningstatus in(7,8) - but only AND-ed with the e-mail branch A (see notes: operator precedence)",
+              "evidence": "Get Automated Joinings SqlCommand DTSX:857"
+            },
+            {
+              "db": "gen_automatedjoining.gen_newcompanyemailagreement / donotsendmm / Contact.gen_emailagreementupdate / gen_automatedjoining.CreatedOn",
+              "role": "condition",
+              "why": "Source WHERE branch A: gen_newcompanyemailagreement = 1 and donotsendmm != 0 and (datediff(second, Contact.gen_emailagreementupdate, gen_automatedjoining.CreatedOn) > 0 or Contact.gen_emailagreementupdate is null). donotsendmm is unqualified in the SQL; its table is resolved by SQL Server name binding (Contact presumed, not proven - schema not supplied)",
+              "evidence": "DTSX:858"
+            },
+            {
+              "db": "gen_automatedjoining.gen_newmarketinginquiriesagreement / gen_quarterstatement / Contact.gen_marketingagreementupdate / gen_automatedjoining.CreatedOn",
+              "role": "condition",
+              "why": "Source WHERE branch B (OR): gen_newmarketinginquiriesagreement = 1 and gen_quarterstatement != 1 and (DATEDIFF(second, Contact.gen_marketingagreementupdate, gen_automatedjoining.CreatedOn) > 0 or Contact.gen_marketingagreementupdate is null). gen_quarterstatement is unqualified (Contact presumed, not proven)",
+              "evidence": "DTSX:859"
+            },
+            {
+              "db": "gen_automatedjoining.gen_applicantidentitynumber = Contact.gen_identitynumber",
+              "role": "key",
+              "why": "Inner JOIN that decides which contact(s) a joining updates; the ContactId of every contact with the applicant identity number becomes the record key",
+              "evidence": "DTSX:856"
+            }
+          ]
+        }
+      ],
+      "evidence": "Update Contact main.cs:118-157 (DTSX:943; ReadOnlyVariables DTSX:1926); Errors output DTSX:1952-1955; paths DTSX:1963-1964; source SQL DTSX:843-859 on [PSQL] (Initial Catalog=ALTSHULER_MSCRM)"
+    }
+  ],
+  "readWriteModifications": [],
+  "lookupBridges": [],
+  "unresolved": [
+    {
+      "where": "Get Automated Joinings: unqualified columns donotsendmm, gen_quarterstatement, gen_joiningstatus, gen_applicantidentitynumber, ContactId",
+      "reason": "Which table (gen_automatedjoining or Contact) each unqualified column binds to is decided by SQL Server from the CRM view schema, which is not supplied. Context suggests Contact for donotsendmm / gen_quarterstatement / ContactId and gen_automatedjoining for gen_joiningstatus / gen_applicantidentitynumber, but this is not proven."
+    }
+  ],
+  "notes": [
+    "Writers in lineage (1): Update Contact - business CRM writer mapped here with 3 attributes (gen_notauthorizeforuse, donotsendmm, gen_quarterstatement). contact[\"contactid\"] (main.cs:128) is the record key, not counted as a value attribute. No ETL plumbing writers exist in this package; Get Organization Variables\\Set Variables only sets variables (no CRM write).",
+    "Source WHERE precedence (DTSX:857-859): \"where gen_joiningstatus in(7,8) and (A) or (B)\" is evaluated by SQL as (gen_joiningstatus in (7,8) AND A) OR B - rows matching marketing branch B are selected for joinings in any status. Whether this is intended cannot be determined from the DTSX.",
+    "Columns UpdateEmailAgreement and UpdateMarketingAgreement are computed in the SQL (DTSX:844-852) and passed to the script, but Row.UpdateEmailAgreement / Row.UpdateMarketingAgreement are never read in main.cs - dead inputs.",
+    "One contact can appear in several DISTINCT rows (several joinings with the same applicant identity number and different values). Each row performs its own Update; for gen_notauthorizeforuse the last processed row wins (no ORDER BY - order not determined).",
+    "gen_notauthorizeforuse is overwritten on every selected row (including clearing it to NULL when the joining value is NULL) although row selection is driven only by the e-mail/marketing agreement conditions."
+  ]
+}

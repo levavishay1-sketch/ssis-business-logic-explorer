@@ -1,0 +1,134 @@
+{
+ "verifier": "ssis-verifier",
+ "package": "0006_LeumiFile-MY-Distributor",
+ "scope": "mapping-A.json",
+ "note": "Independent re-derivation against raw source/DailyProcess/0006_LeumiFile-MY-Distributor.dtsx and component.mjs output; lineage read from inputColumn lineageId, Aggregate AggregationColumnId, Lookup ParameterMap/JoinToReferenceColumn/CopyFromReferenceColumn and Flat File externalMetadataColumnId. File positions recomputed from the 'Minhali Daily Source' FlatFileColumn widths (RaggedRight, 304 columns). All 8 claims, all 5 --fields entries, recordKeyColumns, declaredRowFilters, scriptOutputs and readWriteModifications checked; all code files scanned for CRM writes.",
+ "checked": 20,
+ "counts": { "CONFIRMED": 19, "FIXED": 1, "WRONG": 0, "INCOMPLETE": 0, "UNVERIFIABLE": 0 },
+ "recheck": "2026-11-05 re-check after analyst fix + recompose (mapping-A.json / fieldmap.json 20:02): the only WRONG item is FIXED; `node tools/claims.mjs 0006_LeumiFile-MY-Distributor mapping-A.json` output is byte-identical to the first round (all 8 claims unchanged, still CONFIRMED); --fields unchanged (5 crm_influence_only, still CONFIRMED); fieldmap stats unchanged.",
+ "results": [
+  {
+   "id": "SPOT declaredRowFilters (8 isNeedToUpdate entries) on Update Details from employer Fields CustomerAccount",
+   "verdict": "FIXED",
+   "previousVerdict": "WRONG",
+   "detail": "RE-CHECK: mapping-A.json crmWrites[0].declaredRowFilters is now [] and the write condition still states 'service.Update only when isNeedToUpdate (>=1 attribute set), else DoNotNeedToUpdate output'. Recomposed fieldmap: every target now carries only the 3 tool-detected lookup-routing filters (Check CustomerAccount Exist: Bank_Account_Number_27, Course_Number_22; Get fund type name(product): Course_Number_22) - e.g. gen_compensationeligibility and gen_closingaccountdate verified; no 'declared' rowFilters remain. Each field's own gate is still in its attribute 'condition'. ROUND 1 (WRONG): The 8 declaredRowFilters (Employer_Not_Eligible_Compensation_258, Stop_Provision_Reason_235, Stop_Provision_Date_236, Employee_Work_End_Date_118, Is_Provision_Date_Update_131, Is_Finish_Work_Date_150, Fund_Cloase_Date_51, Source_Account_160) are not row filters. In this writer every attribute is assigned only under its own condition and every assignment sets isNeedToUpdate (main.cs:131-197); no attribute is set unconditionally (unlike 0004 'Update Employer', where gen_modifiedbybank = DateTime.Now is unconditional and needToUpdate really gates it). So isNeedToUpdate never suppresses an attribute that was set, and no field decides whether ANOTHER attribute is written; all rows reach the writer. The composed fieldmap now lists all 8 fields as 'declared' rowFilters of each of the 8 attributes (e.g. Source_Account_160 and Fund_Cloase_Date_51 shown as row filters of gen_compensationeligibility) - false at attribute level; the analyst's own text for the first entry says it 'does not gate the other attributes'. Correct: drop these 8 declaredRowFilters (each field's gate is already in its attribute 'condition'); keep 'Update sent only when >=1 attribute set, else DoNotNeedToUpdate' as a write-level note only. Field dispositions are unaffected (all 8 fields already reach CRM as value or influence).",
+   "evidence": "Update Details from employer Fields CustomerAccount main.cs:124-204 (DTSX 9501, code 9745-9836); fieldmap.json targets[*].rowFilters kind=declared"
+  },
+  {
+   "id": "Update Details from employer Fields CustomerAccount|gen_customeraccount|UPDATE|gen_compensationeligibility",
+   "verdict": "CONFIRMED",
+   "detail": "main.cs:131-133: written only when CompensationEligibilityValue == 1 and (DB NULL or != 1) -> only OptionSetValue(1) ever written, never reset. CompensationEligibilityValue = (CompensationEligibility == \"1\") ? 1 : 0 (Convert...to Int main.cs:124-128); CompensationEligibility = Aggregate group-by of Read minhali data.Employer_Not_Eligible_Compensation_258 (AggregationColumnId, DTSX 2806-2950), ext column of same name, pos 1960, wstr(1); not an input of Trim String Fields. CompensationEligibility_DB <= Check CustomerAccount Exist CopyFromReferenceColumn gen_compensationeligibility -> condition. Entity gen_customeraccount, Id = CustomerAccountID, service.Update (main.cs:127-128, 201).",
+   "evidence": "main.cs:127-137, 199-204; Convert StopPaymentsReason And CompensationEligibility to Int main.cs:116-129; DTSX 2959-3040, 4881-4882, 10744, 10748"
+  },
+  {
+   "id": "Update Details from employer Fields CustomerAccount|gen_customeraccount|UPDATE|gen_updateeligibilitydate",
+   "verdict": "CONFIRMED",
+   "detail": "main.cs:135: DateTime.Now in the same block as gen_compensationeligibility -> no file VALUE; Employer_Not_Eligible_Compensation_258 (via CompensationEligibilityValue) and the lookup keys are INFLUENCE only. Not a fixed value (runtime clock), correctly fixedValue=null.",
+   "evidence": "main.cs:131-137"
+  },
+  {
+   "id": "Update Details from employer Fields CustomerAccount|gen_customeraccount|UPDATE|gen_stoppaymentsreason",
+   "verdict": "CONFIRMED",
+   "detail": "main.cs:139-152: (a) value not NULL/0/-1 and (DB NULL or different) -> OptionSetValue(value); (b) else if DB not NULL and value == 0 -> null (clear); -1 -> not written. StopPaymentsReasonValue: NULL -> 0; else GetValidValue: int.TryParse fail -> -1; int in {7701,7700,7699,781,5706,6643,6620,6814,773,7203,7350,7560,7559,7558,7666} -> int; else -1 (main.cs:118-122,131-151; list re-read literally). Input StopPaymentsReason = Aggregate group-by of Stop_Provision_Reason_235 (pos 1881-1884, wstr(4)), trimmed with \"\" -> NULL by Trim String Fields (readWrite, DTSX 9488). StopPaymentsReason_DB = condition.",
+   "evidence": "main.cs:139-152; Convert...to Int main.cs:116-151; Trim String Fields main.cs:36-58; DTSX 9488-9490"
+  },
+  {
+   "id": "Update Details from employer Fields CustomerAccount|gen_customeraccount|UPDATE|gen_stoppaymentsreportdate",
+   "verdict": "CONFIRMED",
+   "detail": "main.cs:154-168: set DateTime.Parse(file) when file not NULL and (DB NULL or (int)(file - DB).TotalDays != 0); clear (null) when file NULL and DB not NULL. File chain: Stop_Provision_Date_236 (pos 1885-1892, str(10)) -> Aggregate (StopPaymentsReportDate) -> Trim String Fields (Trim, \"\" -> NULL) -> Dates Format FormatYYYYMMDDtoDate (input length 10 -> size check passes; Trim().Length 8 -> yyyy/MM/dd, 6 -> yyyy/MM/01, else NULL; NULL if !TryParse or < 1900-01-01). DB side = DATEADD(hour,3, gen_stoppaymentsreportdate) (DTSX 2961).",
+   "evidence": "main.cs:154-168; Dates Format main.cs:26-88; DTSX 5823 (cachedLength 10), 2961-2980"
+  },
+  {
+   "id": "Update Details from employer Fields CustomerAccount|gen_customeraccount|UPDATE|gen_endemploymentdate",
+   "verdict": "CONFIRMED",
+   "detail": "main.cs:170-178: only set (never cleared) when file date not NULL and (DB NULL or whole-day difference != 0). Employee_Work_End_Date_118 (pos 1337-1344, wstr(10)) -> Aggregate (EndEmploymentDate) -> Dates Format (NOT trimmed by Trim String Fields: not one of its 3 inputs) - analyst's note on Trim().Length vs untrimmed Substring is correct. DB = DATEADD(hour,3, gen_endemploymentdate).",
+   "evidence": "main.cs:170-178; DTSX 5824, 9488-9490"
+  },
+  {
+   "id": "Update Details from employer Fields CustomerAccount|gen_customeraccount|UPDATE|gen_bankstoppaymentsreceivingdate",
+   "verdict": "CONFIRMED",
+   "detail": "main.cs:179-183: DateTime.Now when isProvisionDateUpdate or isEndWorkDate is true; no CRM comparison. isEndWorkDate = (Is_Finish_Work_Date_150 == \"1\"), isProvisionDateUpdate = (Is_Provision_Date_Update_131 == \"1\") (Convert indication fields to boolean main.cs:118-128; inputs <= Aggregate, DTSX 3933-3934). Both fields INFLUENCE only - correct.",
+   "evidence": "main.cs:179-183; Convert indication fields to boolean main.cs:115-130"
+  },
+  {
+   "id": "Update Details from employer Fields CustomerAccount|gen_customeraccount|UPDATE|gen_closingaccountdate",
+   "verdict": "CONFIRMED",
+   "detail": "main.cs:185-189: DateTime.TryParse(Row.FundCloaseDate51) -> value; no DB column read, so sent every run for valid dates; never cleared. Fund_Cloase_Date_51 (pos 425-432, wstr(10)) -> Aggregate -> Dates Format (untrimmed).",
+   "evidence": "main.cs:185-189; DTSX 5825, 10753"
+  },
+  {
+   "id": "Update Details from employer Fields CustomerAccount|gen_customeraccount|UPDATE|gen_sourceaccount",
+   "verdict": "CONFIRMED",
+   "detail": "main.cs:192-197: EntityReference(\"gen_customeraccount\", gen_sourceaccount) when Source_Account_160 not NULL, not all zeros/blank (Trim('0')), lookup matched, and different from gen_sourceaccountDB. gen_sourceaccount = Gen_customeraccountId from full-cache Lookup 'Get Source Account' keyed by trimmed Source_Account_160 = right('000000000000'+Gen_bankaccountnumber,12) (DTSX 7484-7498), NoMatchBehavior 0 with Match output errorRowDisposition=IgnoreFailure (DTSX 7519) -> no filtering. VALUE '—' / Source_Account_160 INFLUENCE is consistent with the project convention (lookup returning a different column than its key = key influence; cf. 0009 verify).",
+   "evidence": "main.cs:192-197; DTSX 7482-7530, 10754-10756"
+  },
+  {
+   "id": "FIELD Course_Number_22 #22",
+   "verdict": "CONFIRMED",
+   "detail": "crm_influence_only: RAW (untrimmed) key of Lookup 'Get fund type name(product)' (ProductNumber, bank '10'; ParameterMap DTSX 7439); its ProductId is the 2nd key of 'Check CustomerAccount Exist' (gen_fundtypename) -> selects CustomerAccountID and all *_DB columns. Pos 163-166 recomputed.",
+   "evidence": "DTSX 7401-7449, 3011, 3027"
+  },
+  {
+   "id": "FIELD Bank_Account_Number_27 #27",
+   "verdict": "CONFIRMED",
+   "detail": "crm_influence_only: RAW key of 'Check CustomerAccount Exist' (gen_bankaccountnumber; ParameterMap DTSX 3011, input DTSX 3021) and warning text (plumbing). Pos 197-208.",
+   "evidence": "DTSX 2959-3040"
+  },
+  {
+   "id": "FIELD Is_Provision_Date_Update_131 #176",
+   "verdict": "CONFIRMED",
+   "detail": "crm_influence_only (condition of gen_bankstoppaymentsreceivingdate). Pos 1391.",
+   "evidence": "Convert indication fields to boolean main.cs:124-128; Update main.cs:179"
+  },
+  {
+   "id": "FIELD Is_Finish_Work_Date_150 #195",
+   "verdict": "CONFIRMED",
+   "detail": "crm_influence_only (condition of gen_bankstoppaymentsreceivingdate). Pos 1412.",
+   "evidence": "Convert indication fields to boolean main.cs:118-122; Update main.cs:179"
+  },
+  {
+   "id": "FIELD Source_Account_160 #205",
+   "verdict": "CONFIRMED",
+   "detail": "crm_influence_only: key of 'Get Source Account' and condition in writer main.cs:192; the written value is the matched CRM id. Pos 1429-1440.",
+   "evidence": "DTSX 7498, 7508; main.cs:192-197"
+  },
+  {
+   "id": "SPOT recordKeyColumns [CustomerAccountID]",
+   "verdict": "CONFIRMED",
+   "detail": "customerAccount.Id = Row.CustomerAccountID (main.cs:128) <= Aggregate group-by <= Check CustomerAccount Exist CopyFromReferenceColumn gen_customeraccountid (full cache, Psql/ALTSHULER_MSCRM, gen_customeraccount INNER JOIN gen_fundmain; keys Bank_Account_Number_27 + gen_fundtypename).",
+   "evidence": "main.cs:127-128; DTSX 2959-3040, 10745"
+  },
+  {
+   "id": "SPOT scriptOutputs (StopPaymentsReasonValue, CompensationEligibilityValue, isEndWorkDate, isProvisionDateUpdate)",
+   "verdict": "CONFIRMED",
+   "detail": "All four expressions match the code literally; output columns 'Column 1'/'Column' are never assigned (dead), as noted.",
+   "evidence": "Convert...to Int main.cs:116-151; Convert indication fields to boolean main.cs:115-130"
+  },
+  {
+   "id": "SPOT readWriteModifications (Trim String Fields *, Dates Format *)",
+   "verdict": "CONFIRMED",
+   "detail": "Trim String Fields: readWrite inputs StopPaymentsReason, StopPaymentsReportDate, Source_Account_160 only (DTSX 9488-9490); Trim, \"\" -> null. Dates Format: readWrite StopPaymentsReportDate (str 10), EndEmploymentDate (wstr 10), Fund_Cloase_Date_51 (wstr 10) (DTSX 5823-5825); fieldList key = column name without '_' matches the Row property names; logic as stated incl. the < 1900-01-01 rule.",
+   "evidence": "Trim String Fields main.cs:36-58; Dates Format main.cs:26-88"
+  },
+  {
+   "id": "SPOT routing / write condition",
+   "verdict": "CONFIRMED",
+   "detail": "Paths: Read minhali data -> Set Task Name Variable (no inputs, pass-through) -> Multicast Output 3 -> Get fund type name(product) (No Match output has no path -> dropped) -> Check CustomerAccount Exist (No Match -> Set Warning columns 1 -> ETL Warning 1) -> Aggregate (all 14 columns AggregationType 0 = group by, DISTINCT) -> Trim String Fields -> Dates Format -> Convert...to Int -> Convert indication fields to boolean -> Get Source Account (Match, IgnoreFailure) -> writer; Updated / DoNotNeedToUpdate / Error outputs to counters / ETL Warning.",
+   "evidence": "component.mjs --list paths; DTSX 2806-2950"
+  },
+  {
+   "id": "SPOT file positions / field identity",
+   "verdict": "CONFIRMED",
+   "detail": "Recomputed from 'Minhali Daily Source' (RaggedRight, cp1255): Course_Number_22 163-166, Bank_Account_Number_27 197-208, Fund_Cloase_Date_51 425-432, Employee_Work_End_Date_118 1337-1344, Is_Provision_Date_Update_131 1391, Is_Finish_Work_Date_150 1412, Source_Account_160 1429-1440, Stop_Provision_Reason_235 1881-1884, Stop_Provision_Date_236 1885-1892, Employer_Not_Eligible_Compensation_258 1960; each Read minhali data output column maps to the ext column of the same name.",
+   "evidence": "DTSX 4-313 (FlatFileColumns), 7578-7700"
+  },
+  {
+   "id": "SPOT status / mechanism",
+   "verdict": "CONFIRMED",
+   "detail": "IOrganizationService.Update via CrmProxy (Supported); all lookups read CRM directly, no staging, no SQL DML to CRM in this package.",
+   "evidence": "main.cs:90-95, 201; sqlStatements (9, all SELECT)"
+  }
+ ],
+ "missingWrites": [],
+ "missingWritesNote": "All code files scanned. Other CRM writes are ETL plumbing only: Create ETL Process record With File Name / ETL Record Finish / OnError Error ETL Process record (gen_etlprocess, annotation), ETL Warning and ETL Warning 1 (gen_etlprocesswarning), Write Errors to ETLProcessCounter - Step 1 (gen_etlprocesscounter). No OLE DB Command / destination components; no disabled executables."
+}

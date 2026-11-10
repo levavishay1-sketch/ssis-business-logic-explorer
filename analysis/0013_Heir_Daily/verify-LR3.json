@@ -1,0 +1,51 @@
+{
+  "verifier": "ssis-verifier",
+  "package": "0013_Heir_Daily",
+  "scope": "logic-claims re-check round 3",
+  "checkedAt": "2026-11-07",
+  "checked": 2,
+  "results": [
+    {
+      "id": "L|finding#2",
+      "hash": "aecc7be9c175",
+      "verdict": "WRONG",
+      "detail": "The finding is framed as a bug ('באג העתק-הדבק'), which the standard forbids. It also says the code checks gencity_IsNull 'instead of' gencountry_IsNull, which asserts an intent that is not proven. The consequence is also stated too broadly. 'שינוי ארץ אינו מזוהה כשהעיר בקובץ ריקה' is not exact: when the city is empty, a change where one country value is NULL and the other is not is still detected (first operand gencountry_IsNull != Gencountrydb_IsNull). Only a change between two non-NULL country values is not detected. The code facts themselves (line 162) are correct.",
+      "evidence": "Update Heir main.cs:162 @DTSX:9184 (sha 3b80125943a0): if (Row.gencountry_IsNull != Row.Gencountrydb_IsNull || (Row.gencity_IsNull == false && IsNeedToUpdate<String>(Row.gencountry, Row.Gencountrydb)))",
+      "wrongUnits": [
+        {
+          "unit": "[1] 'באג העתק-הדבק ... בודק את gencity_IsNull במקום gencountry_IsNull'",
+          "problem": "Bug framing, and an unproven claim about the intended column.",
+          "correct": "Neutral and conditional, for example: 'התנאי לעדכון הארץ (שורה 162) בודק את gencity_IsNull. לכן, אם העיר בקובץ ריקה ושני ערכי הארץ אינם ריקים, שינוי ארץ אינו מתעדכן; אם אחד מערכי הארץ ריק והשני לא, הארץ מתעדכנת.'",
+          "evidence": "Update Heir main.cs:162 @DTSX:9184"
+        },
+        {
+          "unit": "[1] 'שינוי ארץ אינו מזוהה כשהעיר בקובץ ריקה'",
+          "problem": "Too broad. A NULL vs non-NULL difference is detected regardless of the city.",
+          "correct": "Only a change between two non-empty country values is not detected when the file city is empty.",
+          "evidence": "Update Heir main.cs:162"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Foreach Loop Container\\Create And Update Heir|detailed",
+      "hash": "be88c6737b36",
+      "verdict": "WRONG",
+      "detail": "I re-derived all 23 units against the DTSX and the code, and they are correct, with two exceptions. (a) Unit [20] tech says 'התנאי בודק gencity_IsNull במקום gencountry_IsNull'. 'במקום' asserts an intended column, which is not proven and frames the code as a mistake; the standard forbids bug framing. Unit [17] says the same thing neutrally ('התנאי בשורה 162 בודק את העיר'), so this is only a wording issue in [20]. (b) Unit [5] gives the full name as 'שם פרטי, רווח ושם משפחה' and gives the NULL outcome only for status. The expression gen_firstname + \" \" + gen_lastname returns NULL if either part is NULL. The trim script sets an empty value to null; whether the column then becomes NULL is SSIS behaviour not shown in the files. If it does, Create Heir does not write gen_name (main.cs:150-151 if (!Row.genname_IsNull)). This is a missing nuance of a written value. Unit [14] 'כל השדות שיש להם ערך' covers it only implicitly. Everything else is verified: Heir has 12 columns with RedirectRow and Contact has 5 with FailComponent (RetainNulls=false). Merge Join is JoinType=2 (Inner), NumKeyColumns=3, TreatNullsAsEqual=true, and both Sorts have EliminateDuplicates=false. Status is (SUG_PEULA == \"U\" || SUG_PEULA == \"C\") ? 1 : 2, name/status errors are RedirectRow, and region is FailComponent. Append Zeros pads to the input column length, which is 9 (cachedLength=9, DTSX:3952-3953). Format Dates handles 8 and 6 characters, and the field size of 50 is ≥ 10. Contact lookup: contact.gen_identitynumber = gen_customeridentitynumber. Heir lookup uses 4 keys. Change empty strings to null maps TRIM == \"\" to NULL for 11 db columns. Create writes 16 attributes. Update writes the 12 attributes listed, and the date comparison is obj1.Date == obj2.AddHours(3).Date.",
+      "evidence": "DTSX:6641-6750 (Heir source), 4325-4394 (Contact), 6752-6756 (Merge Join), 6932/7084 (EliminateDuplicates=false), 6880-6912 (Set Heir Columns), 3952-3953 (cachedLength 9), 3983-4060 (change empty strings to null), 4070-4118 / 4254-4282 (lookups), Create Heir main.cs:125-248, Update Heir main.cs:123-351 @DTSX:9184, Format Dates main.cs:54-80, Append Zeros main.cs:57-66",
+      "wrongUnits": [
+        {
+          "unit": "[20] tech: 'ארץ: התנאי בודק gencity_IsNull במקום gencountry_IsNull (main.cs:162)'",
+          "problem": "'במקום' asserts an intended column without proof and implicitly frames the code as a bug.",
+          "correct": "'ארץ: התנאי בשורה 162 בודק את gencity_IsNull (main.cs:162)'",
+          "evidence": "Update Heir main.cs:162 @DTSX:9184"
+        },
+        {
+          "unit": "[5] 'שם מלא (שם פרטי, רווח ושם משפחה)'",
+          "problem": "The NULL outcome is missing. If the first or last name is NULL, gen_name is NULL and is not written at create.",
+          "correct": "Add: if the first or last name is empty, and the trim script's null makes the column NULL (SSIS behaviour, not shown in the files), the full name is NULL and the heir is created without gen_name.",
+          "evidence": "Set Heir Columns FriendlyExpression gen_firstname + \" \" + gen_lastname (DTSX ~6900); Create Heir main.cs:150-151"
+        }
+      ]
+    }
+  ]
+}

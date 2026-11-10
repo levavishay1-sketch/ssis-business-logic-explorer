@@ -1,0 +1,672 @@
+{
+  "package": "0024_AgentFundInformation",
+  "analyst": "ssis-business-logic",
+  "source": {
+    "file": "source/DailyProcess/0024_AgentFundInformation.dtsx",
+    "sha256": "659C8F355B506D3D1772DC5A1165E80E3574B31C18BBCD1F2E43A836ADF6E2C4",
+    "lines": 8228
+  },
+  "scopeNote_he": "החבילה אינה קוראת קובץ; כל הנתונים נקראים ממסד הנתונים של ה-CRM ונכתבים חזרה אליו. מנהל החיבורים [CRM] (DTSX:4-6, DTSID {EC67FF20-F4F6-4879-B546-653C1AF02333}) מוגדר בזמן תכנון ל-Data Source=Psql; Initial Catalog=ALTSHULER_MSCRM. כל ארבעת רכיבי הכתיבה העסקיים, בשלושה שלבים, משתמשים בחיבור זה: INSERT דרך OLE DB Destination אחד, DELETE דרך שתי פקודות OLE DB Command עם אותה פקודת SQL, ו-DELETE דרך Execute SQL Task. לכן כולם SQL ישיר על טבלאות ה-CRM (Unsupported). החבילה מפעילה קובץ תצורה חיצוני C:\\Generix\\SSISConfigFile.dtsConfig (DTSX:1 EnableConfig=True, DTSX:17) שלא סופק (blocked_external_dependency); ייתכן שהוא דורס את מחרוזת החיבור בזמן ריצה. ניתוח קוד המקור (VB) של שני רכיבי הסקריפט העסקיים (Create system columns, Set system variables); ה-DLL המקומפל לא פוענח.",
+  "summary_he": "החבילה מתחזקת את הטבלה 'מידע מותר לקופה' (Gen_allowedinformationforfund). כל שורה בה מקשרת סוכן ו/או סוכנות לאיש קשר, לחשבון ולקופה, ובתיאור זה היא נקראת 'הרשאה'. שהטבלה קובעת לאיזה סוכן או סוכנות מותר לראות מידע על איזו קופה הוא השערה לפי שם הטבלה בלבד: החבילה עצמה קוראת את הטבלה רק כדי לבדוק אם צירוף כבר קיים (Lookup, DTSX:2139) וכדי לבחור שורות למחיקה (get allow information, DTSX:2608-2616), ומעבר לכך רק מוסיפה ומוחקת בה שורות. אף קובץ DTSX אחר שסופק אינו מפנה לטבלה, והצרכן העסקי שלה לא ידוע (external_unknown). היא מוסיפה צירופים חדשים של קופה, לקוח, חשבון, סוכן וסוכנות שנגזרים מייפוי כוח עם gen_currentstate = 1 (הסוכן והסוכנות שבייפוי הכוח; ובנוסף, כשבחוזה הסוכן של הקופה מסומן שיתוף מידע והסוכן או הסוכנות שבייפוי הכוח זהים לאלה של הקופה, גם הסוכן והסוכנות של חוזה האב של אותו חוזה), ואינם קיימים עדיין בטבלה, ומדלגת על לקוחות שנפטרו. לאחר מכן היא מוחקת הרשאות של לקוחות שנפטרו, הרשאות שכבר אין להן שורה תואמת בשאילתת האוכלוסייה בכל שישת המפתחות (סוכנות, סוכן, קופה, איש קשר, ייפוי כוח ראשי וחשבון), והרשאות ללא סוכן וללא סוכנות. כל הכתיבות העסקיות נעשות ב-SQL ישיר על מסד הנתונים של ה-CRM (Unsupported). רשומת תהליך ה-ETL (gen_etlprocess, מסגרת) נוצרת ומתעדכנת דרך ה-SDK (Create ETL Process record, crmServiceProxy.Create, DTSX:297; End ETL Process record, crmServiceProxy.Update, DTSX:3019).",
+  "executionOrder": [
+    {
+      "step": 1,
+      "refId": "Package\\Get Organization Variables",
+      "title_he": "טעינת משתני ארגון (מסגרת)",
+      "trigger": "start (no incoming constraint)"
+    },
+    {
+      "step": 2,
+      "refId": "Package\\Create ETL Process record",
+      "title_he": "רשומת תהליך ETL (מסגרת)",
+      "trigger": "after Get Organization Variables · Success (DTSX:7369)"
+    },
+    {
+      "step": 3,
+      "refId": "Package\\Get systemuser organisationname and curency",
+      "title_he": "איתור משתמש המערכת, הארגון והמטבע (קובע את הבעלים, היוצר, המעדכן והיחידה העסקית של ההרשאות שנוצרות)",
+      "trigger": "after Create ETL Process record · Success (DTSX:7372)"
+    },
+    {
+      "step": 4,
+      "refId": "Package\\Create Fund View Table",
+      "title_he": "הוספת הרשאות מידע חדשות לקופות",
+      "trigger": "after Get systemuser organisationname and curency · Success (DTSX:7368)"
+    },
+    {
+      "step": 5,
+      "refId": "Package\\Delete Rows",
+      "title_he": "מחיקת הרשאות של נפטרים והרשאות שאינן תקפות",
+      "trigger": "after Create Fund View Table · Success (DTSX:7370)"
+    },
+    {
+      "step": 6,
+      "refId": "Package\\Execute SQL Task",
+      "title_he": "מחיקת הרשאות ללא סוכן וללא סוכנות",
+      "trigger": "after Delete Rows · Success (DTSX:7371)"
+    },
+    {
+      "step": 7,
+      "refId": "Package\\End ETL Process record",
+      "title_he": "סגירת רשומת תהליך ETL (מסגרת)",
+      "trigger": "after Execute SQL Task · Success (DTSX:7373)"
+    }
+  ],
+  "ignoredAsFramework": [
+    "Package\\Get Organization Variables",
+    "Package\\Create ETL Process record",
+    "Package\\End ETL Process record",
+    "LogProvider SSIS log provider for SQL Server (SRS.SSIS_Logs, DTSX:20)"
+  ],
+  "components": [
+    {
+      "refId": "Package\\Create Fund View Table",
+      "title_he": "הוספת הרשאות מידע חדשות לקופות",
+      "techName": "Create Fund View Table",
+      "short_he": "מחשבת מתוך ייפויי כוח עם gen_currentstate = 1 צירופים של סוכן או סוכנות עם קופות (שהצירוף מתיר לסוכן לראות מידע על הקופה הוא השערה לפי שם הטבלה) שמסומנות כקיימות בקובץ (השערה לפי שם השדה) או ששנת השערוך שלהן היא לפחות השנה הנוכחית פחות 3 (כולל שנים עתידיות), ומוסיפה לטבלת ההרשאות רק צירופים חדשים של לקוחות שלא נפטרו.",
+      "flow_he": [
+        "שליפת קופות שמסומנות כקיימות בקובץ (השערה) או ששנת השערוך שלהן היא לפחות השנה הנוכחית פחות 3 (כולל שנים עתידיות), עם ייפוי כוח שבו gen_currentstate = 1. הסוכן או הסוכנות נלקחים מייפוי הכוח (ענף 1), ובנוסף (UNION ALL), כשבחוזה הסוכן של הקופה מסומן שיתוף מידע והסוכן או הסוכנות שבייפוי הכוח זהים לאלה של הקופה, גם מחוזה האב של אותו חוזה (ac2, ענף 2)",
+        "השמטת צירופים שכבר קיימים בטבלת ההרשאות",
+        "השמטת לקוחות שנפטרו",
+        "יצירת רשומת הרשאה חדשה (SQL ישיר)"
+      ],
+      "short": {
+        "nodes": [
+          {
+            "type": "step",
+            "text": "המערכת מאתרת קופות שמסומנות כקיימות בקובץ (השערה לפי שם השדה) או ששנת השערוך שלהן היא לפחות השנה הנוכחית פחות 3 (אין גבול עליון, ולכן גם שנים עתידיות נכללות), ושיש לחשבון הלקוח שלהן ייפוי כוח עם gen_currentstate = 1. לכל קופה כזו היא לוקחת את הסוכן ו/או הסוכנות שבייפוי הכוח. בנוסף, כשבחוזה הסוכן של הקופה מסומן שיתוף מידע, והסוכן או הסוכנות שבייפוי הכוח זהים לסוכן או לסוכנות של הקופה, היא מוסיפה גם צירופים עם הסוכן והסוכנות של חוזה האב של אותו חוזה."
+          },
+          {
+            "type": "decision",
+            "text": "האם הרשאה לאותו צירוף של סוכן, סוכנות, לקוח, חשבון וקופה כבר קיימת?",
+            "branches": [
+              {
+                "label": "כן",
+                "nodes": [
+                  {
+                    "type": "step",
+                    "text": "לא נעשה דבר, וההרשאה הקיימת נשארת כמו שהיא."
+                  }
+                ]
+              },
+              {
+                "label": "לא",
+                "nodes": [
+                  {
+                    "type": "decision",
+                    "text": "האם הלקוח מסומן כנפטר?",
+                    "branches": [
+                      {
+                        "label": "כן",
+                        "nodes": [
+                          {
+                            "type": "step",
+                            "text": "לא נוצרת הרשאה עבור לקוח שנפטר."
+                          }
+                        ]
+                      },
+                      {
+                        "label": "לא",
+                        "nodes": [
+                          {
+                            "type": "write",
+                            "text": "נוצרת רשומת הרשאה חדשה שמקשרת בין הסוכן או הסוכנות לבין הקופה והלקוח, כולל ייפוי הכוח הראשי והאם הסוכן מקבל עמלה בלבד."
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "type": "end",
+            "text": "כל צירוף חדש שנגזר מייפוי כוח עם gen_currentstate = 1, ושאינו של לקוח שנפטר, נוסף לטבלת ההרשאות. הרשאות קיימות אינן משתנות בשלב זה. הרשאות קיימות של לקוחות שנפטרו, והרשאות שאינן תקפות עוד, נמחקות רק בשלב המחיקה שרץ אחריו."
+          }
+        ]
+      },
+      "detailed": {
+        "nodes": [
+          {
+            "type": "step",
+            "text": "המערכת שולפת קופות שמסומנות Gen_existinfile = 1 (הפירוש קיימת בקובץ נגזר משם השדה בלבד — השערה), או ששנת השערוך שלהן גדולה או שווה לשנה הנוכחית פחות 3 (אין גבול עליון, ולכן גם שנים עתידיות נכללות; השנה הנוכחית נקבעת לפי שעון שרת מסד הנתונים).",
+            "tech": "Get Agent Or Agency Detail From Fund (OLEDBSource, [CRM]) · ((Gen_existinfile is not null and Gen_existinfile = 1) or (gen_fundmain.gen_revaluationdate is not null and year(gen_fundmain.gen_revaluationdate) >= year(getdate())-3))",
+            "evidence": "DTSX:1965-2088; תנאי השנה DTSX:2049-2052"
+          },
+          {
+            "type": "step",
+            "text": "רק קופות שלחשבון הלקוח שלהן יש ייפוי כוח במצב 1 נכללות. בחבילה זו משמעות הערך 1 אינה מוגדרת. בחבילה 0030 רכיב בשם 'Get Active Poa' מסנן ייפויי כוח לפי Gen_currentstate = 1, ונותן לתוצאה את הכינוי ActivePoas (ייפויי כוח פעילים). בתיאור זה ייפוי כוח במצב 1 נקרא ייפוי כוח נוכחי.",
+            "tech": "join gen_customeraccount on gen_customeraccountid = gen_fundmain.gen_customeraccountname · join gen_powerofattorney on gen_powerofattorney.gen_customeraccount = gen_customeraccountid · gen_powerofattorney.gen_currentstate = 1",
+            "evidence": "0030_PoaAccountUpdateDailyTest DTSX:4187, 4222"
+          },
+          {
+            "type": "decision",
+            "text": "מאיזה מקור נקבעים הסוכן והסוכנות של כל שורה? שני המקורות מאוחדים (UNION ALL) ואין בחירה ביניהם, ולכן קופה שעומדת בתנאי ענף 2 מקבלת שורות גם מענף 1.",
+            "tech": "UNION ALL של שני ענפים פעילים; שני ענפים נוספים ('Agents with contract and no POA' ו-'Agents with parent contract without POA') מוערים בהערה ואינם פעילים",
+            "branches": [
+              {
+                "label": "ענף 1: הסוכן והסוכנות שבייפוי הכוח",
+                "nodes": [
+                  {
+                    "type": "step",
+                    "text": "הסוכן והסוכנות מאותרים לפי ייפוי הכוח הנוכחי של הלקוח: רשומת סוכן (gen_agents) שאיש הקשר שלה (gen_contactname) הוא הסוכן שבייפוי הכוח, ורשומת סוכנות (gen_agencie) שהחשבון שלה (gen_agencyname) הוא הסוכנות שבייפוי הכוח. נכתבים מזהי הרשומות שנמצאו; אם לא נמצאה רשומה, נכתב NULL. אם כמה רשומות סוכן או סוכנות תואמות לאותו ערך, נוצרת שורה נפרדת לכל אחת, ובהמשך הרשאה נפרדת לכל אחת.",
+                    "tech": "left join gen_agents on gen_agents.gen_contactname = gen_powerofattorney.gen_agentname · left join gen_agencie on gen_agencie.gen_agencyname = gen_powerofattorney.gen_agencyname"
+                  }
+                ]
+              },
+              {
+                "label": "ענף 2: חוזה האב של חוזה הסוכן, בשיתוף מידע",
+                "nodes": [
+                  {
+                    "type": "step",
+                    "text": "הסוכן והסוכנות נלקחים מחוזה האב של חוזה הסוכן של הקופה. זה קורה רק אם בחוזה הסוכן של הקופה מסומן שיתוף מידע, ורק אם הסוכן או הסוכנות שבייפוי הכוח זהים לסוכן או לסוכנות של הקופה. אם כמה רשומות סוכן או סוכנות תואמות לאותו ערך, נוצרת שורה נפרדת לכל אחת, ובהמשך הרשאה נפרדת לכל אחת.",
+                    "tech": "join Gen_agentcontract ac1 on Gen_agentcontractId = gen_fundmain.gen_brokernumber · join Gen_agentcontract ac2 on ac2.Gen_agentcontractid = ac1.gen_agencycontractnumber · left join gen_agents on gen_agentsid = ac2.gen_agentname · left join gen_agencie on Gen_agencieId = ac2.gen_agencyname · (gen_powerofattorney.Gen_agentname = gen_fundmain.gen_agentname or gen_powerofattorney.Gen_agencyname = gen_fundmain.gen_agencyname) and ac1.Gen_isContractDataSharing is not null and ac1.Gen_isContractDataSharing = 1"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "type": "step",
+            "text": "לכל צירוף של מספר קופה, איש קשר, חשבון, סוכן וסוכנות נשמרת שורה אחת בלבד: זו של ייפוי הכוח שתאריך ההתחלה שלו המאוחר ביותר. ממנו נלקחים ייפוי הכוח הראשי והסימון 'הסוכן מקבל עמלה בלבד', וסימון חסר נחשב 0. אם לשני ייפויי כוח באותו צירוף יש אותו תאריך התחלה, לא מוגדר איזה מהם נבחר.",
+            "tech": "ROW_NUMBER() over(partition by FUND_NUMBER, CONTACT_NAME, ACCOUNT_NAME, AGENT_NAME, AGENCY_NAME order by POW_START_DATE desc) … where RowNum = 1 · IS_COMMISSION_AGENT = isnull(gen_powerofattorney.gen_agentreceivescommissionnly,0) · ORDER BY POW_START_DATE בלבד, ללא שובר שוויון"
+          },
+          {
+            "type": "decision",
+            "text": "האם כבר קיימת בטבלת ההרשאות רשומה לאותו סוכן, סוכנות, איש קשר, חשבון וקופה?",
+            "tech": "Lookup (Full cache, DTSX:2137) על [dbo].[Gen_allowedinformationforfundBase]: Gen_agentname=AGENT_NAME, Gen_agencyname=AGENCY_NAME, Gen_contactname=CONTACT_NAME, Gen_accountname=ACCOUNT_NAME, Gen_fundname=FUND_GUID. ייפוי הכוח הראשי אינו חלק מההשוואה. Match Output אינו מחובר.",
+            "branches": [
+              {
+                "label": "קיימת",
+                "nodes": [
+                  {
+                    "type": "step",
+                    "text": "השורה מושלכת, וההרשאה הקיימת אינה מתעדכנת, גם אם ייפוי הכוח הראשי או סימון העמלה השתנו."
+                  }
+                ]
+              },
+              {
+                "label": "לא קיימת",
+                "nodes": [
+                  {
+                    "type": "decision",
+                    "text": "האם איש הקשר של הקופה מסומן כנפטר?",
+                    "tech": "filtering customers dead (Lookup, Full cache, DTSX:1906): CONTACT_NAME = ContactId מתוך select ContactId from Contact where gen_customeragename = N'נפטר'. Match Output אינו מחובר.",
+                    "branches": [
+                      {
+                        "label": "נפטר",
+                        "nodes": [
+                          {
+                            "type": "step",
+                            "text": "השורה מושלכת ולא נוצרת הרשאה."
+                          }
+                        ]
+                      },
+                      {
+                        "label": "לא נפטר, או שאין איש קשר",
+                        "nodes": [
+                          {
+                            "type": "step",
+                            "text": "לרשומה החדשה נוצרים מזהה חדש ושדות מערכת. הבעלים, היוצר והמעדכן הם משתמש המערכת שאותר בשלב 3, והמצב הוא פעיל (statecode 0).",
+                            "tech": "Create system columns main.vb:18-36 · AllowedfundinfoID = Guid.NewGuid · StateCode = 0 · StatusCode = 1 · OwningUser/CreatedBy/ModifiedBy = Variables.SystemUserId · OwningBusinessUnit = Variables.BusinessUnitId · CreatedOn/ModifiedOn = DateTime.UtcNow"
+                          },
+                          {
+                            "type": "write",
+                            "text": "נוצרת רשומת 'מידע מותר לקופה' עם הסוכן, הסוכנות, איש הקשר, החשבון, הקופה, ייפוי הכוח הראשי וסימון 'הסוכן מקבל עמלה בלבד'.",
+                            "tech": "Gen_allowedinformationforfundBase · INSERT · SQL (OLE DB Destination 'Create Allowed Info Fund extensionbase', AccessMode 0, [CRM], DTSX:608-616) · Unsupported"
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "type": "end",
+            "text": "כל צירוף חדש שנגזר מייפוי כוח נוכחי, ושאינו של לקוח שנפטר, נוסף לטבלת ההרשאות. הרשאות קיימות אינן משתנות בשלב זה."
+          }
+        ]
+      },
+      "detail_he": [
+        {
+          "h": "מקור ואוכלוסייה",
+          "t": "שאילתה על מסד ה-CRM (DTSX:1970). האוכלוסייה כוללת קופות (gen_fundmain) שמסומנות Gen_existinfile = 1 (הפירוש קיימת בקובץ נגזר משם השדה בלבד — השערה). השדה אינו מסומן בשם טבלה בשאילתה, אבל הוא שדה של gen_fundmain (חבילה 0034: from Gen_fundmain where gen_existinfile = 1). שם עמודה לא מסומן חייב להיות חד-משמעי בין טבלאות ה-FROM, ולכן הוא מתייחס ל-gen_fundmain. הקופות נכללות גם אם שנת השערוך שלהן גדולה או שווה לשנה הנוכחית פחות 3 (אין גבול עליון, ולכן גם שנים עתידיות נכללות; השנה הנוכחית נקבעת לפי שעון שרת מסד הנתונים) (year(gen_revaluationdate) >= year(getdate())-3, DTSX:2049-2052). בנוסף, לחשבון הלקוח שלהן יש ייפוי כוח עם gen_currentstate = 1. הסוכן והסוכנות נקבעים בשני ענפים: (1) לפי ייפוי הכוח: מזהי רשומות gen_agents ו-gen_agencie שאיש הקשר/החשבון שלהן הוא הסוכן/הסוכנות שבייפוי הכוח (LEFT JOIN; NULL אם אין התאמה, DTSX:2038-2039, 2046-2047); (2) מחוזה האב (ac2) של חוזה הסוכן של הקופה (ac1), בתנאי ש-ac1.Gen_isContractDataSharing = 1 ושהסוכן או הסוכנות שבייפוי הכוח זהים לאלה של הקופה. החיבורים לסוכן ולסוכנות הם left join, ולכן התאמה לכמה רשומות יוצרת כמה שורות. אחרי איחוד שני הענפים (UNION ALL), לכל צירוף של מספר קופה (gen_fundmain.gen_fundnumber, ולא מזהה רשומת הקופה gen_fundmainid), איש קשר, חשבון, סוכן וסוכנות נשמרת שורה אחת בלבד: זו שתאריך ההתחלה של ייפוי הכוח שלה (Gen_startdate) המאוחר ביותר (ROW_NUMBER() over(partition by FUND_NUMBER, CONTACT_NAME, ACCOUNT_NAME, AGENT_NAME, AGENCY_NAME order by POW_START_DATE desc), RowNum = 1, DTSX:1973, 2034, 2054, 2056, 2084). לכן שורות משני הענפים עם אותו צירוף מתחרות זו בזו, ואם לשתי רשומות קופה יש אותו מספר קופה (או שלשתיהן אין מספר קופה – ב-PARTITION BY ערכי NULL נכללים באותה קבוצה) ואותם איש קשר, חשבון, סוכן וסוכנות, רק אחת מהן מקבלת שורה בריצה זו. בתאריכים זהים, או כשלכל השורות בצירוף אין תאריך התחלה (ב-SQL Server NULL ממוין אחרון בסדר יורד), הבחירה אינה דטרמיניסטית."
+        },
+        {
+          "h": "התאמה לרשומות קיימות",
+          "t": "Lookup על Gen_allowedinformationforfundBase לפי חמישה מפתחות: סוכן, סוכנות, איש קשר, חשבון וקופה. רק שורות ללא התאמה ממשיכות. בנוסף, איש קשר שמסומן gen_customeragename = N'נפטר' נשלל."
+        },
+        {
+          "h": "החלטות",
+          "t": "הרשאה קיימת: השורה מושלכת, ללא עדכון. לקוח שנפטר: השורה מושלכת. אחרת: נוצרת הרשאה חדשה."
+        },
+        {
+          "h": "כתיבה ל-CRM",
+          "t": "INSERT ישיר בטבלה dbo.Gen_allowedinformationforfundBase דרך חיבור [CRM] (מחרוזת החיבור בזמן תכנון: Psql/ALTSHULER_MSCRM; קובץ התצורה C:\\Generix\\SSISConfigFile.dtsConfig שלא סופק (DTSX:17) עשוי לדרוס אותה). זו כתיבה ישירה לטבלת CRM (Unsupported). הערכים שנכתבים (לפי מיפוי היעד): Gen_agencyname ← AGENCY_NAME, Gen_agentname ← AGENT_NAME, Gen_contactname ← CONTACT_NAME, Gen_accountname ← ACCOUNT_NAME, Gen_fundname ← FUND_GUID, Gen_powerofattorneymainname ← POW_MAIN (gen_powerofattorney.gen_powerofattorneymain), gen_agentreceivescommissionnly ← IS_COMMISSION_AGENT = isnull(gen_powerofattorney.gen_agentreceivescommissionnly,0) (ערך ריק נכתב כ-0), Gen_allowedinformationforfundId ← מזהה GUID חדש לכל שורה (Guid.NewGuid, main.vb:36), CreatedOn ו-ModifiedOn ← DateTime.UtcNow בזמן הריצה (main.vb:25,33; לא ערך קבוע). הסקריפט מחשב גם DeletionStateCode = 0 (main.vb:29), אבל העמודה אינה ממופה ליעד ולכן אינה נכתבת. ערכים קבועים מוכחים: statecode = 0, statuscode = 1 (main.vb:27,30). הבעלים (OwnerId), היוצר והמעדכן הם משתמש המערכת שאותר בשלב 3 לפי DomainName = User::UserName, והיחידה העסקית (OwningBusinessUnit) היא היחידה העסקית של אותו משתמש (המשתנה BusinessUnitId) (Get System user id; Create system columns main.vb:18-21)."
+        },
+        {
+          "h": "תוצאה עסקית",
+          "t": "נוספות שורות שמקשרות סוכנים וסוכנויות לקופות של לקוחות שנתנו להם ייפוי כוח עם gen_currentstate = 1 (הערך 1 אינו מוגדר עבור gen_powerofattorney בקבצים שסופקו) (שהשורות מעניקות הרשאת צפייה ב-CRM הוא השערה לפי שם הטבלה; הצרכן לא ידוע, external_unknown). בנוסף, נוספות שורות שמקשרות את הסוכן והסוכנות של חוזה האב (ac2) לקופה, רק אם ללקוח יש ייפוי כוח עם gen_currentstate = 1 שניתן לסוכן או לסוכנות של הקופה, ובחוזה הסוכן של הקופה (ac1) מסומן Gen_isContractDataSharing = 1."
+        }
+      ],
+      "decisions": [
+        {
+          "where": "Get Agent Or Agency Detail From Fund",
+          "condition": "((Gen_existinfile is not null and Gen_existinfile = 1) or (gen_fundmain.gen_revaluationdate is not null and year(gen_fundmain.gen_revaluationdate) >= year(getdate())-3)) and gen_powerofattorney.gen_currentstate = 1",
+          "meaning_he": "קופה שמסומנת Gen_existinfile = 1 (השערה: קיימת בקובץ), או ששנת השערוך שלה ≥ השנה הנוכחית פחות 3 (כולל תאריכים עתידיים), עם ייפוי כוח במצב 1",
+          "outcome_he": "נכנסת לאוכלוסייה"
+        },
+        {
+          "where": "Get Agent Or Agency Detail From Fund (ענף 2)",
+          "condition": "(gen_powerofattorney.Gen_agentname = gen_fundmain.gen_agentname or gen_powerofattorney.Gen_agencyname = gen_fundmain.gen_agencyname) and ac1.Gen_isContractDataSharing is not null and ac1.Gen_isContractDataSharing = 1",
+          "meaning_he": "ייפוי הכוח ניתן לסוכן או לסוכנות של הקופה, וחוזה הסוכן משתף מידע",
+          "outcome_he": "גם הסוכן והסוכנות של חוזה האב מקבלים הרשאה"
+        },
+        {
+          "where": "Get Agent Or Agency Detail From Fund",
+          "condition": "ROW_NUMBER() over(partition by FUND_NUMBER, CONTACT_NAME, ACCOUNT_NAME, AGENT_NAME, AGENCY_NAME order by POW_START_DATE desc) = 1",
+          "meaning_he": "ייפוי הכוח האחרון לכל צירוף",
+          "outcome_he": "שורה אחת לכל צירוף"
+        },
+        {
+          "where": "Lookup",
+          "condition": "Gen_agentname = AGENT_NAME and Gen_agencyname = AGENCY_NAME and Gen_contactname = CONTACT_NAME and Gen_accountname = ACCOUNT_NAME and Gen_fundname = FUND_GUID (No Match → המשך)",
+          "meaning_he": "ההרשאה עדיין לא קיימת",
+          "outcome_he": "קיימת: השורה מושלכת; לא קיימת: ממשיכה"
+        },
+        {
+          "where": "filtering customers dead",
+          "condition": "CONTACT_NAME in (select ContactId from Contact where gen_customeragename = N'נפטר') (No Match → המשך)",
+          "meaning_he": "הלקוח אינו נפטר",
+          "outcome_he": "נפטר: השורה מושלכת; אחרת: נוצרת הרשאה"
+        }
+      ],
+      "crmEffects": [
+        {
+          "entity": "gen_allowedinformationforfund (טבלה Gen_allowedinformationforfundBase)",
+          "verb": "Create (INSERT)",
+          "mechanism": "SQL",
+          "when_he": "לכל צירוף חדש של סוכן, סוכנות, איש קשר, חשבון וקופה שאינו קיים בטבלה ושאיש הקשר שלו אינו מסומן כנפטר. Unsupported."
+        }
+      ],
+      "evidence": [
+        "Get Agent Or Agency Detail From Fund DTSX:1965-2088 (SqlCommand line 1970)",
+        "Lookup DTSX:2137-2149 (CacheType 0, NoMatchBehavior 1, ParameterMap)",
+        "filtering customers dead DTSX:1906-1922",
+        "Create system columns DTSX:684, ReadOnlyVariables DTSX:1862, main.vb lines 18-36",
+        "Create Allowed Info Fund extensionbase DTSX:608-616 (OpenRowset [dbo].[Gen_allowedinformationforfundBase], AccessMode 0)",
+        "[CRM] connection DTSX:4-6 (Psql / ALTSHULER_MSCRM)",
+        "errorRowDisposition=FailComponent on all outputs in the data flows (DTSX:600-2750)"
+      ],
+      "openQuestions_he": [
+        "בחבילה זו משמעות הערך gen_powerofattorney.gen_currentstate = 1 אינה מוגדרת. בחבילה 0030 ערך זה מסונן ברכיב 'Get Active Poa' תחת הכינוי ActivePoas (0030 DTSX:4187, 4222). הגדרת ערכי השדה ב-CRM עצמה לא סופקה.",
+        "כאשר הסוכן או הסוכנות ריקים (left join), לא ידוע אם ה-Lookup במצב Full cache מזהה התאמה בין ערכים ריקים. לכן לא ידוע אם שורות כאלה נוספות מחדש בכל ריצה.",
+        "האם מנגנון ההרשאה עצמו (תוסף, תצוגה או דוח שמסנן לפי טבלה זו) קיים מחוץ לחבילה? לא ידוע (external_unknown).",
+        "כאשר יש שני ייפויי כוח עם אותו Gen_startdate באותו צירוף, לא ידוע איזה ייפוי כוח ראשי ייבחר. הבחירה עשויה להשתנות בין ריצות, וכך לגרום למחיקה ולהוספה מחדש של ההרשאה (השערה)."
+      ]
+    },
+    {
+      "refId": "Package\\Delete Rows",
+      "title_he": "מחיקת הרשאות של נפטרים והרשאות שאינן תקפות",
+      "techName": "Delete Rows",
+      "short_he": "עוברת על כל הרשאות המידע הקיימות, ומוחקת הרשאה של לקוח שנפטר והרשאה שכבר אינה נגזרת מייפוי כוח עם gen_currentstate = 1.",
+      "flow_he": [
+        "קריאת כל ההרשאות הקיימות",
+        "בדיקה מקבילה: האם הלקוח נפטר? האם ההרשאה עדיין תקפה?",
+        "מחיקה ישירה (SQL) של ההרשאה כשאחת הבדיקות נכשלת"
+      ],
+      "short": {
+        "nodes": [
+          {
+            "type": "decision",
+            "text": "לכל הרשאה קיימת בטבלה נבדק: האם הלקוח שלה מסומן כנפטר?",
+            "branches": [
+              {
+                "label": "כן",
+                "nodes": [
+                  {
+                    "type": "write",
+                    "text": "ההרשאה נמחקת."
+                  }
+                ]
+              },
+              {
+                "label": "לא",
+                "nodes": [
+                  {
+                    "type": "step",
+                    "text": "הבדיקה הזו אינה מוחקת את ההרשאה."
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "type": "decision",
+            "text": "האם ההרשאה עדיין נגזרת מייפוי כוח עם gen_currentstate = 1, באותו צירוף ועם אותו ייפוי כוח ראשי?",
+            "branches": [
+              {
+                "label": "כן",
+                "nodes": [
+                  {
+                    "type": "step",
+                    "text": "ההרשאה נשמרת."
+                  }
+                ]
+              },
+              {
+                "label": "לא",
+                "nodes": [
+                  {
+                    "type": "write",
+                    "text": "ההרשאה נמחקת."
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "type": "end",
+            "text": "בטבלה נשארות רק הרשאות תקפות של לקוחות שלא נפטרו."
+          }
+        ]
+      },
+      "detailed": {
+        "nodes": [
+          {
+            "type": "step",
+            "text": "המערכת קוראת את כל רשומות 'מידע מותר לקופה', ללא סינון לפי מצב הרשומה.",
+            "tech": "get allow information (OLEDBSource, [CRM], DTSX:2603-2620): select Gen_agencyname, Gen_agentname, Gen_fundname, Gen_contactname, Gen_powerofattorneymainname, Gen_accountname, Gen_allowedinformationforfundid from Gen_allowedinformationforfund"
+          },
+          {
+            "type": "step",
+            "text": "כל רשומה משוכפלת לשתי בדיקות שרצות במקביל ובאופן בלתי תלוי.",
+            "tech": "Multicast (DTSX:2722); Multicast Output 1 אינו מחובר (dangling, DTSX:2735)"
+          },
+          {
+            "type": "decision",
+            "text": "האם איש הקשר של ההרשאה מסומן כנפטר?",
+            "tech": "Get customers dead (Lookup Full cache, DTSX:2663-2679): Gen_contactname = ContactId מתוך select ContactId from Contact where gen_customeragename = N'נפטר'. רק Match Output מחובר.",
+            "branches": [
+              {
+                "label": "נפטר",
+                "nodes": [
+                  {
+                    "type": "write",
+                    "text": "רשומת ההרשאה נמחקת לפי המזהה שלה.",
+                    "tech": "Delete  Row of customer dead (OLEDBCommand, [CRM], DTSX:2529-2532): delete Gen_allowedinformationforfundBase where Gen_allowedinformationforfundid = ? · SQL · Unsupported"
+                  }
+                ]
+              },
+              {
+                "label": "לא נפטר",
+                "nodes": [
+                  {
+                    "type": "step",
+                    "text": "בבדיקה זו לא נעשה דבר."
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "type": "decision",
+            "text": "האם הצירוף של סוכנות, סוכן, קופה, איש קשר, ייפוי כוח ראשי וחשבון עדיין מופיע באוכלוסיית ההרשאות התקפות?",
+            "tech": "Check if valid allow (Lookup Full cache, DTSX:2225-2463). השאילתה הפעילה זהה לשאילתת המקור של Create Fund View Table (השוואה אחרי הסרת הערות). מפתחות: AGENCY_NAME, AGENT_NAME, FUND_GUID, CONTACT_NAME, POW_MAIN, ACCOUNT_NAME. רק No Match Output מחובר.",
+            "branches": [
+              {
+                "label": "מופיע",
+                "nodes": [
+                  {
+                    "type": "step",
+                    "text": "ההרשאה נשמרת."
+                  }
+                ]
+              },
+              {
+                "label": "לא מופיע",
+                "nodes": [
+                  {
+                    "type": "write",
+                    "text": "רשומת ההרשאה נמחקת לפי המזהה שלה, כי היא כבר אינה נגזרת מייפוי כוח עם gen_currentstate = 1 באותו הרכב.",
+                    "tech": "Delete Not Valid Row (OLEDBCommand, [CRM], DTSX:2566-2569): delete Gen_allowedinformationforfundBase where Gen_allowedinformationforfundid = ? · SQL · Unsupported (×2 זהים לפי dupes.json)"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "type": "end",
+            "text": "הרשאות של לקוחות שנפטרו והרשאות שאינן תקפות עוד, כולל הרשאות שבהן ייפוי הכוח הראשי התחלף, נמחקות פיזית ממסד הנתונים."
+          }
+        ]
+      },
+      "detail_he": [
+        {
+          "h": "מקור ואוכלוסייה",
+          "t": "כל הרשומות בתצוגה Gen_allowedinformationforfund, ללא סינון (DTSX:2608)."
+        },
+        {
+          "h": "התאמה לרשומות קיימות",
+          "t": "שתי בדיקות מקבילות: (א) איש הקשר מופיע ברשימת אנשי הקשר שמסומנים gen_customeragename = N'נפטר'; (ב) הרשומה מתאימה, לפי שישה מפתחות כולל ייפוי הכוח הראשי, לשאילתת האוכלוסייה התקפה, שזהה בחלקה הפעיל לשאילתת ההוספה."
+        },
+        {
+          "h": "החלטות",
+          "t": "התאמה לנפטר: מחיקה. אי-התאמה לאוכלוסייה התקפה: מחיקה. שתי הבדיקות בלתי תלויות, ולכן רשומה אחת עשויה לקבל שתי פקודות מחיקה. השנייה פשוט לא תמצא את הרשומה (השערה: ללא שגיאה)."
+        },
+        {
+          "h": "כתיבה ל-CRM",
+          "t": "DELETE ישיר בטבלה Gen_allowedinformationforfundBase לפי Gen_allowedinformationforfundid, דרך חיבור [CRM] (מחרוזת החיבור בזמן תכנון: Psql/ALTSHULER_MSCRM; קובץ התצורה C:\\Generix\\SSISConfigFile.dtsConfig שלא סופק (DTSX:17) עשוי לדרוס אותה). זו כתיבה ישירה לטבלת CRM (Unsupported)."
+        },
+        {
+          "h": "תוצאה עסקית",
+          "t": "שורת הקישור נמחקת בשני מקרים בלתי תלויים: (א) איש הקשר שלה מסומן gen_customeragename = N'נפטר'; (ב) אין עוד שורה בשאילתת האוכלוסייה (אחרי הסינון RowNum = 1) שתואמת לה בכל שישת המפתחות: סוכנות, סוכן, קופה (FUND_GUID), איש קשר, ייפוי כוח ראשי (POW_MAIN) וחשבון. כל עוד שורה כזו קיימת, הרשומה נשמרת, למשל כשייפוי כוח אחר עם gen_currentstate = 1 של אותו חשבון מניב את אותם ערכים, כולל אותו POW_MAIN. דוגמאות למצבים שעשויים לגרום להיעדר התאמה (הרשימה אינה סגורה): הקופה כבר אינה עומדת בתנאי Gen_existinfile = 1 או year(gen_revaluationdate) >= year(getdate())-3; אין עוד ייפוי כוח עם gen_currentstate = 1 שמניב את הצירוף; ברשומה שמקורה בענף חוזה האב, ac1.Gen_isContractDataSharing כבר אינו 1, או שגם הסוכן וגם הסוכנות שבייפוי הכוח כבר אינם זהים לאלה של הקופה; שינוי בהתאמת הסוכן או הסוכנות (gen_agents.gen_contactname, gen_agencie.gen_agencyname, או חוזה האב ac2) או באיש הקשר או בחשבון של הקופה; והשורה כבר אינה RowNum = 1 בצירוף שלה, למשל כשייפוי כוח עם תאריך התחלה מאוחר יותר ועם POW_MAIN אחר נבחר. לגבי מפתחות ריקים (NULL) ראו את השאלה הפתוחה. שהמחיקה מבטלת הרשאת צפייה ב-CRM הוא השערה לפי שם הטבלה (הצרכן לא ידוע, external_unknown)."
+        }
+      ],
+      "decisions": [
+        {
+          "where": "Get customers dead",
+          "condition": "Gen_contactname in (select ContactId from Contact where gen_customeragename = N'נפטר') (Match → מחיקה)",
+          "meaning_he": "הלקוח נפטר",
+          "outcome_he": "מחיקת ההרשאה"
+        },
+        {
+          "where": "Check if valid allow",
+          "condition": "AGENCY_NAME = Gen_agencyname and AGENT_NAME = Gen_agentname and FUND_GUID = Gen_fundname and CONTACT_NAME = Gen_contactname and POW_MAIN = Gen_powerofattorneymainname and ACCOUNT_NAME = Gen_accountname (No Match → מחיקה)",
+          "meaning_he": "ההרשאה כבר אינה נגזרת מייפוי כוח עם gen_currentstate = 1 באותו הרכב",
+          "outcome_he": "מחיקת ההרשאה"
+        }
+      ],
+      "crmEffects": [
+        {
+          "entity": "gen_allowedinformationforfund (טבלה Gen_allowedinformationforfundBase)",
+          "verb": "Delete",
+          "mechanism": "SQL",
+          "when_he": "כשאיש הקשר מסומן כנפטר. Unsupported."
+        },
+        {
+          "entity": "gen_allowedinformationforfund (טבלה Gen_allowedinformationforfundBase)",
+          "verb": "Delete",
+          "mechanism": "SQL",
+          "when_he": "כשהצירוף, כולל ייפוי הכוח הראשי, אינו מופיע עוד באוכלוסיית ההרשאות התקפות. Unsupported."
+        }
+      ],
+      "evidence": [
+        "get allow information DTSX:2603-2620",
+        "Multicast DTSX:2722, Output 1 dangling DTSX:2735",
+        "Get customers dead DTSX:2663-2679",
+        "Check if valid allow DTSX:2225-2463 (SqlCommand 2227, SqlCommandParam 2341, ParameterMap 2463)",
+        "Delete  Row of customer dead DTSX:2529-2532; Delete Not Valid Row DTSX:2566-2569",
+        "analysis/0024_AgentFundInformation/dupes.json (two delete commands identical)",
+        "[CRM] connection DTSX:4-6"
+      ],
+      "openQuestions_he": [
+        "כאשר POW_MAIN, הסוכן או הסוכנות ריקים, לא ידוע אם ה-Lookup במצב Full cache מתאים ערך ריק לערך ריק. אם לא, הרשאות כאלה יימחקו בכל ריצה (השערה)."
+      ]
+    },
+    {
+      "refId": "Package\\Execute SQL Task",
+      "title_he": "מחיקת הרשאות ללא סוכן וללא סוכנות",
+      "techName": "Execute SQL Task",
+      "short_he": "מוחקת הרשאות מידע שאין בהן לא סוכן ולא סוכנות.",
+      "flow_he": [
+        "מחיקה ישירה (SQL) של כל ההרשאות שבהן גם הסוכן וגם הסוכנות ריקים"
+      ],
+      "short": {
+        "nodes": [
+          {
+            "type": "decision",
+            "text": "האם בהרשאה חסרים גם הסוכן וגם הסוכנות?",
+            "branches": [
+              {
+                "label": "כן",
+                "nodes": [
+                  {
+                    "type": "write",
+                    "text": "ההרשאה נמחקת."
+                  }
+                ]
+              },
+              {
+                "label": "לא",
+                "nodes": [
+                  {
+                    "type": "step",
+                    "text": "ההרשאה נשמרת."
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "type": "end",
+            "text": "לא נשארות הרשאות שאינן משויכות לאף סוכן או סוכנות."
+          }
+        ]
+      },
+      "detailed": {
+        "nodes": [
+          {
+            "type": "step",
+            "text": "השלב רץ אחרי שלבי ההוספה והמחיקה, רק אם הם הצליחו.",
+            "tech": "Precedence Delete Rows → Execute SQL Task · Success (DTSX:7371)"
+          },
+          {
+            "type": "step",
+            "text": "הבדיקה חלה על כל רשומות ההרשאה בטבלה, כולל רשומות שנוספו בשלב ההוספה של אותה ריצה.",
+            "tech": "Gen_allowedinformationforfundBase (ללא סינון נוסף)"
+          },
+          {
+            "type": "decision",
+            "text": "האם בהרשאה חסרים גם הסוכן וגם הסוכנות?",
+            "tech": "where gen_agencyname is null and gen_agentname is null",
+            "branches": [
+              {
+                "label": "כן",
+                "nodes": [
+                  {
+                    "type": "write",
+                    "text": "כל ההרשאות האלה נמחקות בפקודה אחת.",
+                    "tech": "Gen_allowedinformationforfundBase · DELETE · SQL · SQLTask:Connection={EC67FF20-F4F6-4879-B546-653C1AF02333} = [CRM] (DTSX:4, DTSX:4481) · Unsupported"
+                  }
+                ]
+              },
+              {
+                "label": "לא",
+                "nodes": [
+                  {
+                    "type": "step",
+                    "text": "ההרשאה נשמרת."
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "type": "end",
+            "text": "הרשאות שנוצרו קודם לכן בלי סוכן ובלי סוכנות, כולל הרשאות שנוספו בריצה הנוכחית, מוסרות."
+          }
+        ]
+      },
+      "detail_he": [
+        {
+          "h": "מקור ואוכלוסייה",
+          "t": "כל הרשומות בטבלה Gen_allowedinformationforfundBase."
+        },
+        {
+          "h": "התאמה לרשומות קיימות",
+          "t": "אין התאמה; סינון ישיר לפי gen_agencyname is null and gen_agentname is null."
+        },
+        {
+          "h": "החלטות",
+          "t": "גם הסוכן וגם הסוכנות ריקים: מחיקה."
+        },
+        {
+          "h": "כתיבה ל-CRM",
+          "t": "DELETE ישיר דרך Execute SQL Task על חיבור [CRM] (DTSID {EC67FF20-F4F6-4879-B546-653C1AF02333}, Psql/ALTSHULER_MSCRM). זו כתיבה ישירה לטבלת CRM (Unsupported)."
+        },
+        {
+          "h": "תוצאה עסקית",
+          "t": "ניקוי הרשאות שאינן משויכות לאף גורם."
+        }
+      ],
+      "decisions": [
+        {
+          "where": "Execute SQL Task",
+          "condition": "delete from Gen_allowedinformationforfundBase where gen_agencyname is null and gen_agentname is null",
+          "meaning_he": "הרשאה ללא סוכן וללא סוכנות",
+          "outcome_he": "מחיקה"
+        }
+      ],
+      "crmEffects": [
+        {
+          "entity": "gen_allowedinformationforfund (טבלה Gen_allowedinformationforfundBase)",
+          "verb": "Delete",
+          "mechanism": "SQL",
+          "when_he": "בכל ריצה, לכל הרשאה שבה גם הסוכן וגם הסוכנות ריקים. Unsupported."
+        }
+      ],
+      "evidence": [
+        "Execute SQL Task DTSX:4477-4481",
+        "[CRM] connection DTSX:4-6",
+        "Precedence DTSX:7371, 7373"
+      ],
+      "openQuestions_he": []
+    }
+  ],
+  "findings_he": [
+    {
+      "severity": "high",
+      "text": "כל הכתיבות העסקיות בחבילה נעשות ב-SQL ישיר על טבלת CRM, ולא דרך ה-SDK (Unsupported): INSERT ל-Gen_allowedinformationforfundBase, ו-DELETE ממנה בשלושה מקומות. הכתיבה עוקפת את פלטפורמת ה-CRM (השערה לגבי ההשפעה: תוספים, ביקורת ומנגנוני שיתוף אינם מופעלים). מנהל החיבורים [CRM] מצביע בזמן תכנון על Psql/ALTSHULER_MSCRM. קובץ התצורה החיצוני עשוי לדרוס זאת (לא סופק).",
+      "evidence": "[CRM] DTSX:4-6; Create Allowed Info Fund extensionbase DTSX:608-616; Delete commands DTSX:2529-2532, 2566-2569; Execute SQL Task DTSX:4481 (Connection {EC67FF20-…} = [CRM]); config DTSX:17"
+    },
+    {
+      "severity": "medium",
+      "text": "חוסר עקביות במפתחות. שלב ההוספה בודק קיום הרשאה לפי חמישה מפתחות, בלי ייפוי הכוח הראשי. שלב המחיקה בודק תקפות לפי שישה מפתחות, כולל ייפוי הכוח הראשי. לכן, כשייפוי הכוח הראשי מתחלף בצירוף קיים, שלב ההוספה (שרץ ראשון) לא יוסיף רשומה, כי הצירוף קיים. שלב המחיקה (שרץ אחריו) ימחק את הרשומה הישנה. התוצאה: הצירוף ייעדר מהטבלה עד הריצה הבאה. זו מסקנה מהזרימה, לא נבדקה בנתונים.",
+      "evidence": "Lookup DTSX:2140 (5 keys) vs Check if valid allow DTSX:2341 (6 keys incl. POW_MAIN); order DTSX:7370"
+    },
+    {
+      "severity": "low",
+      "text": "שלב ההוספה אינו מסנן שורות שבהן גם הסוכן וגם הסוכנות ריקים, וה-Execute SQL Task מוחק אותן מיד אחריו. אם שורות כאלה קיימות באוכלוסייה, הן נוצרות ונמחקות בכל ריצה (השערה, תלוי בנתונים).",
+      "evidence": "Get Agent Or Agency Detail From Fund (left join gen_agents / gen_agencie) DTSX:1970; Execute SQL Task DTSX:4481"
+    },
+    {
+      "severity": "info",
+      "text": "שני ענפי אוכלוסייה בשאילתה מוערים בהערה ואינם פעילים: סוכנים עם חוזה ללא ייפוי כוח, וסוכנים עם חוזה אב ללא ייפוי כוח ועם שיתוף מידע. כרגע ההרשאות נגזרות רק מייפוי כוח עם gen_currentstate = 1.",
+      "evidence": "SqlCommand DTSX:1970 (שורות שמתחילות ב- --)"
+    },
+    {
+      "severity": "info",
+      "text": "הסינון של לקוחות שנפטרו מבוסס על הערך הטקסטואלי gen_customeragename = N'נפטר' של איש הקשר בלבד. חשבון (Account) אינו נבדק.",
+      "evidence": "filtering customers dead DTSX:1908; Get customers dead DTSX:2665"
+    },
+    {
+      "severity": "info",
+      "text": "החבילה אינה מעדכנת הרשאות קיימות. שינוי בסימון 'הסוכן מקבל עמלה בלבד' בצירוף קיים אינו מתעדכן ואינו גורם למחיקה, כי הסימון אינו חלק ממפתחות ההשוואה.",
+      "evidence": "Lookup DTSX:2140; Check if valid allow DTSX:2341"
+    }
+  ]
+}

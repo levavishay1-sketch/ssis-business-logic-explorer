@@ -1,0 +1,48 @@
+{
+  "verifier": "ssis-verifier",
+  "package": "0016_TransferOut",
+  "scope": "logic-claims re-check round 2",
+  "checkedAt": "2026-11-07",
+  "checked": 4,
+  "results": [
+    {
+      "id": "L|exec",
+      "hash": "061d653d7429",
+      "verdict": "CONFIRMED",
+      "detail": "I re-derived the steps. The package has three precedence constraints. None has DTS:Value or an expression, so all three are Success, and all are LogicalAnd. The order is Get Variables -> Create ETL (5476), Create ETL -> Close Transfer Out (5478), Close Transfer Out -> End ETL (5477). Get Variables has no incoming constraint. There are four executables, none disabled. There are no event handlers and no DTS:Configurations. The step-3 label is the title text; its population and hedges match the SQL.",
+      "evidence": "DTSX:5476-5478; executables DTSX:82, 2427, 2887, 4630",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Close Transfer Out|title",
+      "hash": "b28cfffd593c",
+      "verdict": "WRONG",
+      "detail": "title_he, short_he and flow_he[1-3,5] match the SQL, the splits and main.cs. flow_he[4] says 'קיבוץ לפי טיפול'. The Aggregate actually groups by three columns: Gen_customercareId, Gen_deliverydate and gen_appendixghissuingdate (AggregationType 0 x3), with gen_valuedate as Minimum (6). Delivery date comes from Tout and is one value per care, but the appendix-G date comes from each transaction. So the output is one row per care and appendix-G date, not one row per care. A care with several appendix-G dates gets several updates, as detailed[14] and finding#6 of this package say. The title's flow therefore contradicts the package's own detailed claim.",
+      "evidence": "DTSX:88-141 (Aggregate output columns, AggregationType 0,0,6,0); SQL DTSX:2139-2145 (group by includes ft.gen_appendixghissuingdate)",
+      "wrongUnits": [
+        {
+          "unit": 6,
+          "problem": "The grouping key is given as the care only.",
+          "correct": "קיבוץ לפי טיפול, תאריך מסירה ותאריך הנפקת נספח ג' (שורה לכל צירוף): תאריך ערך מינימלי (Aggregate)",
+          "evidence": "DTSX:88-141"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Close Transfer Out|short",
+      "hash": "6d118fe95113",
+      "verdict": "CONFIRMED",
+      "detail": "The population is customercare state 1 joined to its account courses and to Gen_ftCurrentYear on the fund, with transgrouptype 2 and EntryDate > CreatedOn. Full transfer goes IsFull -> transferCount > 0 -> Union All. Partial transfer needs actual == expected, and expected is the course amount repeated once per joined transaction row. The 'Sums Are Not Equal' and 'Has not thansactions' outputs are unconnected. The write sets gen_currentstate = OptionSetValue(3) and gen_rejectreason = OptionSetValue(34); the text names the constants and says the CRM meaning was not supplied. Fund release date = min value date, plus the appendix date and the delay flag. Both meanings (state 1 = open, group 2 = money went out) are labelled השערה.",
+      "evidence": "SQL DTSX:2119-2145; IsFull DTSX:2091-2094; DTSX:164; Compare sums DTSX:1289; paths DTSX:2412-2422; main.cs DTSX:341-342, 379-393",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Close Transfer Out|detailed",
+      "hash": "a49880c9253f",
+      "verdict": "CONFIRMED",
+      "detail": "Every unit was re-derived.\n- The SQL: inner joins, all columns qualified, WHERE, GROUP BY.\n- expected = sum(ISNULL(ac.amount,0)) repeated once per row.\n- The splits and their unconnected outputs.\n- A NULL Gen_isfulltransfer leads to FailComponent on IsFull. This is marked as SSIS behaviour, is conditional, and is correct: a NULL result in a Conditional Split is an evaluation error.\n- The Union All feeds Aggregate keys care, delivery and appendix date, with Minimum on gen_valuedate.\n- ToLocalTime is applied to the release and appendix dates, each only when not null.\n- DateDiff(Day) > 0 runs on the raw values only when both dates exist. The VB DateDiff semantics are labelled as general .NET knowledge.\n- Constants 3 and 34 are named as constants.\n- Batches of 1000 plus the remainder at EndOfRowset.\n- A Fault goes to ErrorBuffer.Description; Set Warning columns sets RecordKey to \"\", so the warning has no care id.\n\nGen_ftCurrentYear's meaning is labelled השערה. Nothing business-relevant is missing. The CastingError path on a failed batch is runtime plumbing and is out of scope under the standard.",
+      "evidence": "DTSX:2119-2145; 2081-2094; 151-164; 1275-1289; 88-141; paths 2412-2422; main.cs DTSX:379-454; Set Warning columns DTSX:2198-2231",
+      "wrongUnits": []
+    }
+  ]
+}

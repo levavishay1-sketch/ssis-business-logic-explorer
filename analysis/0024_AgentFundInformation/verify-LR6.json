@@ -1,0 +1,33 @@
+{
+  "verifier": "ssis-verifier",
+  "package": "0024_AgentFundInformation",
+  "scope": "logic-claims re-check round 6",
+  "checkedAt": "2026-11-07",
+  "checked": 2,
+  "source": { "file": "source/DailyProcess/0024_AgentFundInformation.dtsx", "sha256": "659C8F355B506D3D1772DC5A1165E80E3574B31C18BBCD1F2E43A836ADF6E2C4" },
+  "results": [
+    {
+      "id": "L|Package\\Create Fund View Table|detail",
+      "hash": "d04c50345e58",
+      "verdict": "INCOMPLETE",
+      "detail": "I re-derived every unit from the raw DTSX and found all stated units correct. [1] The source connection is [CRM] (DTSX:2088-2136). The WHERE clause is ((Gen_existinfile is not null and =1) OR (gen_revaluationdate is not null and year(...) >= year(getdate())-3)) AND poa.gen_currentstate = 1 (DTSX:2048-2053, 2072-2082). The bound is a lower bound only. The Gen_existinfile ownership argument rests on the ambiguity rule plus 0034 DTSX:15 ('from Gen_fundmain where gen_existinfile = 1', single-table FROM). Branch 1 matches by LEFT JOIN on gen_agents.gen_contactname = poa.gen_agentname and gen_agencie.gen_agencyname = poa.gen_agencyname, and writes the gen_agentsid / gen_agencieid record IDs (DTSX:2038-2039, 2046-2047). Branch 2 joins ac1 on fund.gen_brokernumber and ac2 on ac1.gen_agencycontractnumber, uses LEFT JOINs from ac2, requires (poa agent = fund agent OR poa agency = fund agency) and ac1.Gen_isContractDataSharing = 1 (DTSX:2055-2082). The 'contact/account' meaning is supported by 0029 DTSX:26979/26981. [2] The Lookup is full cache, NoMatchBehavior 1, on 5 keys with no POW_MAIN, and only the No Match output has a path (DTSX:2137-2216). filtering customers dead: CONTACT_NAME -> ContactId in 'select ContactId from Contact where gen_customeragename = N'נפטר''. Only its No Match output is connected (DTSX:1906-1922, 2211-2212). [4] Destination: OpenRowset [dbo].[Gen_allowedinformationforfundBase], AccessMode 0, 16 mapped columns. The claim lists all 16 with correct sources. main.vb lines 18-36 match exactly: 18 BU, 19-21 users, 25/33 UtcNow, 27 StatusCode 1, 29 DeletionStateCode (unmapped), 30 StateCode 0, 36 NewGuid. SystemUserId and BusinessUnitId come from the SystemUser lookup on DomainName = @[User::UserName] (DTSX:5390-5392, 7314-7330, Set system variables). The design-time connection plus config caveat is present (DTSX:6, 17). MISSING row-selection detail: [1] says 'לכל צירוף נשמרת השורה של ייפוי הכוח שתאריך ההתחלה שלו המאוחר ביותר' but never says what the 'צירוף' (the dedupe key) is. The key is ROW_NUMBER() OVER (PARTITION BY FUND_NUMBER, CONTACT_NAME, ACCOUNT_NAME, AGENT_NAME, AGENCY_NAME ORDER BY POW_START_DATE DESC) over the UNION ALL of both branches, then RowNum = 1 (DTSX:1973, 2084). FUND_NUMBER is gen_fundmain.gen_fundnumber, not the fund record ID FUND_GUID. Two consequences follow from this key. If two fund records share a gen_fundnumber, or both have NULL gen_fundnumber (NULLs partition together), and also have the same contact, account, agent and agency, only one fund record gets a row in this run. Rows from branch 1 and branch 2 with the same key compete with each other for RowNum = 1. Note, not counted: NULL Gen_startdate sorts last under DESC, and if all candidates are NULL the choice is also nondeterministic. The text names only 'identical dates'.",
+      "evidence": "0024 DTSX:1973 (PARTITION BY FUND_NUMBER, CONTACT_NAME, ACCOUNT_NAME, AGENT_NAME, AGENCY_NAME ORDER BY POW_START_DATE desc), DTSX:2034/2056 (FUND_NUMBER = gen_fundmain.gen_fundnumber; FUND_GUID = gen_fundmainid), DTSX:2054 (union all), DTSX:2084 (RowNum = 1); 0034 DTSX:15; 0029 DTSX:26979, 26981",
+      "wrongUnits": [
+        {
+          "unit": "[1] 'לכל צירוף נשמרת השורה של ייפוי הכוח שתאריך ההתחלה שלו המאוחר ביותר; במקרה של תאריכים זהים, הבחירה אינה דטרמיניסטית.'",
+          "problem": "The dedupe key, a row-selection condition, is not stated. It is the fund number (not the fund record), contact, account, agent and agency, across both UNION ALL branches. If fund records share a fund number (or have NULL), rows can be dropped.",
+          "correct": "לכל צירוף של מספר קופה (gen_fundnumber, לא מזהה רשומת הקופה), איש קשר, חשבון, סוכן וסוכנות, על פני שני הענפים יחד, נשמרת השורה שתאריך ההתחלה של ייפוי הכוח שלה המאוחר ביותר (ROW_NUMBER ... RowNum = 1); אם שתי רשומות קופה חולקות אותו מספר קופה (או שלשתיהן אין מספר) ואותם איש קשר, חשבון, סוכן וסוכנות, רק אחת מהן מקבלת שורה; בתאריכים זהים (או ריקים) הבחירה אינה דטרמיניסטית.",
+          "evidence": "DTSX:1973, 2034, 2054, 2056, 2084"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Delete Rows|detail",
+      "hash": "80601954778f",
+      "verdict": "CONFIRMED",
+      "detail": "I re-derived every unit. [1] 'get allow information' selects 7 columns from the view Gen_allowedinformationforfund with no WHERE clause, over the [CRM] connection (DTSX:2603-2620). The view definition was not supplied. [2] A Multicast has 2 connected outputs, and Output 1 is dangling (DTSX:2722-2746). (a) 'Get customers dead' is full cache, NoMatchBehavior 1, Gen_contactname -> ContactId, reference 'select ContactId from Contact where gen_customeragename = N'נפטר'', and only its Match output is connected (DTSX:2663-2679, 2742). (b) 'Check if valid allow' is full cache, NoMatchBehavior 1, with 6 join keys: AGENCY_NAME, AGENT_NAME, FUND_GUID, CONTACT_NAME, POW_MAIN, ACCOUNT_NAME (DTSX:2341, 2457-2463). Only its No Match output is connected (DTSX:2743). I stripped comments, whitespace and case from both SqlCommands with my own script, and the reference query is character-identical to the insert source query, so 'identical in its active part' is correct. [3]/[4] Both OLE DB Commands run 'delete Gen_allowedinformationforfundBase where Gen_allowedinformationforfundid = ?' over [CRM]. Param_0 comes from get allow information.Gen_allowedinformationforfundid (DTSX:2529-2602). The design-time connection plus config caveat is present (DTSX:6, 17), and Unsupported is correct. The double-delete outcome is labelled השערה. [5] The two independent cases and the 6 keys are correct. The examples are explicitly open-ended and each is consistent with the SQL, including the OR/NULL semantics of the branch-2 agent/agency condition and the RowNum = 1 / POW_MAIN example. NULL keys are deferred to an open question. Neither Delete Rows component is disabled. Note, not counted: the dedupe key of the population query ('בצירוף שלה') is not spelled out here either. That gap is counted on the Create Fund View Table claim, which this claim references as 'identical'.",
+      "evidence": "DTSX:2603-2620, 2663-2679, 2722-2746, 2225-2463 (SqlCommand 2227, SqlCommandParam 2341, ParameterMap ~2463), 2529-2602; [CRM] DTSX:4-6; config DTSX:17",
+      "wrongUnits": []
+    }
+  ]
+}

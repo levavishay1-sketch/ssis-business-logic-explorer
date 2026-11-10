@@ -1,0 +1,25 @@
+{
+  "verifier": "ssis-verifier",
+  "package": "0013_Heir_Daily",
+  "scope": "logic-claims re-check",
+  "checkedAt": "2026-11-10",
+  "checked": 2,
+  "results": [
+    {
+      "id": "L|finding#2",
+      "hash": "37d39f9e1ba5",
+      "verdict": "CONFIRMED",
+      "detail": "Re-derived from Update Heir main.cs:162 (DTSX:9612). The condition is gencountry_IsNull != Gencountrydb_IsNull || (gencity_IsNull == false && IsNeedToUpdate<String>(gencountry, Gencountrydb)). All three cases in the text follow from it. (a) City NULL and both country values present: both operands are false, so gen_country is not set. (b) Exactly one country value NULL: the first operand is true whatever the city is. (c) City present and both country values NULL: IsNeedToUpdate reads Row.gencountry and Row.Gencountrydb while both are NULL. The outcome of that read is correctly left unverified and marked as SSIS behaviour. The db side 'empty' equals NULL through 'change empty strings to null' (DTSX:4044: TRIM == \"\" ? NULL(DT_WSTR,50)). The file side 'empty' equals IsNull through the trim script (Trim All Input Columns 1 main.cs:53-57), with the caveat stated in the detailed claim. The finding is conditional and is not framed as a bug.",
+      "evidence": "source/DailyProcess/0013_Heir_Daily.dtsx:9612 (Update Heir main.cs:162); DTSX:4044; Trim All Input Columns 1 main.cs:51-60",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Foreach Loop Container\\Create And Update Heir|detailed",
+      "hash": "f9e23d26d164",
+      "verdict": "CONFIRMED",
+      "detail": "All 23 units were re-derived. [1]-[3]: Heir has 12 columns, and both error and truncation are RedirectRow. Contact has 5 columns, and both are FailComponent. RetainNulls=false is set on both (DTSX:6643, 4327). The trim scripts set an empty or blank string to null (main.cs:53-57), and the NULL semantics are marked. Heir Error Output goes to 'Derived Column', which has no further path. [4]: Merge Join JoinType=2, NumKeyColumns=3, TreatNullsAsEqual=true (DTSX:6754-6756). The sort keys pair region/MACHOZ, portfolio/MIS_TIK and request/MIS_BAKASHA in positions 1-3. [5]: the expressions are exact (DTSX:6900-6912). gen_status and gen_name are RedirectRow to Derived Column 1, and gen_region is FailComponent. The NULL outcomes are marked. [6]: Append Zeros pads to the input length 9 (cachedLength=9) after removing '.'. Format Dates handles 8 or 6 characters (field length 50 >= 10), and invalid values become null. Neither script has a try/catch (main.cs:38-56 / 38-53). The conditional caveats are stated. [7]-[11]: Check If Contact Exist uses contact.gen_identitynumber = gen_customeridentitynumber, and No Match goes to Derived Column 2 (no path). [12]-[15]: Check If  Heir Exist uses 4 keys (CacheType=0, full cache), and No Match goes to Create Heir. Create Heir writes 16 attributes only when not NULL (main.cs:132-186), with ExecuteMultiple Create batches of 1000. Its outputs have no paths. [16]-[22]: Update Heir main.cs:131-230 compares 12 attributes. Country uses gencity_IsNull at line 162. The date comparison is .Date vs .AddHours(3).Date (main.cs:313). The read-when-file-NULL behaviour and the CastingError catch (233-242) are described correctly and conditionally. Name, region, portfolio and request are not updated. DontNeedToUpdate goes to 'no need to' (no path). [23] is correct. Note only: 'קובץ הרשם' names the source after its file pattern (Rasham*.txt, DTSX:11142; connection 'Source - Rasham', DTSX:121). It is a name, not a proven business meaning.",
+      "evidence": "source/DailyProcess/0013_Heir_Daily.dtsx:4325-4394, 6641-6750, 6752-6760, 6885-6912, 3159 (Append Zeros main.cs:38-66), 5853 (Format Dates main.cs:38-80), 4254-4282, 4070-4118, 3983-4044, 4394 (Create Heir main.cs:125-248), 9184 (Update Heir main.cs:123-351)",
+      "wrongUnits": []
+    }
+  ]
+}

@@ -1,0 +1,191 @@
+{
+  "verifier": "ssis-verifier",
+  "package": "0025_Agents_Agencies",
+  "scope": "logic-claims re-check round 3",
+  "checkedAt": "2026-11-07",
+  "checked": 21,
+  "results": [
+    {
+      "id": "L|summary",
+      "hash": "f5326b957c64",
+      "verdict": "WRONG",
+      "detail": "Part (2) and most of scopeNote_he verified: gen_commissionpostponed != 1 (NULL excluded), three expiry dates null or dateadd(HOUR,3,x) < CONVERT(DATE,GETDATE()), reason 5/4, SDK update; [CRM] DTSID {D51CCED1-...} Psql/ALTSHULER_MSCRM design-time (DTSX:4-6), both OLE DB Commands and all sources on [CRM], disabled Execute SQL Task Connection={D51CCED1-...} (DTSX:3160), EnableConfig=True + unsupplied config. One wrong unit (assembly name). Also missing in part (1) (would be INCOMPLETE on its own): the summary says the sum is written to 'שווי סוכן' or 'שווי סוכנות' without the row-selection condition HAVING ABS(sum - isnull(gen_agentvalue,0) + isnull(gen_agencyvalue,0)) > 1 (DTSX:5090) and without the branch rule that decides which field is written (agent when gen_agentsid is not NULL, evaluated first; agency only when there is no agent; rows with neither are dropped - DTSX:5014-5047, Default Output unconnected).",
+      "evidence": "0025_Agents_Agencies.dtsx:4-6, 1 (EnableConfig), 3160, 5090, 5014-5047; CRM2015.Proxy references at 4336, 6553; 'using CRM.Proxy;' at 4214, 6293",
+      "wrongUnits": [
+        {
+          "unit": "scopeNote_he 'האסמבלי CRM.Proxy חיצוני (external_unknown)'",
+          "problem": "CRM.Proxy is the namespace used by the code ('using CRM.Proxy;'). The referenced external assembly is CRM2015.Proxy (Reference Include=\"CRM2015.Proxy, Version=4.1.9.1, ... PublicKeyToken=711cada7bd1faa44\", HintPath D:\\CRM2015.Proxy.dll).",
+          "correct": "האסמבלי CRM2015.Proxy (גרסה 4.1.9.1; namespace CRM.Proxy) חיצוני (external_unknown)",
+          "evidence": "0025_Agents_Agencies.dtsx:4336, 6553 (Reference/HintPath); 4214, 6293 (using CRM.Proxy)"
+        }
+      ]
+    },
+    {
+      "id": "L|exec",
+      "hash": "a3a1fed35f96",
+      "verdict": "CONFIRMED",
+      "detail": "Constraints DTSX:7071-7076 are a Success chain without expressions in the stated order; Set Gen_commissionpostponed DTS:Disabled=True (DTSX:3156); disabled-task-counts-as-success is attributed to SSIS behaviour; OnError handler Error ETL Process record at DTSX:7086.",
+      "evidence": "0025_Agents_Agencies.dtsx:7071-7076, 3156, 7086",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|finding#4",
+      "hash": "dcbab6aa16ef",
+      "verdict": "WRONG",
+      "detail": "Expression verified (DTSX:5090): gen_agencyvalue is added. Ownership assumption labelled. (ב) is now conditional and correct; the opposite-sign remark is hedged. Wrong unit in (א).",
+      "evidence": "0025_Agents_Agencies.dtsx:5061-5090, 5127-5132",
+      "wrongUnits": [
+        {
+          "unit": "(א) 'אחרי עדכון מוצלח התנאי שווה ל-ABS(2×sum) ... ולכן הסוכנות נכתבת מחדש בכל ריצה עם אותו ערך'",
+          "problem": "Data-dependent outcome stated unconditionally. In a later run the condition is ABS(sum_new + sum_old) (stored gen_agencyvalue = previous sum), not ABS(2×sum); it equals ABS(2×sum) and the rewrite is 'with the same value' only if the no-agent balances of that agency did not change since the previous update. If they changed, the agency is written with the new sum (and the row is skipped if sum_new ≈ -sum_old).",
+          "correct": "(א) בצירוף בלי סוכן, אם היתרות לא השתנו מאז העדכון הקודם, התנאי שווה ל-ABS(2×sum) ונשאר מעל 1 לכל סכום שערכו המוחלט גדול מ-0.5, ולכן הסוכנות נכתבת מחדש עם אותו ערך בכל ריצה כזו.",
+          "evidence": "0025_Agents_Agencies.dtsx:5090, 5130"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Update agents balance|title",
+      "hash": "54fec85d0a9a",
+      "verdict": "CONFIRMED",
+      "detail": "short_he and flow_he match: sum per agent/agency combination over direct and parent contract rows (union all), HAVING expression quoted with stored NULL = 0 and the add sign, agent first (EvaluationOrder 0), agency when no agent, last-processed combination rule conditional on more than one passing combination. Title is a label.",
+      "evidence": "0025_Agents_Agencies.dtsx:5061-5090, 5014-5047, 5130-5132, 5174-5176",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Update agents balance|short",
+      "hash": "93c0de6a4a36",
+      "verdict": "CONFIRMED",
+      "detail": "[1] union all of contract and parent contract (acc.Gen_agentcontractId = ac.gen_agencycontractnumber); [2] exact HAVING semantics, ownership stated as unknown; [3]-[9] split order and unconnected Default Output; [10] conditional on updates completing; agency gets only no-agent sum (one no-agent group per agency, argued in detailed [12]).",
+      "evidence": "0025_Agents_Agencies.dtsx:5061-5090, 5014-5047, paths 5217-5219",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Update agents balance|detailed",
+      "hash": "d8382e682a6e",
+      "verdict": "CONFIRMED",
+      "detail": "All units re-derived. Key ownership argued per the accepted form (Gen_agentsId DTSX:6007 from Gen_agents, Gen_agencieId DTSX:3946 from Gen_agencie, both on [CRM]); agent_balance exposes only gen_agentname, gen_agencyname, gen_accountbalance; value-column ownership left unknown with hypothesis; GROUP BY includes the stored values; Update Agents Param_0 <- balance, Param_1 <- gen_agentsid; Update Agencies Param_0 <- balance, Param_1 <- gen_agencieid; Unsupported direct SQL.",
+      "evidence": "0025_Agents_Agencies.dtsx:5061-5090, 6007, 3946, 5014-5047, 5127-5180, 5217-5219",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Update agents balance|decisions",
+      "hash": "160d99bf4dc4",
+      "verdict": "CONFIRMED",
+      "detail": "HAVING quoted verbatim; split conditions !ISNULL(gen_agentsid) order 0, !ISNULL(gen_agencieid) order 1; Default Output not connected.",
+      "evidence": "0025_Agents_Agencies.dtsx:5090, 5014-5047, 5217-5219",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Update agents balance|crm",
+      "hash": "acfe1eea68a8",
+      "verdict": "CONFIRMED",
+      "detail": "Update Gen_agentsBase set gen_agentvalue = ? where gen_agentsid = ?; Update Gen_agencieBase set gen_agencyvalue = ? where gen_agencieid = ?; both on [CRM]; when_he matches split and filter.",
+      "evidence": "0025_Agents_Agencies.dtsx:5130-5136, 5174-5180",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Update agents balance|open",
+      "hash": "f7882b3aa824",
+      "verdict": "CONFIRMED",
+      "detail": "[1] 0023_Employers.dtsx:7797 has gen_fundmain.gen_accountbalance and 0026_Expectedtransfervalue.dtsx:172 has Gen_fundmain.Gen_AccountBalance; ambiguity argument correct. [2] genuine open question. [3] grep of all source/DailyProcess/*.dtsx: gen_agentvalue / gen_agencyvalue appear only in 0025 and never table-qualified.",
+      "evidence": "0023_Employers.dtsx:7797; 0026_Expectedtransfervalue.dtsx:172; grep source/DailyProcess/*.dtsx",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\update agents commissionpostponed field|title",
+      "hash": "fed1b45441b1",
+      "verdict": "CONFIRMED",
+      "detail": "short_he matches the SQL (DTSX:6007-6012): != 1 with NULL excluded, three dates null or +3h earlier than today; NULL meaning labelled hypothesis. flow_he items are summary bullets consistent with it; reason 5/4 matches the derived column on the already-shifted licence date.",
+      "evidence": "0025_Agents_Agencies.dtsx:6007-6012, 6047-6055, main.cs (DTSX:6279+) 71-80",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\update agents commissionpostponed field|short",
+      "hash": "7dbd3acaf434",
+      "verdict": "CONFIRMED",
+      "detail": "Population, reason decision (+3h stated), SDK write of gen_commissionpostponed = true and gen_pausereason; end unit limited correctly (faulted items unmarked; further failure behaviour out of scope).",
+      "evidence": "0025_Agents_Agencies.dtsx:6007-6012, 6047-6055, 6349-6358, 6375-6392",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\update agents commissionpostponed field|detailed",
+      "hash": "032114f7f9f2",
+      "verdict": "CONFIRMED",
+      "detail": "SQL, derived column (usageType readWrite on gen_pausereason, expression ISNULL(lic) || DATEDIFF(\"dd\",GETDATE(),lic) < 0 ? 5 : 4), clock caveat on branch [9], script (entity gen_agents, Id = GenagentsId, gen_commissionpostponed = true, gen_pausereason OptionSetValue if not null, batches of 1000, ExecuteMultipleExtension RequestType.Update), Fault -> new ErrorBuffer row with Description only -> Set Warning columns 1 -> ETL Warning 1; CastingError unconnected; ContinueOnError unknown. main.cs line refs verified (line 1 = DTSX:6279).",
+      "evidence": "0025_Agents_Agencies.dtsx:6007-6012, 6047-6055, 6279-6420, paths 7061-7064",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\update agents commissionpostponed field|detail",
+      "hash": "4367af56d130",
+      "verdict": "CONFIRMED",
+      "detail": "Population incl. NULL exclusion, update by Gen_agentsId, reason expression, literal true (main.cs:73), reason (main.cs:74-75), batches of 1000, Supported; outcome limited correctly.",
+      "evidence": "0025_Agents_Agencies.dtsx:6007-6012, 6047-6055, 6349-6358",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\update agents commissionpostponed field|decisions",
+      "hash": "1d8846007bb3",
+      "verdict": "CONFIRMED",
+      "detail": "Both conditions quoted exactly; meanings state NULL exclusion and label NULL-date meaning as hypothesis.",
+      "evidence": "0025_Agents_Agencies.dtsx:6007-6012, 6047-6055",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\update agents commissionpostponed field|crm",
+      "hash": "5bfea6695b64",
+      "verdict": "CONFIRMED",
+      "detail": "gen_agents Update (gen_commissionpostponed = true, gen_pausereason) via SDK; when_he matches the SQL population.",
+      "evidence": "0025_Agents_Agencies.dtsx:6349-6358, 6375",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\update agencies commissionpostponed field|title",
+      "hash": "8ea7f7f2a404",
+      "verdict": "CONFIRMED",
+      "detail": "Same logic on Gen_agencie with gen_bookkeepingexp / gen_taxdeductionexp (DTSX:3946-3951); script differs from the agents script only in main.cs lines 71-72 (Entity(\"gen_agencie\"), Row.GenagencieId) - diff re-run.",
+      "evidence": "0025_Agents_Agencies.dtsx:3946-3951, 3986-3994, 4200-4345 vs 6279-6424",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\update agencies commissionpostponed field|short",
+      "hash": "83ac5307356a",
+      "verdict": "CONFIRMED",
+      "detail": "As for agents; population, reason, SDK write and limited end statement verified.",
+      "evidence": "0025_Agents_Agencies.dtsx:3946-3951, 3986-3994, 4270-4280",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\update agencies commissionpostponed field|detailed",
+      "hash": "b97d06162049",
+      "verdict": "CONFIRMED",
+      "detail": "SQL with gen_bookkeepingexp / gen_taxdeductionexp, NULL exclusion, derived column on shifted licence date (DTSX:3946), identical script except entity/id, Fault -> new Error row -> Set Warning columns 1 -> ETL Warning 1 (paths DTSX:5000-5003), CastingError unconnected.",
+      "evidence": "0025_Agents_Agencies.dtsx:3946-3951, 3986-3994, 4200-4345, 4995-5006",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\update agencies commissionpostponed field|detail",
+      "hash": "24eaf995e6a0",
+      "verdict": "CONFIRMED",
+      "detail": "Population incl. NULL exclusion, update by Gen_agencieId, reason expression, SDK Update with true and 4/5, outcome limited correctly.",
+      "evidence": "0025_Agents_Agencies.dtsx:3946-3951, 3986-3994, 4270-4280",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\update agencies commissionpostponed field|decisions",
+      "hash": "9413ba8b6560",
+      "verdict": "CONFIRMED",
+      "detail": "Both conditions quoted exactly (DTSX:3946-3951; 3986-3994).",
+      "evidence": "0025_Agents_Agencies.dtsx:3946-3951, 3986-3994",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\update agencies commissionpostponed field|crm",
+      "hash": "30adae1a9aef",
+      "verdict": "CONFIRMED",
+      "detail": "gen_agencie Update (gen_commissionpostponed = true, gen_pausereason) via SDK; when_he matches.",
+      "evidence": "0025_Agents_Agencies.dtsx:4270-4280, 4296",
+      "wrongUnits": []
+    }
+  ]
+}

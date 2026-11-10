@@ -1,0 +1,69 @@
+{
+  "verifier": "ssis-verifier",
+  "package": "0003_ExtractMislakaFiles",
+  "scope": "mapping-A.json",
+  "checked": 10,
+  "results": [
+    {
+      "id": "NO-CRM-WRITES",
+      "verdict": "CONFIRMED",
+      "detail": "Raw DTSX has no CrmProxy/Entity/OrganizationService usage, no ExecuteSQLTask, no OLE DB Command/Destination, no SqlConnection, no event handlers, no log providers, no configurations. Executables: Get Organization Variables (data flow: OLE DB Source SELECT gen_key, gen_value FROM gen_etlvariable WHERE gen_scope='global' OR gen_scope=? with Parameter0 = System::PackageName, on [Psql] = Psql/ALTSHULER_MSCRM; script Set Variables), Clear Archive and WorkFolder (Script Task: Directory.Delete), Extract Mislaka Files (Script Task: SharpCompress extract, File.Delete, File.Move). The survey's crm-sdk-delete hits are Directory.Delete (DTSX 364) and File.Delete (DTSX 924).",
+      "evidence": "0003_ExtractMislakaFiles.dtsx:6, 25, 349-365, 634, 905-947, 1222-1242, 2068-2072"
+    },
+    {
+      "id": "LOGIC summary / scopeNote",
+      "verdict": "CONFIRMED",
+      "detail": "Variables ArchivePath/DestPath/SourcePath/ZipFileName default 'fromDB' (DTSX 11-22), loaded from gen_etlvariable at run time; SharpCompress HintPath C:\\MyProjects\\...\\SharpCompress.dll (DTSX 819) not supplied. 'Mislaka = pension clearing house' correctly labelled hypothesis.",
+      "evidence": "0003_ExtractMislakaFiles.dtsx:11-22, 819, 1232-1239"
+    },
+    {
+      "id": "LOGIC detailed nodes (archive path concat, recursive search, per-file extract, delete+move)",
+      "verdict": "CONFIRMED",
+      "detail": "Path.Combine with a single concatenated argument (ArchivePath + yyyyMMdd); GetFiles(sourcePath, zipFileName + \"*.7z\", AllDirectories); CreateDirectory only when files exist; extractPath = destPath + name without extension; WriteEntryToDirectory ExtractFullPath=true, Overwrite=true for non-directory entries; File.Exists -> File.Delete; File.Move; no try/catch.",
+      "evidence": "0003_ExtractMislakaFiles.dtsx:905-947"
+    },
+    {
+      "id": "LOGIC finding#1 (no CRM write)",
+      "verdict": "CONFIRMED",
+      "detail": "Same as NO-CRM-WRITES.",
+      "evidence": "0003_ExtractMislakaFiles.dtsx:364, 924, 1232"
+    },
+    {
+      "id": "LOGIC finding#2 (cleanup can throw on nested old folders and block extraction)",
+      "verdict": "CONFIRMED",
+      "detail": "foldersToRemove is materialised (ToList) from GetDirectories(..., AllDirectories) for both roots before any deletion; a parent is enumerated before its children; Directory.Delete(parent, true) removes children, then Directory.Delete(child) throws DirectoryNotFoundException; no try/catch; constraint 2072 (Success) then blocks Extract Mislaka Files. Correctly conditional on nested folders older than 7 days existing.",
+      "evidence": "0003_ExtractMislakaFiles.dtsx:354-365, 2072, 942"
+    },
+    {
+      "id": "LOGIC finding#3 (no error handling, no ETL record)",
+      "verdict": "CONFIRMED",
+      "detail": "Main has no try/catch; no event handlers; no ETL process tasks; files handled before a failure are already moved.",
+      "evidence": "0003_ExtractMislakaFiles.dtsx:905-930"
+    },
+    {
+      "id": "LOGIC finding#4 (string concatenation instead of Path.Combine)",
+      "verdict": "CONFIRMED",
+      "detail": "archivePath = Path.Combine(ArchivePath + yyyyMMdd); extractPath = destPath + GetFileNameWithoutExtension(zipFile).",
+      "evidence": "0003_ExtractMislakaFiles.dtsx:910, 919"
+    },
+    {
+      "id": "LOGIC finding#5 (recursive source search may re-pick archived files)",
+      "verdict": "CONFIRMED",
+      "detail": "SearchOption.AllDirectories on SourcePath; effect depends on unknown path values - correctly hedged.",
+      "evidence": "0003_ExtractMislakaFiles.dtsx:912"
+    },
+    {
+      "id": "LOGIC finding#6 (work folder keeps extracted files about one week)",
+      "verdict": "CONFIRMED",
+      "detail": "Subfolders of DestPath with creation time older than 7 days (TotalDays > 7) are deleted recursively.",
+      "evidence": "0003_ExtractMislakaFiles.dtsx:354-364"
+    },
+    {
+      "id": "LOGIC executionOrder",
+      "verdict": "CONFIRMED",
+      "detail": "Get Organization Variables -> Clear Archive and WorkFolder (2071) -> Extract Mislaka Files (2072), both Success.",
+      "evidence": "0003_ExtractMislakaFiles.dtsx:2070-2072"
+    }
+  ],
+  "missingWrites": []
+}

@@ -1,0 +1,54 @@
+# 0039_UpdateAgentAppointmentDate.dtsx · 40CB7193EE5D3EDC1B31F9A6471941A2C00FC0CB367E054EAE8011313DA815A0
+
+## Connection managers
+- [psql] OLEDB Data Source=psql;Initial Catalog=ALTSHULER_MSCRM;Integrated Security=SSPI;  
+
+## Executables (disabled marked !)
+-   Create ETL Process record | Microsoft.ScriptTask  
+-   End ETL Process record | Microsoft.Pipeline  
+-   Get All Funds | Microsoft.Pipeline  
+-   Get Organization Variables | Microsoft.Pipeline  
+
+## Precedence
+- Get Organization Variables -> Create ETL Process record | Success Constraint   
+- Create ETL Process record -> Get All Funds | Success Constraint   
+- Get All Funds -> End ETL Process record | Success Constraint   
+
+## DataFlow End ETL Process record
+  - ETL Record Finish | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 2 out 0
+  - Get gen_etlprocessid | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 0 out 1
+  - Lookup | Lookup  | conn [psql]  | in 1 out 1
+     path Lookup.Outputs[Lookup Match Output] => ETL Record Finish.Inputs[Input 0]
+     path Get gen_etlprocessid.Outputs[Output 0] => Lookup.Inputs[Lookup Input]
+
+## DataFlow Get All Funds
+  - Create System Variables | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 2 out 2
+  - GEt Relvante Funds To Update | OLEDBSource  | conn [psql]  | in 0 out 3
+  - Update agent appointment date | OLEDBCommand  | conn [psql]  | in 4 out 0
+     path GEt Relvante Funds To Update.Outputs[OLE DB Source Output] => Create System Variables.Inputs[Input 0]
+     path Create System Variables.Outputs[Output 0] => Update agent appointment date.Inputs[OLE DB Command Input]
+
+## DataFlow Get Organization Variables
+  - Get Organization Variables | OLEDBSource  | conn [psql]  | in 0 out 2
+  - Set Organization Variables | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 2 out 0
+     path Get Organization Variables.Outputs[OLE DB Source Output] => Set Organization Variables.Inputs[Input 0]
+
+## SQL statements
+- End ETL Process record\Lookup | Microsoft.Lookup.SqlCommand | [psql] 
+    select p.gen_etlprocessid , case when pw.gen_etlprocessid is null then 0 else 1 end as isWarningExist from gen_etlprocess p left join (select distinct gen_etlprocessId from gen_etlprocesswarning ) as pw on p.gen_etlprocessId = pw.gen_etlprocessId
+- End ETL Process record\Lookup | Microsoft.Lookup.SqlCommandParam | [psql] 
+    select * from (select p.gen_etlprocessid , case when pw.gen_etlprocessid is null then 0 else 1 end as isWarningExist from gen_etlprocess p left join (select distinct gen_etlprocessId from gen_etlprocesswarning ) as pw on p.gen_etlprocessId = pw.gen_etlprocessId) [refTable] where [refTable].[gen_etlprocessid] = ?
+- Get All Funds\GEt Relvante Funds To Update | Microsoft.OLEDBSource.SqlCommand | [psql] 
+    select distinct gen_agentappointmentdate,Gen_fundmainId ,(select top 1 gen_agentappointmentdate from Gen_fundmain sourcedate with (nolock) where sourcedate.gen_agentappointmentdate is not null and sourcedate.Gen_customeraccountname is not null and sourcedate.Gen_customeraccountname=targetdate.Gen_customeraccountname order by sourcedate.gen_agentappointmentdate desc ) as AgentAppointmentDateToInser
+- Get All Funds\Update agent appointment date | Microsoft.OLEDBCommand.SqlCommand | [psql] 
+    update Gen_fundmainBase set gen_agentappointmentdate=?,ModifiedBy=?,ModifiedOn=? where Gen_fundmainId=?
+- Get Organization Variables\Get Organization Variables | Microsoft.OLEDBSource.SqlCommand | [psql] 
+    SELECT gen_key ,gen_Value FROM gen_etlvariable where gen_scope ='global' or gen_scope = ?
+
+## Code write candidates (per owner)
+- Create ETL Process record {"variables-write":2,"sql-command":1,"crm-entity":1,"crm-sdk-create":1}
+- End ETL Process record\ETL Record Finish {"sql-command":2,"crm-entity":3,"output-buffer":1,"crm-sdk-update":1}
+- End ETL Process record\Get gen_etlprocessid {"sql-command":2,"output-buffer":2}
+- Get All Funds\Create System Variables {"sql-command":2,"output-buffer":2}
+
+## External refs (non-framework) CRM2015.Proxy

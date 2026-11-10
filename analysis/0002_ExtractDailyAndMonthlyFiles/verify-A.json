@@ -1,0 +1,63 @@
+{
+  "verifier": "ssis-verifier",
+  "package": "0002_ExtractDailyAndMonthlyFiles",
+  "scope": "mapping-A.json",
+  "checked": 9,
+  "results": [
+    {
+      "id": "NO-CRM-WRITES",
+      "verdict": "CONFIRMED",
+      "detail": "Raw DTSX grep for CrmProxy/Entity/.Create(/.Update(/.Delete(/ExecuteMultiple/ExecuteNonQuery/SqlConnection/SqlStatementSource/DML finds only ETL plumbing CRM writes: Create gen_etlprocess (Create ETL Process record, DTSX 513-519), Update gen_etlprocess (ETL Record Finish, DTSX 1037-1046), Create gen_etlprocesswarning (ETL_Warning, DTSX 2721-2734), OnError Update gen_etlprocess + Create annotation (DTSX 5480-5495). The survey's crm-sdk hits in Extract GZ Fiels are File.Create (DTSX 3851) and File.Delete (DTSX 3885) on the file system. No Execute SQL Task, no OLE DB Command/Destination; [psql] (ALTSHULER_MSCRM) is used only by OLE DB Source 'Get Etl Variables' (DTSX 4478-4480) and the Lookup in End ETL Process record (DTSX 2461) - reads only. Executables: Create ETL Process record, End ETL Process record, Extract GZ  Fiels, Get Organization Variables, OnError\\Error ETL Process record.",
+      "evidence": "0002_ExtractDailyAndMonthlyFiles.dtsx:178, 510-519, 788, 1034-1046, 2484, 2530, 2688-2734, 3851, 3885, 4467-4488, 5425-5495"
+    },
+    {
+      "id": "LOGIC summary / scopeNote",
+      "verdict": "CONFIRMED",
+      "detail": "DailyFilePath default is empty (DTSX 35-37) and is set at run time by Set Variables from gen_etlvariable (scope 'global' or 'LeumiFile-IC', DTSX 4480); VersionComments='Bank Leumi Import Daily'; MonthlyFilePath line commented out (DTSX 3660). Consumers of the files correctly marked as hypothesis.",
+      "evidence": "0002_ExtractDailyAndMonthlyFiles.dtsx:1, 35-37, 3659-3660, 4478-4480"
+    },
+    {
+      "id": "LOGIC detailed nodes (archive path, .gz selection, decompress, copy+delete, error rows)",
+      "verdict": "CONFIRMED",
+      "detail": "Archive = Path.Combine(Path.Combine(path,\"Archive GZ\"), DateTime.Now.ToString(\"yyyy-MM-dd\")); top-level GetFiles() filtered by Extension.Contains(\".gz\"); File.Create(dir + name without extension) overwrites; Parse_GZ returns true or rethrows; MoveGZFileToArchive: CreateDirectory if missing, File.Copy without overwrite, File.Delete; exceptions -> ErrorBuffer rows -> Set Warning columns -> ETL_Warning.",
+      "evidence": "0002_ExtractDailyAndMonthlyFiles.dtsx:3655-3690, 3848-3886"
+    },
+    {
+      "id": "LOGIC finding#1 (monthly folder not processed)",
+      "verdict": "CONFIRMED",
+      "detail": "//Pathlist.Add(ReadOnlyVariables[\"User::MonthlyFilePath\"]...) is commented out; only DailyFilePath is added.",
+      "evidence": "0002_ExtractDailyAndMonthlyFiles.dtsx:3659-3660"
+    },
+    {
+      "id": "LOGIC finding#2 (File.Copy without overwrite fails if same name archived today)",
+      "verdict": "CONFIRMED",
+      "detail": "File.Copy(file, dest) two-argument overload throws IOException when dest exists (.NET behaviour); caught per file, gz stays, decompressed file already written; repeats on later runs the same day.",
+      "evidence": "0002_ExtractDailyAndMonthlyFiles.dtsx:3884-3885, 3682-3686"
+    },
+    {
+      "id": "LOGIC finding#3 (partial decompressed file left on failure)",
+      "verdict": "CONFIRMED",
+      "detail": "File.Create precedes GZipStream.CopyTo; on exception the catch rethrows and the partially written file remains.",
+      "evidence": "0002_ExtractDailyAndMonthlyFiles.dtsx:3850-3863"
+    },
+    {
+      "id": "LOGIC finding#4 (survey crm-sdk hits are File.Create/File.Delete)",
+      "verdict": "CONFIRMED",
+      "detail": "Extract GZ Fiels uses only System.IO / System.IO.Compression; no CRM proxy reference in that component.",
+      "evidence": "0002_ExtractDailyAndMonthlyFiles.dtsx:3851, 3885"
+    },
+    {
+      "id": "LOGIC finding#5 (Extension.Contains(\".gz\") also matches .gzip etc.)",
+      "verdict": "CONFIRMED",
+      "detail": "String.Contains on the extension, not equality.",
+      "evidence": "0002_ExtractDailyAndMonthlyFiles.dtsx:3876"
+    },
+    {
+      "id": "LOGIC executionOrder / ignoredAsFramework",
+      "verdict": "CONFIRMED",
+      "detail": "Constraints 5413-5415 (all Success, no Value attribute), OnError handler at 5418; log provider ObjectName 'SSIS log provider for SQL Server1' ConfigString qsrs.SSIS_Logs (DTSX 16).",
+      "evidence": "0002_ExtractDailyAndMonthlyFiles.dtsx:16, 5413-5418"
+    }
+  ],
+  "missingWrites": []
+}

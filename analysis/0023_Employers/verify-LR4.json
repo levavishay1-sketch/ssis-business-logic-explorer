@@ -1,0 +1,64 @@
+{
+  "verifier": "ssis-verifier",
+  "package": "0023_Employers",
+  "scope": "logic-claims re-check",
+  "checkedAt": "2026-11-10",
+  "checked": 6,
+  "results": [
+    {
+      "id": "L|summary",
+      "hash": "3a65c04592ea",
+      "verdict": "INCOMPLETE",
+      "detail": "The stated facts are correct. That covers the isFileExist trigger (Check File Existence ScriptMain.cs:308-325; Constraints 4/5/6 at DTSX:8057-8059, with 5 and 6 OR). It also covers the MF Source design-time path with the config caveat (DTSX:11, 33), the inner join to product with the ownership argument (0004:37558/37568/37617/70147/70153 checked), and the 'ערך' wording with the meaning labelled השערה. Part (2) is correct too: all accounts by LEFT JOIN, 0 when there is no balance, direct UPDATE dbo.AccountBase (Unsupported, DTSX:7991-7994) when a stored value is NULL or different, and the NULL-fee failure condition (Check if to update orders 0-3, all FailComponent, DTSX:7744-7772). MISSING: part (1) gives the update condition only as 'שמקושרות למוצר ... בתנאי שאחד התוקפים חל'. It leaves out the product-type filter that decides which gen_employers records are written. Only records whose ProductTypeCode is 200001/1 (Pension Fund) or 200000/2 (Study Fund) continue. A record of any other non-NULL type goes to 'DE Output', which has no path, so it is never updated even when a validity condition holds. A NULL type fails the data flow, so part (2) does not run in that run. The text 'ערך הצבירה לפי סוג המוצר (עמודת גמל או השתלמות)' only implies this.",
+      "evidence": "source/DailyProcess/0023_Employers.dtsx:3702-3724 (Check Fund type: conditions, FailComponent, EvaluationOrder 0/1); data flow paths: no path from Check Fund type.Outputs[DE Output]; DTSX:5917/5975",
+      "wrongUnits": [
+        {
+          "unit": "[1] summary_he (1): 'לכל מספר תאגיד בקובץ מתעדכנות ... רשומות gen_employers ... שמקושרות למוצר ... בתנאי שאחד התוקפים חל'",
+          "problem": "Missing row-selection condition: the product type. Records with another product type are silently skipped, and a NULL type fails the step.",
+          "correct": "Only gen_employers records whose product has ProductTypeCode 200001/1 or 200000/2 are updated. Other types are skipped without documentation. A NULL ProductTypeCode fails the data flow (FailComponent), and then the archive and the account calculation do not run.",
+          "evidence": "DTSX:3702-3724; no PATH from Check Fund type.Outputs[DE Output]"
+        }
+      ]
+    },
+    {
+      "id": "L|finding#3",
+      "hash": "14ac83185c16",
+      "verdict": "CONFIRMED",
+      "detail": "Check If Date Valid: order 0 'Deposit Date Valid' = !ISNULL(gen_mfdepositstartdate) && gen_mfdepositstartdate < GETDATE(). Order 1 'MF Accumulation Date Valid' = all three accumulation values present && start < GETDATE() && end > GETDATE(). Both outputs go to Union All 1 and then to Create. Create sets every non-NULL field (main.cs:127-136) with no further check. So a row valid by deposit also writes an accumulation value whose period has ended or not started. A row valid by accumulation also writes a deposit value whose start date is in the future (or NULL). The text is conditional and not framed as a bug.",
+      "evidence": "source/DailyProcess/0023_Employers.dtsx:3743-3768; Create main.cs:121-144 (DTSX:3887)",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Set MF on employers|title",
+      "hash": "739261d86fb9",
+      "verdict": "CONFIRMED",
+      "detail": "The title has the MF meaning labelled השערה. short_he is verified: the inner join to product, several records per corporate number, and the management-fee wording with an explicit השערה label. The ownership argument is checked against 0004:37558/37568/37617/70147/70153. flow_he[1] is TRIM + convert ((DT_DBTIMESTAMP)/(DT_R8)). flow_he[2] is Merge Join JoinType=1 (DTSX:5732). flow_he[3] is ISNULL(Gen_employersid), which leads to the warning 'מעסיק לא נמצא במאגר הנתונים'. flow_he[4] is Check Fund type 200001/1 → provident_fund, 200000/2 → study_fund, DE Output with no path, and NULL → FailComponent. flow_he[5] is the OR validity check. flow_he[6] is ExecuteMultiple Update of non-NULL fields. The product-type filter that the summary lacks is present here in flow_he[4].",
+      "evidence": "source/DailyProcess/0023_Employers.dtsx:5684-5699, 5730-5734, 3787-3801, 3702-3724, 3743-3768, 3887 (Create main.cs:121-182), 6093",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Set MF on employers|short",
+      "hash": "5c108bb3c3a3",
+      "verdict": "CONFIRMED",
+      "detail": "[2]/[4]: a record must have a product to be fetched (inner join). The warning is raised even when product-less records exist, and ownership is argued. [6]: header 'גמל' → provident_fund_Source and 'השתלמות' → study_fund_Source (externalMetadataColumnId at DTSX:5871/5877). Pension Fund (200001/1) takes provident_fund and Study Fund (200000/2) takes study_fund. Other types are skipped and NULL fails. [7]: the validity condition is correct (start < now < end for accumulation). [9]: Default Output leads to the warning 'תאריך לא נכון או לא קיים' and no update. [11]: the meaning is labelled השערה.",
+      "evidence": "source/DailyProcess/0023_Employers.dtsx:5847-5889, 3702-3724, 3743-3768, 6045",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Set MF on employers|detailed",
+      "hash": "4155f99078b1",
+      "verdict": "CONFIRMED",
+      "detail": "All 29 units were re-derived. [1]: the 8 headers map to the stated columns (DTSX:5847-5889). MF Source has no PropertyExpression (DTSX:9-24), and the config caveat is present. [2]: TRIM only trims (main.cs:51-58). RetainNulls=false (DTSX:5838). convert maps ISNULL||\"\" to NULL, else a cast. All 6 columns are FailComponent (DTSX:3837-3867). The blocking Sort after convert means no row reaches Create on a conversion failure. [3]: the SQL and the ownership argument are verified. [4]: Left outer join, 1 key, TreatNullsAsEqual=true. [5]-[7]: the warning text is exact (DTSX:6093/6111). [10]-[18]: the conditions and EvaluationOrder are exact, both outputs are FailComponent (DTSX:3712/3720), and DE Output has no path. A failure blocks Move FileTo Archive (Constraint 2, DTSX:8055) and Update employer amount (Constraint 6 needs Move, and Constraint 5 is false, DTSX:8058-8059). [19]: the derived columns are verified (DTSX:5917/5975). [20]-[26] are exact. [27]: RequestType.Update (main.cs:147), only non-NULL fields, no comparison. [28]: Error → 'נכשל בקליטת הנתונים' (DTSX:6159). [29] is correct.",
+      "evidence": "source/DailyProcess/0023_Employers.dtsx:9-24, 3702-3885, 5684-5734, 5836-5889, 5917-6030, 6033-6173, 6317, 6368 (TRIM), 3887 (Create main.cs:121-182), 8055-8059",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Set MF on employers|detail",
+      "hash": "a6ca4ad63e90",
+      "verdict": "CONFIRMED",
+      "detail": "[1]: CodePage 1255, Delimited, header row (DTSX:11). [2]: the matching is a Left outer join on gen_corporatenumber, each gen_employers record is updated separately, and the inner join to product has the ownership argument with the 0004 evidence verified. [3]: the decisions (1)-(3) match Check if employer exist, Check Fund type (including DE Output with no path and NULL → FailComponent) and Check If Date Valid. [4]: the 5 attributes are written only when not NULL (Create main.cs:127-136). [5]: the numeric values' meaning is labelled השערה.",
+      "evidence": "source/DailyProcess/0023_Employers.dtsx:11, 3702-3801, 5684-5734, Create main.cs:121-182",
+      "wrongUnits": []
+    }
+  ]
+}

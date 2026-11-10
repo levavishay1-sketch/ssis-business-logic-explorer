@@ -1,0 +1,41 @@
+{
+  "verifier": "ssis-verifier",
+  "package": "0039_UpdateAgentAppointmentDate",
+  "scope": "logic-claims re-check after fixes",
+  "checkedAt": "2026-11-07T12:08:22Z",
+  "checked": 4,
+  "results": [
+    {
+      "id": "L|summary",
+      "hash": "52f6ce913b18",
+      "verdict": "CONFIRMED",
+      "detail": "Unit 1: the population and value match the source SQL. Targets have gen_agentappointmentdate null and Gen_customeraccountname IN accounts that have a dated fund. The value is top 1 ... order by desc among funds of the same account with a non-null date (a target's own date is null, so it is taken from other funds). The write is a direct UPDATE Gen_fundmainBase on [psql] (Unsupported). Gen_customeraccountname is guid in 0005:2644 and joins Gen_customeraccountId in 0015:75552. The 0004 meaning was checked against the DTSX. In 0004 Minhali daily\\Set Date Fields, gen_agentappointmentdate is a readWrite input column (0004:77355). It is set to DateTime.Now only when the broker number changed (both values non-null and different) AND the agency name or the agent name changed (0004:75547-75577). Otherwise the row carries the existing DB value, copied by lookup (0004:60253-60408). Case 1 (ChangeOthrFundsSameAccount == TRUE) leads to UPDATE Gen_fundmain SET gen_agentappointmentdate = ? WHERE gen_customeraccountname = ? and Gen_fundmainid <> ? on [CRM] (0004:92815-92825, path 93526). The only disabled executable in 0004 is Foreach Loop Container 1 (99361). No other supplied package writes gen_agentappointmentdate (grep: only 0004 and 0039). Unit 2: there is a single connection manager [psql]. All four connection uses point to it (DTSX:3264, 3300, 3376, 2319). Create ETL Process record creates gen_etlprocess through CrmProxy (DTSX:285-293 = ScriptMain.cs:~98-106). There is no DTS:Configuration (evidence.configurations = []). The possibility of a runtime override is stated correctly as external_unknown.",
+      "evidence": "DTSX:4-8, 3246-3256, 3294-3296, 3305-3308 (Param_0..3), 2621-2622; 0004_LeumiFile-MY.dtsx:75547-75577, 77355, 92815-92825, 93526, 99361; 0005_Customer Account.dtsx:2644; 0015_TransferIn.dtsx:75552",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|ignored",
+      "hash": "45904f914e1f",
+      "verdict": "CONFIRMED",
+      "detail": "The package has four executables: Get Organization Variables, Create ETL Process record, Get All Funds, End ETL Process record (DTSX:40, 640, 2365, 3355). The three listed ones are ETL/Organization Variables plumbing, as CLAUDE.md declares. Create System Variables is correctly no longer listed. Its ModifiedBy/ModifiedOn outputs feed Param_1/Param_2 of the business UPDATE (DTSX:3305-3308, path 3350). This is described in the Get All Funds claims.",
+      "evidence": "DTSX:40, 640, 2365, 3355, 3349-3350, 4224-4226",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Get All Funds|detailed",
+      "hash": "82dec9c97717",
+      "verdict": "CONFIRMED",
+      "detail": "All units match the DTSX. The connection is [psql] = psql/ALTSHULER_MSCRM, used for both read and write. The population and decision SQL are quoted exactly. A NULL Gen_customeraccountname cannot satisfy IN, so such funds are not selected. Create System Variables sets ModifiedOn = DateTime.UtcNow and ModifiedBy = new Guid(Convert.ToString(User::CrmAdminId)) per row (DTSX:2621-2622). The default variable value is '' (DTSX:11-12), so an empty or invalid value throws before the first buffer reaches the OLE DB Command, provided at least one row exists. The UPDATE binds Param_0 = AgentAppointmentDateToInsert, Param_1 = ModifiedBy, Param_2 = ModifiedOn, Param_3 = Gen_fundmainId (DTSX:3305-3308). Its input has errorRowDisposition=FailComponent (DTSX:3303), and the error output has no path. End ETL Process record follows only on Success (DTSX:4226).",
+      "evidence": "DTSX:3246-3256, 3264, 3294-3308, 3349-3350, 2621-2622, 4224-4226",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Get All Funds|detail",
+      "hash": "9c823da2512e",
+      "verdict": "CONFIRMED",
+      "detail": "Unit 1: the source is Gen_fundmain with (nolock). select distinct includes Gen_fundmainId, so it returns one row per fund. Unit 2: the key is Param_3 = Gen_fundmainId. The guid/lookup nature of Gen_customeraccountname is shown only in other packages; the 0039 DTSX does not select or type that column, as the text says. Unit 3: there is no split component; the logic is in SQL, and top 1 ... desc gives the latest date. Unit 4: the parameter mapping was verified and the write is Unsupported. Unit 5: the 0004 meaning was verified, as in L|summary.",
+      "evidence": "DTSX:3246-3256, 3294-3308, 2621-2622; 0004_LeumiFile-MY.dtsx:75547-75577, 92815-92825; 0005:2644; 0015:75552",
+      "wrongUnits": []
+    }
+  ]
+}

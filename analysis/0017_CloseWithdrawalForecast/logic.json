@@ -1,0 +1,617 @@
+{
+  "package": "0017_CloseWithdrawalForecast",
+  "analyst": "ssis-business-logic",
+  "source": {
+    "file": "source/DailyProcess/0017_CloseWithdrawalForecast.dtsx",
+    "sha256": "91AF73F3FBBF9A812BA9770E90C09E85D8C99C52324C6C26E2B75E0F9903DD5E",
+    "lines": 6167
+  },
+  "scopeNote_he": "נותח קוד המקור (C#) של רכיבי הסקריפט בלבד; ה-DLL המקומפל לא פוענח. ExecuteMultipleExtension (namespace CRM.Proxy) מגיע מהאסמבלי החיצוני CRM2015.Proxy (גרסה 4.1.9.1 בשתי ההפניות; HintPath D:\\CRM2015.Proxy.dll בסקריפט close withdrawal של הזרם האוטומטי, DTSX:119, ו-HintPath C:\\Windows\\assembly\\GAC_MSIL\\CRM2015.Proxy\\4.1.9.1__711cada7bd1faa44\\CRM2015.Proxy.dll בסקריפט close withdrawal של הזרם הידני, DTSX:1557–1559; external_unknown) – לא ידוע אם הוא מגדיר ContinueOnError. מנהל החיבורים היחיד [CRM] מוגדר בזמן התכנון כ-Data Source=Psql; Initial Catalog=ALTSHULER_MSCRM (DTSX:4-7) ומשמש לקריאה בלבד (שאילתות מקור על טבלאות CRM). זו מחרוזת החיבור של זמן התכנון בלבד: בחבילה EnableConfig=True (DTSX:1) ותצורת XML בנתיב C:\\Generix\\SSISConfigFile.dtsConfig (DTSX:11), קובץ שלא סופק ויכול לדרוס את החיבור בזמן ריצה. לכן מסד ה-CRM שאליו החבילה מתחברת בפועל הוא blocked_external_dependency. אין בחבילה קובץ, Staging או SQL DML. כל הכתיבה העסקית ל-CRM היא עדכון gen_withdrawal דרך ה-SDK (ExecuteMultiple, Supported). משמעויות ערכי option-set (מצב 8/10, סטטוס היזון חוזר 4/5/6, פעולה 54, סוג קבוצת תנועה 5) אינן מוגדרות בחבילה; רק הערכים 3/14/15 מתועדים בהערות הקוד.",
+  "summary_he": "החבילה סוגרת בקשות משיכה (gen_withdrawal) במצב 8 או 10, שכבר נרשמו עבורן ב-CRM תנועות מסוג פעולה 54 וקבוצת תנועה 5 (השערה: תנועות משיכה) בקופות של חשבון הלקוח, שתאריך הערך שלהן אינו מוקדם מ-gen_datesenttothebank בבקשות במצב 8 (טבלת המקור של gen_datesenttothebank לא ידועה; כשהוא ריק התנועה אינה נספרת) או ממועד יצירת הבקשה w.CreatedOn בבקשות במצב 10 (השוואת תאריך ושעה), ושיש להן לפחות פיצול שכבות נזילות מתאים. סטטוס הסיום נקבע כך (שמות הסטטוסים מהערות הקוד): בבקשות במצב 8 – 'הסתיים' (3) אם כל פיצולי שכבות הנזילות הרלוונטיים בסטטוס היזון חוזר 4, אחרת 'הסתיים חלקית' (14); בבקשות במצב 10 – 'הסתיים' (3) כברירת מחדל, ללא תלות בסטטוסי ההיזון החוזר. בשני הזרמים הסטטוס הוא 'הסתיים – קיים פער' (15) במשיכה חלקית שבה החלק השלם של הערך המוחלט של סכום התנועות שונה מזה של Gen_withdrawalvalue (השערה לפי השם: הסכום שהתבקש; טבלת המקור לא ידועה). לכן בקשה במצב 10 מקבלת תמיד 3 או 15. החבילה רושמת גם את תאריך המשיכה בפועל ואת תאריך סיום המשיכה (gen_dateofactualwithdrawal ו-gen_withdrawalfinishdate, שניהם תאריך הערך המוקדם של התנועות אחרי ToLocalTime), את הסכום שנמשך בפועל ואת הסכום נטו. שני זרמים: בקשות במצב 8 (בשם הרכיב: נשלחו אוטומטית) ובקשות במצב 10 (בשם הרכיב: נשלחו ידנית).",
+  "executionOrder": [
+    {
+      "step": 1,
+      "refId": "Package\\Get Variables",
+      "title_he": "טעינת משתני ETL (מסגרת)",
+      "trigger": "start (no incoming constraint)"
+    },
+    {
+      "step": 2,
+      "refId": "Package\\Create ETL Process record",
+      "title_he": "רשומת תהליך ETL (מסגרת)",
+      "trigger": "after Get Variables · Success (DTSX:5312)"
+    },
+    {
+      "step": 3,
+      "refId": "Package\\Close automaty sended withdrawals",
+      "title_he": "סגירת בקשות משיכה במצב 8 (נשלחו אוטומטית)",
+      "trigger": "after Create ETL Process record · Success (DTSX:5313)"
+    },
+    {
+      "step": 4,
+      "refId": "Package\\Close manualy sended withdrawals",
+      "title_he": "סגירת בקשות משיכה במצב 10 (נשלחו ידנית)",
+      "trigger": "after Close automaty sended withdrawals · Success (DTSX:5314)"
+    },
+    {
+      "step": 5,
+      "refId": "Package\\End ETL Process record",
+      "title_he": "סיום רשומת תהליך ETL (מסגרת)",
+      "trigger": "after Close manualy sended withdrawals · Success (DTSX:5315)"
+    }
+  ],
+  "ignoredAsFramework": [
+    "Package\\Get Variables",
+    "Package\\Create ETL Process record",
+    "Package\\End ETL Process record",
+    "Package.EventHandlers[OnError]",
+    "Package.EventHandlers[OnError]\\Error ETL Process record"
+  ],
+  "components": [
+    {
+      "refId": "Package\\Close automaty sended withdrawals",
+      "title_he": "סגירת בקשות משיכה שנשלחו אוטומטית",
+      "techName": "Close automaty sended withdrawals",
+      "short_he": "בקשות משיכה במצב 8 שנמצאו עבורן תנועות מסוג פעולה 54 וקבוצה 5 (השערה: תנועות משיכה) בקופות החשבון, שתאריך הערך שלהן אינו מוקדם מהערך gen_datesenttothebank (לפי השם: מועד השליחה לבנק – השערה; טבלת המקור לא ידועה; כשהערך ריק התנועה אינה נספרת), ושיש להן לפחות פיצול נזילות אחד שסטטוס ההיזון שלו אינו ריק ואינו 5/6, מסומנות כמסתיימות: 'הסתיים' כשכל הפיצולים האלה (סטטוס לא ריק ולא 5/6) נמצאים בסטטוס היזון 4 (משמעות הסטטוסים – השערה), אחרת 'הסתיים חלקית', ו'הסתיים – קיים פער' במשיכה חלקית שבה החלק השלם של הערך המוחלט של סכום התנועות שונה מזה של Gen_withdrawalvalue (השערה: הסכום שהתבקש). נרשמים תאריך המשיכה בפועל ותאריך סיום המשיכה, הסכום שנמשך בפועל והסכום נטו.",
+      "flow_he": [
+        "איתור בקשות משיכה במצב 8 עם תנועות מסוג פעולה 54, קבוצה 5 (השערה: תנועות משיכה) בקופות החשבון, שתאריך הערך שלהן אינו מוקדם מ-gen_datesenttothebank (השערה: מועד השליחה לבנק; טבלת המקור לא ידועה)",
+        "סיכום סכומי התנועות ואיסוף סטטוסי ההיזון החוזר של פיצולי הנזילות (ללא סטטוס 5, 6 וללא סטטוס ריק)",
+        "קביעת סטטוס: 3 הסתיים / 14 הסתיים חלקית / 15 הסתיים – קיים פער",
+        "עדכון בקשת המשיכה ב-CRM: סטטוס, תאריך משיכה בפועל ותאריך סיום, סכום בפועל וסכום נטו"
+      ],
+      "short": {
+        "nodes": [
+          {
+            "type": "step",
+            "text": "המערכת מאתרת בקשות משיכה במצב 8 (לפי שם הרכיב: נשלחו אוטומטית – השערה), שכבר נרשמו עבורן תנועות מסוג 54/5 (השערה: תנועות משיכה) בקופות של חשבון הלקוח, שתאריך הערך שלהן אינו מוקדם מהערך gen_datesenttothebank (לפי השם: מועד השליחה לבנק – השערה; טבלת המקור לא ידועה). כשהערך הזה ריק, התנועה אינה נספרת. נבחרות רק בקשות שיש להן לפחות פיצול שכבות נזילות אחד שסטטוס ההיזון שלו אינו ריק ואינו 5 או 6; האחרות אינן מטופלות ונשארות במצבן (8)."
+          },
+          {
+            "type": "decision",
+            "text": "האם כל פיצולי שכבות הנזילות הרלוונטיים של הבקשה (ללא פיצולים בסטטוס 5 או 6 וללא פיצולים שהסטטוס שלהם ריק) נמצאים בסטטוס היזון חוזר 4 (השערה: היזון מוצלח)?",
+            "branches": [
+              {
+                "label": "כן",
+                "nodes": [
+                  {
+                    "type": "step",
+                    "text": "הבקשה תסומן 'הסתיים'."
+                  }
+                ]
+              },
+              {
+                "label": "לא",
+                "nodes": [
+                  {
+                    "type": "step",
+                    "text": "הבקשה תסומן 'הסתיים חלקית'."
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "type": "decision",
+            "text": "האם זו משיכה חלקית שבה החלק השלם של הערך המוחלט של סכום התנועות שונה מהחלק השלם של הערך המוחלט של Gen_withdrawalvalue (השערה לפי השם: הסכום שהתבקש)?",
+            "branches": [
+              {
+                "label": "כן",
+                "nodes": [
+                  {
+                    "type": "step",
+                    "text": "הבקשה תסומן 'הסתיים – קיים פער', במקום הסטטוס שנקבע קודם."
+                  }
+                ]
+              },
+              {
+                "label": "לא",
+                "nodes": [
+                  {
+                    "type": "step",
+                    "text": "הסטטוס שנקבע קודם נשאר."
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "type": "write",
+            "text": "בקשת המשיכה מתעדכנת ב-CRM בסטטוס הסיום, בתאריך המשיכה בפועל ובתאריך סיום המשיכה (שניהם תאריך הערך המוקדם של התנועות, אחרי המרה לשעון המקומי), בסכום שנמשך בפועל ובסכום נטו."
+          },
+          {
+            "type": "end",
+            "text": "בקשות המשיכה שנבחרו מקבלות ב-CRM סטטוס סיום ונתונים שחושבו מהתנועות, אלא אם העדכון שלהן נכשל."
+          }
+        ]
+      },
+      "detailed": {
+        "nodes": [
+          {
+            "type": "step",
+            "text": "האוכלוסייה היא בקשות משיכה במצב 8 (לפי שם הרכיב: נשלחו אוטומטית – השערה).",
+            "tech": "get open withdrawal · Gen_withdrawal WHERE gen_currentstate = 8",
+            "evidence": "DTSX:1117, DTSX:1135"
+          },
+          {
+            "type": "step",
+            "text": "לכל בקשה נאספות תנועות מטבלת gen_ftcurrentyear (לפי שמה: השנה הנוכחית – השערה) בכל הקופות של חשבון הלקוח, מסוג פעולה 54 וקבוצת תנועה 5, שתאריך הערך שלהן אינו מוקדם מהערך gen_datesenttothebank (לפי השם: מועד השליחה לבנק – השערה). gen_datesenttothebank מופיע בשאילתה בלי שם טבלה, ובקבצים שסופקו אין ראיה לאיזו מהטבלאות המחוברות הוא שייך (טבלת המקור לא ידועה; השערה: בקשת המשיכה). כשהערך ריק (NULL) ההשוואה אינה מתקיימת והתנועה אינה נספרת; אם העמודה שייכת לבקשה (השערה), בקשה כזו אינה נבחרת.",
+            "tech": "Gen_withdrawal → Gen_customeraccount (gen_AccountNumber) → Gen_fundmain (Gen_customeraccountname) → gen_ftcurrentyear (Gen_fundnumber) → Gen_fundtransactiontype; Gen_actionid = 54 AND gen_transgrouptype = 5 AND ft.gen_valuedate >= gen_datesenttothebank",
+            "evidence": "DTSX:1094-1120"
+          },
+          {
+            "type": "step",
+            "text": "מהתנועות מחושבים: סכום התנועות הכולל, סכום הנטו הכולל ותאריך הערך המוקדם ביותר.",
+            "tech": "sum(ISNULL(gen_transtotalamount,0)), sum(ISNULL(gen_netoamountofaction,0)), min(ft.gen_valuedate); GROUP BY w.Gen_withdrawalId, Gen_withdrawalvalue",
+            "evidence": "DTSX:1094"
+          },
+          {
+            "type": "step",
+            "text": "מפיצולי שכבות הנזילות של הבקשה, למעט פיצולים בסטטוס היזון חוזר 5 או 6 ופיצולים שהסטטוס שלהם ריק, נלקחים: הסטטוס הנמוך והגבוה, והאם קיים פיצול של משיכה חלקית.",
+            "tech": "gen_fluiditylayerspartition: flp.gen_feedbackstatus not in(5,6); min/max(gen_feedbackstatus), min(gen_withdrawalfromfund + 0), min(gen_withdrawaltype + 0)",
+            "evidence": "DTSX:1130-1136"
+          },
+          {
+            "type": "decision",
+            "text": "האם לבקשה יש גם תנועות 54/5 מתאימות וגם לפחות פיצול נזילות אחד שסטטוס ההיזון שלו אינו ריק ואינו 5/6?",
+            "tech": "INNER JOIN trans ⨝ flpart on Gen_withdrawalId",
+            "branches": [
+              {
+                "label": "לא",
+                "nodes": [
+                  {
+                    "type": "end",
+                    "text": "הבקשה לא מטופלת בריצה זו ונשארת במצבה."
+                  }
+                ]
+              },
+              {
+                "label": "כן",
+                "nodes": [
+                  {
+                    "type": "step",
+                    "text": "הבקשה עוברת לקביעת סטטוס הסיום, שברירת המחדל שלו היא 'הסתיים חלקית'.",
+                    "tech": "currentstate = 14 //הסתיים חלקית",
+                    "evidence": "close withdrawal main.cs:30"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "type": "decision",
+            "text": "האם כל פיצולי הנזילות שנלקחו בחשבון (סטטוס היזון לא ריק ולא 5/6) נמצאים בסטטוס היזון חוזר 4?",
+            "tech": "Row.minStatus == Row.maxStatus && Row.minStatus == 4",
+            "branches": [
+              {
+                "label": "כן",
+                "nodes": [
+                  {
+                    "type": "step",
+                    "text": "הסטטוס נקבע ל'הסתיים'.",
+                    "tech": "currentstate = 3 //הסתיים",
+                    "evidence": "main.cs:32-33"
+                  }
+                ]
+              },
+              {
+                "label": "לא",
+                "nodes": [
+                  {
+                    "type": "step",
+                    "text": "הסטטוס נשאר 'הסתיים חלקית'.",
+                    "tech": "currentstate = 14"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "type": "decision",
+            "text": "האם זו משיכה חלקית (סוג משיכה 0 או 'משיכה מהקופה' 0 באחד הפיצולים)?",
+            "tech": "(!genwithdrawaltype_IsNull && genwithdrawaltype == 0) || (!genwithdrawalfromfund_IsNull && genwithdrawalfromfund == 0) //משיחה חלקית",
+            "evidence": "main.cs:35",
+            "branches": [
+              {
+                "label": "כן",
+                "nodes": [
+                  {
+                    "type": "decision",
+                    "text": "האם הסכום הכולל של התנועות, בערך מוחלט וביחידות שלמות (Math.Truncate), שונה מהערך Gen_withdrawalvalue (השערה לפי השם: הסכום שהתבקש בבקשה; טבלת המקור לא ידועה; ערך ריק נחשב 0)?",
+                    "tech": "Math.Truncate(Math.Abs(gentranstotalamount)) != Math.Truncate(Math.Abs(Genwithdrawalvalue))",
+                    "evidence": "main.cs:37",
+                    "branches": [
+                      {
+                        "label": "כן",
+                        "nodes": [
+                          {
+                            "type": "step",
+                            "text": "הסטטוס נקבע ל'הסתיים – קיים פער', ללא קשר לסטטוסי ההיזון החוזר.",
+                            "tech": "currentstate = 15",
+                            "evidence": "main.cs:39"
+                          }
+                        ]
+                      },
+                      {
+                        "label": "לא",
+                        "nodes": [
+                          {
+                            "type": "step",
+                            "text": "הסטטוס שנקבע לפי ההיזון החוזר נשאר."
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "label": "לא",
+                "nodes": [
+                  {
+                    "type": "step",
+                    "text": "במשיכה שאינה חלקית לא נבדק פער סכומים, והסטטוס שנקבע לפי ההיזון החוזר נשאר."
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "type": "write",
+            "text": "בקשת המשיכה מתעדכנת: סטטוס הסיום, תאריך המשיכה בפועל ותאריך סיום המשיכה (שניהם תאריך הערך המוקדם של התנועות), הסכום שנמשך בפועל (סכום התנועות) והסכום נטו.",
+            "tech": "gen_withdrawal · Update · SDK (ExecuteMultipleExtension RequestType.Update, מנות של 1000): gen_currentstate, gen_dateofactualwithdrawal, gen_withdrawalfinishdate (= genvaluedate.ToLocalTime()), gen_actualwithdrawalamount, gen_nettransferamount",
+            "evidence": "main.cs:43-59, 62-64, 70, 102-104"
+          },
+          {
+            "type": "step",
+            "text": "עדכון שה-CRM החזיר עליו שגיאה (Fault) נרשם לפלט שגיאות של הרכיב שאינו מחובר לשום יעד, ולכן תשובת השגיאה אינה נשמרת בזרימה. אם לא מתקבלת תשובה מהשרת, אין רישום, והרשימה מתרוקנת. (טיפול בחריגות בזמן השליחה – מחוץ להיקף.)",
+            "tech": "ErrorBuffer.AddRow() (main.cs:88-89); תשובה ריקה: התנאי ב-main.cs:72 נכשל ו-myEntities.Clear() (main.cs:93); Error output ללא path (paths: DTSX:1193 בלבד)"
+          },
+          {
+            "type": "end",
+            "text": "בקשות המשיכה שנבחרו מקבלות ב-CRM סטטוס סיום ונתונים שחושבו מהתנועות, אלא אם העדכון שלהן נכשל."
+          }
+        ]
+      },
+      "detail_he": [
+        {
+          "h": "מקור ואוכלוסייה",
+          "t": "שאילתה על טבלאות CRM (חיבור [CRM]: Data Source=Psql; Initial Catalog=ALTSHULER_MSCRM – מחרוזת חיבור בזמן תכנון; קובץ התצורה שלא סופק עשוי לדרוס אותה): בקשות gen_withdrawal במצב gen_currentstate = 8, שיש להן תנועות בטבלת gen_ftcurrentyear (לפי שם הטבלה: שנה נוכחית – השערה) בכל קופה (Gen_fundmain) של חשבון הלקוח, מסוג Gen_actionid = 54 ו-gen_transgrouptype = 5, בתאריך ערך >= gen_datesenttothebank (DTSX:1094-1120). gen_datesenttothebank מופיע בלי שם טבלה, וטבלת המקור שלו לא ידועה (השערה: Gen_withdrawal). כשהוא ריק (NULL) ההשוואה אינה מתקיימת והתנועה אינה נספרת; אם הוא של הבקשה (השערה), בקשה כזו אינה נבחרת. בנוסף נדרש לפחות פיצול gen_fluiditylayerspartition אחד שסטטוס ההיזון שלו אינו ריק ואינו 5/6 (DTSX:1136)."
+        },
+        {
+          "h": "התאמה לרשומות קיימות",
+          "t": "אין התאמה לנתוני קובץ: הבקשה מזוהה לפי Gen_withdrawalId שנשלף מ-CRM, והעדכון נעשה ישירות על אותו מזהה (main.cs:44). התנועות משויכות לבקשה דרך חשבון הלקוח ולא דרך קשר ישיר לבקשה."
+        },
+        {
+          "h": "החלטות",
+          "t": "ברירת מחדל 14 'הסתיים חלקית'; אם min=max=4 → 3 'הסתיים'; אם משיכה חלקית (סוג משיכה 0 או gen_withdrawalfromfund 0) וסכום התנועות ביחידות שלמות (Math.Truncate) בערך מוחלט שונה מ-Gen_withdrawalvalue (השערה לפי השם: הסכום המבוקש; טבלת המקור לא ידועה; ריק נחשב 0) → 15 'הסתיים – קיים פער' (גובר על השניים הקודמים). שמות הסטטוסים מהערות הקוד בלבד (main.cs:30,33,39)."
+        },
+        {
+          "h": "כתיבה ל-CRM",
+          "t": "Update ל-gen_withdrawal דרך ה-SDK (ExecuteMultipleExtension, מנות של 1000): gen_currentstate, gen_dateofactualwithdrawal ו-gen_withdrawalfinishdate (תאריך הערך המוקדם, ToLocalTime), gen_actualwithdrawalamount (סכום התנועות), gen_nettransferamount (סכום הנטו). אין יצירה או מחיקה."
+        },
+        {
+          "h": "תוצאה עסקית",
+          "t": "בקשות במצב 8 שנבחרו (תנועות 54/5 ופיצול מתאים) מקבלות סטטוס סיום ונתונים מהתנועות. תשובות Fault מה-CRM אינן נשמרות ביעד כלשהו בזרימה (פלט השגיאה לא מחובר), ואם מהשרת לא מתקבלת תשובה תקינה (null, בלי תוצאות או בלי Responses) אין רישום כלל והרשימה מתרוקנת (main.cs:72, 93; טיפול בחריגות – מחוץ להיקף)."
+        }
+      ],
+      "decisions": [
+        {
+          "where": "get open withdrawal (SQL)",
+          "condition": "gen_currentstate = 8 and Gen_fundtransactiontype.Gen_actionid = 54 and Gen_fundtransactiontype.gen_transgrouptype = 5 and ft.gen_valuedate >= gen_datesenttothebank",
+          "meaning_he": "בקשה במצב 8 שנרשמה לחשבון שלה תנועה מסוג 54/5 שתאריך הערך שלה אינו מוקדם מ-gen_datesenttothebank (לפי השם: מועד השליחה לבנק – השערה; טבלת המקור לא ידועה, השערה: הבקשה). כש-gen_datesenttothebank ריק (NULL) ההשוואה אינה מתקיימת והתנועה אינה נספרת; אם העמודה שייכת לבקשה (השערה), בקשה כזו אינה נכללת.",
+          "outcome_he": "נכללת באוכלוסייה; אחרת לא מטופלת"
+        },
+        {
+          "where": "get open withdrawal (SQL)",
+          "condition": "gen_currentstate = 8 and flp.gen_feedbackstatus not in(5,6)  (INNER JOIN)",
+          "meaning_he": "נדרש לפחות פיצול נזילות אחד שסטטוס ההיזון שלו אינו ריק ואינו 5 או 6",
+          "outcome_he": "בקשה שכל פיצוליה בסטטוס 5/6 או בסטטוס ריק, או שאין לה פיצולים, אינה מטופלת"
+        },
+        {
+          "where": "close withdrawal main.cs:32",
+          "condition": "Row.minStatus == Row.maxStatus && Row.minStatus == 4",
+          "meaning_he": "כל הפיצולים הרלוונטיים בסטטוס היזון 4",
+          "outcome_he": "gen_currentstate = 3 (הסתיים); אחרת 14 (הסתיים חלקית)"
+        },
+        {
+          "where": "close withdrawal main.cs:35-37",
+          "condition": "(!Row.genwithdrawaltype_IsNull && Row.genwithdrawaltype == 0 || !Row.genwithdrawalfromfund_IsNull && Row.genwithdrawalfromfund == 0) && Math.Truncate(Math.Abs(Row.gentranstotalamount)) != Math.Truncate(Math.Abs(Row.Genwithdrawalvalue))",
+          "meaning_he": "משיכה חלקית (לפי הערת הקוד) שהסכום שבוצע אינו שווה, ביחידות שלמות (Math.Truncate) ובערך מוחלט, ל-Gen_withdrawalvalue (השערה לפי השם: הסכום המבוקש; טבלת המקור לא ידועה; ריק נחשב 0)",
+          "outcome_he": "gen_currentstate = 15 (הסתיים – קיים פער)"
+        }
+      ],
+      "crmEffects": [
+        {
+          "entity": "gen_withdrawal",
+          "verb": "Update",
+          "mechanism": "SDK",
+          "when_he": "לכל בקשה שעברה את סינון השאילתה: gen_currentstate (3/14/15) תמיד; gen_dateofactualwithdrawal ו-gen_withdrawalfinishdate כשתאריך הערך אינו NULL; gen_actualwithdrawalamount ו-gen_nettransferamount כשהסכומים אינם NULL"
+        }
+      ],
+      "evidence": [
+        "Package\\Close automaty sended withdrawals\\get open withdrawal · DTSX:1089, SqlCommand DTSX:1094-1142",
+        "Package\\Close automaty sended withdrawals\\close withdrawal · DTSX:82, main.cs (code DTSX:84, sha 90acdfb43975) lines 30-59, 68-94",
+        "path DTSX:1193 (המסלול היחיד בזרם; פלט Error לא מחובר)",
+        "precedence DTSX:5313, DTSX:5314"
+      ],
+      "openQuestions_he": [
+        "משמעות מצב gen_currentstate = 8 אינה מוגדרת בחבילה (שם הרכיב מרמז 'נשלח אוטומטית' – השערה).",
+        "משמעות סטטוסי ההיזון החוזר 4, 5, 6 של gen_fluiditylayerspartition אינה מוגדרת בחבילה.",
+        "משמעות Gen_actionid = 54 ו-gen_transgrouptype = 5 (סוג תנועת משיכה – השערה) אינה מוגדרת בחבילה.",
+        "נענה חלקית: gen_currentstate שייך ל-Gen_withdrawal. בחבילה 0014 השאילתה מפנה אל w.Gen_currentstate כאשר w הוא Gen_withdrawal (0014_AccountCourses.dtsx:3901), כלומר לטבלה Gen_withdrawal יש עמודה כזו. אילו גם לטבלה מחוברת נוספת בשאילתה כאן הייתה עמודה כזו, השאילתה הייתה נכשלת על שם עמודה דו-משמעי, ולפי המשתמש החבילה רצה בפרודקשן. לכן זו העמודה של Gen_withdrawal. בנוסף, אותו רכיב כותב את המאפיין gen_currentstate לישות gen_withdrawal דרך ה-SDK (main.cs:45). השיוך של gen_datesenttothebank לטבלה עדיין לא הוכח (השערה: Gen_withdrawal).",
+        "האם ExecuteMultipleExtension (namespace CRM.Proxy, מהאסמבלי החיצוני CRM2015.Proxy) מגדיר ContinueOnError – לא ידוע.",
+        "טבלת המקור והמשמעות של Gen_withdrawalvalue לא ידועות. העמודה מופיעה בלי שם טבלה (ISNULL(Gen_withdrawalvalue, 0), DTSX:1106; גם ב-GROUP BY) בשאילתה שמחברת את Gen_withdrawal, Gen_customeraccount, Gen_fundmain, gen_ftcurrentyear ו-Gen_fundtransactiontype. אילו העמודה הייתה קיימת ביותר מטבלה אחת השאילתה הייתה נכשלת, ולפי המשתמש החבילה רצה בפרודקשן, כך שהיא שייכת לטבלה אחת בלבד; בקבצים שסופקו אין ראיה איזו (ההופעה היחידה האחרת, בחבילה 0020, היא על gen_preservation). השערה לפי השם: סכום המשיכה המבוקש ב-Gen_withdrawal. הערך משמש בבדיקת הפער לסטטוס 15 (main.cs:37).",
+        "נענה חלקית: gen_transtotalamount (בלי שם טבלה, DTSX:1107) הוא של gen_ftcurrentyear: בחבילה 0016 השאילתה מפנה ל-ft.gen_transtotalamount כש-ft הוא Gen_ftCurrentYear (0016_TransferOut.dtsx:2125, 2132), ואילו העמודה הייתה קיימת ביותר מטבלה אחת בשאילתה כאן, השאילתה הייתה נכשלת (לפי המשתמש החבילה רצה בפרודקשן). טבלת המקור של gen_netoamountofaction (DTSX:1108) לא הוכחה באותה דרך: בקבצים שסופקו היא מופיעה רק ב-INSERT לטבלת הבסיס Gen_ftCurrentYearBase (0008_LeumiFile-PY.dtsx:63118 ואילך), לא בשאילתה על gen_ftcurrentyear (השערה: gen_ftcurrentyear)."
+      ]
+    },
+    {
+      "refId": "Package\\Close manualy sended withdrawals",
+      "title_he": "סגירת בקשות משיכה שנשלחו ידנית",
+      "techName": "Close manualy sended withdrawals",
+      "short_he": "בקשות משיכה במצב 10 שנמצאו עבורן תנועות מסוג פעולה 54 וקבוצה 5 (השערה: תנועות משיכה) בקופות החשבון, שתאריך הערך שלהן אינו מוקדם ממועד יצירת הבקשה (השוואת תאריך ושעה), ושיש להן לפחות פיצול נזילות אחד שסטטוס ההיזון שלו אינו 5 ואינו ריק, מסומנות 'הסתיים', או 'הסתיים – קיים פער' במשיכה חלקית שבה החלק השלם של הערך המוחלט של סכום התנועות שונה מזה של Gen_withdrawalvalue. נרשמים תאריך המשיכה בפועל ותאריך סיום המשיכה, הסכום שנמשך בפועל והסכום נטו.",
+      "flow_he": [
+        "איתור בקשות משיכה במצב 10 עם תנועות מסוג פעולה 54, קבוצה 5 (השערה: תנועות משיכה) בקופות החשבון, שתאריך הערך שלהן אינו מוקדם ממועד יצירת הבקשה (השוואת תאריך ושעה)",
+        "סיכום סכומי התנועות; בדיקה אם יש פיצול נזילות של משיכה חלקית (ללא סטטוס 5)",
+        "קביעת סטטוס: 3 הסתיים / 15 הסתיים – קיים פער",
+        "עדכון בקשת המשיכה ב-CRM: סטטוס, תאריך משיכה בפועל ותאריך סיום, סכום בפועל וסכום נטו"
+      ],
+      "short": {
+        "nodes": [
+          {
+            "type": "step",
+            "text": "המערכת מאתרת בקשות משיכה במצב 10 (לפי שם הרכיב: נשלחו ידנית – השערה), שכבר נרשמו עבורן תנועות מסוג 54/5 (השערה: תנועות משיכה) בקופות של חשבון הלקוח, שתאריך הערך שלהן אינו מוקדם ממועד יצירת הבקשה (השוואת תאריך ושעה). נבחרות רק בקשות שיש להן לפחות פיצול שכבות נזילות אחד שסטטוס ההיזון שלו אינו 5 ואינו ריק; האחרות אינן מטופלות ונשארות במצבן (10)."
+          },
+          {
+            "type": "step",
+            "text": "כברירת מחדל הבקשה תסומן 'הסתיים'."
+          },
+          {
+            "type": "decision",
+            "text": "האם זו משיכה חלקית שבה החלק השלם של הערך המוחלט של סכום התנועות שונה מהחלק השלם של הערך המוחלט של Gen_withdrawalvalue (השערה לפי השם: הסכום שהתבקש)?",
+            "branches": [
+              {
+                "label": "כן",
+                "nodes": [
+                  {
+                    "type": "step",
+                    "text": "הבקשה תסומן 'הסתיים – קיים פער'."
+                  }
+                ]
+              },
+              {
+                "label": "לא",
+                "nodes": [
+                  {
+                    "type": "step",
+                    "text": "הבקשה נשארת 'הסתיים'."
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "type": "write",
+            "text": "בקשת המשיכה מתעדכנת ב-CRM בסטטוס הסיום, בתאריך המשיכה בפועל ובתאריך סיום המשיכה (שניהם תאריך הערך המוקדם של התנועות, אחרי המרה לשעון המקומי), בסכום שנמשך בפועל ובסכום נטו."
+          },
+          {
+            "type": "end",
+            "text": "בקשות המשיכה שנבחרו מקבלות ב-CRM סטטוס סיום ונתונים שחושבו מהתנועות, אלא אם העדכון שלהן נכשל."
+          }
+        ]
+      },
+      "detailed": {
+        "nodes": [
+          {
+            "type": "step",
+            "text": "האוכלוסייה היא בקשות משיכה במצב 10 (לפי שם הרכיב: נשלחו ידנית – השערה).",
+            "tech": "get open withdrawal · Gen_withdrawal WHERE gen_currentstate = 10",
+            "evidence": "DTSX:2197, DTSX:2212"
+          },
+          {
+            "type": "step",
+            "text": "לכל בקשה נאספות תנועות מטבלת gen_ftcurrentyear (לפי שמה: השנה הנוכחית – השערה) בכל הקופות של חשבון הלקוח, מסוג פעולה 54 וקבוצת תנועה 5, שתאריך הערך שלהן אינו מוקדם ממועד יצירת הבקשה.",
+            "tech": "Gen_withdrawal → Gen_customeraccount → Gen_fundmain → gen_ftcurrentyear → Gen_fundtransactiontype; Gen_actionid = 54 AND gen_transgrouptype = 5 AND gen_valuedate >= w.CreatedOn",
+            "evidence": "DTSX:2176-2200"
+          },
+          {
+            "type": "step",
+            "text": "מהתנועות מחושבים: סכום התנועות הכולל, סכום הנטו הכולל ותאריך הערך המוקדם ביותר.",
+            "tech": "sum(ISNULL(gen_transtotalamount,0)), sum(ISNULL(gen_netoamountofaction,0)), min(ft.gen_valuedate)",
+            "evidence": "DTSX:2176"
+          },
+          {
+            "type": "step",
+            "text": "מפיצולי שכבות הנזילות של הבקשה, למעט פיצולים בסטטוס היזון חוזר 5 ופיצולים שהסטטוס שלהם ריק (בהנחה ש-'! =' מתפרש כ-'!='; ראו ממצא 5), נבדק אם קיים פיצול של משיכה חלקית. סטטוסי ההיזון עצמם אינם משפיעים על הסטטוס בזרם זה.",
+            "tech": "gen_fluiditylayerspartition: flp.gen_feedbackstatus ! =5; min(gen_withdrawalfromfund + 0), min(gen_withdrawaltype + 0)",
+            "evidence": "DTSX:2213"
+          },
+          {
+            "type": "decision",
+            "text": "האם לבקשה יש גם תנועות 54/5 מתאימות וגם לפחות פיצול נזילות אחד שסטטוס ההיזון שלו אינו 5 ואינו ריק?",
+            "tech": "INNER JOIN trans ⨝ flpart on Gen_withdrawalid",
+            "branches": [
+              {
+                "label": "לא",
+                "nodes": [
+                  {
+                    "type": "end",
+                    "text": "הבקשה לא מטופלת בריצה זו ונשארת במצבה."
+                  }
+                ]
+              },
+              {
+                "label": "כן",
+                "nodes": [
+                  {
+                    "type": "step",
+                    "text": "הבקשה עוברת לקביעת סטטוס הסיום, שברירת המחדל שלו היא 'הסתיים'.",
+                    "tech": "currentstate = 3 //הסתיים",
+                    "evidence": "close withdrawal main.cs:34"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "type": "decision",
+            "text": "האם זו משיכה חלקית (סוג משיכה 0 או 'משיכה מהקופה' 0 באחד הפיצולים)?",
+            "tech": "(!genwithdrawaltype_IsNull && genwithdrawaltype == 0) || (!genwithdrawalfromfund_IsNull && genwithdrawalfromfund == 0) //משיחה חלקית",
+            "evidence": "main.cs:36",
+            "branches": [
+              {
+                "label": "כן",
+                "nodes": [
+                  {
+                    "type": "decision",
+                    "text": "האם הסכום הכולל של התנועות, בערך מוחלט וביחידות שלמות (Math.Truncate), שונה מהערך Gen_withdrawalvalue (השערה לפי השם: הסכום שהתבקש בבקשה; טבלת המקור לא ידועה; ערך ריק נחשב 0)?",
+                    "tech": "Math.Truncate(Math.Abs(gentranstotalamount)) != Math.Truncate(Math.Abs(Genwithdrawalvalue))",
+                    "evidence": "main.cs:38",
+                    "branches": [
+                      {
+                        "label": "כן",
+                        "nodes": [
+                          {
+                            "type": "step",
+                            "text": "הסטטוס נקבע ל'הסתיים – קיים פער'.",
+                            "tech": "currentstate = 15",
+                            "evidence": "main.cs:40"
+                          }
+                        ]
+                      },
+                      {
+                        "label": "לא",
+                        "nodes": [
+                          {
+                            "type": "step",
+                            "text": "הסטטוס נשאר 'הסתיים'."
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "label": "לא",
+                "nodes": [
+                  {
+                    "type": "step",
+                    "text": "במשיכה שאינה חלקית לא נבדק פער סכומים והסטטוס נשאר 'הסתיים'."
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "type": "write",
+            "text": "בקשת המשיכה מתעדכנת: סטטוס הסיום (3 או 15); תאריך המשיכה בפועל ותאריך סיום המשיכה, שניהם תאריך הערך המוקדם של התנועות אחרי המרה לשעון המקומי של שרת ה-SSIS, ורק כשהוא אינו ריק; הסכום שנמשך בפועל (סכום התנועות) והסכום נטו (סכום הנטו), כל אחד רק כשאינו ריק.",
+            "tech": "gen_withdrawal · Update · SDK (ExecuteMultipleExtension RequestType.Update, מנות של 1000): gen_currentstate = OptionSetValue(3/15); gen_dateofactualwithdrawal = gen_withdrawalfinishdate = genvaluedate.ToLocalTime() (רק אם genvaluedate אינו NULL); gen_actualwithdrawalamount = Money(gentranstotalamount); gen_nettransferamount = Money(gennetoamountofaction) (main.cs:46-59, DTSX:1459-1472)",
+            "evidence": "main.cs:44-60, 63-65, 72, 96-98"
+          },
+          {
+            "type": "step",
+            "text": "תשובות Fault מה-CRM אינן נבדקות: עדכון שה-CRM החזיר עליו שגיאה אינו נרשם בזרימה. (טיפול בחריגות בזמן השליחה – מחוץ להיקף.)",
+            "tech": "ExcecuteBulk (main.cs:70-88) מטפל רק בתשובה תקינה; אין ענף Fault"
+          },
+          {
+            "type": "end",
+            "text": "בקשות המשיכה שנבחרו מקבלות ב-CRM סטטוס סיום ונתונים שחושבו מהתנועות, אלא אם העדכון שלהן נכשל."
+          }
+        ]
+      },
+      "detail_he": [
+        {
+          "h": "מקור ואוכלוסייה",
+          "t": "שאילתה על טבלאות CRM: gen_withdrawal במצב gen_currentstate = 10 עם תנועות gen_ftcurrentyear בקופות החשבון מסוג Gen_actionid = 54 ו-gen_transgrouptype = 5 בתאריך ערך >= w.CreatedOn (DTSX:2176-2200), ולפחות פיצול gen_fluiditylayerspartition אחד שסטטוס ההיזון שלו אינו 5 ואינו ריק (DTSX:2213, בהנחה ש-'! =' מתפרש כ-'!=')."
+        },
+        {
+          "h": "התאמה לרשומות קיימות",
+          "t": "הבקשה מזוהה לפי Gen_withdrawalid שנשלף מ-CRM; העדכון על אותו מזהה (main.cs:45). התנועות משויכות דרך חשבון הלקוח."
+        },
+        {
+          "h": "החלטות",
+          "t": "ברירת מחדל 3 'הסתיים'; משיכה חלקית שסכומה ביחידות שלמות (Math.Truncate) בערך מוחלט שונה מ-Gen_withdrawalvalue (השערה לפי השם: הסכום המבוקש; טבלת המקור לא ידועה; ריק נחשב 0) → 15 'הסתיים – קיים פער' (main.cs:34-42). בניגוד לזרם האוטומטי אין בדיקת סטטוס היזון 4 ואין סטטוס 14."
+        },
+        {
+          "h": "כתיבה ל-CRM",
+          "t": "Update ל-gen_withdrawal דרך ה-SDK (ExecuteMultipleExtension, מנות של 1000): gen_currentstate (3 או 15); gen_dateofactualwithdrawal ו-gen_withdrawalfinishdate (תאריך הערך המוקדם min(ft.gen_valuedate), אחרי ToLocalTime, רק כשאינו ריק); gen_actualwithdrawalamount (Money של סכום התנועות sum(ISNULL(gen_transtotalamount,0))); gen_nettransferamount (Money של סכום הנטו sum(ISNULL(gen_netoamountofaction,0))). אין יצירה או מחיקה (main.cs:46-59)."
+        },
+        {
+          "h": "תוצאה עסקית",
+          "t": "בקשות במצב 10 שנבחרו (תנועות 54/5 ופיצול מתאים) מקבלות סטטוס סיום ונתונים מהתנועות. תשובות Fault מהעדכון אינן מתועדות בזרימה (טיפול בחריגות – מחוץ להיקף)."
+        }
+      ],
+      "decisions": [
+        {
+          "where": "get open withdrawal (SQL)",
+          "condition": "gen_currentstate = 10 and Gen_fundtransactiontype.Gen_actionid = 54 and Gen_fundtransactiontype.gen_transgrouptype = 5 and gen_valuedate >= w.CreatedOn",
+          "meaning_he": "בקשה במצב 10 שנרשמה לחשבון שלה תנועה מסוג 54/5 שתאריך הערך שלה אינו מוקדם ממועד יצירת הבקשה (השוואת תאריך ושעה מלאים, לא לפי יום)",
+          "outcome_he": "נכללת באוכלוסייה"
+        },
+        {
+          "where": "get open withdrawal (SQL)",
+          "condition": "gen_currentstate = 10 and flp.gen_feedbackstatus ! =5  (INNER JOIN)",
+          "meaning_he": "נדרש לפחות פיצול נזילות אחד שסטטוס ההיזון שלו אינו 5 ואינו ריק (בהנחה ש-'! =' מתפרש כ-'!=')",
+          "outcome_he": "בקשה שכל פיצוליה בסטטוס 5 או בסטטוס ריק, או שאין לה פיצולים, אינה מטופלת"
+        },
+        {
+          "where": "close withdrawal main.cs:36-38",
+          "condition": "(!Row.genwithdrawaltype_IsNull && Row.genwithdrawaltype == 0 || !Row.genwithdrawalfromfund_IsNull && Row.genwithdrawalfromfund == 0) && Math.Truncate(Math.Abs(Row.gentranstotalamount)) != Math.Truncate(Math.Abs(Row.Genwithdrawalvalue))",
+          "meaning_he": "משיכה חלקית שהסכום שבוצע אינו שווה, ביחידות שלמות (Math.Truncate) ובערך מוחלט, ל-Gen_withdrawalvalue (השערה לפי השם: הסכום המבוקש; טבלת המקור לא ידועה; ריק נחשב 0)",
+          "outcome_he": "gen_currentstate = 15; אחרת 3"
+        }
+      ],
+      "crmEffects": [
+        {
+          "entity": "gen_withdrawal",
+          "verb": "Update",
+          "mechanism": "SDK",
+          "when_he": "לכל בקשה שעברה את סינון השאילתה: gen_currentstate (3/15) תמיד; התאריכים והסכומים כשאינם NULL"
+        }
+      ],
+      "evidence": [
+        "Package\\Close manualy sended withdrawals\\get open withdrawal · DTSX:2171, SqlCommand DTSX:2176-2219",
+        "Package\\Close manualy sended withdrawals\\close withdrawal · DTSX:1204, main.cs (code DTSX:1206, sha 9c74a56e8cd2) lines 34-60, 70-100",
+        "path DTSX:2264",
+        "precedence DTSX:5314, DTSX:5315"
+      ],
+      "openQuestions_he": [
+        "משמעות מצב gen_currentstate = 10 אינה מוגדרת בחבילה (שם הרכיב מרמז 'נשלח ידנית' – השערה).",
+        "נענה: gen_valuedate הלא-מסויג שייך ל-gen_ftcurrentyear (ft). אותה פקודה מפנה ל-ft.gen_valuedate (min(ft.gen_valuedate)), ולכן לטבלה ft יש עמודה כזו. אילו לטבלה מחוברת נוספת הייתה עמודה באותו שם, השאילתה הייתה נכשלת על שם עמודה דו-משמעי. לכן, כשהשאילתה רצה, זו העמודה של ft, כמו בזרם האוטומטי.",
+        "מדוע הזרם הידני מחריג רק סטטוס 5 ואילו האוטומטי מחריג 5 ו-6 – לא ידוע.",
+        "טבלת המקור והמשמעות של Gen_withdrawalvalue לא ידועות. העמודה מופיעה בלי שם טבלה (ISNULL(Gen_withdrawalvalue, 0), DTSX:2186; גם ב-GROUP BY) בשאילתה שמחברת את Gen_withdrawal, Gen_customeraccount, Gen_fundmain, gen_ftcurrentyear ו-Gen_fundtransactiontype. אילו העמודה הייתה קיימת ביותר מטבלה אחת השאילתה הייתה נכשלת, ולפי המשתמש החבילה רצה בפרודקשן, כך שהיא שייכת לטבלה אחת בלבד; בקבצים שסופקו אין ראיה איזו. השערה לפי השם: סכום המשיכה המבוקש ב-Gen_withdrawal. הערך משמש בבדיקת הפער לסטטוס 15 (main.cs:38)."
+      ]
+    }
+  ],
+  "findings_he": [
+    {
+      "severity": "medium",
+      "text": "סכום המשיכה בפועל, סכום הנטו ותאריך המשיכה מחושבים מכל תנועות 54/5 בכל הקופות של חשבון הלקוח, שתאריך הערך שלהן אינו מוקדם מ-gen_datesenttothebank (אוטומטי; לפי השם: מועד השליחה לבנק, טבלת המקור לא ידועה) או ממועד יצירת הבקשה (ידני; השוואת תאריך ושעה), ללא קישור ישיר לבקשת המשיכה. אם לחשבון יש כמה בקשות משיכה במצב 8 או 10 או תנועות 54/5 נוספות באותה תקופה, הסכומים יצורפו, ואז הסטטוס 'קיים פער' או הסכום בפועל עשויים לשקף גם תנועות שאינן של הבקשה.",
+      "evidence": "DTSX:1105-1120, DTSX:2186-2200"
+    },
+    {
+      "severity": "medium",
+      "text": "תשובות שגיאה (Fault) מה-CRM אינן נשמרות ביעד כלשהו בתוך זרימות הנתונים. בזרם האוטומטי, תשובת Fault נכתבת לפלט Error שאין לו path. בזרם הידני אין טיפול בתשובות Fault. בשני הזרמים, אם ExecuteMultipleRequest מחזיר תשובה ריקה, אין רישום והרשימה מתרוקנת. בקשה שהעדכון שלה לא בוצע נשארת במצב 8/10, והיא תיבחר שוב בריצה מאוחרת רק אם היא עדיין עומדת בתנאי השאילתה באותה ריצה. (טיפול בחריגות בזמן השליחה – מחוץ להיקף.)",
+      "evidence": "auto main.cs:72, 85-90, 93 + paths DTSX:1193 בלבד; manual main.cs:74-87; תנאי בחירה DTSX:1117-1136, 2197-2213"
+    },
+    {
+      "severity": "low",
+      "text": "בדיקת הפער אינה מחשבת הפרש: היא קוצצת כל סכום בנפרד ליחידות שלמות אחרי ערך מוחלט (Math.Truncate(Math.Abs(x))) ומשווה את התוצאות. לכן פער של שבר שחוצה גבול של יחידה שלמה מזוהה (100.99 מול 101.00 → 100 ≠ 101 → סטטוס 15), ופער של עד 0.99 בתוך אותה יחידה שלמה אינו מזוהה (100.10 מול 100.90 → 100 = 100). בגלל הערך המוחלט, סכומים שווים בסימנים הפוכים נחשבים תואמים. הסכום שנכתב ל-gen_actualwithdrawalamount שומר על הסימן המקורי.",
+      "evidence": "auto main.cs:37 (DTSX:158), main.cs:54; manual main.cs:38 (DTSX:1451), main.cs:55"
+    },
+    {
+      "severity": "low",
+      "text": "בזרם האוטומטי, בקשה במצב 8 נבחרת רק אם יש לה גם תנועה מתאימה וגם לפחות פיצול שכבות נזילות אחד שסטטוס ההיזון שלו אינו 5 או 6 (INNER JOIN). בקשה עם תנועה אבל בלי פיצול כזה (כל הפיצולים בסטטוס 5/6, סטטוס ריק, או שאין פיצולים) אינה נבחרת ונשארת במצבה (8). בקשה שנבחרה מקבלת תמיד סטטוס סיום, לפחות 'הסתיים חלקית', גם אם אף פיצול אינו בסטטוס 4.",
+      "evidence": "SQL DTSX:1126-1141; auto main.cs:30-33"
+    },
+    {
+      "severity": "info",
+      "text": "UNVERIFIABLE (לא ניתן לאמת מתוך ה-DTSX): בשאילתה הידנית מופיע 'flp.gen_feedbackstatus ! =5' (עם רווח). לפי ידע כללי על T-SQL, שלא הוכח כאן, המפרש מקבל רווח בתוך אופרטור השוואה מורכב. אם כך, המשמעות היא '<> 5': סטטוס 6 נכלל וסטטוס ריק מוחרג, בשונה מ-NOT IN (5,6) בזרם האוטומטי. ראיה נסיבתית: למקור יש externalMetadataColumns isUsed=True עם 7 העמודות של השאילתה (DTSX:2236-2244), כלומר הפקודה תוארה בהצלחה בשלב כלשהו. אם השאילתה אינה עוברת ניתוח, ולידציית החבילה תיכשל (אין DelayValidation) ושני זרמי הסגירה לא ירוצו. ההכרעה דורשת לוגים של הרצות ייצור.",
+      "evidence": "SQL DTSX:2213; metadata DTSX:2236-2244; DTSX:1198 (ללא DelayValidation); precedence DTSX:5315"
+    },
+    {
+      "severity": "info",
+      "text": "התאריכים נכתבים אחרי ToLocalTime() על gen_valuedate שנקרא מטבלת CRM. בין הקבצים שסופקו, רק חבילה 0008 כותבת את Gen_ftCurrentYearBase.Gen_ValueDate (insert ftCurrentYearBase 1-5). בחבילה 0008 הערך עובר בסקריפט 'Dates ToUniveral', שממיר אותו ב-ToUniversalTime() אם הוא ניתן לפענוח ואינו שווה ל-CrmMinimumDate. לכן, לשורות שנכתבו כך, הערך שמור ב-UTC וה-ToLocalTime() כאן מחזיר אותו לשעון המקומי של השרת. שורות שנכתבו ממקור שלא סופק הן external_unknown.",
+      "evidence": "auto main.cs:49-50; manual main.cs:50-51; 0008_LeumiFile-PY.dtsx 'FT\\Dates ToUniveral' main.cs:43-51 (DTSX:59787) ו-'insert ftCurrentYearBase 1-5' (DTSX:63115 ואילך); 0022 DTSX:5050-5054 (עדכון Owner בלבד)"
+    }
+  ]
+}

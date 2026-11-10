@@ -1,0 +1,166 @@
+# 0028_Fund Enrolment.dtsx · 87DD97D507243E63D6B13EE4A556CC69891B1B15F2237AE362456304BB9FDA42
+
+## Connection managers
+- [CRM] OLEDB Data Source=Psql;Initial Catalog=ALTSHULER_MSCRM;Integrated Security=SSPI;  
+- [SRS.GENERIX_STAGING] OLEDB Data Source=Psrs;Initial Catalog=GENERIX_STAGING;Integrated Security=SSPI;  
+
+## Executables (disabled marked !)
+-   Close FundEnrolments For Pension | Microsoft.Pipeline  
+-   Create ETL Process record | Microsoft.ScriptTask  
+-   Create Fundenrolment | Microsoft.Pipeline  
+-   Create FundEnrolment For Pension | Microsoft.Pipeline  
+- ! Create FundEnrolment For Transfer Request | Microsoft.Pipeline  
+-   End ETL Process record | Microsoft.Pipeline  
+-   Get Organization Variables | Microsoft.Pipeline  
+-   Truncate Table TblFundEnrolments | Microsoft.ExecuteSQLTask  | SQL: truncate table TblFundEnrolments
+-   Update FundEnrolment | Microsoft.Pipeline  
+-   Update Reject Management With Fund Enrolment | Microsoft.Pipeline  
+
+## Precedence
+- Get Organization Variables -> Create ETL Process record | Success Constraint   
+- Create ETL Process record -> Truncate Table TblFundEnrolments | Success Constraint   
+- Create Fundenrolment -> Create FundEnrolment For Pension | Success Constraint   
+- Create FundEnrolment For Pension -> Close FundEnrolments For Pension | Success Constraint   
+- Close FundEnrolments For Pension -> Create FundEnrolment For Transfer Request | Success Constraint   
+- Create FundEnrolment For Transfer Request -> Update Reject Management With Fund Enrolment | Success Constraint   
+- Update Reject Management With Fund Enrolment -> Update FundEnrolment | Success Constraint   
+- Truncate Table TblFundEnrolments -> Create Fundenrolment | Success Constraint   
+- Update FundEnrolment -> End ETL Process record | Success Constraint   
+
+## DataFlow Close FundEnrolments For Pension
+  - Close Fund Enrolment | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 1 out 0
+  - Get Pension Joinings | OLEDBSource  | conn [CRM]  | in 0 out 10
+     path Get Pension Joinings.Outputs[OLE DB Source Output] => Close Fund Enrolment.Inputs[Input 0]
+
+## DataFlow Create Fundenrolment
+  - Check If Rejects Null | ConditionalSplit  | conn   | in 10 out 0
+  - Create gen_fundEnrolment | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 37 out 3
+  - Get All joining reject From bank | OLEDBSource  | conn [CRM]  | in 0 out 44
+  - Insert To TemporaryTable | OLEDBCommand  | conn [SRS.GENERIX_STAGING]  | in 1 out 0
+  - Is Fundenrolment Exits | Lookup  | conn [CRM]  | in 1 out 2
+  - Multicast | Multicast  | conn   | in 0 out 0
+  - Set gen_notes | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 10 out 1
+  - Update Owner | OLEDBCommand  | conn [CRM]  | in 2 out 0
+     path Check If Rejects Null.Outputs[Create Row] => Create gen_fundEnrolment.Inputs[Input 0]
+     path Is Fundenrolment Exits.Outputs[Lookup No Match Output] => Check If Rejects Null.Inputs[Conditional Split Input]
+     path Multicast.Outputs[Multicast Output 1] => Update Owner.Inputs[OLE DB Command Input]
+     path Multicast.Outputs[Multicast Output 2] => Insert To TemporaryTable.Inputs[OLE DB Command Input]
+     path Get All joining reject From bank.Outputs[OLE DB Source Output] => Set gen_notes.Inputs[Input 0]
+     path Set gen_notes.Outputs[Output 0] => Is Fundenrolment Exits.Inputs[Lookup Input]
+     path Create gen_fundEnrolment.Outputs[Result] => Multicast.Inputs[Multicast Input 1]
+
+## DataFlow Create FundEnrolment For Pension
+  - Create Fund Enrolment | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 45 out 5
+  - Get Pension Joining | OLEDBSource  | conn [CRM]  | in 0 out 44
+  - Insert To TemporaryTable | OLEDBCommand  | conn [SRS.GENERIX_STAGING]  | in 1 out 0
+  - Multicast | Multicast  | conn   | in 0 out 0
+  - Set gen_note | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 5 out 1
+  - Upate Pension Joining | OLEDBCommand  | conn [CRM]  | in 2 out 0
+  - Update Fund Enrolment Owner | OLEDBCommand  | conn [CRM]  | in 3 out 0
+     path Multicast.Outputs[Multicast Output 1] => Update Fund Enrolment Owner.Inputs[OLE DB Command Input]
+     path Multicast.Outputs[Multicast Output 2] => Upate Pension Joining.Inputs[OLE DB Command Input]
+     path Multicast.Outputs[Multicast Output 4] => Insert To TemporaryTable.Inputs[OLE DB Command Input]
+     path Get Pension Joining.Outputs[OLE DB Source Output] => Set gen_note.Inputs[Input 0]
+     path Set gen_note.Outputs[Output 0] => Create Fund Enrolment.Inputs[Input 0]
+     path Create Fund Enrolment.Outputs[Result] => Multicast.Inputs[Multicast Input 1]
+
+## DataFlow Create FundEnrolment For Transfer Request
+  - Create Fund Enrolment | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 36 out 3
+  - Derived Column | DerivedColumn  | conn   | in 0 out 0
+  - Get Failed Transfer Request | OLEDBSource  | conn [CRM]  | in 0 out 40
+  - Insert To TemporaryTable | OLEDBCommand  | conn [CRM]  | in 1 out 0
+  - Multicast | Multicast  | conn   | in 0 out 0
+  - Set gen_note 1 | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 5 out 1
+  - Update Fund Enrolment Owner | OLEDBCommand  | conn [CRM]  | in 2 out 0
+  - Update Transfer Request | OLEDBCommand  | conn [CRM]  | in 2 out 0
+     path Create Fund Enrolment.Outputs[Failure] => Derived Column.Inputs[Derived Column Input]
+     path Multicast.Outputs[Multicast Output 1] => Update Fund Enrolment Owner.Inputs[OLE DB Command Input]
+     path Multicast.Outputs[Multicast Output 2] => Update Transfer Request.Inputs[OLE DB Command Input]
+     path Multicast.Outputs[Multicast Output 3] => Insert To TemporaryTable.Inputs[OLE DB Command Input]
+     path Get Failed Transfer Request.Outputs[OLE DB Source Output] => Set gen_note 1.Inputs[Input 0]
+     path Set gen_note 1.Outputs[Output 0] => Create Fund Enrolment.Inputs[Input 0]
+     path Create Fund Enrolment.Outputs[Success] => Multicast.Inputs[Multicast Input 1]
+
+## DataFlow End ETL Process record
+  - ETL Record Finish | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 2 out 0
+  - Get gen_etlprocessid | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 0 out 1
+  - Lookup | Lookup  | conn [CRM]  | in 1 out 1
+     path Lookup.Outputs[Lookup Match Output] => ETL Record Finish.Inputs[Input 0]
+     path Get gen_etlprocessid.Outputs[Output 0] => Lookup.Inputs[Lookup Input]
+
+## DataFlow Get Organization Variables
+  - Get Organization Variables | OLEDBSource  | conn [CRM]  | in 0 out 2
+  - Set Organization Variables | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 2 out 0
+     path Get Organization Variables.Outputs[OLE DB Source Output] => Set Organization Variables.Inputs[Input 0]
+
+## DataFlow Update FundEnrolment
+  - Get FundEnrolments | OLEDBSource  | conn [SRS.GENERIX_STAGING]  | in 0 out 1
+  - Update FundEnrolment | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 1 out 0
+     path Get FundEnrolments.Outputs[OLE DB Source Output] => Update FundEnrolment.Inputs[Input 0]
+
+## DataFlow Update Reject Management With Fund Enrolment
+  - Derived Column | DerivedColumn  | conn   | in 0 out 0
+  - Derived Column 1 | DerivedColumn  | conn   | in 0 out 0
+  - Get Reject Management And Fund Enrolment | OLEDBSource  | conn [CRM]  | in 0 out 2
+  - Update Reject Management With Fund Enrolment | ManagedComponentHost (Microsoft.ScriptComponentHost) | conn   | in 2 out 1
+     path Update Reject Management With Fund Enrolment.Outputs[Failure] => Derived Column.Inputs[Derived Column Input]
+     path Get Reject Management And Fund Enrolment.Outputs[OLE DB Source Output] => Update Reject Management With Fund Enrolment.Inputs[Input 0]
+     path Update Reject Management With Fund Enrolment.Outputs[Success] => Derived Column 1.Inputs[Derived Column Input]
+
+## SQL statements
+- Close FundEnrolments For Pension\Get Pension Joinings | Microsoft.OLEDBSource.SqlCommand | [CRM] 
+    select Gen_fundenrolment.Gen_fundenrolmentid, pj.gen_identification, Gen_fundenrolment.gen_enrolmentstatus, pj.gen_joiningstatus, pj.gen_existsreject, gen_rejectreasonsnotes, pj.gen_rejectionreason1, pj.gen_rejectionreason2, pj.gen_rejectionreason3, pj.gen_rejectionreason4 from gen_pensionjoining pj join Gen_fundenrolment on pj.gen_fundenrolmentid = Gen_fundenrolment.Gen_fundenrolmentid where Gen_
+- Create Fundenrolment\Get All joining reject From bank | Microsoft.OLEDBSource.SqlCommand | [CRM] 
+    select aj.gen_automatedjoiningId, aj.gen_isoldrejectmethod, productByCourse.ProductId as gen_fundtypename, DATEADD(hh,3,aj.gen_lastsyncdate) as gen_lastsyncdate , DATEADD(hh,3,aj.modifiedon) as ModifiedOn , DATEADD(hh,3,aj.createdon) as createdon, gen_joiningstatus AS JoiningStatus, gen_joiningtype AS JoiningType, aj.gen_agentcontract, Right(aj.gen_applicantfirstname+' '+ aj.gen_applicantlastname,
+- Create Fundenrolment\Insert To TemporaryTable | Microsoft.OLEDBCommand.SqlCommand | [SRS.GENERIX_STAGING] 
+    insert into TblFundEnrolments (gen_fundenrolmentid) values(?)
+- Create Fundenrolment\Is Fundenrolment Exits | Microsoft.Lookup.SqlCommand | [CRM] 
+    select gen_fundenrolmentid, CreatedOn, gen_automatedjoining, Gen_enrolmentStatus from gen_fundenrolment where gen_automatedjoining IS NOT NULL
+- Create Fundenrolment\Is Fundenrolment Exits | Microsoft.Lookup.SqlCommandParam | [CRM] 
+    select * from (select gen_fundenrolmentid, CreatedOn, gen_automatedjoining, Gen_enrolmentStatus from gen_fundenrolment where gen_automatedjoining IS NOT NULL) [refTable] where [refTable].[gen_automatedjoining] = ?
+- Create Fundenrolment\Update Owner | Microsoft.OLEDBCommand.SqlCommand | [CRM] 
+    update Gen_fundenrolmentBase set OwnerId = ?, OwnerIdType = 9 where Gen_fundenrolmentId = ?
+- Create FundEnrolment For Pension\Get Pension Joining | Microsoft.OLEDBSource.SqlCommand | [CRM] 
+    select pj.gen_isoldrejectmethod, pj.gen_agentcontract, pj.gen_pensionjoiningid, pj.gen_fundenrolmentid, pj.gen_firstname, pj.gen_lastname, pj.gen_joiningsource, pj.gen_newsletterapproval, pj.gen_fundnumber, pj.gen_product, pj.gen_fundtype, pj.gen_expectedtransferamount, pj.gen_datestampreceived, pj.gen_mobilephone, pj.gen_needhealthdeclaration, pj.gen_underwritingstatus, pj.gen_city, pj.gen_pobox,
+- Create FundEnrolment For Pension\Insert To TemporaryTable | Microsoft.OLEDBCommand.SqlCommand | [SRS.GENERIX_STAGING] 
+    insert into TblFundEnrolments (gen_fundenrolmentid) values(?)
+- Create FundEnrolment For Pension\Upate Pension Joining | Microsoft.OLEDBCommand.SqlCommand | [CRM] 
+    update gen_pensionjoiningBase set gen_fundenrolmentid = ? where gen_pensionjoiningid = ?
+- Create FundEnrolment For Pension\Update Fund Enrolment Owner | Microsoft.OLEDBCommand.SqlCommand | [CRM] 
+    update Gen_fundenrolmentBase set OwnerId = ?, OwnerIdType = ? where Gen_fundenrolmentId = ?
+- Create FundEnrolment For Transfer Request\Get Failed Transfer Request | Microsoft.OLEDBSource.SqlCommand | [CRM] 
+    select --Contact.Gen_address1_city as gen_contactcity, Contact.gen_cityname as gen_contactcity, Contact.address1_line1 as gen_contactstreet, Contact.gen_address1_buildingid as gen_contacthousenumber, Contact.address1_postalcode as gen_zipcode, --מיקוד לקוח פרטי Contact.gen_postalcode as gen_contactpostalcode, -- ת.ד. לקוח פרטי Contact.emailaddress1 as gen_contactemail, Contact.mobilephone as gen_c
+- Create FundEnrolment For Transfer Request\Insert To TemporaryTable | Microsoft.OLEDBCommand.SqlCommand | [CRM] 
+    insert into ##TblFundEnrolments (gen_fundenrolmentid) values(?)
+- Create FundEnrolment For Transfer Request\Update Fund Enrolment Owner | Microsoft.OLEDBCommand.SqlCommand | [CRM] 
+    update Gen_fundenrolmentBase set OwnerId = ?, OwnerIdType = 9 where Gen_fundenrolmentId = ?
+- Create FundEnrolment For Transfer Request\Update Transfer Request | Microsoft.OLEDBCommand.SqlCommand | [CRM] 
+    update gen_transferrequestBase set gen_fundenrolmentid = ? where gen_transferrequestid = ?
+- End ETL Process record\Lookup | Microsoft.Lookup.SqlCommand | [CRM] 
+    select p.gen_etlprocessid , case when pw.gen_etlprocessid is null then 0 else 1 end as isWarningExist from gen_etlprocess p left join (select distinct gen_etlprocessId from gen_etlprocesswarning ) as pw on p.gen_etlprocessId = pw.gen_etlprocessId
+- End ETL Process record\Lookup | Microsoft.Lookup.SqlCommandParam | [CRM] 
+    select * from (select p.gen_etlprocessid , case when pw.gen_etlprocessid is null then 0 else 1 end as isWarningExist from gen_etlprocess p left join (select distinct gen_etlprocessId from gen_etlprocesswarning ) as pw on p.gen_etlprocessId = pw.gen_etlprocessId) [refTable] where [refTable].[gen_etlprocessid] = ?
+- Get Organization Variables\Get Organization Variables | Microsoft.OLEDBSource.SqlCommand | [CRM] 
+    SELECT gen_key ,gen_Value FROM gen_etlvariable where gen_scope ='global' or gen_scope = ?
+- Truncate Table TblFundEnrolments | ExecuteSQLTask | [SRS.GENERIX_STAGING] 
+    truncate table TblFundEnrolments
+- Update FundEnrolment\Get FundEnrolments | Microsoft.OLEDBSource.SqlCommand | [SRS.GENERIX_STAGING] 
+    select * from TblFundEnrolments
+- Update Reject Management With Fund Enrolment\Get Reject Management And Fund Enrolment | Microsoft.OLEDBSource.SqlCommand | [CRM] 
+    select gen_rejectmanagementid, fe.Gen_fundenrolmentId -- הצטרפות ממוכנת from gen_automatedjoining aj join gen_fundenrolmentbase fe on aj.gen_automatedjoiningId = fe.Gen_automatedjoining and (aj.gen_isoldrejectmethod != 1 or aj.gen_isoldrejectmethod is null) join gen_rejectmanagementBase rm on aj.gen_automatedjoiningId = rm.gen_automatedjoiningid and rm.gen_fundenrolmentid is null and rm.statecode 
+
+## Code write candidates (per owner)
+- Close FundEnrolments For Pension\Close Fund Enrolment {"crm-service":1,"sql-command":2,"crm-entity":2,"crm-sdk-update":1}
+- Create ETL Process record {"crm-entity":1,"crm-sdk-create":1,"variables-write":1}
+- Create Fundenrolment\Create gen_fundEnrolment {"crm-service":1,"sql-command":2,"crm-entity":17,"output-buffer":7,"crm-sdk-create":1}
+- Create Fundenrolment\Set gen_notes {"sql-command":2,"output-buffer":1}
+- Create FundEnrolment For Pension\Create Fund Enrolment {"crm-service":1,"sql-command":2,"crm-entity":20,"output-buffer":14,"crm-sdk-create":1}
+- Create FundEnrolment For Pension\Set gen_note {"sql-command":2,"output-buffer":1}
+- Create FundEnrolment For Transfer Request\Create Fund Enrolment {"crm-service":1,"sql-command":2,"crm-entity":18,"output-buffer":3,"crm-sdk-create":1}
+- Create FundEnrolment For Transfer Request\Set gen_note 1 {"sql-command":2,"output-buffer":1}
+- End ETL Process record\ETL Record Finish {"sql-command":2,"crm-entity":3,"output-buffer":1,"crm-sdk-update":1}
+- End ETL Process record\Get gen_etlprocessid {"sql-command":2,"output-buffer":2}
+- Update FundEnrolment\Update FundEnrolment {"sql-command":2,"crm-service":1,"crm-entity":2,"crm-sdk-update":1}
+- Update Reject Management With Fund Enrolment\Update Reject Management With Fund Enrolment {"sql-command":2,"crm-service":1,"crm-entity":2,"crm-sdk-update":1,"output-buffer":1}
+
+## External refs (non-framework) CRM2015.Proxy

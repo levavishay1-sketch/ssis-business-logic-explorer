@@ -1,0 +1,245 @@
+{
+  "verifier": "ssis-verifier",
+  "package": "0008_LeumiFile-PY",
+  "scope": "logic-claims re-check round 2",
+  "checkedAt": "2026-11-07T17:20:50Z",
+  "checked": 14,
+  "results": [
+    {
+      "id": "L|Package\\Get Sytem User Id|title",
+      "hash": "9f03f4201f19",
+      "verdict": "CONFIRMED",
+      "detail": "Re-derived:\n- Get Transaction Currency ID (Execute SQL on CRM): select top 1 TransactionCurrencyId from TransactionCurrency, with no ORDER BY.\n- Get User Id: lower(domainname) = ?, where ? = User::UserDomainName, loaded from gen_etlvariable (scope global/LeumiFile-PY) by Set Organization Variables.\n- Lookups for currency (CurrencyName = \"שקל חדש\") and organization (LOWER(Name) = LOWER(@OrganizationName)).\n- Set Variables PostExecute overwrites TransactionCurrencyId.\n- UserId and BusinessUnitId are used only in FT Create System Columns (OwnerId/CreatedBy/ModifiedBy/OwningUser/OwningBusinessUnit). TransactionCurrencyId is used in FT and in the 5 SDK Create gen_TransferIn copies.\nNotes:\n- The title says 'שווה' while the SQL lowers domainname only. This is equivalent under a case-insensitive collation; the collation is not in the files, and the detailed claim states the lower().\n- UserId/OrganizationId also go to the ETL warning records (out-of-scope plumbing).",
+      "evidence": "DTSX:85587-85592, 84649-84661, 84482-84606, 85518; Set Variables main.cs:49-77; FT Create System Columns main.cs:115-126; Get Etl Variables DTSX:82694; SDK Create gen_TransferIn main.cs:83-88",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Get Sytem User Id|detailed",
+      "hash": "0966d4865f1a",
+      "verdict": "CONFIRMED",
+      "detail": "All units hold:\n- [1] TOP 1 without ORDER BY, overwritten in PostExecute.\n- [2] lower(domainname) = User::UserDomainName.\n- [3] \"שקל חדש\" and organization lookups (NoMatchBehavior=0, Full cache).\n- [4] Set Variables writes BusinessUnitId, TransactionCurrencyId, UserId, OrganizationId.\n- [5] PostExecute assigns all four unconditionally. With no row they keep Guid.Empty, and the flow does not fail. With several rows the last processed row wins.\n- [6] UserId/BusinessUnitId are used only in the FT insert (business scope), TransactionCurrencyId in FT and transferin. No SDK create uses UserId/BusinessUnitId.\n- [7] The SDK identity depends on CrmProxy, an unsupplied assembly.\nRuntime failure of the currency/org/owner lookups is plumbing and not required.",
+      "evidence": "DTSX:84594-84606, 84482-84496, 84539-84551, 84649-84661, 85587-85592; Set Variables main.cs:49-77; FT Create System Columns main.cs:118-126; grep User::UserId/BusinessUnitId/TransactionCurrencyId in 0008",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Write PY File To Staging|title",
+      "hash": "27f4a9d71932",
+      "verdict": "WRONG",
+      "detail": "'נטען כמות שהוא' (loaded as-is) does not match the DTSX.\n- The PY source connection manager defines 174 columns (RaggedRight, cp1255). Read \"PY\" File outputs 171 of them; FILLER_132, Filler_162_195 and FillerEnd are not output. Insert To PY_FileData maps 153.\n- 18 parsed columns are not loaded: 146-148, 150-156, 158, 159, 202-204, BankTransaction_ID_91 (file column #91), Related_Action_ID_98 (file column #98) and Filler_205_211.\n- The staging columns BankTransaction_ID_91 and Related_Action_ID_98 are filled from other file fields: FILLER1_29_BankTransactionId (column #29, width 11) and Filler_83_RelatedActionId (column #83, width 10), after Remove Leading Zero.\n- This is business-relevant. FT takes gen_transferid (the existence-check key and Gen_transferid) from staging BankTransaction_ID_91, and gen_relatedactionidentifier from Related_Action_ID_98. Those values therefore come from file fields #29 and #83, not from file fields #91 and #98.\nThe connection and config wording (SSISConfigFileSrs.dtsConfig may override) is correct.",
+      "evidence": "DTSX:9-190 (FlatFileColumns: #29 FILLER1_29_BankTransactionId w=11, #83 Filler_83_RelatedActionId w=10, #91 BankTransaction_ID_91 w=9, #98 Related_Action_ID_98 w=9); Insert To PY_FileData DTSX:85616 inputs FILLER1_29_BankTransactionId->ext:BankTransaction_ID_91, Filler_83_RelatedActionId->ext:Related_Action_ID_98; Remove Leading Zero DTSX:87203",
+      "wrongUnits": [
+        {
+          "unit": 2,
+          "problem": "'נטען כמות שהוא' is not exact. 18 parsed file columns are not loaded (including the file's BankTransaction_ID_91 and Related_Action_ID_98). The staging columns BankTransaction_ID_91 and Related_Action_ID_98 receive FILLER1_29_BankTransactionId and Filler_83_RelatedActionId with leading zeros removed.",
+          "correct": "קובץ ה-PY נטען לטבלת PY_FileData. לעמודות BankTransaction_ID_91 ו-Related_Action_ID_98 ב-Staging נכתבים השדות FILLER1_29_BankTransactionId (עמודה 29) ו-Filler_83_RelatedActionId (עמודה 83) אחרי הסרת אפסים מובילים. השדות BankTransaction_ID_91 (עמודה 91) ו-Related_Action_ID_98 (עמודה 98) שבקובץ, ועוד 16 עמודות (146-159 חלקית, 202-204, Filler_205_211), אינם נטענים.",
+          "evidence": "DTSX:85616 (Insert To PY_FileData input mapping), DTSX:9-190"
+        },
+        {
+          "unit": 4,
+          "problem": "The flow 'Remove Leading Zero: BankTransactionId, RelatedActionId' does not show that the cleaned values replace the staging columns named BankTransaction_ID_91 and Related_Action_ID_98.",
+          "correct": "Remove Leading Zero: FILLER1_29_BankTransactionId -> BankTransaction_ID_91, Filler_83_RelatedActionId -> Related_Action_ID_98",
+          "evidence": "DTSX:87203, 85616"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Write PY File To Staging|detailed",
+      "hash": "947c33e277c3",
+      "verdict": "INCOMPLETE",
+      "detail": "The stated units are correct:\n- [1] Truncate precedes the load (precedence constraint).\n- [2] RaggedRight, cp1255, 174 columns.\n- [3] REPLACE(LTRIM(REPLACE(x,\"0\",\" \")),\" \",\"0\") semantics are described correctly.\n- [4] all rows go to [dbo].[PY_FileData], with the config-override caveat.\n- [5] no filter.\nMissing business logic: the step decides which file field feeds the staging columns that FT later writes to CRM. Staging BankTransaction_ID_91 receives file field FILLER1_29_BankTransactionId (column 29) and Related_Action_ID_98 receives Filler_83_RelatedActionId (column 83). The file's own BankTransaction_ID_91 (column 91) and Related_Action_ID_98 (column 98) are discarded, along with 16 other parsed columns. FT uses staging BankTransaction_ID_91 as gen_transferid (written to Gen_ftCurrentYearBase and used as an existence-check key) and Related_Action_ID_98 as gen_relatedactionidentifier.",
+      "evidence": "DTSX:85616 Insert To PY_FileData input mapping; DTSX:9-190 FlatFileColumns; FT PY File Data From Staging external mapping BankTransaction_ID_91->gen_transferid (DTSX:65865); FT insert Param_26/Param_72",
+      "wrongUnits": [
+        {
+          "unit": 4,
+          "problem": "Missing: which file fields land in staging BankTransaction_ID_91 / Related_Action_ID_98, and that file fields #91, #98 (plus 16 others) are not loaded.",
+          "correct": "Add: ל-Staging.BankTransaction_ID_91 נכתב FILLER1_29_BankTransactionId (עמודה 29) ול-Related_Action_ID_98 נכתב Filler_83_RelatedActionId (עמודה 83), שניהם אחרי הסרת אפסים מובילים. השדות BankTransaction_ID_91 / Related_Action_ID_98 שבקובץ (עמודות 91/98) ועוד 16 עמודות אינם נטענים.",
+          "evidence": "DTSX:85616"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\FT|detailed",
+      "hash": "2da42079c345",
+      "verdict": "WRONG",
+      "detail": "Re-derived the whole flow. Most units are exact:\n- Order: Trim, then last row, then group-type split, then Full-cache existence lookup, then money, Format Dates, Dates ToUniveral, additional fields, Get Bank Id (NoMatchBehavior 0 + FailComponent), direction split, product, competitor (IgnoreFailure), Append Zeros, system columns, fund, group/provision type, trans type, overpayment, salary, tax 54, FinancialModuleWay, 5 identical inserts (RedirectRow), then the ContactBase update on success. The demislika branch comes from Multicast 3.\n- The group-type mapping, provision types 1-7, the overpayment conditions, the salary NULL rules, the tax arrays {01,02,04}/{05,06}, the 7 date columns and the Param numbers all check out. The insert has 80 columns.\n- The package has only Success constraints, so [24] is correct.\nWrong units:\n(a) [18] 'הסכומים מומרים מאגורות לשקלים': the code divides by 100. The agorot-to-shekel meaning is not proven.\n(b) Inconsistent terminology moves conditions to the wrong column. In [44]/[45]/[77], 'סוג הפעולה' = Action_Type_56 (gen_TranstypeId) and 'סוג הפעולה המשני' = Action_Operation_Type_57. In [50] 'סוג הפעולה 01 או 03' and in [58] 'סוג פעולה 01/02/04/05/06' refer to Action_Operation_Type_57 (genTransgroupTypeId).\n(c) Meanings taken from column names are stated as the state of the record without a label: [65] 'איש הקשר ... מסומן \"נדרש חישוב זכאות להלוואה\"' (gen_loaneligibilitycalculationrequired = 1), [72] 'מסומן \"זוהתה הפקדה לחודש המדווח\" עם תאריך הזיהוי' (gen_depositidentificationforreportedmonth = 1, gen_depositidentificationstatusdate = GETDATE()), and [77] 'איש הקשר מסומן לחישוב זכאות להלוואה, וחודשי שכר מדווחים מסומנים כמזוהים'. The SQL comment '--yes' proves only that 1 = yes.\nAccepted labels: 53 = deposit, estate 2 = employee, products 1/4 = gemel/education fund are backed by code constants (enum FundEstateTypeCode.Employee=2, ProductSubCustomerAccountCode Gemel=1/EducationFund=4, output FtCurrentOrPrevDepositCondition), although the text does not cite them.",
+      "evidence": "FT components: Format money fields DTSX:61683; Set trans group type main.vb:17-47; Get trans type name DTSX:62940; Check for overpayment main.cs:117-130; Set Tax Fields main.cs:24-50; Update Loaneligibilitycalculationrequired DTSX:82566; Update Dmei Slika Month Salary DTSX:82519; Set CompensationSalary main.cs:154-164 (enums)",
+      "wrongUnits": [
+        {
+          "unit": 18,
+          "problem": "'מאגורות לשקלים' is an unproven unit meaning. The code only divides by 100.",
+          "correct": "סכומי הקובץ מחולקים ב-100 (DT_CY), וערך ריק (NULL) הופך ל-0.",
+          "evidence": "DTSX:61683"
+        },
+        {
+          "unit": 50,
+          "problem": "'סוג הפעולה 01 או 03' refers to Action_Operation_Type_57, but units 44/45 define 'סוג הפעולה' as Action_Type_56 (the condition is attributed to the wrong column).",
+          "correct": "סוג הפעולה המשני (Action_Operation_Type_57) 01 או 03, הפעולה (Action_Type_56) 53, ...",
+          "evidence": "Check for overpayment main.cs:119-120"
+        },
+        {
+          "unit": 58,
+          "problem": "'(סוג פעולה 01/02/04/05/06)' refers to Action_Operation_Type_57 (genTransgroupTypeId), which units 44/45 call 'סוג הפעולה המשני'.",
+          "correct": "כאשר סוג הפעולה המשני (Action_Operation_Type_57) הוא 01/02/04 (Withdrawals בקוד) או 05/06 (UndoWithdrawals בקוד) ...",
+          "evidence": "Set Tax Fields main.cs:24-25, 41"
+        },
+        {
+          "unit": 65,
+          "problem": "'מסומן \"נדרש חישוב זכאות להלוואה\"' states the meaning of gen_loaneligibilitycalculationrequired, taken from the column name, as fact.",
+          "correct": "ב-ContactBase של איש הקשר של הקופה השדה gen_loaneligibilitycalculationrequired מקבל 1 (לפי שם השדה: נדרש חישוב זכאות להלוואה – המשמעות לא מוכחת).",
+          "evidence": "DTSX:82566"
+        },
+        {
+          "unit": 72,
+          "problem": "'מסומן \"זוהתה הפקדה לחודש המדווח\" עם תאריך הזיהוי' states the column-name meaning as fact.",
+          "correct": "ברשומת gen_demislikamonthsalary: gen_depositidentificationforreportedmonth = 1 (בהערת SQL: yes), gen_depositidentificationstatusdate = GETDATE(), ModifiedOn = GETDATE(), ModifiedBy = CrmAdminId (לפי שמות השדות: זיהוי הפקדה לחודש המדווח – המשמעות לא מוכחת).",
+          "evidence": "DTSX:82519"
+        },
+        {
+          "unit": 77,
+          "problem": "'איש הקשר מסומן לחישוב זכאות להלוואה, וחודשי שכר מדווחים מסומנים כמזוהים' states business meaning from column names without a label.",
+          "correct": "... ל-ContactBase נכתב gen_loaneligibilitycalculationrequired = 1, ולרשומות gen_demislikamonthsalary שנמצאו נכתב gen_depositidentificationforreportedmonth = 1 עם תאריך (משמעות השדות לפי שמם בלבד).",
+          "evidence": "DTSX:82566, 82519"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\FT|detail",
+      "hash": "1e543c7d5a7e",
+      "verdict": "WRONG",
+      "detail": "Correct units:\n- [1] population: '@' last row; Action_Type_56 != 58 and Transfer_Type_2 = 2; direction 1/2.\n- [2] match keys; Full cache with no in-file dedupe; bank '10' with FailComponent; padding to 12 with dot removal.\n- [3] list of decisions.\n- In [4], the 80-column INSERT with Owner/CreatedBy = UserId and StateCode 0 / StatusCode 1, and the Unsupported classification.\nWrong: [4] and [5] describe the ContactBase and gen_demislikamonthsalary updates through meanings taken from column names, without labelling them:\n- 'לסימון חישוב זכאות להלוואה' and 'לסימון זיהוי הפקדה';\n- 'זכאות הלוואה של העמית מסומנת לחישוב מחדש';\n- 'חודשי שכר מדווחים שזוהתה להם הפקדה מסומנים'.\nThe code only sets gen_loaneligibilitycalculationrequired = 1 and gen_depositidentificationforreportedmonth = 1 (+ status date). Nothing proves 'recalculation', 'member', or that a deposit was 'identified' in a business sense.",
+      "evidence": "DTSX:82566, 82519; FT insert DTSX:63118 (80 columns / 80 '?')",
+      "wrongUnits": [
+        {
+          "unit": 4,
+          "problem": "'לסימון חישוב זכאות להלוואה' / 'לסימון זיהוי הפקדה' are meanings taken from column names.",
+          "correct": "UPDATE ContactBase SET gen_loaneligibilitycalculationrequired = 1 אחרי הכנסה מוצלחת; UPDATE gen_demislikamonthsalary SET gen_depositidentificationforreportedmonth = 1, gen_depositidentificationstatusdate = GETDATE() (משמעות השדות לפי שמם בלבד).",
+          "evidence": "DTSX:82566, 82519"
+        },
+        {
+          "unit": 5,
+          "problem": "'זכאות הלוואה של העמית מסומנת לחישוב מחדש; חודשי שכר מדווחים שזוהתה להם הפקדה מסומנים' asserts business meaning (recalculation, identified deposit) without proof.",
+          "correct": "לאיש הקשר של הקופה נכתב gen_loaneligibilitycalculationrequired = 1, ולחודשי השכר שנמצאו נכתב gen_depositidentificationforreportedmonth = 1 עם תאריך (המשמעות העסקית לא מוכחת).",
+          "evidence": "DTSX:82566, 82519"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Create fundmain for transferin|detailed",
+      "hash": "333e1f2f5953",
+      "verdict": "WRONG",
+      "detail": "Re-derived:\n- Source, then Trim (12 columns), then '@' last-row check, then Filter (57, Transfer_Type_2 = \"1\", same account, same fund type, Age_Dependent_Model_112 != \"1\").\n- The direction split feeds Sort/Sort 1 (EliminateDuplicates=false), then an Inner Merge Join (JoinType=2, NumKeyColumns=1) on Request_ID_74.\n- Append Zeros, then get dest fundtype (bank 10 product), then get dest fund (Partial cache; No Match continues).\n- Fund number = (DT_WSTR,4)(DT_I4)course + \"-\" + (DT_WSTR,12)(DT_I8)account; remove duplicate keeps the first per fund number.\n- get source fund (Full cache; bank 10, gen_existinfile = 1, account + productnumber = Source_Fund_Course_17).\n- Set Fields, then Dates To Local (DateTime.ToLocalTime unless the value equals CrmMinimumDate), then the SDK Create gen_fundmain (ExecuteMultiple, batches of 10). Copy 3's Error output goes to Union All Created.\nWrong units:\n(a) [21] describes the source fund as 'מסומנת \"קיימת בקובץ\"'. That is the meaning of gen_existinfile taken from its column name and it is not labelled.\n(b) [34] states 'לכל בקשת העברה ... שאין לה קופת יעד נוצרת קופה אחת ... כהכנה לקליטת ההעברה'. Creation also requires the bank-10 target product and the source fund (gen_existinfile = 1), and only the first row per fund number is kept. The purpose 'כהכנה לקליטת ההעברה' is not proven.\n(c) [9] omits that Append Zeros also removes '.' characters. This affects the written gen_bankaccountnumber and gen_fundtypenumber.\nNote: [28] '\"קיימת בקובץ\" = כן' is in label=value form; adding the technical name gen_existinfile there is recommended.",
+      "evidence": "DTSX:34026, 36425, 36273/36326 (EliminateDuplicates=false), 34586-34588, 22694 (Append Zeros main.cs:57-66), 34127, 34065, 33995, 34813, 34190-34232, 35598, 32977, 23617 main.cs:40-118, path DTSX:37737",
+      "wrongUnits": [
+        {
+          "unit": 21,
+          "problem": "'קופת המקור (בנק 10, מסומנת \"קיימת בקובץ\")' gives a meaning taken from the column name gen_existinfile as fact.",
+          "correct": "האם קיימת קופת מקור בבנק 10 שהשדה gen_existinfile שלה שווה 1 (משמעות הדגל לא מוכחת) לחשבון ולמסלול המקור?",
+          "evidence": "DTSX:34192-34230"
+        },
+        {
+          "unit": 34,
+          "problem": "Overstated and with an unproven purpose. Creation also needs the target product (bank 10) and the source fund with gen_existinfile = 1, and only the first row per fund number is kept. 'כהכנה לקליטת ההעברה' is an inference.",
+          "correct": "לבקשת העברה בין מסלולים שאין לה קופת יעד, כשקיים מוצר יעד של בנק 10 וקיימת קופת מקור (gen_existinfile = 1), נוצרת קופה אחת במסלול היעד (פעם אחת לכל מספר קופה).",
+          "evidence": "DTSX:34127, 34190, 34813"
+        },
+        {
+          "unit": 9,
+          "problem": "Append Zeros also removes '.' from the account and course numbers. This value is written to CRM.",
+          "correct": "מספר החשבון ומספרי המסלולים: נקודות מוסרות, ואז הערך מרופד באפסים משמאל עד אורך השדה (ריק הופך לאפסים).",
+          "evidence": "Append Zeros main.cs:59-63 (DTSX:22694)"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Create fundmain for transferin|crm",
+      "hash": "8c14281bb467",
+      "verdict": "WRONG",
+      "detail": "Entity gen_fundmain, verb Create and mechanism SDK (CrmProxy, ExecuteMultipleExtension RequestType.Create) are correct.\nThe when_he text 'קופת מקור בבנק 10 המסומנת קיימת בקובץ' states the meaning of gen_existinfile from its column name without a label; the code only checks gen_existinfile = 1.\nThe condition list also omits a row-selection gate: a bank-10 product must exist for the target course (get dest fundtype, No Match unconnected). It also omits that only the first row per fund number is created (remove duplicate).",
+      "evidence": "DTSX:34190-34232 (gen_existinfile = 1), 34127 (get dest fundtype), 34813 (remove duplicate), 23617 main.cs:40, 142",
+      "wrongUnits": [
+        {
+          "unit": 1,
+          "problem": "'המסומנת קיימת בקובץ' is a meaning taken from the column name. The target-product condition is missing.",
+          "correct": "בקשת העברה בין מסלולים שיש לה מוצר יעד בבנק 10 ואין לה קופת יעד, ויש לה קופת מקור בבנק 10 שהשדה gen_existinfile שלה = 1 (משמעות הדגל לא מוכחת); נוצרת פעם אחת לכל מספר קופה.",
+          "evidence": "DTSX:34127, 34065, 34190, 34813"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Create fundmain for transferin|short",
+      "hash": "ab60dd10301e",
+      "verdict": "WRONG",
+      "detail": "Extra check (same component, same issue). [8] 'קופת המקור בבנק 10 והיא מסומנת כקיימת בקובץ' states the column-name meaning of gen_existinfile as fact, without a label. [13] 'כך שההעברה בין המסלולים יכולה להיקלט' asserts a purpose and dependency that the DTSX does not prove: Create transferin Maslulim does not use the created fund. The rest is a fair summary.",
+      "evidence": "DTSX:34190-34232; Create transferin Maslulim flow has no gen_fundmain lookup (DTSX:37773 ff.)",
+      "wrongUnits": [
+        {
+          "unit": 8,
+          "problem": "'מסומנת כקיימת בקובץ' is a meaning taken from the column name gen_existinfile.",
+          "correct": "האם קיימת קופת המקור בבנק 10 שהדגל gen_existinfile שלה שווה 1 (משמעות הדגל לא מוכחת)?",
+          "evidence": "DTSX:34192-34230"
+        },
+        {
+          "unit": 13,
+          "problem": "The purpose 'כך שההעברה בין המסלולים יכולה להיקלט' is an unproven inference.",
+          "correct": "ללקוח נוצרה קופה במסלול היעד.",
+          "evidence": "DTSX:23617"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Create transferin Maslulim|detailed",
+      "hash": "d3c1b78e9dbb",
+      "verdict": "INCOMPLETE",
+      "detail": "Re-derived. Every stated unit matches:\n- Handle Gemel (constants GEMEL_TO_INVEST_BY_BANK=\"5006\" -> GEMEL_TO_INVEST_BY_CRM=\"1025\"), before Trim.\n- Trim (12 columns), then the '@' check.\n- Filter: Action_Operation_Type_57 != \"04\" && 57 && \"2\" && equal account and type && Age != \"1\".\n- get tranferin: Full cache on gen_requestidentifier only; Match unconnected.\n- Sort/Sort 1 with EliminateDuplicates=true and the listed keys; Merge Join with JoinType=2 and NumKeyColumns=3; outputs taken from the left side.\n- Format Dates: an empty value leads to str=null and then str.Trim() throws an uncaught NRE.\n- 8/6-character parsing, then ToUniversalTime.\n- Filter Last Two Month: he-IL TryParse && date > UtcNow.AddMonths(-2).\n- Get source customer account (Full cache).\n- transfertype 5 / currentstate 1, Dates To Local, then SDK Create (gen_transferid = account number, src = dest = customer account, currency if parseable).\nMissing: [16] says only that the account number and fund type are padded with zeros. Append Zeros also strips '.' characters. That changes the account number written to gen_transferid and the key used for the customer-account lookup.",
+      "evidence": "Handle Gemel main.cs:79-80,120-124 (DTSX:42542); DTSX:40871, 42492, 39413, 50313-50379, 43485-43487; Append Zeros main.cs:59-63 (DTSX:38575); Format Dates main.cs:55-71 (DTSX:41626); Filter Last Two Month main.cs:31-37; DTSX:42407, 49608; Dates To Local main.cs:53-57; SDK Create gen_TransferIn main.cs:36-87",
+      "wrongUnits": [
+        {
+          "unit": 16,
+          "problem": "The dot removal done by Append Zeros is omitted. It affects the written gen_transferid and the lookup key.",
+          "correct": "ממספר החשבון ומסוג הקופה מוסרות נקודות, ואז הם מרופדים באפסים משמאל (12 / 4). ...",
+          "evidence": "Append Zeros main.cs:59-63 (DTSX:38575)"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Create transferin Maslulim|decisions",
+      "hash": "9855033bf46b",
+      "verdict": "INCOMPLETE",
+      "detail": "All 7 listed decisions are correct:\n- Gemel constants;\n- the filter expression;\n- the request-id lookup;\n- Sort EliminateDuplicates=true with all columns as keys;\n- the Inner Merge Join with 3 keys;\n- the > UtcNow-2 months filter, with NULL dropped and empty values failing earlier in Format Dates;\n- the customer-account lookup.\nMissing row-selection decision: Check For Last Row In FIle (SUBSTRING(CheckLastRow,1,1) == \"@\" -> the 'Last row' output is unconnected, so the row is dropped). It is present in the detailed claim and in the other components' decision lists, but absent here.",
+      "evidence": "Check For Last Row In FIle DTSX:39380; paths: Check For Last Row In FIle.Outputs[else] -> Filter for transfer between courses",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Create Acount Courses and course partition for transferin|title",
+      "hash": "0b8452788e9c",
+      "verdict": "CONFIRMED",
+      "detail": "Re-derived the flow:\n- The source has no action-type filter; '@' rows are dropped.\n- get tranferin (Partial cache): Gen_transferin joined to Gen_customeraccount on gen_customeraccountdest, WHERE Gen_bankaccountnumber = Target_Fund_AccountNumber_47 AND gen_requestidentifier = Request_ID_74, with no state filter.\n- IsFullTransfer and AmountCalculationType expressions as stated.\n- Direction != \"2\" (including NULL): get source fund (bank 10, productnumber = Source_Fund_Course_17, account = Target_Fund_AccountNumber_47), then Check for exist account courses (No cache), then SDK Create gen_accountcourses (balance, receivership/warning/confiscate/mortgaged flags).\n- Direction \"2\": get dest fund (inner joins Contact and Gen_agentcontract), then Check if exist course partition (Full cache), then SDK Create gen_coursepartition.\n- ExecuteMultiple batches of 10, with 5 copies for each entity.",
+      "evidence": "DTSX:6158, 3342, 2437, 5916-5940, 19093, 19849, 5782-5822, 3282-3300, 5635-5683, 3375-3393; SDK main.cs (DTSX:6338, 12673)",
+      "wrongUnits": []
+    },
+    {
+      "id": "L|Package\\Create Acount Courses and course partition for transferin|detailed",
+      "hash": "995e0fed8cfe",
+      "verdict": "INCOMPLETE",
+      "detail": "All stated units match the DTSX:\n- Trim of the 9 listed columns before the '@' check.\n- Partial-cache get tranferin, ahead of Format Dates. An empty date throws an NRE for both directions.\n- 8/6-character parsing, ToUniversalTime, and ToLocalTime only in the destination branch.\n- Field writes for gen_accountcourses (gen_transactiontype, gen_amauntcalculationtype, gen_name = source gen_fundnumber, gen_financenumber, 4 flags, links, balance = transaction amount) and for gen_coursepartition (type 2, gen_creationdate = DateTime.Parse(local date), applicant id, fundfinanceid, contractnumber, links incl. supervisor).\n- No-cache and Full-cache existence checks.\n- All 10 SDK copies route Error to unions, then the ETL warning.\n- Duplicates within the run are possible.\nMissing: [3] says only that the account and course numbers are padded with zeros. Append Zeros also removes '.' characters. These values are the keys of get tranferin, get source fund and get dest fund, so the omission changes which rows match (row selection).",
+      "evidence": "Append Zeros main.cs:59-63 (DTSX:2437); DTSX:19996, 5916, 4854, 3480, 6338 main.cs:27-103, 12673 main.cs:27-102; error paths to Union All Error accountcourses/coursepartition -> Count Error Rows -> Union All Errors -> insert etl process warning 2",
+      "wrongUnits": [
+        {
+          "unit": 3,
+          "problem": "Dot removal by Append Zeros is omitted. It affects the lookup keys and therefore the row selection.",
+          "correct": "ממספר חשבון היעד וממספרי המסלולים מוסרות נקודות, ואז הם מרופדים באפסים משמאל (12 / 4 / 4); ערך ריק הופך לאפסים.",
+          "evidence": "Append Zeros main.cs:59-63 (DTSX:2437)"
+        }
+      ]
+    },
+    {
+      "id": "L|Package\\Create Acount Courses and course partition for transferin|decisions",
+      "hash": "eeb2589a2ea3",
+      "verdict": "INCOMPLETE",
+      "detail": "The 6 listed decisions are correct:\n- the '@' check;\n- get tranferin (account + request id, No Match dropped);\n- the IsFullTransfer/AmountCalculationType expressions;\n- the direction split;\n- the two existence checks.\nMissing row-selection decisions that gate the CRM writes:\n- get source fund: Gen_fundmain bank 10 with productnumber = Source_Fund_Course_17 and gen_bankaccountnumber = Target_Fund_AccountNumber_47. No Match is unconnected, so no gen_accountcourses is created.\n- get dest fund: Gen_fundmain bank 10, inner-joined to Contact and Gen_agentcontract, account = Target_Fund_AccountNumber_47, productnumber = Target_Fund_course_44. No Match is unconnected, so no gen_coursepartition is created.",
+      "evidence": "get source fund DTSX:5782-5822; get dest fund DTSX:5635-5683; paths Split Direction -> get source fund / get dest fund, and Lookup Match Output -> Check... (No Match outputs unconnected)",
+      "wrongUnits": []
+    }
+  ],
+  "missingWrites": []
+}
