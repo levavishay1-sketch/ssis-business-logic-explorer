@@ -1,0 +1,20 @@
+digraph F {
+  rankdir=TB; nodesep=0.4; ranksep=0.4;
+  labelloc=t; fontsize=18; fontname="Helvetica-Bold";
+  label="SSIS Explorer - per-package pipeline (who does each step)";
+  node [shape=box, style="rounded,filled", fontname="Helvetica", fontsize=11, margin="0.14,0.08", width=5.6];
+  edge [fontname="Helvetica", fontsize=9, color="#555555"];
+
+  s0 [label="0  START\nMain session reads CLAUDE.md + HANDOFF.md", fillcolor="#ffe9a8"];
+  s1 [label="1  EXTRACT   [TOOL]  batch-prep.mjs\nsource/*.dtsx -> evidence/ + lineage/ + reports/inventory.json\ncoverage check: every count must equal raw XML, else package not closed", fillcolor="#c9eed3"];
+  s2 [label="2  INTERPRET   [AGENTS, in parallel]\nssis-business-logic -> analysis/<pkg>/logic.json\nssis-field-lineage  -> analysis/<pkg>/mapping-*.json\n(both use component.mjs / origins.mjs for facts)", fillcolor="#c5d9ff"];
+  s3 [label="3  COMPOSE   [TOOL]  compose.mjs\nmapping-*.json + lineage -> fieldmap.json\n(one row per file field <-> CRM field pair)", fillcolor="#c9eed3"];
+  s4 [label="4  SPLIT INTO CLAIMS   [TOOL]  logic-claims.mjs / claims.mjs\nstable id + hash per claim", fillcolor="#c9eed3"];
+  s5 [label="5  VERIFY   [AGENT]  ssis-verifier\nre-derives each claim from RAW DTSX, tries to refute\n-> verify-*.json  (CONFIRMED / WRONG / MISSING)", fillcolor="#c5d9ff"];
+  s6 [label="6  AUDIT   [TOOL]  logic-audit.mjs + mapping-audit.mjs\nverified only if verdict hash == current text hash\ncurrent: 1315 verified, 83 stale, 0 wrong; 391/391 pairs", fillcolor="#c9eed3"];
+  s7 [label="7  BUILD   [TOOL]  build-html.mjs (+ template.html, theme.css)\n-> out/ssis-explorer.html   (ssis-ui-designer owns the look)", fillcolor="#c9eed3"];
+  s8 [label="8  REVIEW   [USER]\nreviewDecision stays pending_user_approval until the user decides", fillcolor="#fde2e2", color="#c0392b"];
+
+  s0 -> s1 -> s2 -> s3 -> s4 -> s5 -> s6 -> s7 -> s8;
+  s6 -> s2 [label="wrong / stale claims:\nfix text, then re-verify\n(max 2 more rounds,\nelse stays 'not verified')", style=dashed, color="#c0392b", fontcolor="#c0392b", constraint=false];
+}

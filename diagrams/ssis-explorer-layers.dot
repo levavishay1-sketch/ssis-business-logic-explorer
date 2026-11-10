@@ -1,0 +1,55 @@
+digraph L {
+  rankdir=TB; newrank=true; nodesep=0.3; ranksep=0.5; splines=true;
+  labelloc=t; fontsize=18; fontname="Helvetica-Bold";
+  label="SSIS Explorer - who is responsible for what (layers)";
+  node [shape=box, style="rounded,filled", fontname="Helvetica", fontsize=11, margin="0.12,0.06", width=2.3];
+  edge [fontname="Helvetica", fontsize=9, color="#555555"];
+
+  user [label="User\nasks, reviews, approves\n(reviewDecision is only theirs)", fillcolor="#fde2e2", color="#c0392b", shape=oval, width=3];
+
+  subgraph cluster_rules { label="RULES - text files read first, bind everyone"; style="rounded,filled"; fillcolor="#fff7e0"; color="#d4a017"; fontname="Helvetica-Bold";
+    r1 [label="CLAUDE.md\n15 rules + layout", fillcolor="#ffe9a8"];
+    r2 [label="HANDOFF.md\nstate + next steps", fillcolor="#ffe9a8"];
+    r3 [label="logic-verify-standard.md\nfrozen verdict rules", fillcolor="#ffe9a8"];
+  }
+
+  main [label="MAIN SESSION (orchestrator)\nruns tools via Bash, delegates via Agent tool,\nnever sets technicalVerification on its own work", fillcolor="#dbe9ff", color="#2c5aa0", penwidth=2, width=5.5];
+
+  subgraph cluster_agents { label="AGENTS - LLM interpretation  (.claude/agents/*.md)"; style="rounded,filled"; fillcolor="#e8f0ff"; color="#2c5aa0"; fontname="Helvetica-Bold";
+    a1 [label="ssis-business-logic\nwrites business\ndescription", fillcolor="#c5d9ff"];
+    a2 [label="ssis-field-lineage\nmaps file field\n<-> CRM field", fillcolor="#c5d9ff"];
+    a3 [label="ssis-verifier\nrefutes claims vs\nraw DTSX", fillcolor="#c5d9ff"];
+    a4 [label="ssis-ui-designer\nlook & UX only", fillcolor="#c5d9ff"];
+  }
+
+  subgraph cluster_tools { label="TOOLS - deterministic code, no LLM  (tools/*.mjs, run with node)"; style="rounded,filled"; fillcolor="#e6f7ea"; color="#2e8b57"; fontname="Helvetica-Bold";
+    t1 [label="EXTRACT\nbatch-prep, dtsx-extract,\nlineage, dupes, survey", fillcolor="#c9eed3"];
+    t2 [label="HELP ANALYSTS\ncomponent, origins,\nevidence-summary", fillcolor="#c9eed3"];
+    t3 [label="COMPOSE / CLAIMS\ncompose, logic-claims,\nclaims, claimid, recheck", fillcolor="#c9eed3"];
+    t4 [label="AUDIT / BUILD\nlogic-audit, mapping-audit,\nbuild-html, serve", fillcolor="#c9eed3"];
+  }
+
+  subgraph cluster_data { label="DATA - where results live"; style="rounded,filled"; fillcolor="#f2f2f2"; color="#888888"; fontname="Helvetica-Bold";
+    d1 [label="source/\nDTSX inputs\n(untrusted, not in git)", shape=cylinder, fillcolor="#dddddd"];
+    d2 [label="evidence/ lineage/\nmachine facts\n(not in git)", shape=cylinder, fillcolor="#e2e2e2"];
+    d3 [label="analysis/<pkg>/\ninterpretation +\nverdicts (in git)", shape=cylinder, fillcolor="#e2e2e2"];
+    d4 [label="reports/  out/\naudits, status;\nexplorer HTML", shape=cylinder, fillcolor="#e2e2e2"];
+  }
+
+  planned [label="NOT BUILT YET (listed in HANDOFF):  Hooks (block full DTSX read; validate logic.json)  |  project Skill  |  evidence-pack.mjs  |  Plugins: none",
+           style="rounded,dashed,filled", fillcolor="#ffffff", color="#999999", fontcolor="#555555", width=7, fontsize=10];
+
+  user -> main [label="request"];
+  r1 -> main [style=dashed]; r2 -> main [style=dashed]; r3 -> a3 [style=dashed, label="verdict rules"];
+  main -> a1 [label="Agent tool"]; main -> a2; main -> a3; main -> a4;
+  main -> t1 [label="Bash: node tools/..", constraint=false, style=dotted];
+  a1 -> t2 [style=dotted, label="use"]; a2 -> t2 [style=dotted];
+  a3 -> t3 [style=dotted, label="claims"]; a4 -> t4 [style=dotted];
+  t1 -> d1 [dir=back, label="reads"]; t2 -> d2 [dir=both]; t3 -> d3 [dir=both]; t4 -> d4;
+  d1 -> d2 [style=invis]; d2 -> d3 [style=invis]; d3 -> d4 [style=invis];
+  d4 -> planned [style=invis];
+  { rank=same; t1; t2; t3; t4 }
+  { rank=same; d1; d2; d3; d4 }
+  t1 -> t2 [style=invis]; t2 -> t3 [style=invis]; t3 -> t4 [style=invis];
+  d1 -> d2 [style=invis];
+}
