@@ -82,6 +82,16 @@ footer{color:var(--mut);font-size:12.5px;margin-top:26px}
 .bar{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px}.bar button{background:var(--surface);box-shadow:var(--sh);font-size:13px;padding:6px 13px}
 tr.dt>td{background:var(--soft);padding:4px 18px 14px}
 .tgl{background:var(--soft);color:var(--acc);font-size:12px;padding:1px 9px;border-radius:8px;margin-inline-start:6px}
+.plainbox{background:var(--agent-t);color:var(--ink);border-radius:12px;padding:10px 14px}.plainbox h4{margin:0 0 2px;font-size:12px;color:var(--agent-d)}.plainbox p{font-size:14.5px}
+.hero h2,.pl h2{margin:0 0 8px;font-size:19px;font-weight:700;text-wrap:balance}.hero p,.pl p{margin:6px 0;font-size:15px}
+.ex{display:grid;gap:10px;margin-top:10px}.exs{display:grid;grid-template-columns:44px 1fr;gap:12px;background:var(--surface);border-radius:14px;box-shadow:var(--sh);padding:14px 16px}
+.exs .n{width:34px;height:34px;border-radius:50%;background:var(--acc);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700}
+.exs h3{margin:0 0 2px;font-size:15.5px;display:flex;flex-wrap:wrap;align-items:center;gap:6px}.exs p{margin:2px 0 6px;font-size:14px;color:var(--ink)}
+.who{font-size:12px;font-weight:700;border-radius:8px;padding:0 9px}.who.code{background:var(--tool-t);color:var(--tool-d)}.who.ai{background:var(--agent-t);color:var(--agent-d)}.who.you{background:var(--user-t);color:var(--user-d)}
+.cols{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px;margin-top:10px}.col{background:var(--surface);border-radius:14px;box-shadow:var(--sh);padding:14px 16px}
+.col h3{margin:0;font-size:16px}.col .sub{margin-bottom:6px}.col ul{margin:6px 0 0;padding-inline-start:18px;font-size:14px}
+.gl{display:grid;gap:0;margin-top:8px}.gl div{display:grid;grid-template-columns:minmax(120px,190px) 1fr;gap:14px;padding:9px 0;border-bottom:1px solid var(--line)}.gl div:last-child{border-bottom:0}.gl b{font-size:14px}.gl span{font-size:14px;color:var(--ink)}
+@media (max-width:560px){.gl div{grid-template-columns:1fr;gap:2px}.exs{grid-template-columns:36px 1fr}}
 @media (max-width:560px){h1{font-size:21px}.step{padding:14px 14px;margin-inline-start:40px}.step .num{inset-inline-start:-40px;width:28px;height:28px}.step::before{inset-inline-start:-27px}.loop{margin-inline-start:40px}.tabs button{padding:7px 11px}}
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 </style>
@@ -91,6 +101,7 @@ tr.dt>td{background:var(--soft);padding:4px 18px 14px}
 <header><div><h1 id="ttl"></h1><div class="sub" id="sub"></div></div><button id="theme" aria-label="החלפת ערכת נושא">◐ ערכת נושא</button></header>
 <div class="kpis" id="kpis"></div>
 <nav class="tabs" role="tablist" id="tabs"></nav>
+<section class="tab" id="t-plain"></section>
 <section class="tab" id="t-flow"></section>
 <section class="tab" id="t-agents"></section>
 <section class="tab" id="t-tools"></section>
@@ -104,7 +115,7 @@ const S = D.scan, M = D.manifest || { steps: [], loops: [] };
 const $ = (id) => document.getElementById(id);
 const el = (tag, cls, text, attrs) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; if (attrs) for (const k in attrs) e.setAttribute(k, attrs[k]); return e; };
 // Hebrew text with embedded Latin names: isolate each Latin run (paths, identifiers, phrases) so the bidi algorithm keeps its order
-const W = '(?:(?<![\\u0590-\\u05FF])-{1,2})?[A-Za-z][A-Za-z0-9_<>*\\/.\\-\\[\\]=|$#@:+()]*';
+const W = '(?:(?<![\\u0590-\\u05FF])-{1,2})?[A-Za-z0-9][A-Za-z0-9_<>*\\/.,\\-\\[\\]=|$#@:+()]*';
 const LTRRE = new RegExp(W + '(?: ' + W + ')*', 'g');
 function rich(text) {
   const f = document.createDocumentFragment(); let last = 0; text = String(text);
@@ -127,6 +138,7 @@ const LABELS = [['goal', 'מטרה'], ['inputs', 'קלט'], ['how', 'איך זה
 function block(d, orig) {
   if (!d) return null;
   const w = el('div', 'blk');
+  if (d.plain) { const pb = el('div', 'plainbox'); pb.append(el('h4', '', 'במילים פשוטות'), elr('p', '', d.plain)); w.append(pb); }
   if (d.usage) { const s = el('div', 'sec'); s.append(el('h4', '', 'הרצה'), el('div', 'use', d.usage)); w.append(s); }
   LABELS.forEach(([k, l]) => {
     const v = d[k]; if (!v || (Array.isArray(v) && !v.length)) return;
@@ -147,7 +159,7 @@ const sev = (s) => S.health.filter((h) => h.severity === s).length;
 [['סוכנים', S.counts.agents], ['סקילים', S.counts.skills], ['Hooks', S.counts.hooks], ['כלי פרויקט', S.counts.scripts], ['קבצי חוקים', S.counts.rulesFiles], ['ממצאי בריאות', S.health.length]].forEach(([l, v]) => { const k = el('div', 'kpi'); k.append(el('b', '', v), l); $('kpis').append(k); });
 
 // ---- tabs ----
-const TABS = [['flow', 'זרימה'], ['agents', 'סוכנים'], ['tools', 'כלים'], ['rules', 'חוקים'], ['health', 'בריאות (' + S.health.length + ')']];
+const TABS = [['plain', 'במילים פשוטות'], ['flow', 'זרימה'], ['agents', 'סוכנים'], ['tools', 'כלים'], ['rules', 'חוקים'], ['health', 'בריאות (' + S.health.length + ')']];
 function show(id) { TABS.forEach(([k]) => { $('t-' + k).classList.toggle('on', k === id); const b = $('b-' + k); b.setAttribute('aria-selected', k === id); b.classList.toggle('on', k === id); }); try { history.replaceState(null, '', '#' + id); } catch (e) { } }
 TABS.forEach(([k, l]) => { const b = el('button', '', l, { id: 'b-' + k, role: 'tab' }); b.addEventListener('click', () => show(k)); $('tabs').append(b); });
 
@@ -165,6 +177,20 @@ function jump(ref) {
   const t = document.querySelector('#t-' + tab + ' [data-key="' + name + '"]');
   if (t) { t.scrollIntoView({ behavior: 'smooth', block: 'center' }); t.classList.add('flash'); setTimeout(() => t.classList.remove('flash'), 1800); }
 }
+
+// ---- plain-words tab ----
+(function () {
+  const P = M.plain, root = $('t-plain'); if (!P) { root.append(el('div', 'd', 'אין הסבר פשוט ב-architecture.json')); return; }
+  const hero = el('div', 'card hero'); hero.append(el('h2', '', P.intro.title)); P.intro.paras.forEach((t) => hero.append(elr('p', '', t))); root.append(hero);
+  const ex = el('div', 'pl'); ex.style.margin = '18px 0 0'; ex.append(el('h2', '', P.example.title), elr('p', 'sub', P.example.intro));
+  const list = el('div', 'ex'); P.example.steps.forEach((s) => { const r = el('div', 'exs'), n = el('div', 'n', s.n), b = el('div'); const h = el('h3'); h.append(el('span', 'who ' + (s.who === 'קוד' ? 'code' : s.who === 'אתה' ? 'you' : 'ai'), s.who), s.title); b.append(h, elr('p', '', s.text)); if (s.real) b.append(chip(s.real, 'file mono')); r.append(n, b); list.append(r); });
+  ex.append(list); root.append(ex);
+  const roles = el('div', 'pl'); roles.style.margin = '22px 0 0'; roles.append(el('h2', '', P.roles.title)); const cols = el('div', 'cols');
+  [['code', P.roles.code], ['ai', P.roles.ai], ['you', P.roles.you]].forEach(([k, c]) => { const x = el('div', 'col'); const h = el('h3'); h.append(el('span', 'who ' + k, c.name)); x.append(h, el('div', 'sub', c.sub)); const u = el('ul'); c.items.forEach((i) => u.append(elr('li', '', i))); x.append(u); cols.append(x); });
+  roles.append(cols); root.append(roles);
+  const why = el('div', 'card pl'); why.style.marginTop = '18px'; why.append(el('h2', '', P.why.title)); P.why.paras.forEach((t) => why.append(elr('p', '', t))); root.append(why);
+  const gl = el('div', 'card pl'); gl.style.marginTop = '12px'; gl.append(el('h2', '', 'מילון מונחים')); const g = el('div', 'gl'); P.glossary.forEach(([a, b]) => { const r = el('div'); r.append(elr('b', '', a), elr('span', '', b)); g.append(r); }); gl.append(g); root.append(gl);
+})();
 
 // ---- flow ----
 const KIND = { tool: 'כלי קוד', agent: 'סוכן', user: 'אתה' };
@@ -286,8 +312,8 @@ hh.append(el('div', 'd', 'הבדיקות קוראות קבצים בלבד. הן 
 // ---- theme + footer ----
 $('theme').onclick = () => { const r = document.documentElement, dark = r.dataset.theme ? r.dataset.theme === 'dark' : matchMedia('(prefers-color-scheme:dark)').matches; r.dataset.theme = dark ? 'light' : 'dark'; };
 $('foot').textContent = 'נוצר מסריקה של קבצי הפרויקט (architecture-explorer). סדר הפעולות והקישור בין שלב לסוכן נקראים מ-.claude/architecture.json, וכל השאר מהקבצים עצמם.';
-show((location.hash || '#flow').slice(1).replace(/[^a-z]/g, '') || 'flow');
-if (!document.getElementById('b-' + (location.hash || '#flow').slice(1))) show('flow');
+show((location.hash || '#plain').slice(1).replace(/[^a-z]/g, '') || 'plain');
+if (!document.getElementById('b-' + (location.hash || '#plain').slice(1))) show('plain');
 </script>
 </body>
 </html>
