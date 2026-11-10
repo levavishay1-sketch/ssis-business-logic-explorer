@@ -1,0 +1,64 @@
+{
+  "title": "ארכיטקטורת הסוכנים: SSIS Business-Logic Explorer",
+  "orchestrator": {
+    "title": "סשן ראשי = המתזמר (ראש הצוות)",
+    "text": "קורא CLAUDE.md ו-HANDOFF.md, מריץ כלים דרך Bash, מעביר משימות לסוכנים דרך כלי Agent. לעולם לא מאשר בעצמו את העבודה."
+  },
+  "steps": [
+    {
+      "id": "1", "kind": "tool", "title": "חילוץ דטרמיניסטי",
+      "text": "מפיק evidence ושושלת עמודות מה-DTSX, ובודק שכל ספירה שווה ל-XML. בלי מודל.",
+      "scripts": ["batch-prep.mjs", "dtsx-extract.mjs", "lineage.mjs", "dupes.mjs", "survey.mjs"],
+      "outputs": ["evidence/<pkg>.json", "lineage/<pkg>.lineage.json", "reports/inventory.json"]
+    },
+    {
+      "id": "2", "kind": "agent", "parallel": true, "title": "פירוש: לוגיקה עסקית ומיפוי שדות",
+      "text": "שני סוכנים במקביל: אחד כותב תיאור עסקי בעברית, השני ממפה שדה בקובץ לשדה ב-CRM.",
+      "agents": ["ssis-business-logic", "ssis-field-lineage"],
+      "uses": {
+        "ssis-business-logic": ["survey.mjs", "component.mjs"],
+        "ssis-field-lineage": ["component.mjs", "origins.mjs"]
+      },
+      "outputs": ["analysis/<pkg>/logic.json", "analysis/<pkg>/mapping-*.json"]
+    },
+    {
+      "id": "3", "kind": "tool", "title": "הרכבה ופירוק לטענות",
+      "text": "מחבר מיפוי לשושלת הדטרמיניסטית, ומפרק כל משפט לטענה עם מזהה קבוע ו-hash.",
+      "scripts": ["compose.mjs", "logic-claims.mjs", "claims.mjs", "claimid.mjs"],
+      "outputs": ["analysis/<pkg>/fieldmap.json"]
+    },
+    {
+      "id": "4", "kind": "agent", "title": "אימות עצמאי",
+      "text": "בודק שלא כתב את הניתוח מנסה להפריך כל טענה מול ה-DTSX הגולמי, ומחפש גם מה שהוחמץ.",
+      "agents": ["ssis-verifier"],
+      "uses": { "ssis-verifier": ["claims.mjs", "logic-claims.mjs", "component.mjs", "origins.mjs"] },
+      "outputs": ["analysis/<pkg>/verify-*.json"]
+    },
+    {
+      "id": "5", "kind": "agent", "proposed": true, "title": "תיקון (מוצע, עוד לא קיים)",
+      "text": "מתקן רק טענות שסומנו שגויות או ישנות, ורושם ביומן. היום זו הנחיה חד-פעמית בכל פעם.",
+      "agents": ["ssis-fixer"],
+      "outputs": ["analysis/<pkg>/fixlog-L.json"]
+    },
+    {
+      "id": "6", "kind": "tool", "title": "ביקורת ובנייה",
+      "text": "טענה מאומתת רק אם ה-hash של הפסיקה זהה לטקסט הנוכחי. אחר כך בונים את הסייר.",
+      "scripts": ["logic-audit.mjs", "mapping-audit.mjs", "build-html.mjs", "serve.mjs"],
+      "outputs": ["out/ssis-explorer.html"]
+    },
+    {
+      "id": "★", "kind": "agent", "onDemand": true, "title": "עיצוב (לפי דרישה)",
+      "text": "משפר מראה ו-UX בלבד. לא נוגע בנתונים, במספרים או במשמעות הטקסט.",
+      "agents": ["ssis-ui-designer"],
+      "uses": { "ssis-ui-designer": ["build-html.mjs"] },
+      "outputs": ["tools/theme.css", "tools/template.html"]
+    },
+    {
+      "id": "7", "kind": "user", "title": "בדיקה ואישור",
+      "text": "Claude קובע רק technicalVerification. reviewDecision נשאר pending עד שהמשתמש מחליט."
+    }
+  ],
+  "loops": [
+    { "from": "6", "to": "4", "label": "טענה שגויה או ישנה: מתקנים ובודקים שוב (עד 2 סבבים, אחרת נשארת 'לא אומת')" }
+  ]
+}

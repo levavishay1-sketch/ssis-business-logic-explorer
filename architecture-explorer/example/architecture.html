@@ -1,0 +1,221 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ארכיטקטורת הסוכנים: SSIS Business-Logic Explorer</title>
+<style>
+:root{--bg:#f4f6fb;--surface:#fff;--ink:#1b1b1f;--mut:#667085;--line:#dfe3ec;--navy:#1f3a8a;--red:#d92d20;--redbg:#fee4e2;--warn:#b54708;--warnbg:#fef0c7;
+--agent-f:#e3e6ff;--agent-s:#5560e8;--agent-d:#2b34a8;--tool-f:#d9f4e3;--tool-s:#1f9d55;--tool-d:#0f5f33;--user-f:#ffe4d2;--user-s:#e8590c;--user-d:#9c3a05;
+--prop-f:#f3f0ff;--prop-s:#8b6fd6;--prop-d:#4b2fa0;--file-f:#fff4cc;--file-s:#e0a100;--file-d:#7a5600;--gray-f:#eef0f4;--gray-s:#98a2b3;--gray-d:#344054}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0f1117;--surface:#181b23;--ink:#e8eaf0;--mut:#98a2b3;--line:#2c313d;--navy:#27408f;--red:#ff6b5e;--redbg:#40201d;--warn:#fdb022;--warnbg:#3d2e0b;
+--agent-f:#20264f;--agent-s:#7b86ff;--agent-d:#c9ceff;--tool-f:#12392a;--tool-s:#34c07a;--tool-d:#a6e8c4;--user-f:#43220f;--user-s:#ff8a4c;--user-d:#ffd3b8;
+--prop-f:#2a2347;--prop-s:#a58df0;--prop-d:#d8ccff;--file-f:#3d3210;--file-s:#f0bd2a;--file-d:#fbe39a;--gray-f:#262a33;--gray-s:#667085;--gray-d:#d0d5dd}}
+:root[data-theme="dark"]{--bg:#0f1117;--surface:#181b23;--ink:#e8eaf0;--mut:#98a2b3;--line:#2c313d;--navy:#27408f;--red:#ff6b5e;--redbg:#40201d;--warn:#fdb022;--warnbg:#3d2e0b;
+--agent-f:#20264f;--agent-s:#7b86ff;--agent-d:#c9ceff;--tool-f:#12392a;--tool-s:#34c07a;--tool-d:#a6e8c4;--user-f:#43220f;--user-s:#ff8a4c;--user-d:#ffd3b8;
+--prop-f:#2a2347;--prop-s:#a58df0;--prop-d:#d8ccff;--file-f:#3d3210;--file-s:#f0bd2a;--file-d:#fbe39a;--gray-f:#262a33;--gray-s:#667085;--gray-d:#d0d5dd}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:"Heebo","Noto Sans Hebrew",Arial,sans-serif;font-size:15px;line-height:1.5}
+.wrap{max-width:980px;margin:0 auto;padding:16px}
+header{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between;margin-bottom:10px}
+h1{font-size:22px;margin:0}.sub{color:var(--mut);font-size:13px}
+button{font:inherit;cursor:pointer;border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:10px;padding:6px 12px}
+button:hover{border-color:var(--agent-s)}button[aria-pressed="true"],button.on{background:var(--agent-s);color:#fff;border-color:var(--agent-s)}
+.kpis{display:flex;flex-wrap:wrap;gap:8px;margin:8px 0 14px}
+.kpi{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:6px 12px;font-size:13px}.kpi b{font-size:18px;display:block}
+.tabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px}
+.tabs button{border-radius:999px}
+section.tab{display:none}section.tab.on{display:block}
+.chip{display:inline-block;border:1px solid var(--gray-s);background:var(--gray-f);color:var(--gray-d);border-radius:999px;padding:1px 10px;font-size:12px;margin:2px 0 2px 6px;white-space:nowrap}
+.chip.mono{font-family:ui-monospace,Menlo,Consolas,monospace;direction:ltr;unicode-bidi:isolate;font-size:11.5px}
+.chip.agent{background:var(--agent-f);border-color:var(--agent-s);color:var(--agent-d)}.chip.tool{background:var(--surface);border-color:var(--tool-s);color:var(--tool-d)}
+.chip.file{background:var(--file-f);border-color:var(--file-s);color:var(--file-d)}.chip.prop{background:var(--prop-f);border-color:var(--prop-s);color:var(--prop-d)}
+.chip.warn{background:var(--warnbg);border-color:var(--warn);color:var(--warn)}.chip.bad{background:var(--redbg);border-color:var(--red);color:var(--red)}
+.chip.user{background:var(--user-f);border-color:var(--user-s);color:var(--user-d)}
+.chip[data-ref]{cursor:pointer}.chip.hl{outline:2px solid var(--red);outline-offset:1px}
+.orch{background:var(--navy);color:#fff;border-radius:14px;padding:12px 16px}.orch b{font-size:16px}.orch p{margin:4px 0 0;color:#cfd9ff;font-size:13px}
+.ctl{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:0 0 12px}.ctl .sp{flex:1}
+.conn{height:26px;display:flex;justify-content:center;align-items:flex-end}.conn i{display:block;width:0;height:100%;border-inline-start:2.5px solid var(--mut);position:relative}
+.conn i::after{content:"";position:absolute;bottom:-1px;inset-inline-start:-7px;border:6px solid transparent;border-top:8px solid var(--mut);border-bottom:0}
+.step{border:2px solid var(--k-s);background:var(--k-f);border-radius:14px;padding:12px 14px;transition:opacity .2s}
+.step.k-tool{--k-s:var(--tool-s);--k-f:var(--tool-f);--k-d:var(--tool-d)}.step.k-agent{--k-s:var(--agent-s);--k-f:var(--agent-f);--k-d:var(--agent-d)}.step.k-user{--k-s:var(--user-s);--k-f:var(--user-f);--k-d:var(--user-d)}
+.step.proposed{border-style:dashed;--k-s:var(--prop-s);--k-f:var(--prop-f);--k-d:var(--prop-d)}
+.step.dim{opacity:.3}.step.active{box-shadow:0 0 0 3px var(--k-s)}
+.step h3{margin:0 0 2px;font-size:17px;color:var(--k-d)}.step p{margin:2px 0 6px;font-size:14px}
+.num{display:inline-flex;width:26px;height:26px;border-radius:50%;background:var(--k-s);color:#fff;align-items:center;justify-content:center;font-weight:700;font-size:14px;margin-inline-start:8px}
+.row{margin:4px 0}.row .lab{font-size:12px;font-weight:700;color:var(--mut);margin-inline-end:6px}
+.agents2{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:10px;margin-top:6px}
+.mini{background:var(--surface);border:1px solid var(--k-s);border-radius:12px;padding:8px 10px}.mini b{color:var(--k-d)}
+.loop{margin:4px 0;padding:6px 12px;border:2px dashed var(--red);background:var(--redbg);color:var(--red);border-radius:10px;font-size:13px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:12px 14px;margin-bottom:10px}
+.card.flash{outline:3px solid var(--red)}.card h3{margin:0;font-size:16px}.card .d{color:var(--mut);font-size:13px;margin:4px 0}
+.card.prop{border-style:dashed;border-color:var(--prop-s)}
+table{width:100%;border-collapse:collapse;background:var(--surface);border:1px solid var(--line);border-radius:12px;overflow:hidden;font-size:13.5px}
+th,td{padding:7px 10px;border-bottom:1px solid var(--line);text-align:start;vertical-align:top}th{background:var(--gray-f);color:var(--gray-d)}
+tr.flash td{background:var(--warnbg)}
+input[type=search]{font:inherit;padding:7px 12px;border:1px solid var(--line);border-radius:10px;background:var(--surface);color:var(--ink);width:100%;max-width:340px;margin-bottom:10px}
+.sev{display:flex;gap:8px;align-items:flex-start;padding:8px 0;border-bottom:1px solid var(--line)}
+ul.h{margin:6px 0;padding-inline-start:18px;font-size:13.5px}
+footer{color:var(--mut);font-size:12px;margin-top:18px;border-top:1px solid var(--line);padding-top:8px}
+.legend{display:flex;flex-wrap:wrap;gap:10px;font-size:12px;color:var(--mut);margin:10px 0}.legend i{display:inline-block;width:12px;height:12px;border-radius:3px;margin-inline-end:4px;vertical-align:-1px}
+@media (max-width:560px){h1{font-size:18px}.wrap{padding:12px}}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header><div><h1 id="ttl"></h1><div class="sub" id="sub"></div></div><button id="theme" aria-label="החלפת ערכת נושא">◐ ערכת נושא</button></header>
+<div class="kpis" id="kpis"></div>
+<nav class="tabs" role="tablist" id="tabs"></nav>
+<section class="tab" id="t-flow"></section>
+<section class="tab" id="t-agents"></section>
+<section class="tab" id="t-tools"></section>
+<section class="tab" id="t-rules"></section>
+<section class="tab" id="t-health"></section>
+<footer id="foot"></footer>
+</div>
+<script>
+const D = {"scan":{"scannedAt":"2026-11-10T11:29:53.725Z","root":"ssis-business-logic-explorer","scriptDirs":["tools","scripts"],"counts":{"agents":4,"skills":0,"commands":0,"hooks":0,"mcpServers":0,"scripts":18,"rulesFiles":2},"rules":[{"path":"CLAUDE.md","lines":36,"headings":[{"level":1,"text":"SSIS Business-Logic Explorer — Working Rules","line":1},{"level":2,"text":"Layout","line":7},{"level":2,"text":"Focus (user direction, 2026-11-05)","line":14},{"level":2,"text":"Rules","line":20}],"numberedItems":15,"scriptRefs":["mapping-audit.mjs","dtsx-extract.mjs","lineage.mjs"]},{"path":"HANDOFF.md","lines":57,"headings":[{"level":1,"text":"HANDOFF – איפה עצרנו ואיך ממשיכים","line":1},{"level":2,"text":"הקמה במחשב חדש","line":5},{"level":2,"text":"מצב העבודה","line":25},{"level":2,"text":"המשימות הבאות, לפי הסדר","line":31},{"level":2,"text":"החלטות של המשתמש שחשוב לזכור","line":43},{"level":2,"text":"מבנה (קצר)","line":51}],"numberedItems":9,"scriptRefs":["batch-prep.mjs","build-html.mjs","serve.mjs","logic-audit.mjs","mapping-audit.mjs","logic-claims.mjs"]}],"agents":[{"file":".claude/agents/ssis-business-logic.md","name":"ssis-business-logic","description":"Expert in extracting the BUSINESS logic of an SSIS (DTSX) package (populations, decisions, matching rules, what gets created/updated in CRM and when), ignoring ETL plumbing. Produces Hebrew business descriptions backed by evidence. Use to describe what a package does.","tools":["Read","Grep","Glob","Bash","Write"],"model":null,"skills":[],"bodyLines":54,"readsRules":["CLAUDE.md"],"mentionedFiles":["analysis/\u003cpkg>/dupes.json"],"scripts":["survey.mjs","component.mjs"],"missingScripts":[]},{"file":".claude/agents/ssis-field-lineage.md","name":"ssis-field-lineage","description":"Expert in SSIS (DTSX) field-level lineage into Dynamics CRM. Given a package and a set of data flows, resolves every script/SQL hop and maps each CRM attribute written to the exact source-file fields (and back), with every manipulation and line-level evidence. Use for file→CRM field mapping work.","tools":["Read","Grep","Glob","Bash","Write"],"model":null,"skills":[],"bodyLines":66,"readsRules":["CLAUDE.md"],"mentionedFiles":["analysis/\u003cpkg>/dupes.json"],"scripts":["component.mjs","origins.mjs","claims.mjs"],"missingScripts":[]},{"file":".claude/agents/ssis-ui-designer.md","name":"ssis-ui-designer","description":"UI/visual designer for the SSIS Explorer HTML (tools/template.html + tools/theme.css). Improves look, hierarchy and usability WITHOUT changing data, wording of facts, or behaviour. Use for any visual/UX change to the explorer.","tools":["Read","Grep","Glob","Bash","Edit","Write"],"model":null,"skills":[],"bodyLines":28,"readsRules":["CLAUDE.md"],"mentionedFiles":[],"scripts":["build-html.mjs"],"missingScripts":[]},{"file":".claude/agents/ssis-verifier.md","name":"ssis-verifier","description":"Independent adversarial verifier for SSIS→CRM field mappings and business-logic claims. Tries to refute each claim against the raw DTSX and code; reports confirmed/wrong/missing with exact evidence. Never edits analysis files.","tools":["Read","Grep","Glob","Bash","Write"],"model":null,"skills":[],"bodyLines":23,"readsRules":["CLAUDE.md"],"mentionedFiles":[],"scripts":["component.mjs","origins.mjs","claims.mjs","claimid.mjs"],"missingScripts":[]}],"skills":[],"commands":[],"hooks":[],"mcpServers":[],"launch":[{"name":"explorer","command":"node tools/serve.mjs","port":8765,"scripts":["serve.mjs"]}],"scripts":[{"name":"batch-prep.mjs","path":"tools/batch-prep.mjs","lines":29,"description":"Deterministic preparation for every package in a folder: extract → lineage → dupes → survey,","descriptionLines":["Deterministic preparation for every package in a folder: extract → lineage → dupes → survey,","then a one-line inventory per package (coverage, file sources, CRM writers) → reports/inventory.json","Usage: node tools/batch-prep.mjs source/DailyProcess [skip-pkg ...]"],"documented":true,"usedBy":{"agents":[],"skills":[],"commands":[],"hooks":[],"launch":[],"rules":["HANDOFF.md"],"scripts":[]}},{"name":"build-html.mjs","path":"tools/build-html.mjs","lines":54,"description":"Build the standalone explorer HTML from evidence + analysis (no network, data embedded).","descriptionLines":["Build the standalone explorer HTML from evidence + analysis (no network, data embedded).","Usage: node tools/build-html.mjs \u003cout.html> \u003cpkg> [\u003cpkg> ...]"],"documented":true,"usedBy":{"agents":["ssis-ui-designer"],"skills":[],"commands":[],"hooks":[],"launch":[],"rules":["HANDOFF.md"],"scripts":[]}},{"name":"claimid.mjs","path":"tools/claimid.mjs","lines":54,"description":"Stable claim IDs for composed CRM write targets, and deterministic matching of verifier results to targets.","descriptionLines":["Stable claim IDs for composed CRM write targets, and deterministic matching of verifier results to targets.","Canonical ID: \"\u003cwriter component name>|\u003centity>|\u003cverb>|\u003cattribute>\".","When two writers in one package share that base (same component name in different data flows), the"],"documented":true,"usedBy":{"agents":["ssis-verifier"],"skills":[],"commands":[],"hooks":[],"launch":[],"rules":[],"scripts":["build-html.mjs","claims.mjs","mapping-audit.mjs"]}},{"name":"claims.mjs","path":"tools/claims.mjs","lines":37,"description":"List the composed mapping claims (from analysis/\u003cpkg>/fieldmap.json) that came from one analyst file,","descriptionLines":["List the composed mapping claims (from analysis/\u003cpkg>/fieldmap.json) that came from one analyst file,","each with a stable claim id, its file-field sources (value / influence) and the full chain of steps.","Usage: node tools/claims.mjs \u003cpkg> \u003cmapping-X.json> [--fields]   (--fields: list file fields whose disposition needs checking)"],"documented":true,"usedBy":{"agents":["ssis-field-lineage","ssis-verifier"],"skills":[],"commands":[],"hooks":[],"launch":[],"rules":[],"scripts":["claimid.mjs"]}},{"name":"component.mjs","path":"tools/component.mjs","lines":43,"description":"Print everything an analyst needs about ONE component: class, connections, key properties,","descriptionLines":["Print everything an analyst needs about ONE component: class, connections, key properties,","inputs (with Row.\u003cprop> names), outputs (with buffer prop names), expressions, SQL, and user","C# source with line numbers (template help regions removed; line numbers are the file's own)."],"documented":true,"usedBy":{"agents":["ssis-business-logic","ssis-field-lineage","ssis-verifier"],"skills":[],"commands":[],"hooks":[],"launch":[],"rules":[],"scripts":[]}},{"name":"compose.mjs","path":"tools/compose.mjs","lines":126,"description":"Compose the final file↔CRM field mapping for a package.","descriptionLines":["Compose the final file↔CRM field mapping for a package.","1) gathers analyst scriptOutputs from analysis/\u003cpkg>/mapping-*.json → analysis/\u003cpkg>/resolutions.json","2) re-runs tools/lineage.mjs with the resolutions"],"documented":true,"usedBy":{"agents":[],"skills":[],"commands":[],"hooks":[],"launch":[],"rules":[],"scripts":["build-html.mjs"]}},{"name":"dtsx-extract.mjs","path":"tools/dtsx-extract.mjs","lines":339,"description":"Deterministic DTSX evidence extractor.","descriptionLines":["Deterministic DTSX evidence extractor.","Usage: node tools/dtsx-extract.mjs \u003cfile.dtsx> \u003cout.json> [relativePathRoot]","Produces facts only (no interpretation). Every object carries refId + line."],"documented":true,"usedBy":{"agents":[],"skills":[],"commands":[],"hooks":[],"launch":[],"rules":["CLAUDE.md"],"scripts":["batch-prep.mjs","build-html.mjs"]}},{"name":"dupes.mjs","path":"tools/dupes.mjs","lines":30,"description":"Groups script components / OLE DB commands whose user code or SQL is byte-identical (after","descriptionLines":["Groups script components / OLE DB commands whose user code or SQL is byte-identical (after","whitespace normalisation), within the same data flow. Proves \"copy N is identical to copy 1\"","so analysts can analyse one representative. Also reports input-column-list equality."],"documented":true,"usedBy":{"agents":[],"skills":[],"commands":[],"hooks":[],"launch":[],"rules":[],"scripts":["batch-prep.mjs"]}},{"name":"evidence-summary.mjs","path":"tools/evidence-summary.mjs","lines":28,"description":"Prints a compact text summary of an evidence JSON (for review; no interpretation).","descriptionLines":["Prints a compact text summary of an evidence JSON (for review; no interpretation)."],"documented":true,"usedBy":{"agents":[],"skills":[],"commands":[],"hooks":[],"launch":[],"rules":[],"scripts":[]}},{"name":"lineage.mjs","path":"tools/lineage.mjs","lines":417,"description":"Deterministic column-lineage graph over an evidence JSON.","descriptionLines":["Deterministic column-lineage graph over an evidence JSON.","Usage: node tools/lineage.mjs evidence/\u003cpkg>.json lineage/\u003cpkg>.lineage.json","Every edge carries {kind, component, evidence}. Edges the tool cannot prove are emitted as"],"documented":true,"usedBy":{"agents":[],"skills":[],"commands":[],"hooks":[],"launch":[],"rules":["CLAUDE.md"],"scripts":["batch-prep.mjs","build-html.mjs","compose.mjs"]}},{"name":"logic-audit.mjs","path":"tools/logic-audit.mjs","lines":44,"description":"Audit of the business-logic descriptions: every claim produced by tools/logic-claims.mjs must carry an independent","descriptionLines":["Audit of the business-logic descriptions: every claim produced by tools/logic-claims.mjs must carry an independent","verdict (analysis/\u003cpkg>/verify-L*.json) that is CONFIRMED or FIXED AND whose hash equals the claim's current hash","(i.e. the text shown is exactly the text that was verified). Later verify files override earlier ones for the same id"],"documented":true,"usedBy":{"agents":[],"skills":[],"commands":[],"hooks":[],"launch":[],"rules":["HANDOFF.md"],"scripts":["build-html.mjs","logic-claims.mjs"]}},{"name":"logic-claims.mjs","path":"tools/logic-claims.mjs","lines":115,"description":"Splits a package's business-logic analysis (analysis/\u003cpkg>/logic.json) into verifiable claims with STABLE ids.","descriptionLines":["Splits a package's business-logic analysis (analysis/\u003cpkg>/logic.json) into verifiable claims with STABLE ids.","Every text unit shown in the explorer belongs to exactly one claim. Units inside a claim are numbered [n] so a","verifier can point at the exact sentence that is wrong."],"documented":true,"usedBy":{"agents":[],"skills":[],"commands":[],"hooks":[],"launch":[],"rules":["HANDOFF.md"],"scripts":["build-html.mjs","logic-audit.mjs"]}},{"name":"mapping-audit.mjs","path":"tools/mapping-audit.mjs","lines":53,"description":"Audit of the single file→CRM relation (\"the file field's value enters this CRM field\") for every package.","descriptionLines":["Audit of the single file→CRM relation (\"the file field's value enters this CRM field\") for every package.","Checks, per package that reads a file:","1. both directions agree: pairs seen from the file side (sources[].crm, role value) == pairs seen from the CRM side (targets[].valueSources)"],"documented":true,"usedBy":{"agents":[],"skills":[],"commands":[],"hooks":[],"launch":[],"rules":["CLAUDE.md","HANDOFF.md"],"scripts":[]}},{"name":"origins.mjs","path":"tools/origins.mjs","lines":29,"description":"Print the backward origin tree of each input of a write component (from lineage JSON).","descriptionLines":["Print the backward origin tree of each input of a write component (from lineage JSON).","Usage: node tools/origins.mjs lineage/\u003cpkg>.lineage.json \"\u003ccomponent name suffix>\" [maxDepth]"],"documented":true,"usedBy":{"agents":["ssis-field-lineage","ssis-verifier"],"skills":[],"commands":[],"hooks":[],"launch":[],"rules":[],"scripts":[]}},{"name":"recheck.mjs","path":"tools/recheck.mjs","lines":19,"description":"For every non-CONFIRMED verifier result, show what the CURRENT composed fieldmap says,","descriptionLines":["For every non-CONFIRMED verifier result, show what the CURRENT composed fieldmap says,","so tool fixes can be separated from analyst fixes. Usage: node tools/recheck.mjs \u003cpkg>"],"documented":true,"usedBy":{"agents":[],"skills":[],"commands":[],"hooks":[],"launch":[],"rules":[],"scripts":[]}},{"name":"scratch-bw.mjs","path":"tools/scratch-bw.mjs","lines":15,"description":"Inspect BufferWrapper property→index layout for a script component (dev helper).","descriptionLines":["Inspect BufferWrapper property→index layout for a script component (dev helper)."],"documented":true,"usedBy":{"agents":[],"skills":[],"commands":[],"hooks":[],"launch":[],"rules":[],"scripts":[]}},{"name":"serve.mjs","path":"tools/serve.mjs","lines":11,"description":"Minimal static server for previewing out/ (localhost only).","descriptionLines":["Minimal static server for previewing out/ (localhost only)."],"documented":true,"usedBy":{"agents":[],"skills":[],"commands":[],"hooks":[],"launch":["explorer"],"rules":["HANDOFF.md"],"scripts":[]}},{"name":"survey.mjs","path":"tools/survey.mjs","lines":25,"description":"Compact structural survey of an evidence JSON (control flow, data flows, SQL, write candidates).","descriptionLines":["Compact structural survey of an evidence JSON (control flow, data flows, SQL, write candidates)."],"documented":true,"usedBy":{"agents":["ssis-business-logic"],"skills":[],"commands":[],"hooks":[],"launch":[],"rules":[],"scripts":["batch-prep.mjs"]}}],"manifest":{"title":"ארכיטקטורת הסוכנים: SSIS Business-Logic Explorer","orchestrator":{"title":"סשן ראשי = המתזמר (ראש הצוות)","text":"קורא CLAUDE.md ו-HANDOFF.md, מריץ כלים דרך Bash, מעביר משימות לסוכנים דרך כלי Agent. לעולם לא מאשר בעצמו את העבודה."},"steps":[{"id":"1","kind":"tool","title":"חילוץ דטרמיניסטי","text":"מפיק evidence ושושלת עמודות מה-DTSX, ובודק שכל ספירה שווה ל-XML. בלי מודל.","scripts":["batch-prep.mjs","dtsx-extract.mjs","lineage.mjs","dupes.mjs","survey.mjs"],"outputs":["evidence/\u003cpkg>.json","lineage/\u003cpkg>.lineage.json","reports/inventory.json"]},{"id":"2","kind":"agent","parallel":true,"title":"פירוש: לוגיקה עסקית ומיפוי שדות","text":"שני סוכנים במקביל: אחד כותב תיאור עסקי בעברית, השני ממפה שדה בקובץ לשדה ב-CRM.","agents":["ssis-business-logic","ssis-field-lineage"],"uses":{"ssis-business-logic":["survey.mjs","component.mjs"],"ssis-field-lineage":["component.mjs","origins.mjs"]},"outputs":["analysis/\u003cpkg>/logic.json","analysis/\u003cpkg>/mapping-*.json"]},{"id":"3","kind":"tool","title":"הרכבה ופירוק לטענות","text":"מחבר מיפוי לשושלת הדטרמיניסטית, ומפרק כל משפט לטענה עם מזהה קבוע ו-hash.","scripts":["compose.mjs","logic-claims.mjs","claims.mjs","claimid.mjs"],"outputs":["analysis/\u003cpkg>/fieldmap.json"]},{"id":"4","kind":"agent","title":"אימות עצמאי","text":"בודק שלא כתב את הניתוח מנסה להפריך כל טענה מול ה-DTSX הגולמי, ומחפש גם מה שהוחמץ.","agents":["ssis-verifier"],"uses":{"ssis-verifier":["claims.mjs","logic-claims.mjs","component.mjs","origins.mjs"]},"outputs":["analysis/\u003cpkg>/verify-*.json"]},{"id":"5","kind":"agent","proposed":true,"title":"תיקון (מוצע, עוד לא קיים)","text":"מתקן רק טענות שסומנו שגויות או ישנות, ורושם ביומן. היום זו הנחיה חד-פעמית בכל פעם.","agents":["ssis-fixer"],"outputs":["analysis/\u003cpkg>/fixlog-L.json"]},{"id":"6","kind":"tool","title":"ביקורת ובנייה","text":"טענה מאומתת רק אם ה-hash של הפסיקה זהה לטקסט הנוכחי. אחר כך בונים את הסייר.","scripts":["logic-audit.mjs","mapping-audit.mjs","build-html.mjs","serve.mjs"],"outputs":["out/ssis-explorer.html"]},{"id":"★","kind":"agent","onDemand":true,"title":"עיצוב (לפי דרישה)","text":"משפר מראה ו-UX בלבד. לא נוגע בנתונים, במספרים או במשמעות הטקסט.","agents":["ssis-ui-designer"],"uses":{"ssis-ui-designer":["build-html.mjs"]},"outputs":["tools/theme.css","tools/template.html"]},{"id":"7","kind":"user","title":"בדיקה ואישור","text":"Claude קובע רק technicalVerification. reviewDecision נשאר pending עד שהמשתמש מחליט."}],"loops":[{"from":"6","to":"4","label":"טענה שגויה או ישנה: מתקנים ובודקים שוב (עד 2 סבבים, אחרת נשארת 'לא אומת')"}]},"health":[{"severity":"info","code":"agent-no-model","subject":"ssis-business-logic","message":"No model set (inherits the default)"},{"severity":"info","code":"agent-no-model","subject":"ssis-field-lineage","message":"No model set (inherits the default)"},{"severity":"info","code":"agent-no-model","subject":"ssis-ui-designer","message":"No model set (inherits the default)"},{"severity":"info","code":"agent-no-model","subject":"ssis-verifier","message":"No model set (inherits the default)"},{"severity":"info","code":"script-unreferenced","subject":"tools/evidence-summary.mjs","message":"Not referenced by any agent, skill, command, hook, rules file or other script"},{"severity":"info","code":"script-unreferenced","subject":"tools/recheck.mjs","message":"Not referenced by any agent, skill, command, hook, rules file or other script"},{"severity":"info","code":"script-unreferenced","subject":"tools/scratch-bw.mjs","message":"Not referenced by any agent, skill, command, hook, rules file or other script"},{"severity":"info","code":"agent-script-not-in-flow","subject":"ssis-field-lineage","message":"ssis-field-lineage's definition mentions claims.mjs, which the flow does not list for it"},{"severity":"medium","code":"flow-script-not-in-agent","subject":"ssis-verifier","message":"The flow says ssis-verifier uses logic-claims.mjs, but its definition file never mentions it"},{"severity":"info","code":"agent-script-not-in-flow","subject":"ssis-verifier","message":"ssis-verifier's definition mentions claimid.mjs, which the flow does not list for it"}]},"manifest":{"title":"ארכיטקטורת הסוכנים: SSIS Business-Logic Explorer","orchestrator":{"title":"סשן ראשי = המתזמר (ראש הצוות)","text":"קורא CLAUDE.md ו-HANDOFF.md, מריץ כלים דרך Bash, מעביר משימות לסוכנים דרך כלי Agent. לעולם לא מאשר בעצמו את העבודה."},"steps":[{"id":"1","kind":"tool","title":"חילוץ דטרמיניסטי","text":"מפיק evidence ושושלת עמודות מה-DTSX, ובודק שכל ספירה שווה ל-XML. בלי מודל.","scripts":["batch-prep.mjs","dtsx-extract.mjs","lineage.mjs","dupes.mjs","survey.mjs"],"outputs":["evidence/\u003cpkg>.json","lineage/\u003cpkg>.lineage.json","reports/inventory.json"]},{"id":"2","kind":"agent","parallel":true,"title":"פירוש: לוגיקה עסקית ומיפוי שדות","text":"שני סוכנים במקביל: אחד כותב תיאור עסקי בעברית, השני ממפה שדה בקובץ לשדה ב-CRM.","agents":["ssis-business-logic","ssis-field-lineage"],"uses":{"ssis-business-logic":["survey.mjs","component.mjs"],"ssis-field-lineage":["component.mjs","origins.mjs"]},"outputs":["analysis/\u003cpkg>/logic.json","analysis/\u003cpkg>/mapping-*.json"]},{"id":"3","kind":"tool","title":"הרכבה ופירוק לטענות","text":"מחבר מיפוי לשושלת הדטרמיניסטית, ומפרק כל משפט לטענה עם מזהה קבוע ו-hash.","scripts":["compose.mjs","logic-claims.mjs","claims.mjs","claimid.mjs"],"outputs":["analysis/\u003cpkg>/fieldmap.json"]},{"id":"4","kind":"agent","title":"אימות עצמאי","text":"בודק שלא כתב את הניתוח מנסה להפריך כל טענה מול ה-DTSX הגולמי, ומחפש גם מה שהוחמץ.","agents":["ssis-verifier"],"uses":{"ssis-verifier":["claims.mjs","logic-claims.mjs","component.mjs","origins.mjs"]},"outputs":["analysis/\u003cpkg>/verify-*.json"]},{"id":"5","kind":"agent","proposed":true,"title":"תיקון (מוצע, עוד לא קיים)","text":"מתקן רק טענות שסומנו שגויות או ישנות, ורושם ביומן. היום זו הנחיה חד-פעמית בכל פעם.","agents":["ssis-fixer"],"outputs":["analysis/\u003cpkg>/fixlog-L.json"]},{"id":"6","kind":"tool","title":"ביקורת ובנייה","text":"טענה מאומתת רק אם ה-hash של הפסיקה זהה לטקסט הנוכחי. אחר כך בונים את הסייר.","scripts":["logic-audit.mjs","mapping-audit.mjs","build-html.mjs","serve.mjs"],"outputs":["out/ssis-explorer.html"]},{"id":"★","kind":"agent","onDemand":true,"title":"עיצוב (לפי דרישה)","text":"משפר מראה ו-UX בלבד. לא נוגע בנתונים, במספרים או במשמעות הטקסט.","agents":["ssis-ui-designer"],"uses":{"ssis-ui-designer":["build-html.mjs"]},"outputs":["tools/theme.css","tools/template.html"]},{"id":"7","kind":"user","title":"בדיקה ואישור","text":"Claude קובע רק technicalVerification. reviewDecision נשאר pending עד שהמשתמש מחליט."}],"loops":[{"from":"6","to":"4","label":"טענה שגויה או ישנה: מתקנים ובודקים שוב (עד 2 סבבים, אחרת נשארת 'לא אומת')"}]}};
+const S = D.scan, M = D.manifest || { steps: [], loops: [] };
+const $ = (id) => document.getElementById(id);
+const el = (tag, cls, text, attrs) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; if (attrs) for (const k in attrs) e.setAttribute(k, attrs[k]); return e; };
+const chip = (text, cls, ref, title) => { const c = el('span', 'chip ' + (cls || ''), text); if (ref) { c.dataset.ref = ref; c.addEventListener('mouseenter', () => hl(ref)); c.addEventListener('mouseleave', () => hl(null)); c.addEventListener('click', () => jump(ref)); } if (title) c.title = title; return c; };
+const scriptDesc = (n) => { const s = S.scripts.find((x) => x.name === n); return s && s.description ? s.description : null; };
+const agentOf = (n) => S.agents.find((a) => a.name === n);
+
+// ---- header ----
+$('ttl').textContent = M.title || S.root;
+$('sub').textContent = 'פרויקט: ' + S.root + ' · נסרק ' + S.scannedAt.slice(0, 16).replace('T', ' ') + ' UTC';
+const sev = (s) => S.health.filter((h) => h.severity === s).length;
+[['סוכנים', S.counts.agents], ['סקילים', S.counts.skills], ['Hooks', S.counts.hooks], ['כלי פרויקט', S.counts.scripts], ['קבצי חוקים', S.counts.rulesFiles], ['ממצאי בריאות', S.health.length]].forEach(([l, v]) => { const k = el('div', 'kpi'); k.append(el('b', '', v), l); $('kpis').append(k); });
+
+// ---- tabs ----
+const TABS = [['flow', 'זרימה'], ['agents', 'סוכנים'], ['tools', 'כלים'], ['rules', 'חוקים'], ['health', 'בריאות (' + S.health.length + ')']];
+function show(id) { TABS.forEach(([k]) => { $('t-' + k).classList.toggle('on', k === id); const b = $('b-' + k); b.setAttribute('aria-selected', k === id); b.classList.toggle('on', k === id); }); try { history.replaceState(null, '', '#' + id); } catch (e) { } }
+TABS.forEach(([k, l]) => { const b = el('button', '', l, { id: 'b-' + k, role: 'tab' }); b.addEventListener('click', () => show(k)); $('tabs').append(b); });
+
+// ---- highlight and jump ----
+function hl(ref) {
+  document.querySelectorAll('.chip.hl').forEach((c) => c.classList.remove('hl'));
+  document.querySelectorAll('.step').forEach((s) => s.classList.remove('dim'));
+  if (!ref) return;
+  document.querySelectorAll('.chip[data-ref="' + ref + '"]').forEach((c) => c.classList.add('hl'));
+  document.querySelectorAll('#t-flow .step').forEach((s) => { if (!s.querySelector('.chip[data-ref="' + ref + '"]')) s.classList.add('dim'); });
+}
+function jump(ref) {
+  const [type, name] = ref.split(':');
+  const tab = type === 'agent' ? 'agents' : 'tools'; show(tab);
+  const t = document.querySelector('#t-' + tab + ' [data-key="' + name + '"]');
+  if (t) { t.scrollIntoView({ behavior: 'smooth', block: 'center' }); t.classList.add('flash'); setTimeout(() => t.classList.remove('flash'), 1800); }
+}
+
+// ---- flow ----
+const KIND = { tool: 'כלי קוד', agent: 'סוכן', user: 'אתה' };
+const flow = $('t-flow');
+const ctl = el('div', 'ctl');
+const bPrev = el('button', '', '◀ הקודם'), bNext = el('button', '', 'הבא ▶'), bPlay = el('button', '', '▶▶ הרצה'), bAll = el('button', 'on', 'הצג הכול');
+const hint = el('span', 'sub', 'ריחוף על שם סוכן או כלי מדגיש את כל השלבים שבהם הוא מופיע');
+ctl.append(bPrev, bNext, bPlay, bAll, el('span', 'sp'), hint); flow.append(ctl);
+const lg = el('div', 'legend'); [['agent', 'סוכן (מודל)'], ['tool', 'כלי קוד'], ['file', 'קובץ פלט'], ['prop', 'מוצע, עוד לא קיים'], ['user', 'אתה']].forEach(([k, l]) => { const s = el('span'); const i = el('i'); i.style.background = 'var(--' + k + '-s)'; s.append(i, l); lg.append(s); }); flow.append(lg);
+if (M.orchestrator) { const o = el('div', 'orch'); o.append(el('b', '', M.orchestrator.title), el('p', '', M.orchestrator.text)); flow.append(o); }
+const steps = [];
+M.steps.forEach((st, i) => {
+  const cn = el('div', 'conn'); cn.append(el('i')); flow.append(cn);
+  const box = el('div', 'step k-' + st.kind + (st.proposed ? ' proposed' : ''), null, { 'data-step': i });
+  const h = el('h3'); h.append(el('span', 'num', st.id), st.title);
+  if (st.proposed) h.append(chip('מוצע', 'prop')); if (st.onDemand) h.append(chip('לפי דרישה', 'user')); if (st.parallel) h.append(chip('במקביל', 'agent')); h.append(chip(KIND[st.kind], st.kind));
+  box.append(h, el('p', '', st.text));
+  if (st.agents && st.agents.length) {
+    const g = el('div', 'agents2');
+    st.agents.forEach((n) => {
+      const a = agentOf(n), m = el('div', 'mini');
+      m.append(chip(n, 'agent mono', 'agent:' + n));
+      if (a) { m.append(chip(a.model ? 'מודל: ' + a.model : 'מודל לא מוגדר', a.model ? '' : 'warn')); const r = el('div', 'row'); r.append(el('span', 'lab', 'כלי Claude Code:')); a.tools.forEach((t) => r.append(chip(t, 'mono'))); m.append(r); }
+      else m.append(chip('אין קובץ הגדרה', 'bad'));
+      const u = (st.uses || {})[n]; if (u && u.length) { const r = el('div', 'row'); r.append(el('span', 'lab', 'כלי פרויקט:')); u.forEach((s) => r.append(chip(s, 'tool mono', 'script:' + s, scriptDesc(s)))); m.append(r); }
+      g.append(m);
+    });
+    box.append(g);
+  }
+  if (st.scripts && st.scripts.length) { const r = el('div', 'row'); r.append(el('span', 'lab', 'כלי פרויקט:')); st.scripts.forEach((s) => r.append(chip(s, 'tool mono', 'script:' + s, scriptDesc(s)))); box.append(r); }
+  if (st.outputs && st.outputs.length) { const r = el('div', 'row'); r.append(el('span', 'lab', 'פלט:')); st.outputs.forEach((o) => r.append(chip(o, 'file mono'))); box.append(r); }
+  flow.append(box); steps.push(box);
+  (M.loops || []).filter((l) => l.from === st.id).forEach((l) => { const t = M.steps.find((x) => x.id === l.to); flow.append(el('div', 'loop', '↩ חוזר לשלב ' + l.to + (t ? ' (' + t.title + ')' : '') + ': ' + l.label)); });
+});
+let cur = -1, timer = null;
+function setStep(i) { cur = i; steps.forEach((s, k) => { s.classList.toggle('active', k === i); s.classList.toggle('dim', i >= 0 && k !== i); }); bAll.classList.toggle('on', i < 0); if (i >= 0) steps[i].scrollIntoView({ behavior: 'smooth', block: 'center' }); }
+function stop() { if (timer) { clearInterval(timer); timer = null; bPlay.textContent = '▶▶ הרצה'; } }
+bNext.onclick = () => { stop(); setStep(Math.min(steps.length - 1, cur + 1)); };
+bPrev.onclick = () => { stop(); setStep(Math.max(0, cur - 1)); };
+bAll.onclick = () => { stop(); setStep(-1); };
+bPlay.onclick = () => { if (timer) return stop(); bPlay.textContent = '■ עצור'; setStep(0); timer = setInterval(() => { if (cur >= steps.length - 1) return stop(); setStep(cur + 1); }, 1800); };
+const stepsOf = (kind, name) => M.steps.filter((s) => (kind === 'agent' ? (s.agents || []) : (s.scripts || []).concat(Object.values(s.uses || {}).flat())).includes(name)).map((s) => s.id);
+
+// ---- agents ----
+const ag = $('t-agents');
+S.agents.forEach((a) => {
+  const c = el('div', 'card', null, { 'data-key': a.name || a.file }), h = el('h3'); h.append(chip(a.name || a.file, 'agent mono'), a.model ? chip('מודל: ' + a.model) : chip('מודל לא מוגדר', 'warn'));
+  const st = stepsOf('agent', a.name); if (st.length) h.append(chip('שלב ' + st.join(', ')));
+  c.append(h, el('div', 'd', a.description || '(אין תיאור)'));
+  let r = el('div', 'row'); r.append(el('span', 'lab', 'כלי Claude Code:')); (a.tools.length ? a.tools : ['(לא הוגדר: יורש הכול)']).forEach((t) => r.append(chip(t, 'mono'))); c.append(r);
+  if (a.scripts.length) { r = el('div', 'row'); r.append(el('span', 'lab', 'כלי פרויקט שההגדרה מזכירה:')); a.scripts.forEach((s) => r.append(chip(s, 'tool mono', 'script:' + s, scriptDesc(s)))); c.append(r); }
+  if (a.readsRules.length) { r = el('div', 'row'); r.append(el('span', 'lab', 'קורא חוקים:')); a.readsRules.forEach((x) => r.append(chip(x, 'mono'))); c.append(r); }
+  if (a.mentionedFiles.length) { r = el('div', 'row'); r.append(el('span', 'lab', 'קבצים שמוזכרים:')); a.mentionedFiles.forEach((x) => r.append(chip(x, 'file mono'))); c.append(r); }
+  c.append(el('div', 'd', 'קובץ: ' + a.file + ' · ' + a.bodyLines + ' שורות הנחיות'));
+  ag.append(c);
+});
+M.steps.filter((s) => s.proposed).forEach((s) => (s.agents || []).filter((n) => !agentOf(n)).forEach((n) => { const c = el('div', 'card prop', null, { 'data-key': n }), h = el('h3'); h.append(chip(n, 'prop mono'), chip('מוצע, אין קובץ הגדרה', 'prop')); c.append(h, el('div', 'd', s.text)); ag.append(c); }));
+if (!S.agents.length) ag.append(el('div', 'd', 'לא נמצאו סוכנים ב-.claude/agents'));
+
+// ---- tools ----
+const tl = $('t-tools');
+const q = el('input', '', null, { type: 'search', placeholder: 'חיפוש כלי...', 'aria-label': 'חיפוש כלי' }); tl.append(q);
+const tb = el('table'); const th = el('tr'); ['כלי', 'מה הוא עושה (שורה ראשונה בקובץ)', 'בשלב', 'מוזכר על ידי'].forEach((x) => th.append(el('th', '', x))); tb.append(th);
+S.scripts.forEach((s) => {
+  const tr = el('tr', '', null, { 'data-key': s.name }), u = s.usedBy;
+  const by = []; u.agents.forEach((x) => by.push(['agent', x])); u.scripts.length && by.push(['txt', u.scripts.length + ' כלים']); u.rules.forEach((x) => by.push(['txt', x])); u.launch.forEach((x) => by.push(['txt', 'launch:' + x])); u.hooks.forEach((x) => by.push(['txt', 'hook:' + x]));
+  const c1 = el('td'); c1.append(chip(s.name, 'tool mono', 'script:' + s.name)); if (!s.documented) c1.append(chip('ללא תיעוד', 'warn'));
+  const c2 = el('td', '', s.description || '—'), c3 = el('td', '', stepsOf('script', s.name).join(', ') || '—'), c4 = el('td');
+  if (!by.length) c4.append(chip('לא מוזכר באף מקום', 'warn')); by.forEach(([t, x]) => c4.append(t === 'agent' ? chip(x, 'agent mono', 'agent:' + x) : chip(x)));
+  tr.append(c1, c2, c3, c4); tb.append(tr);
+});
+tl.append(tb);
+q.addEventListener('input', () => { const v = q.value.toLowerCase(); tb.querySelectorAll('tr[data-key]').forEach((r) => { r.style.display = r.textContent.toLowerCase().includes(v) ? '' : 'none'; }); });
+tl.append(el('div', 'd', 'הקישורים מבוססים על הזכרת שם קובץ בטקסט. הם מראים מי מזכיר כלי, לא מוכיחים שהוא מופעל.'));
+
+// ---- rules ----
+const ru = $('t-rules');
+S.rules.forEach((r) => { const c = el('div', 'card'), h = el('h3'); h.append(chip(r.path, 'mono'), chip(r.lines + ' שורות'), chip(r.numberedItems + ' סעיפים ממוספרים')); c.append(h); const ul = el('ul', 'h'); r.headings.filter((x) => x.level <= 2).forEach((x) => ul.append(el('li', '', x.text))); c.append(ul); ru.append(c); });
+if (!S.rules.length) ru.append(el('div', 'd', 'לא נמצא CLAUDE.md או AGENTS.md'));
+
+// ---- health ----
+const HE = {
+  'agent-no-model': (h) => 'ל-' + h.subject + ' לא הוגדר מודל (יורש את ברירת המחדל)',
+  'agent-no-description': (h) => 'ל-' + h.subject + ' אין תיאור, ולכן המתזמר לא יודע מתי להשתמש בו',
+  'agent-no-tools': (h) => 'ל-' + h.subject + ' לא הוגדרה רשימת כלים, ולכן הוא יורש את כולם',
+  'agent-no-name': (h) => 'בקובץ ' + h.subject + ' אין שם בכותרת',
+  'agent-long': (h) => h.subject + ': הגדרה ארוכה. כדאי להעביר ידע לסקיל. ' + h.message.match(/\((\d+) lines\)/)?.[0],
+  'agent-missing-script': (h) => h.subject + ' מזכיר כלי שלא קיים: ' + h.message.split(': ')[1],
+  'agent-duplicate-name': (h) => 'שני קבצי סוכן עם אותו שם: ' + h.subject,
+  'script-unreferenced': (h) => h.subject + ' לא מוזכר באף סוכן, סקיל, פקודה, hook, קובץ חוקים או כלי אחר',
+  'script-undocumented': (h) => h.subject + ' ללא שורת תיעוד בראש הקובץ',
+  'flow-script-not-in-agent': (h) => 'הזרימה אומרת ש-' + h.subject + ' משתמש ב-' + (h.message.match(/uses (\S+),/) || [])[1] + ', אבל קובץ ההגדרה שלו לא מזכיר אותו',
+  'agent-script-not-in-flow': (h) => 'ההגדרה של ' + h.subject + ' מזכירה את ' + (h.message.match(/mentions (\S+),/) || [])[1] + ', והזרימה לא מפרטת אותו אצלו',
+  'manifest-unknown-agent': (h) => h.subject + ': ב-architecture.json מופיע סוכן שאין לו קובץ',
+  'manifest-unknown-script': (h) => h.subject + ': ב-architecture.json מופיע כלי שלא קיים',
+  'skill-no-description': (h) => 'לסקיל ' + h.subject + ' אין תיאור, ולכן לא יופעל', 'skill-broken': (h) => 'סקיל ' + h.subject + ': ' + h.message,
+  'hook-no-command': (h) => 'Hook ' + h.subject + ' בלי פקודה', 'settings-invalid-json': (h) => h.subject + ' אינו JSON תקין',
+  'no-rules-file': () => 'לא נמצא CLAUDE.md או AGENTS.md'
+};
+const hh = $('t-health'); const SEV = [['high', 'גבוה', 'bad'], ['medium', 'בינוני', 'warn'], ['info', 'מידע', '']];
+if (!S.health.length) hh.append(el('div', 'd', 'לא נמצאו ממצאים'));
+SEV.forEach(([k, l, cls]) => { const items = S.health.filter((h) => h.severity === k); if (!items.length) return; const c = el('div', 'card'); c.append(el('h3', '', l + ' (' + items.length + ')')); items.forEach((h) => { const r = el('div', 'sev'); r.append(chip(l, cls), el('span', '', (HE[h.code] ? HE[h.code](h) : h.message))); c.append(r); }); hh.append(c); });
+hh.append(el('div', 'd', 'הבדיקות קוראות קבצים בלבד. הן לא בודקות איכות או נכונות של התוכן.'));
+
+// ---- theme + footer ----
+$('theme').onclick = () => { const r = document.documentElement, dark = r.dataset.theme ? r.dataset.theme === 'dark' : matchMedia('(prefers-color-scheme:dark)').matches; r.dataset.theme = dark ? 'light' : 'dark'; };
+$('foot').textContent = 'נוצר מסריקה של קבצי הפרויקט (architecture-explorer). סדר הפעולות והקישור בין שלב לסוכן נקראים מ-.claude/architecture.json, וכל השאר מהקבצים עצמם.';
+show((location.hash || '#flow').slice(1).replace(/[^a-z]/g, '') || 'flow');
+if (!document.getElementById('b-' + (location.hash || '#flow').slice(1))) show('flow');
+</script>
+</body>
+</html>

@@ -137,6 +137,16 @@ if (!rules.length) H('medium', 'no-rules-file', root, 'No CLAUDE.md / AGENTS.md'
 if (manifest) {
   const known = new Set(agents.map((a) => a.name));
   (manifest.steps || []).forEach((st) => (st.agents || []).forEach((n) => { if (!known.has(n) && !(st.proposed)) H('high', 'manifest-unknown-agent', `step ${st.id || st.title || '?'}`, `architecture.json mentions agent "${n}" that has no file`); }));
+  // declared flow vs agent definitions (exact file-name mentions)
+  const agentByName = new Map(agents.map((a) => [a.name, a]));
+  const declared = new Map();
+  (manifest.steps || []).forEach((st) => Object.entries(st.uses || {}).forEach(([an, ss]) => { declared.set(an, new Set([...(declared.get(an) || []), ...ss])); }));
+  (manifest.steps || []).forEach((st) => (st.scripts || []).concat(Object.values(st.uses || {}).flat()).forEach((n) => { if (!scriptByName.has(n)) H('high', 'manifest-unknown-script', `step ${st.id}`, `architecture.json mentions script "${n}" that does not exist`); }));
+  declared.forEach((set, an) => {
+    const a = agentByName.get(an); if (!a) return;
+    set.forEach((s) => { if (!a.scripts.includes(s)) H('medium', 'flow-script-not-in-agent', an, `The flow says ${an} uses ${s}, but its definition file never mentions it`); });
+    a.scripts.forEach((s) => { if (!set.has(s)) H('info', 'agent-script-not-in-flow', an, `${an}'s definition mentions ${s}, which the flow does not list for it`); });
+  });
 }
 
 const out = {
