@@ -79,7 +79,9 @@ const S = D.scan, M = D.manifest || { steps: [], loops: [] };
 const $ = (id) => document.getElementById(id);
 const el = (tag, cls, text, attrs) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; if (attrs) for (const k in attrs) e.setAttribute(k, attrs[k]); return e; };
 const chip = (text, cls, ref, title) => { const c = el('span', 'chip ' + (cls || ''), text); if (ref) { c.dataset.ref = ref; c.addEventListener('mouseenter', () => hl(ref)); c.addEventListener('mouseleave', () => hl(null)); c.addEventListener('click', () => jump(ref)); } if (title) c.title = title; return c; };
-const scriptDesc = (n) => { const s = S.scripts.find((x) => x.name === n); return s && s.description ? s.description : null; };
+const TD = M.descriptions || {};
+const TIPS = { Read: 'קורא קובץ', Grep: 'מחפש טקסט בקבצים', Glob: 'מוצא קבצים לפי שם', Bash: 'מריץ פקודות', Write: 'כותב קובץ חדש', Edit: 'עורך קובץ קיים', Agent: 'מפעיל סוכן' };
+const scriptDesc = (n) => { const he = (TD.scripts || {})[n]; if (he) return he; const s = S.scripts.find((x) => x.name === n); return s && s.description ? s.description : null; };
 const agentOf = (n) => S.agents.find((a) => a.name === n);
 
 // ---- header ----
@@ -129,7 +131,7 @@ M.steps.forEach((st, i) => {
     st.agents.forEach((n) => {
       const a = agentOf(n), m = el('div', 'mini');
       m.append(chip(n, 'agent mono', 'agent:' + n));
-      if (a) { m.append(chip(a.model ? 'מודל: ' + a.model : 'מודל לא מוגדר', a.model ? '' : 'warn')); const r = el('div', 'row'); r.append(el('span', 'lab', 'כלי Claude Code:')); a.tools.forEach((t) => r.append(chip(t, 'mono'))); m.append(r); }
+      if (a) { m.append(chip(a.model ? 'מודל: ' + a.model : 'מודל לא מוגדר', a.model ? '' : 'warn')); const r = el('div', 'row'); r.append(el('span', 'lab', 'כלי Claude Code:')); a.tools.forEach((t) => r.append(chip(t, 'mono', null, TIPS[t]))); m.append(r); }
       else m.append(chip('אין קובץ הגדרה', 'bad'));
       const u = (st.uses || {})[n]; if (u && u.length) { const r = el('div', 'row'); r.append(el('span', 'lab', 'כלי פרויקט:')); u.forEach((s) => r.append(chip(s, 'tool mono', 'script:' + s, scriptDesc(s)))); m.append(r); }
       g.append(m);
@@ -155,8 +157,10 @@ const ag = $('t-agents');
 S.agents.forEach((a) => {
   const c = el('div', 'card', null, { 'data-key': a.name || a.file }), h = el('h3'); h.append(chip(a.name || a.file, 'agent mono'), a.model ? chip('מודל: ' + a.model) : chip('מודל לא מוגדר', 'warn'));
   const st = stepsOf('agent', a.name); if (st.length) h.append(chip('שלב ' + st.join(', ')));
-  c.append(h, el('div', 'd', a.description || '(אין תיאור)'));
-  let r = el('div', 'row'); r.append(el('span', 'lab', 'כלי Claude Code:')); (a.tools.length ? a.tools : ['(לא הוגדר: יורש הכול)']).forEach((t) => r.append(chip(t, 'mono'))); c.append(r);
+  const heA = (TD.agents || {})[a.name];
+  c.append(h, el('div', 'd', heA || a.description || '(אין תיאור)'));
+  if (heA && a.description) { const dt = el('details', 'd'); dt.append(el('summary', '', 'הטקסט המקורי בקובץ ההגדרה (באנגלית)'), el('div', '', a.description)); c.append(dt); }
+  let r = el('div', 'row'); r.append(el('span', 'lab', 'כלי Claude Code:')); (a.tools.length ? a.tools : ['(לא הוגדר: יורש הכול)']).forEach((t) => r.append(chip(t, 'mono', null, TIPS[t]))); c.append(r);
   if (a.scripts.length) { r = el('div', 'row'); r.append(el('span', 'lab', 'כלי פרויקט שההגדרה מזכירה:')); a.scripts.forEach((s) => r.append(chip(s, 'tool mono', 'script:' + s, scriptDesc(s)))); c.append(r); }
   if (a.readsRules.length) { r = el('div', 'row'); r.append(el('span', 'lab', 'קורא חוקים:')); a.readsRules.forEach((x) => r.append(chip(x, 'mono'))); c.append(r); }
   if (a.mentionedFiles.length) { r = el('div', 'row'); r.append(el('span', 'lab', 'קבצים שמוזכרים:')); a.mentionedFiles.forEach((x) => r.append(chip(x, 'file mono'))); c.append(r); }
@@ -169,12 +173,12 @@ if (!S.agents.length) ag.append(el('div', 'd', 'לא נמצאו סוכנים ב-
 // ---- tools ----
 const tl = $('t-tools');
 const q = el('input', '', null, { type: 'search', placeholder: 'חיפוש כלי...', 'aria-label': 'חיפוש כלי' }); tl.append(q);
-const tb = el('table'); const th = el('tr'); ['כלי', 'מה הוא עושה (שורה ראשונה בקובץ)', 'בשלב', 'מוזכר על ידי'].forEach((x) => th.append(el('th', '', x))); tb.append(th);
+const tb = el('table'); const th = el('tr'); ['כלי', 'מה הוא עושה', 'בשלב', 'מוזכר על ידי'].forEach((x) => th.append(el('th', '', x))); tb.append(th);
 S.scripts.forEach((s) => {
   const tr = el('tr', '', null, { 'data-key': s.name }), u = s.usedBy;
   const by = []; u.agents.forEach((x) => by.push(['agent', x])); u.scripts.length && by.push(['txt', u.scripts.length + ' כלים']); u.rules.forEach((x) => by.push(['txt', x])); u.launch.forEach((x) => by.push(['txt', 'launch:' + x])); u.hooks.forEach((x) => by.push(['txt', 'hook:' + x]));
   const c1 = el('td'); c1.append(chip(s.name, 'tool mono', 'script:' + s.name)); if (!s.documented) c1.append(chip('ללא תיעוד', 'warn'));
-  const c2 = el('td', '', s.description || '—'), c3 = el('td', '', stepsOf('script', s.name).join(', ') || '—'), c4 = el('td');
+  const c2 = el('td', '', scriptDesc(s.name) || '—'), c3 = el('td', '', stepsOf('script', s.name).join(', ') || '—'), c4 = el('td');
   if (!by.length) c4.append(chip('לא מוזכר באף מקום', 'warn')); by.forEach(([t, x]) => c4.append(t === 'agent' ? chip(x, 'agent mono', 'agent:' + x) : chip(x)));
   tr.append(c1, c2, c3, c4); tb.append(tr);
 });
@@ -184,7 +188,7 @@ tl.append(el('div', 'd', 'הקישורים מבוססים על הזכרת שם �
 
 // ---- rules ----
 const ru = $('t-rules');
-S.rules.forEach((r) => { const c = el('div', 'card'), h = el('h3'); h.append(chip(r.path, 'mono'), chip(r.lines + ' שורות'), chip(r.numberedItems + ' סעיפים ממוספרים')); c.append(h); const ul = el('ul', 'h'); r.headings.filter((x) => x.level <= 2).forEach((x) => ul.append(el('li', '', x.text))); c.append(ul); ru.append(c); });
+S.rules.forEach((r) => { const c = el('div', 'card'), h = el('h3'); h.append(chip(r.path, 'mono'), chip(r.lines + ' שורות'), chip(r.numberedItems + ' סעיפים ממוספרים')); c.append(h); if ((TD.rules || {})[r.path]) c.append(el('div', 'd', TD.rules[r.path])); const ul = el('ul', 'h'); r.headings.filter((x) => x.level <= 2).forEach((x) => ul.append(el('li', '', (TD.headings || {})[x.text] || x.text))); c.append(ul); ru.append(c); });
 if (!S.rules.length) ru.append(el('div', 'd', 'לא נמצא CLAUDE.md או AGENTS.md'));
 
 // ---- health ----
