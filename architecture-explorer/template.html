@@ -71,6 +71,17 @@ input[type=search]{font:inherit;padding:9px 14px;border:0;border-radius:12px;bac
 .sev{display:flex;gap:10px;align-items:flex-start;padding:10px 0;border-bottom:1px solid var(--line)}.sev:last-child{border-bottom:0}
 ul.h{margin:8px 0 2px;padding-inline-start:18px;font-size:13.5px;color:var(--mut)}
 footer{color:var(--mut);font-size:12.5px;margin-top:26px}
+.more{margin-top:10px;border-top:1px solid var(--line);padding-top:6px}
+.more>summary{cursor:pointer;color:var(--acc);font-size:13px;font-weight:500;padding:4px 0;list-style:none}.more>summary::-webkit-details-marker{display:none}
+.more>summary::before{content:"◂ ";display:inline-block;transition:transform .15s}.more[open]>summary::before{transform:rotate(-90deg)}
+.blk{display:grid;gap:12px;padding:8px 0 2px}.blk .sec h4{margin:0 0 3px;font-size:12px;font-weight:700;color:var(--mut)}
+.blk ul,.blk ol{margin:0;padding-inline-start:20px;font-size:13.5px}.blk li{margin:2px 0}.blk p{margin:0;font-size:13.5px}
+.blk .use{direction:ltr;text-align:left;font-family:var(--mono);font-size:12px;background:var(--soft);border-radius:10px;padding:8px 12px;white-space:pre-wrap;overflow-x:auto;unicode-bidi:isolate}
+.blk .gate{background:var(--warn-t);color:var(--warn-d);border-radius:10px;padding:8px 12px;font-size:13.5px}
+.blk .orig{direction:ltr;text-align:left;font-family:var(--mono);font-size:11.5px;color:var(--mut);white-space:pre-wrap;unicode-bidi:isolate}
+.bar{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px}.bar button{background:var(--surface);box-shadow:var(--sh);font-size:13px;padding:6px 13px}
+tr.dt>td{background:var(--soft);padding:4px 18px 14px}
+.tgl{background:var(--soft);color:var(--acc);font-size:12px;padding:1px 9px;border-radius:8px;margin-inline-start:6px}
 @media (max-width:560px){h1{font-size:21px}.step{padding:14px 14px;margin-inline-start:40px}.step .num{inset-inline-start:-40px;width:28px;height:28px}.step::before{inset-inline-start:-27px}.loop{margin-inline-start:40px}.tabs button{padding:7px 11px}}
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 </style>
@@ -92,11 +103,42 @@ const D = __DATA__;
 const S = D.scan, M = D.manifest || { steps: [], loops: [] };
 const $ = (id) => document.getElementById(id);
 const el = (tag, cls, text, attrs) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; if (attrs) for (const k in attrs) e.setAttribute(k, attrs[k]); return e; };
+// Hebrew text with embedded Latin names: isolate each Latin run (paths, identifiers, phrases) so the bidi algorithm keeps its order
+const W = '(?:(?<![\\u0590-\\u05FF])-{1,2})?[A-Za-z][A-Za-z0-9_<>*\\/.\\-\\[\\]=|$#@:+()]*';
+const LTRRE = new RegExp(W + '(?: ' + W + ')*', 'g');
+function rich(text) {
+  const f = document.createDocumentFragment(); let last = 0; text = String(text);
+  for (const m of text.matchAll(LTRRE)) {
+    let tok = m[0], tail = ''; const tm = /[.:,)(\-]+$/.exec(tok); if (tm) { tail = tm[0]; tok = tok.slice(0, -tail.length); }
+    if (!tok) continue; if (m.index > last) f.append(text.slice(last, m.index));
+    const b = document.createElement('bdi'); b.dir = 'ltr'; b.textContent = tok; f.append(b); last = m.index + tok.length;
+  }
+  if (last < text.length) f.append(text.slice(last)); return f;
+}
+const elr = (tag, cls, text) => { const e = el(tag, cls); e.append(rich(text)); return e; };
 const chip = (text, cls, ref, title) => { const c = el('span', 'chip ' + (cls || ''), text); if (ref) { c.dataset.ref = ref; c.addEventListener('mouseenter', () => hl(ref)); c.addEventListener('mouseleave', () => hl(null)); c.addEventListener('click', () => jump(ref)); } if (title) c.title = title; return c; };
 const TD = M.descriptions || {};
 const TIPS = { Read: 'קורא קובץ', Grep: 'מחפש טקסט בקבצים', Glob: 'מוצא קבצים לפי שם', Bash: 'מריץ פקודות', Write: 'כותב קובץ חדש', Edit: 'עורך קובץ קיים', Agent: 'מפעיל סוכן' };
 const scriptDesc = (n) => { const he = (TD.scripts || {})[n]; if (he) return he; const s = S.scripts.find((x) => x.name === n); return s && s.description ? s.description : null; };
 const agentOf = (n) => S.agents.find((a) => a.name === n);
+const DET = TD_DET();
+function TD_DET() { return (M.details || {}); }
+const LABELS = [['goal', 'מטרה'], ['inputs', 'קלט'], ['how', 'איך זה עובד'], ['outputs', 'פלט'], ['rules', 'כללים'], ['limits', 'גבולות'], ['gate', 'שער מעבר'], ['notes', 'הערות']];
+function block(d, orig) {
+  if (!d) return null;
+  const w = el('div', 'blk');
+  if (d.usage) { const s = el('div', 'sec'); s.append(el('h4', '', 'הרצה'), el('div', 'use', d.usage)); w.append(s); }
+  LABELS.forEach(([k, l]) => {
+    const v = d[k]; if (!v || (Array.isArray(v) && !v.length)) return;
+    const s = el('div', 'sec'); s.append(el('h4', '', l));
+    if (k === 'goal') s.append(elr('p', '', v)); else if (k === 'gate') s.append(elr('div', 'gate', v));
+    else { const L = el(k === 'how' ? 'ol' : 'ul'); v.forEach((x) => L.append(elr('li', '', x))); s.append(L); }
+    w.append(s);
+  });
+  if (orig && orig.length) { const dt = el('details'); dt.append(el('summary', 'sub', 'הערת הכותרת המקורית בקובץ (באנגלית)'), el('div', 'orig', orig.join('\n'))); w.append(dt); }
+  return w;
+}
+const more = (d, label, open, orig) => { const b = block(d, orig); if (!b) return null; const dt = el('details', 'more'); if (open) dt.open = true; dt.append(el('summary', '', label || 'פירוט מלא'), b); return dt; };
 
 // ---- header ----
 $('ttl').textContent = M.title || S.root;
@@ -132,14 +174,14 @@ const bPrev = el('button', '', '◀ הקודם'), bNext = el('button', '', 'הב
 const hint = el('span', 'sub', 'ריחוף על שם סוכן או כלי מדגיש את כל השלבים שבהם הוא מופיע');
 ctl.append(bPrev, bNext, bPlay, bAll, el('span', 'sp'), hint); flow.append(ctl);
 const lg = el('div', 'legend'); [['agent', 'סוכן (מודל)'], ['tool', 'כלי קוד'], ['file', 'קובץ פלט'], ['prop', 'מוצע, עוד לא קיים'], ['user', 'אתה']].forEach(([k, l]) => { const s = el('span'); const i = el('i'); i.style.background = 'var(--' + k + '-s)'; s.append(i, l); lg.append(s); }); flow.append(lg);
-if (M.orchestrator) { const o = el('div', 'orch'); o.append(el('b', '', M.orchestrator.title), el('p', '', M.orchestrator.text)); flow.append(o); }
+if (M.orchestrator) { const o = el('div', 'orch'); o.append(el('b', '', M.orchestrator.title), elr('p', '', M.orchestrator.text)); flow.append(o); }
 const steps = [];
 M.steps.forEach((st, i) => {
   const cn = el('div', 'conn'); cn.append(el('i')); flow.append(cn);
   const box = el('div', 'step k-' + st.kind + (st.proposed ? ' proposed' : ''), null, { 'data-step': i });
   const h = el('h3'); h.append(el('span', 'num', st.id), st.title);
   if (st.proposed) h.append(chip('מוצע', 'prop')); if (st.onDemand) h.append(chip('לפי דרישה', 'user')); if (st.parallel) h.append(chip('במקביל', 'agent')); h.append(chip(KIND[st.kind], st.kind));
-  box.append(h, el('p', '', st.text));
+  box.append(h, elr('p', '', st.text));
   if (st.agents && st.agents.length) {
     const g = el('div', 'agents2');
     st.agents.forEach((n) => {
@@ -154,6 +196,7 @@ M.steps.forEach((st, i) => {
   }
   if (st.scripts && st.scripts.length) { const r = el('div', 'row'); r.append(el('span', 'lab', 'כלי פרויקט:')); st.scripts.forEach((s) => r.append(chip(s, 'tool mono', 'script:' + s, scriptDesc(s)))); box.append(r); }
   if (st.outputs && st.outputs.length) { const r = el('div', 'row'); r.append(el('span', 'lab', 'פלט:')); st.outputs.forEach((o) => r.append(chip(o, 'file mono'))); box.append(r); }
+  const mm = more((DET.steps || {})[st.id], 'פירוט השלב: קלט, פלט, שער מעבר'); if (mm) box.append(mm);
   flow.append(box); steps.push(box);
   (M.loops || []).filter((l) => l.from === st.id).forEach((l) => { const t = M.steps.find((x) => x.id === l.to); flow.append(el('div', 'loop', '↩ חוזר לשלב ' + l.to + (t ? ' (' + t.title + ')' : '') + ': ' + l.label)); });
 });
@@ -173,13 +216,14 @@ S.agents.forEach((a) => {
   const c = el('div', 'card', null, { 'data-key': a.name || a.file }), h = el('h3'); h.append(chip(a.name || a.file, 'agent mono'), a.model ? chip('מודל: ' + a.model) : chip('מודל לא מוגדר', 'warn'));
   const st = stepsOf('agent', a.name); if (st.length) h.append(chip('שלב ' + st.join(', ')));
   const heA = (TD.agents || {})[a.name];
-  c.append(h, el('div', 'd', heA || a.description || '(אין תיאור)'));
+  c.append(h, elr('div', 'd', heA || a.description || '(אין תיאור)'));
   if (heA && a.description) { const dt = el('details', 'd'); dt.append(el('summary', '', 'הטקסט המקורי בקובץ ההגדרה (באנגלית)'), el('div', '', a.description)); c.append(dt); }
   let r = el('div', 'row'); r.append(el('span', 'lab', 'כלי Claude Code:')); (a.tools.length ? a.tools : ['(לא הוגדר: יורש הכול)']).forEach((t) => r.append(chip(t, 'mono', null, TIPS[t]))); c.append(r);
   if (a.scripts.length) { r = el('div', 'row'); r.append(el('span', 'lab', 'כלי פרויקט שההגדרה מזכירה:')); a.scripts.forEach((s) => r.append(chip(s, 'tool mono', 'script:' + s, scriptDesc(s)))); c.append(r); }
   if (a.readsRules.length) { r = el('div', 'row'); r.append(el('span', 'lab', 'קורא חוקים:')); a.readsRules.forEach((x) => r.append(chip(x, 'mono'))); c.append(r); }
   if (a.mentionedFiles.length) { r = el('div', 'row'); r.append(el('span', 'lab', 'קבצים שמוזכרים:')); a.mentionedFiles.forEach((x) => r.append(chip(x, 'file mono'))); c.append(r); }
   r = el('div', 'row'); r.append(el('span', 'lab', 'קובץ ההגדרה:'), chip(a.file, 'mono'), el('span', 'sub', a.bodyLines + ' שורות הנחיות')); c.append(r);
+  const am = more((DET.agents || {})[a.name], 'פירוט מלא: קלט, שלבי עבודה, פלט, כללים וגבולות', true); if (am) c.append(am);
   ag.append(c);
 });
 M.steps.filter((s) => s.proposed).forEach((s) => (s.agents || []).filter((n) => !agentOf(n)).forEach((n) => { const c = el('div', 'card prop', null, { 'data-key': n }), h = el('h3'); h.append(chip(n, 'prop mono'), chip('מוצע, אין קובץ הגדרה', 'prop')); c.append(h, el('div', 'd', s.text)); ag.append(c); }));
@@ -188,22 +232,31 @@ if (!S.agents.length) ag.append(el('div', 'd', 'לא נמצאו סוכנים ב-
 // ---- tools ----
 const tl = $('t-tools');
 const q = el('input', '', null, { type: 'search', placeholder: 'חיפוש כלי...', 'aria-label': 'חיפוש כלי' }); tl.append(q);
+const bar = el('div', 'bar'); const bOpen = el('button', '', 'הרחב הכול'), bClose = el('button', '', 'כווץ הכול'); bar.append(bOpen, bClose); tl.append(bar);
 const tb = el('table'); const th = el('tr'); ['כלי', 'מה הוא עושה', 'בשלב', 'מוזכר על ידי'].forEach((x) => th.append(el('th', '', x))); tb.append(th);
 S.scripts.forEach((s) => {
   const tr = el('tr', '', null, { 'data-key': s.name }), u = s.usedBy;
   const by = []; u.agents.forEach((x) => by.push(['agent', x])); u.scripts.length && by.push(['txt', u.scripts.length + ' כלים']); u.rules.forEach((x) => by.push(['txt', x])); u.launch.forEach((x) => by.push(['txt', 'launch:' + x])); u.hooks.forEach((x) => by.push(['txt', 'hook:' + x]));
   const c1 = el('td'); c1.append(chip(s.name, 'tool mono', 'script:' + s.name)); if (!s.documented) c1.append(chip('ללא תיעוד', 'warn'));
-  const c2 = el('td', '', scriptDesc(s.name) || '—'), c3 = el('td', '', stepsOf('script', s.name).join(', ') || '—'), c4 = el('td');
+  const c2 = elr('td', '', scriptDesc(s.name) || '—'), c3 = el('td', '', stepsOf('script', s.name).join(', ') || '—'), c4 = el('td');
   if (!by.length) c4.append(chip('לא מוזכר באף מקום', 'warn')); by.forEach(([t, x]) => c4.append(t === 'agent' ? chip(x, 'agent mono', 'agent:' + x) : chip(x)));
+  const dd = (DET.scripts || {})[s.name], blk = block(dd, s.headerLines && s.headerLines.length ? s.headerLines : null);
+  if (blk) { const tg = el('button', 'tgl', 'פירוט ▾', { 'aria-expanded': 'false' }); c1.append(tg); const dr = el('tr', 'dt', null, { 'data-for': s.name }); dr.style.display = 'none'; const dc = el('td', '', null, { colspan: 4 }); dc.append(blk); dr.append(dc);
+    const flip = (on) => { dr.style.display = on ? '' : 'none'; tg.setAttribute('aria-expanded', on); tg.textContent = on ? 'פירוט ▴' : 'פירוט ▾'; tr.dataset.open = on ? '1' : ''; };
+    tg.addEventListener('click', () => flip(dr.style.display === 'none')); tr._flip = flip; tr.append(c1, c2, c3, c4); tb.append(tr, dr); return; }
   tr.append(c1, c2, c3, c4); tb.append(tr);
 });
 const tw = el('div', 'tablewrap'); tw.append(tb); tl.append(tw);
-q.addEventListener('input', () => { const v = q.value.toLowerCase(); tb.querySelectorAll('tr[data-key]').forEach((r) => { r.style.display = r.textContent.toLowerCase().includes(v) ? '' : 'none'; }); });
+const rows = () => [...tb.querySelectorAll('tr[data-key]')];
+bOpen.onclick = () => rows().forEach((r) => r._flip && r._flip(true)); bClose.onclick = () => rows().forEach((r) => r._flip && r._flip(false));
+q.addEventListener('input', () => { const v = q.value.toLowerCase(); rows().forEach((r) => { const dr = tb.querySelector('tr[data-for="' + r.dataset.key + '"]'); const hit = (r.textContent + (dr ? dr.textContent : '')).toLowerCase().includes(v); r.style.display = hit ? '' : 'none'; if (dr) dr.style.display = hit && r.dataset.open ? '' : 'none'; }); });
 tl.append(el('div', 'd', 'הקישורים מבוססים על הזכרת שם קובץ בטקסט. הם מראים מי מזכיר כלי, לא מוכיחים שהוא מופעל.'));
 
 // ---- rules ----
 const ru = $('t-rules');
-S.rules.forEach((r) => { const c = el('div', 'card'), h = el('h3'); h.append(chip(r.path, 'mono'), chip(r.lines + ' שורות'), chip(r.numberedItems + ' סעיפים ממוספרים')); c.append(h); if ((TD.rules || {})[r.path]) c.append(el('div', 'd', TD.rules[r.path])); const ul = el('ul', 'h'); r.headings.filter((x) => x.level <= 2).forEach((x) => ul.append(el('li', '', (TD.headings || {})[x.text] || x.text))); c.append(ul); ru.append(c); });
+S.rules.forEach((r) => { const c = el('div', 'card'), h = el('h3'); h.append(chip(r.path, 'mono'), chip(r.lines + ' שורות'), chip(r.numberedItems + ' סעיפים ממוספרים')); c.append(h); if ((TD.rules || {})[r.path]) c.append(el('div', 'd', TD.rules[r.path])); const rd = (DET.rules || {})[r.path];
+  if (rd && rd.items) { const sec = el('div', 'blk'); const s2 = el('div', 'sec'); s2.append(el('h4', '', 'הסעיפים')); const ol = el('ol'); rd.items.forEach((x) => ol.append(elr('li', '', x))); s2.append(ol); sec.append(s2); (rd.notes || []).forEach((n) => sec.append(el('p', 'sub', n))); const dt = el('details', 'more'); dt.open = r.path === 'CLAUDE.md'; dt.append(el('summary', '', 'כל הסעיפים בעברית'), sec); c.append(dt); }
+  const ul = el('ul', 'h'); r.headings.filter((x) => x.level <= 2).forEach((x) => ul.append(el('li', '', (TD.headings || {})[x.text] || x.text))); c.append(ul); ru.append(c); });
 if (!S.rules.length) ru.append(el('div', 'd', 'לא נמצא CLAUDE.md או AGENTS.md'));
 
 // ---- health ----

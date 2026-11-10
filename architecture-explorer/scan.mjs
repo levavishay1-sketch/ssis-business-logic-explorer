@@ -39,12 +39,13 @@ function firstComment(text) {
   }
   return out;
 }
+function headerBlock(text) { const out = []; for (const l of lines(text)) { if (/^#!/.test(l)) continue; const m = /^\s*(?:\/\/|#)\s?(.*)$/.exec(l); if (m) out.push(m[1]); else break; if (out.length >= 24) break; } return out; }
 const scripts = [];
 for (const d of scriptDirs) {
   for (const e of list(path.join(root, d), (x) => x.isFile() && SCRIPT_EXT.test(x.name))) {
     const p = path.join(root, d, e.name), t = read(p) || '';
     const fc = firstComment(t);
-    scripts.push({ name: e.name, path: rel(p), lines: lines(t).length, description: fc[0] || null, descriptionLines: fc, documented: fc.length > 0 });
+    scripts.push({ name: e.name, path: rel(p), lines: lines(t).length, description: fc[0] || null, descriptionLines: fc, documented: fc.length > 0, headerLines: headerBlock(t) });
   }
 }
 const scriptByName = new Map(scripts.map((s) => [s.name, s]));
